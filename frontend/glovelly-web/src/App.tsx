@@ -25,6 +25,8 @@ type ClientForm = {
 }
 
 type AuthUser = {
+  userId: string
+  role: string
   name: string
   email: string
 }
