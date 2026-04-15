@@ -8,10 +8,10 @@ public static class CrudEndpoints
 {
     public static IEndpointRouteBuilder MapCrudEndpoints(this IEndpointRouteBuilder app)
     {
-        var clients = app.MapGroup("/clients").WithTags("Clients");
-        var gigs = app.MapGroup("/gigs").WithTags("Gigs");
-        var invoices = app.MapGroup("/invoices").WithTags("Invoices");
-        var invoiceLines = app.MapGroup("/invoice-lines").WithTags("InvoiceLines");
+        var clients = app.MapGroup("/clients").WithTags("Clients").RequireAuthorization();
+        var gigs = app.MapGroup("/gigs").WithTags("Gigs").RequireAuthorization();
+        var invoices = app.MapGroup("/invoices").WithTags("Invoices").RequireAuthorization();
+        var invoiceLines = app.MapGroup("/invoice-lines").WithTags("InvoiceLines").RequireAuthorization();
 
         MapClientEndpoints(clients);
         MapGigEndpoints(gigs);

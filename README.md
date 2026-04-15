@@ -30,6 +30,29 @@ This starts:
 - Backend API: `http://localhost:5153`
 - Swagger UI: `http://localhost:5153/swagger`
 
+### Google OIDC setup
+
+Glovelly now requires Google sign-in before the SPA can call the API.
+
+1. Create a Google OAuth client in Google Cloud as a `Web application`.
+2. Add these authorised redirect URIs:
+   - `http://localhost:5153/signin-oidc`
+   - `https://localhost:7087/signin-oidc`
+   - Your production callback, for example `https://your-domain/signin-oidc`
+3. For local development, store the Google credentials with `dotnet user-secrets` from [backend/Glovelly.Api/Glovelly.Api.csproj](/Users/alexhowgego/dev/glovelly/backend/Glovelly.Api/Glovelly.Api.csproj:1):
+
+```bash
+cd backend/Glovelly.Api
+dotnet user-secrets set "Authentication:Google:ClientId" "your-client-id"
+dotnet user-secrets set "Authentication:Google:ClientSecret" "your-client-secret"
+```
+
+4. As an alternative, you can provide the same values via environment variables:
+   - `Authentication__Google__ClientId`
+   - `Authentication__Google__ClientSecret`
+
+The frontend signs users in through `/auth/login`, the backend completes the Google OpenID Connect flow, and the app stores the session in a secure cookie before allowing access to `/clients`, `/gigs`, `/invoices`, and `/invoice-lines`.
+
 Press `Ctrl+C` to stop both services.
 
 ## Docker

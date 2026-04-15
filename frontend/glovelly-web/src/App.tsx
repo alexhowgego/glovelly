@@ -24,6 +24,11 @@ type ClientForm = {
   billingAddress: Address
 }
 
+type AuthUser = {
+  name: string
+  email: string
+}
+
 const emptyForm = (): ClientForm => ({
   name: '',
   email: '',
@@ -39,24 +44,83 @@ const emptyForm = (): ClientForm => ({
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
+function buildApiUrl(path: string) {
+  return `${apiBaseUrl}${path}`
+}
+
+function buildReturnUrl() {
+  return window.location.href
+}
+
+async function fetchWithSession(input: string, init?: RequestInit) {
+  return fetch(input, {
+    credentials: 'include',
+    ...init,
+  })
+}
+
 function App() {
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [mode, setMode] = useState<'create' | 'edit'>('create')
   const [form, setForm] = useState<ClientForm>(emptyForm)
-  const [status, setStatus] = useState('Connecting to the API...')
+  const [status, setStatus] = useState('Checking your session...')
   const [isLoading, setIsLoading] = useState(false)
   const [isApiConnected, setIsApiConnected] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
 
   useEffect(() => {
     let ignore = false
 
-    const loadClients = async () => {
-      setIsLoading(true)
+    const loadApp = async () => {
+      setIsCheckingSession(true)
 
       try {
-        const response = await fetch(`${apiBaseUrl}/clients`)
+        const sessionResponse = await fetchWithSession(buildApiUrl('/auth/me'))
+        if (sessionResponse.status === 401) {
+          if (ignore) {
+            return
+          }
+
+          setIsAuthenticated(false)
+          setAuthUser(null)
+          setIsApiConnected(false)
+          setClients([])
+          setSelectedClientId('')
+          setShouldCloseBrowserNotice(false)
+          setStatus('Sign in with Google to access Glovelly.')
+          return
+        }
+
+        if (!sessionResponse.ok) {
+          throw new Error('Unable to verify your session.')
+        }
+
+        const user = (await sessionResponse.json()) as AuthUser
+        if (ignore) {
+          return
+        }
+
+        setIsAuthenticated(true)
+        setAuthUser(user)
+
+        setIsLoading(true)
+
+        const response = await fetchWithSession(buildApiUrl('/clients'))
+        if (response.status === 401) {
+          setIsAuthenticated(false)
+          setAuthUser(null)
+          setIsApiConnected(false)
+          setClients([])
+          setSelectedClientId('')
+          setStatus('Your session expired. Sign in again to keep working.')
+          return
+        }
+
         if (!response.ok) {
           throw new Error('Unable to load clients.')
         }
@@ -69,26 +133,29 @@ function App() {
         setClients(data)
         setSelectedClientId(data[0]?.id ?? '')
         setIsApiConnected(true)
+        setShouldCloseBrowserNotice(false)
         setStatus(
           data.length > 0
-            ? 'Connected to the API.'
-            : 'Connected to the API. No clients yet.'
+            ? `Signed in as ${user.email}.`
+            : `Signed in as ${user.email}. No clients yet.`
         )
       } catch {
         if (!ignore) {
           setIsApiConnected(false)
           setClients([])
           setSelectedClientId('')
-          setStatus('API unavailable. Start the backend to manage clients.')
+          setShouldCloseBrowserNotice(false)
+          setStatus('API unavailable. Start the backend to finish sign-in.')
         }
       } finally {
         if (!ignore) {
           setIsLoading(false)
+          setIsCheckingSession(false)
         }
       }
     }
 
-    void loadClients()
+    void loadApp()
 
     return () => {
       ignore = true
@@ -146,10 +213,7 @@ function App() {
     })
   }
 
-  const updateField = (
-    field: keyof ClientForm,
-    value: string | Address
-  ) => {
+  const updateField = (field: keyof ClientForm, value: string | Address) => {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -164,6 +228,42 @@ function App() {
         [field]: value,
       },
     }))
+  }
+
+  const signIn = () => {
+    const loginUrl = buildApiUrl(
+      `/auth/login?returnUrl=${encodeURIComponent(buildReturnUrl())}`
+    )
+    window.location.assign(loginUrl)
+  }
+
+  const signOut = async () => {
+    setIsLoading(true)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/auth/logout'), {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Unable to sign out.')
+      }
+
+      setIsAuthenticated(false)
+      setAuthUser(null)
+      setIsApiConnected(false)
+      setClients([])
+      setSelectedClientId('')
+      setSearchQuery('')
+      setMode('create')
+      setForm(emptyForm())
+      setShouldCloseBrowserNotice(true)
+      setStatus('Signed out. Close your browser to fully end the Google session.')
+    } catch {
+      setStatus('Unable to sign out right now.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -182,7 +282,12 @@ function App() {
       },
     }
 
-    if (!payload.name || !payload.email || !payload.billingAddress.line1 || !payload.billingAddress.city) {
+    if (
+      !payload.name ||
+      !payload.email ||
+      !payload.billingAddress.line1 ||
+      !payload.billingAddress.city
+    ) {
       setStatus('Name, email, address line 1 and city are required.')
       return
     }
@@ -196,16 +301,24 @@ function App() {
 
       const isEdit = mode === 'edit' && selectedClient
       const endpoint = isEdit
-        ? `${apiBaseUrl}/clients/${selectedClient.id}`
-        : `${apiBaseUrl}/clients`
+        ? buildApiUrl(`/clients/${selectedClient.id}`)
+        : buildApiUrl('/clients')
 
-      const response = await fetch(endpoint, {
+      const response = await fetchWithSession(endpoint, {
         method: isEdit ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       })
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setStatus('Your session expired. Sign in again to save changes.')
+        return
+      }
 
       if (!response.ok) {
         throw new Error('Save failed.')
@@ -245,9 +358,17 @@ function App() {
         throw new Error('API unavailable.')
       }
 
-      const response = await fetch(`${apiBaseUrl}/clients/${selectedClient.id}`, {
+      const response = await fetchWithSession(buildApiUrl(`/clients/${selectedClient.id}`), {
         method: 'DELETE',
       })
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setStatus('Your session expired. Sign in again to delete clients.')
+        return
+      }
 
       if (!response.ok) {
         throw new Error('Delete failed.')
@@ -270,6 +391,53 @@ function App() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (isCheckingSession) {
+    return (
+      <main className="app-shell auth-shell">
+        <section className="hero-panel auth-panel">
+          <div className="hero-copy">
+            <p className="eyebrow">Security</p>
+            <h1>Checking your Google session.</h1>
+            <p className="hero-text">
+              Glovelly now protects client and invoice data behind OpenID Connect.
+            </p>
+          </div>
+          <span className="status-pill">{status}</span>
+        </section>
+      </main>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <main className="app-shell auth-shell">
+        <section className="hero-panel auth-panel">
+          <div className="hero-copy">
+            <p className="eyebrow">Secure Sign-In</p>
+            <h1>Glovelly now uses Google to verify who’s allowed in.</h1>
+            <p className="hero-text">
+              Sign in with the Google account attached to your deployment so the API
+              can issue a secure app session before any business data is loaded.
+            </p>
+          </div>
+
+          <div className="auth-actions">
+            <span className="status-pill">{status}</span>
+            {shouldCloseBrowserNotice && (
+              <p className="auth-note">
+                The Glovelly session cookie has been cleared. Close your browser if you
+                want to fully end the Google sign-in session too.
+              </p>
+            )}
+            <button className="primary-button" onClick={signIn} type="button">
+              Continue with Google
+            </button>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   return (
@@ -303,9 +471,20 @@ function App() {
               <p>active cities</p>
             </article>
             <article>
-              <span>{isApiConnected ? 'Live' : 'Demo'}</span>
+              <span>{isApiConnected ? 'Live' : 'Offline'}</span>
               <p>data source</p>
             </article>
+          </div>
+
+          <div className="session-card">
+            <div>
+              <p className="section-label">Signed In</p>
+              <strong>{authUser?.name ?? authUser?.email}</strong>
+              <span>{authUser?.email}</span>
+            </div>
+            <button className="ghost-button" onClick={signOut} type="button" disabled={isLoading}>
+              Sign out
+            </button>
           </div>
         </div>
       </section>
@@ -356,7 +535,7 @@ function App() {
                 <p>
                   {isApiConnected
                     ? 'Try a different term or add a fresh client profile.'
-                    : 'Start the backend and refresh this page to load seeded data.'}
+                    : 'Start the backend and refresh this page to complete sign-in.'}
                 </p>
               </div>
             )}
@@ -489,9 +668,7 @@ function App() {
               <span>County / state</span>
               <input
                 value={form.billingAddress.stateOrCounty}
-                onChange={(event) =>
-                  updateAddressField('stateOrCounty', event.target.value)
-                }
+                onChange={(event) => updateAddressField('stateOrCounty', event.target.value)}
                 placeholder="Greater Manchester"
               />
             </label>
@@ -500,9 +677,7 @@ function App() {
               <span>Postal code</span>
               <input
                 value={form.billingAddress.postalCode}
-                onChange={(event) =>
-                  updateAddressField('postalCode', event.target.value)
-                }
+                onChange={(event) => updateAddressField('postalCode', event.target.value)}
                 placeholder="M3 5JZ"
               />
             </label>
@@ -519,10 +694,10 @@ function App() {
 
           <div className="form-actions">
             <button className="primary-button" type="submit" disabled={isLoading}>
-              {mode === 'create' ? 'Create client' : 'Save changes'}
+              {mode === 'create' ? 'Save client' : 'Update client'}
             </button>
-            <button className="ghost-button" type="button" onClick={startCreating}>
-              Clear form
+            <button className="ghost-button" onClick={startCreating} type="button">
+              Reset form
             </button>
           </div>
         </form>

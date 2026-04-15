@@ -103,6 +103,10 @@ jobs:
           service: ${{ env.CLOUD_RUN_SERVICE }}
           region: ${{ env.GCP_REGION }}
           image: ${{ env.IMAGE_URI }}:sha-${{ github.sha }}
+          secrets: |-
+            Authentication__Google__ClientId=google-client-id:latest
+            Authentication__Google__ClientSecret=google-client-secret:latest
+          secrets_update_strategy: merge
           flags: >-
             --allow-unauthenticated
             --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com

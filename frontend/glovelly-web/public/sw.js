@@ -26,6 +26,17 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  const requestUrl = new URL(event.request.url)
+  if (
+    requestUrl.pathname.startsWith('/auth') ||
+    requestUrl.pathname.startsWith('/clients') ||
+    requestUrl.pathname.startsWith('/gigs') ||
+    requestUrl.pathname.startsWith('/invoices') ||
+    requestUrl.pathname.startsWith('/invoice-lines')
+  ) {
+    return
+  }
+
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => caches.match('/'))
