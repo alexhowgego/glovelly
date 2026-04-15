@@ -1,0 +1,25 @@
+{
+  "name": "Glovelly",
+  "short_name": "Glovelly",
+  "description": "Glovelly client management, starring Gordon the Mozart-wigged rubber chicken.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5efe6",
+  "theme_color": "#255a7a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/gordon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/gordon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
