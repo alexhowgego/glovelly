@@ -1,6 +1,8 @@
+using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Glovelly.Api.Endpoints;
 
@@ -8,10 +10,10 @@ public static class CrudEndpoints
 {
     public static IEndpointRouteBuilder MapCrudEndpoints(this IEndpointRouteBuilder app)
     {
-        var clients = app.MapGroup("/clients").WithTags("Clients").RequireAuthorization();
-        var gigs = app.MapGroup("/gigs").WithTags("Gigs").RequireAuthorization();
-        var invoices = app.MapGroup("/invoices").WithTags("Invoices").RequireAuthorization();
-        var invoiceLines = app.MapGroup("/invoice-lines").WithTags("InvoiceLines").RequireAuthorization();
+        var clients = app.MapGroup("/clients").WithTags("Clients").RequireAuthorization(GlovellyPolicies.GlovellyUser);
+        var gigs = app.MapGroup("/gigs").WithTags("Gigs").RequireAuthorization(GlovellyPolicies.GlovellyUser);
+        var invoices = app.MapGroup("/invoices").WithTags("Invoices").RequireAuthorization(GlovellyPolicies.GlovellyUser);
+        var invoiceLines = app.MapGroup("/invoice-lines").WithTags("InvoiceLines").RequireAuthorization(GlovellyPolicies.GlovellyUser);
 
         MapClientEndpoints(clients);
         MapGigEndpoints(gigs);
@@ -42,12 +44,13 @@ public static class CrudEndpoints
             return client is null ? Results.NotFound() : Results.Ok(client);
         });
 
-        group.MapPost("/", async (Client client, AppDbContext db) =>
+        group.MapPost("/", async (Client client, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             client.Id = Guid.NewGuid();
             client.Name = client.Name.Trim();
             client.Email = client.Email.Trim();
             client.BillingAddress ??= new Address();
+            StampCreate(client, currentUserAccessor.TryGetUserId(user));
 
             db.Clients.Add(client);
             await db.SaveChangesAsync();
@@ -55,7 +58,7 @@ public static class CrudEndpoints
             return Results.Created($"/clients/{client.Id}", client);
         });
 
-        group.MapPut("/{id:guid}", async (Guid id, Client request, AppDbContext db) =>
+        group.MapPut("/{id:guid}", async (Guid id, Client request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             var client = await db.Clients.FirstOrDefaultAsync(client => client.Id == id);
             if (client is null)
@@ -66,6 +69,7 @@ public static class CrudEndpoints
             client.Name = request.Name.Trim();
             client.Email = request.Email.Trim();
             client.BillingAddress = request.BillingAddress ?? new Address();
+            StampUpdate(client, currentUserAccessor.TryGetUserId(user));
 
             await db.SaveChangesAsync();
 
@@ -109,7 +113,7 @@ public static class CrudEndpoints
             return gig is null ? Results.NotFound() : Results.Ok(gig);
         });
 
-        group.MapPost("/", async (Gig gig, AppDbContext db) =>
+        group.MapPost("/", async (Gig gig, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             if (!await db.Clients.AnyAsync(client => client.Id == gig.ClientId))
             {
@@ -124,6 +128,7 @@ public static class CrudEndpoints
             gig.Venue = gig.Venue.Trim();
             gig.Notes = gig.Notes?.Trim();
             gig.Client = null;
+            StampCreate(gig, currentUserAccessor.TryGetUserId(user));
 
             db.Gigs.Add(gig);
             await db.SaveChangesAsync();
@@ -131,7 +136,7 @@ public static class CrudEndpoints
             return Results.Created($"/gigs/{gig.Id}", gig);
         });
 
-        group.MapPut("/{id:guid}", async (Guid id, Gig request, AppDbContext db) =>
+        group.MapPut("/{id:guid}", async (Guid id, Gig request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             var gig = await db.Gigs.FirstOrDefaultAsync(value => value.Id == id);
 
@@ -156,6 +161,7 @@ public static class CrudEndpoints
             gig.TravelMiles = request.TravelMiles;
             gig.Notes = request.Notes?.Trim();
             gig.Invoiced = request.Invoiced;
+            StampUpdate(gig, currentUserAccessor.TryGetUserId(user));
 
             await db.SaveChangesAsync();
 
@@ -201,7 +207,7 @@ public static class CrudEndpoints
             return invoice is null ? Results.NotFound() : Results.Ok(invoice);
         });
 
-        group.MapPost("/", async (Invoice invoice, AppDbContext db) =>
+        group.MapPost("/", async (Invoice invoice, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             if (!await db.Clients.AnyAsync(client => client.Id == invoice.ClientId))
             {
@@ -216,6 +222,7 @@ public static class CrudEndpoints
             invoice.Notes = invoice.Notes?.Trim();
             invoice.Client = null;
             invoice.Lines = new List<InvoiceLine>();
+            StampCreate(invoice, currentUserAccessor.TryGetUserId(user));
 
             db.Invoices.Add(invoice);
             await db.SaveChangesAsync();
@@ -223,7 +230,7 @@ public static class CrudEndpoints
             return Results.Created($"/invoices/{invoice.Id}", invoice);
         });
 
-        group.MapPut("/{id:guid}", async (Guid id, Invoice request, AppDbContext db) =>
+        group.MapPut("/{id:guid}", async (Guid id, Invoice request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             var invoice = await db.Invoices
                 .Include(value => value.Lines)
@@ -249,6 +256,7 @@ public static class CrudEndpoints
             invoice.Status = request.Status;
             invoice.Subtotal = request.Subtotal;
             invoice.Notes = request.Notes?.Trim();
+            StampUpdate(invoice, currentUserAccessor.TryGetUserId(user));
 
             await db.SaveChangesAsync();
 
@@ -377,5 +385,38 @@ public static class CrudEndpoints
 
         invoice.Subtotal = invoice.Lines.Sum(line => line.Total);
         await db.SaveChangesAsync();
+    }
+
+    private static void StampCreate(Client client, Guid? userId)
+    {
+        client.CreatedByUserId = userId;
+        client.UpdatedByUserId = userId;
+    }
+
+    private static void StampUpdate(Client client, Guid? userId)
+    {
+        client.UpdatedByUserId = userId;
+    }
+
+    private static void StampCreate(Gig gig, Guid? userId)
+    {
+        gig.CreatedByUserId = userId;
+        gig.UpdatedByUserId = userId;
+    }
+
+    private static void StampUpdate(Gig gig, Guid? userId)
+    {
+        gig.UpdatedByUserId = userId;
+    }
+
+    private static void StampCreate(Invoice invoice, Guid? userId)
+    {
+        invoice.CreatedByUserId = userId;
+        invoice.UpdatedByUserId = userId;
+    }
+
+    private static void StampUpdate(Invoice invoice, Guid? userId)
+    {
+        invoice.UpdatedByUserId = userId;
     }
 }

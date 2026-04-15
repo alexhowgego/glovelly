@@ -5,6 +5,7 @@ namespace Glovelly.Api.Data;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<User> Users => Set<User>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Gig> Gigs => Set<Gig>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
@@ -12,6 +13,28 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(user => user.Id);
+            entity.Property(user => user.GoogleSubject)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(user => user.Email)
+                .IsRequired()
+                .HasMaxLength(320);
+            entity.Property(user => user.DisplayName)
+                .HasMaxLength(200);
+            entity.Property(user => user.Role)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+            entity.Property(user => user.CreatedUtc)
+                .IsRequired();
+            entity.HasIndex(user => user.GoogleSubject)
+                .IsUnique();
+            entity.HasIndex(user => user.Email)
+                .IsUnique();
+        });
+
         modelBuilder.Entity<Client>(entity =>
         {
             entity.HasKey(client => client.Id);
@@ -19,6 +42,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasMaxLength(200);
             entity.Property(client => client.Email)
                 .HasMaxLength(320);
+            entity.HasOne(client => client.CreatedByUser)
+                .WithMany(user => user.ClientsCreated)
+                .HasForeignKey(client => client.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(client => client.UpdatedByUser)
+                .WithMany(user => user.ClientsUpdated)
+                .HasForeignKey(client => client.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.OwnsOne(client => client.BillingAddress, address =>
             {
@@ -43,6 +74,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(gig => gig.Notes)
                 .HasMaxLength(4000);
 
+            entity.HasOne(gig => gig.CreatedByUser)
+                .WithMany(user => user.GigsCreated)
+                .HasForeignKey(gig => gig.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(gig => gig.UpdatedByUser)
+                .WithMany(user => user.GigsUpdated)
+                .HasForeignKey(gig => gig.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(gig => gig.Client)
                 .WithMany(client => client.Gigs)
                 .HasForeignKey(gig => gig.ClientId)
@@ -62,6 +101,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(invoice => invoice.Notes)
                 .HasMaxLength(4000);
 
+            entity.HasOne(invoice => invoice.CreatedByUser)
+                .WithMany(user => user.InvoicesCreated)
+                .HasForeignKey(invoice => invoice.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(invoice => invoice.UpdatedByUser)
+                .WithMany(user => user.InvoicesUpdated)
+                .HasForeignKey(invoice => invoice.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(invoice => invoice.Client)
                 .WithMany(client => client.Invoices)
                 .HasForeignKey(invoice => invoice.ClientId)
