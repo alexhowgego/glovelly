@@ -1,0 +1,3 @@
+export DevelopmentSeeding__AdminGoogleSubject="your-google-subject-claim"
+export DevelopmentSeeding__AdminEmail="you@example.com"
+export DevelopmentSeeding__AdminDisplayName="Your Name"

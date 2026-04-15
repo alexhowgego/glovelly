@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend/Glovelly.Api"
 FRONTEND_DIR="$ROOT_DIR/frontend/glovelly-web"
+LOCAL_DEV_CONFIG_FILE="$ROOT_DIR/.glovelly.dev.local"
 
 if ! command -v dotnet >/dev/null 2>&1; then
   echo "dotnet is required but was not found on PATH."
@@ -14,6 +15,11 @@ fi
 if ! command -v npm >/dev/null 2>&1; then
   echo "npm is required but was not found on PATH."
   exit 1
+fi
+
+if [[ -f "$LOCAL_DEV_CONFIG_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$LOCAL_DEV_CONFIG_FILE"
 fi
 
 backend_pid=""
@@ -67,6 +73,9 @@ echo "Glovelly dev environment is starting."
 echo "Frontend: http://localhost:5173"
 echo "Backend:  http://localhost:5153"
 echo "Swagger:  http://localhost:5153/swagger"
+if [[ -n "${DevelopmentSeeding__AdminGoogleSubject:-}" ]]; then
+  echo "Local admin seeding: enabled for in-memory development database"
+fi
 echo
 echo "Press Ctrl+C to stop both services."
 

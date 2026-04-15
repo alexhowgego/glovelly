@@ -1,13 +1,16 @@
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Glovelly.Api.Data;
 
 public static class AppDbSeeder
 {
-    public static async Task SeedAsync(AppDbContext dbContext)
+    public static async Task SeedAsync(AppDbContext dbContext, IConfiguration configuration)
     {
         await dbContext.Database.EnsureCreatedAsync();
+
+        await SeedDevelopmentAdminUserAsync(dbContext, configuration);
 
         if (await dbContext.Clients.AnyAsync())
         {
@@ -171,6 +174,46 @@ public static class AppDbSeeder
         dbContext.Invoices.AddRange(invoices);
         dbContext.InvoiceLines.AddRange(invoiceLines);
         dbContext.Gigs.AddRange(gigs);
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedDevelopmentAdminUserAsync(AppDbContext dbContext, IConfiguration configuration)
+    {
+        var googleSubject = configuration["DevelopmentSeeding:AdminGoogleSubject"]?.Trim();
+        if (string.IsNullOrWhiteSpace(googleSubject))
+        {
+            return;
+        }
+
+        var existingUser = await dbContext.Users
+            .FirstOrDefaultAsync(user => user.GoogleSubject == googleSubject);
+
+        if (existingUser is not null)
+        {
+            if (!existingUser.IsActive || existingUser.Role != UserRole.Admin)
+            {
+                existingUser.IsActive = true;
+                existingUser.Role = UserRole.Admin;
+                await dbContext.SaveChangesAsync();
+            }
+
+            return;
+        }
+
+        var email = configuration["DevelopmentSeeding:AdminEmail"]?.Trim();
+        var displayName = configuration["DevelopmentSeeding:AdminDisplayName"]?.Trim();
+
+        dbContext.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            GoogleSubject = googleSubject,
+            Email = string.IsNullOrWhiteSpace(email) ? "local-admin@glovelly.local" : email,
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName,
+            Role = UserRole.Admin,
+            IsActive = true,
+            CreatedUtc = DateTime.UtcNow,
+        });
 
         await dbContext.SaveChangesAsync();
     }

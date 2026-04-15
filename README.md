@@ -30,6 +30,34 @@ This starts:
 - Backend API: `http://localhost:5153`
 - Swagger UI: `http://localhost:5153/swagger`
 
+If you want the in-memory local development database to auto-seed your own Glovelly admin user, create a git-ignored local config file from the example:
+
+```bash
+cp .glovelly.dev.local.example .glovelly.dev.local
+```
+
+Then set at least your Google subject claim in `.glovelly.dev.local`:
+
+```bash
+export DevelopmentSeeding__AdminGoogleSubject="your-google-subject-claim"
+export DevelopmentSeeding__AdminEmail="you@example.com"
+export DevelopmentSeeding__AdminDisplayName="Your Name"
+```
+
+`run-dev.sh` sources this file automatically before starting the backend. The admin user is only seeded when no `ConnectionStrings:Glovelly` value is configured and Glovelly is using the in-memory development database.
+
+#### Finding your Google subject claim locally
+
+If you do not already know your Google subject claim (`sub`), Glovelly exposes a development-only helper endpoint:
+
+```text
+http://localhost:5153/auth/debug/google-claims
+```
+
+Open that URL locally, sign in with the Google account you want to enrol, and Glovelly will return the raw Google claims as JSON before local user matching runs. Copy the `sub` value into `.glovelly.dev.local` as `DevelopmentSeeding__AdminGoogleSubject`.
+
+There is also a second development-only endpoint at `http://localhost:5153/auth/debug/claims` which shows the claims on the current Glovelly application session after a user has been successfully matched and signed in.
+
 ### Google OIDC setup
 
 Glovelly now requires Google sign-in before the SPA can call the API.
