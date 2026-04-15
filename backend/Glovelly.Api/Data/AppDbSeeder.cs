@@ -10,7 +10,7 @@ public static class AppDbSeeder
     {
         await dbContext.Database.EnsureCreatedAsync();
 
-        await SeedDevelopmentAdminUserAsync(dbContext, configuration);
+        var seededAdminUserId = await SeedDevelopmentAdminUserAsync(dbContext, configuration);
 
         if (await dbContext.Clients.AnyAsync())
         {
@@ -28,6 +28,8 @@ public static class AppDbSeeder
                 Id = foxAndFinchId,
                 Name = "Fox & Finch Events",
                 Email = "bookings@foxandfinch.co.uk",
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId,
                 BillingAddress = new Address
                 {
                     Line1 = "12 Chapel Street",
@@ -42,6 +44,8 @@ public static class AppDbSeeder
                 Id = northlightId,
                 Name = "Northlight Weddings",
                 Email = "accounts@northlightweddings.com",
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId,
                 BillingAddress = new Address
                 {
                     Line1 = "7 Hawthorn Mews",
@@ -56,6 +60,8 @@ public static class AppDbSeeder
                 Id = riversideId,
                 Name = "Riverside Arts Centre",
                 Email = "finance@riversidearts.org",
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId,
                 BillingAddress = new Address
                 {
                     Line1 = "84 Mill Lane",
@@ -178,12 +184,12 @@ public static class AppDbSeeder
         await dbContext.SaveChangesAsync();
     }
 
-    private static async Task SeedDevelopmentAdminUserAsync(AppDbContext dbContext, IConfiguration configuration)
+    private static async Task<Guid?> SeedDevelopmentAdminUserAsync(AppDbContext dbContext, IConfiguration configuration)
     {
         var googleSubject = configuration["DevelopmentSeeding:AdminGoogleSubject"]?.Trim();
         if (string.IsNullOrWhiteSpace(googleSubject))
         {
-            return;
+            return null;
         }
 
         var existingUser = await dbContext.Users
@@ -198,13 +204,13 @@ public static class AppDbSeeder
                 await dbContext.SaveChangesAsync();
             }
 
-            return;
+            return existingUser.Id;
         }
 
         var email = configuration["DevelopmentSeeding:AdminEmail"]?.Trim();
         var displayName = configuration["DevelopmentSeeding:AdminDisplayName"]?.Trim();
 
-        dbContext.Users.Add(new User
+        var seededUser = new User
         {
             Id = Guid.NewGuid(),
             GoogleSubject = googleSubject,
@@ -213,8 +219,12 @@ public static class AppDbSeeder
             Role = UserRole.Admin,
             IsActive = true,
             CreatedUtc = DateTime.UtcNow,
-        });
+        };
+
+        dbContext.Users.Add(seededUser);
 
         await dbContext.SaveChangesAsync();
+
+        return seededUser.Id;
     }
 }

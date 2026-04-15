@@ -25,9 +25,11 @@ public static class CrudEndpoints
 
     private static void MapClientEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("/", async (AppDbContext db) =>
+        group.MapGet("/", async (AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var clients = await db.Clients
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .OrderBy(client => client.Name)
                 .ToListAsync();
@@ -35,9 +37,11 @@ public static class CrudEndpoints
             return Results.Ok(clients);
         });
 
-        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
+        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var client = await db.Clients
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(client => client.Id == id);
 
@@ -60,7 +64,10 @@ public static class CrudEndpoints
 
         group.MapPut("/{id:guid}", async (Guid id, Client request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
-            var client = await db.Clients.FirstOrDefaultAsync(client => client.Id == id);
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var client = await db.Clients
+                .WhereVisibleTo(userId)
+                .FirstOrDefaultAsync(client => client.Id == id);
             if (client is null)
             {
                 return Results.NotFound();
@@ -76,9 +83,12 @@ public static class CrudEndpoints
             return Results.Ok(client);
         });
 
-        group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
+        group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
-            var client = await db.Clients.FirstOrDefaultAsync(client => client.Id == id);
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var client = await db.Clients
+                .WhereVisibleTo(userId)
+                .FirstOrDefaultAsync(client => client.Id == id);
             if (client is null)
             {
                 return Results.NotFound();
@@ -115,7 +125,10 @@ public static class CrudEndpoints
 
         group.MapPost("/", async (Gig gig, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
-            if (!await db.Clients.AnyAsync(client => client.Id == gig.ClientId))
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!await db.Clients
+                    .WhereVisibleTo(userId)
+                    .AnyAsync(client => client.Id == gig.ClientId))
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -138,6 +151,7 @@ public static class CrudEndpoints
 
         group.MapPut("/{id:guid}", async (Guid id, Gig request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs.FirstOrDefaultAsync(value => value.Id == id);
 
             if (gig is null)
@@ -145,7 +159,9 @@ public static class CrudEndpoints
                 return Results.NotFound();
             }
 
-            if (!await db.Clients.AnyAsync(client => client.Id == request.ClientId))
+            if (!await db.Clients
+                    .WhereVisibleTo(userId)
+                    .AnyAsync(client => client.Id == request.ClientId))
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -209,7 +225,10 @@ public static class CrudEndpoints
 
         group.MapPost("/", async (Invoice invoice, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
-            if (!await db.Clients.AnyAsync(client => client.Id == invoice.ClientId))
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!await db.Clients
+                    .WhereVisibleTo(userId)
+                    .AnyAsync(client => client.Id == invoice.ClientId))
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -232,6 +251,7 @@ public static class CrudEndpoints
 
         group.MapPut("/{id:guid}", async (Guid id, Invoice request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
@@ -241,7 +261,9 @@ public static class CrudEndpoints
                 return Results.NotFound();
             }
 
-            if (!await db.Clients.AnyAsync(client => client.Id == request.ClientId))
+            if (!await db.Clients
+                    .WhereVisibleTo(userId)
+                    .AnyAsync(client => client.Id == request.ClientId))
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -385,6 +407,11 @@ public static class CrudEndpoints
 
         invoice.Subtotal = invoice.Lines.Sum(line => line.Total);
         await db.SaveChangesAsync();
+    }
+
+    private static IQueryable<Client> WhereVisibleTo(this IQueryable<Client> query, Guid? userId)
+    {
+        return query.Where(client => client.CreatedByUserId == null || client.CreatedByUserId == userId);
     }
 
     private static void StampCreate(Client client, Guid? userId)
