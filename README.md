@@ -14,3 +14,18 @@ Create a gig and generate an invoice draft from it.
 - Frontend: React (PWA planned)
 - Backend: ASP.NET Core Web API
 - Database: PostgreSQL (SQLite for local dev initially)
+
+## Local Development
+
+Run both the frontend and backend together from the repo root:
+
+```bash
+./run-dev.sh
+```
+
+This starts:
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:5153`
+- Swagger UI: `http://localhost:5153/swagger`
+
+Press `Ctrl+C` to stop both services.

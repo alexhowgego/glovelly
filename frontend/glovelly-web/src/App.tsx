@@ -24,48 +24,6 @@ type ClientForm = {
   billingAddress: Address
 }
 
-const seedClients: Client[] = [
-  {
-    id: 'c1',
-    name: 'Fox & Finch Events',
-    email: 'bookings@foxandfinch.co.uk',
-    billingAddress: {
-      line1: '12 Chapel Street',
-      line2: '',
-      city: 'Manchester',
-      stateOrCounty: 'Greater Manchester',
-      postalCode: 'M3 5JZ',
-      country: 'United Kingdom',
-    },
-  },
-  {
-    id: 'c2',
-    name: 'Northlight Weddings',
-    email: 'accounts@northlightweddings.com',
-    billingAddress: {
-      line1: '7 Hawthorn Mews',
-      line2: '',
-      city: 'Leeds',
-      stateOrCounty: 'West Yorkshire',
-      postalCode: 'LS1 4PR',
-      country: 'United Kingdom',
-    },
-  },
-  {
-    id: 'c3',
-    name: 'Riverside Arts Centre',
-    email: 'finance@riversidearts.org',
-    billingAddress: {
-      line1: '84 Mill Lane',
-      line2: 'Studio 3',
-      city: 'Bristol',
-      stateOrCounty: 'Bristol',
-      postalCode: 'BS1 6QX',
-      country: 'United Kingdom',
-    },
-  },
-]
-
 const emptyForm = (): ClientForm => ({
   name: '',
   email: '',
@@ -79,22 +37,19 @@ const emptyForm = (): ClientForm => ({
   },
 })
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
 function App() {
-  const [clients, setClients] = useState<Client[]>(seedClients)
-  const [selectedClientId, setSelectedClientId] = useState<string>(seedClients[0]?.id ?? '')
+  const [clients, setClients] = useState<Client[]>([])
+  const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [mode, setMode] = useState<'create' | 'edit'>('create')
   const [form, setForm] = useState<ClientForm>(emptyForm)
-  const [status, setStatus] = useState('Prototype mode using sample clients.')
+  const [status, setStatus] = useState('Connecting to the API...')
   const [isLoading, setIsLoading] = useState(false)
+  const [isApiConnected, setIsApiConnected] = useState(false)
 
   useEffect(() => {
-    if (!apiBaseUrl) {
-      return
-    }
-
     let ignore = false
 
     const loadClients = async () => {
@@ -113,6 +68,7 @@ function App() {
 
         setClients(data)
         setSelectedClientId(data[0]?.id ?? '')
+        setIsApiConnected(true)
         setStatus(
           data.length > 0
             ? 'Connected to the API.'
@@ -120,7 +76,10 @@ function App() {
         )
       } catch {
         if (!ignore) {
-          setStatus('API unavailable, showing sample clients.')
+          setIsApiConnected(false)
+          setClients([])
+          setSelectedClientId('')
+          setStatus('API unavailable. Start the backend to manage clients.')
         }
       } finally {
         if (!ignore) {
@@ -231,65 +190,42 @@ function App() {
     setIsLoading(true)
 
     try {
-      if (apiBaseUrl) {
-        const isEdit = mode === 'edit' && selectedClient
-        const endpoint = isEdit
-          ? `${apiBaseUrl}/clients/${selectedClient.id}`
-          : `${apiBaseUrl}/clients`
-
-        const response = await fetch(endpoint, {
-          method: isEdit ? 'PUT' : 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        })
-
-        if (!response.ok) {
-          throw new Error('Save failed.')
-        }
-
-        const savedClient = (await response.json()) as Client
-
-        setClients((current) => {
-          if (isEdit) {
-            return current.map((client) =>
-              client.id === savedClient.id ? savedClient : client
-            )
-          }
-
-          return [savedClient, ...current]
-        })
-
-        setSelectedClientId(savedClient.id)
-        setMode('edit')
-        setStatus(isEdit ? 'Client updated.' : 'Client created.')
-      } else {
-        if (mode === 'edit' && selectedClient) {
-          const updatedClient: Client = {
-            id: selectedClient.id,
-            ...payload,
-          }
-
-          setClients((current) =>
-            current.map((client) =>
-              client.id === updatedClient.id ? updatedClient : client
-            )
-          )
-          setSelectedClientId(updatedClient.id)
-          setStatus('Client updated locally.')
-        } else {
-          const createdClient: Client = {
-            id: crypto.randomUUID(),
-            ...payload,
-          }
-
-          setClients((current) => [createdClient, ...current])
-          setSelectedClientId(createdClient.id)
-          setMode('edit')
-          setStatus('Client created locally.')
-        }
+      if (!isApiConnected) {
+        throw new Error('API unavailable.')
       }
+
+      const isEdit = mode === 'edit' && selectedClient
+      const endpoint = isEdit
+        ? `${apiBaseUrl}/clients/${selectedClient.id}`
+        : `${apiBaseUrl}/clients`
+
+      const response = await fetch(endpoint, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        throw new Error('Save failed.')
+      }
+
+      const savedClient = (await response.json()) as Client
+
+      setClients((current) => {
+        if (isEdit) {
+          return current.map((client) =>
+            client.id === savedClient.id ? savedClient : client
+          )
+        }
+
+        return [savedClient, ...current]
+      })
+
+      setSelectedClientId(savedClient.id)
+      setMode('edit')
+      setStatus(isEdit ? 'Client updated.' : 'Client created.')
     } catch {
       setStatus('Unable to save right now. Check that the API is running.')
     } finally {
@@ -305,14 +241,16 @@ function App() {
     setIsLoading(true)
 
     try {
-      if (apiBaseUrl) {
-        const response = await fetch(`${apiBaseUrl}/clients/${selectedClient.id}`, {
-          method: 'DELETE',
-        })
+      if (!isApiConnected) {
+        throw new Error('API unavailable.')
+      }
 
-        if (!response.ok) {
-          throw new Error('Delete failed.')
-        }
+      const response = await fetch(`${apiBaseUrl}/clients/${selectedClient.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Delete failed.')
       }
 
       let nextSelectedClientId = ''
@@ -326,7 +264,7 @@ function App() {
       setSelectedClientId(nextSelectedClientId)
       setMode('create')
       setForm(emptyForm())
-      setStatus(apiBaseUrl ? 'Client deleted.' : 'Client deleted locally.')
+      setStatus('Client deleted.')
     } catch {
       setStatus('Unable to delete right now.')
     } finally {
@@ -365,7 +303,7 @@ function App() {
               <p>active cities</p>
             </article>
             <article>
-              <span>{apiBaseUrl ? 'Live' : 'Demo'}</span>
+              <span>{isApiConnected ? 'Live' : 'Demo'}</span>
               <p>data source</p>
             </article>
           </div>
@@ -414,8 +352,12 @@ function App() {
 
             {filteredClients.length === 0 && (
               <div className="empty-state">
-                <strong>No clients match that search.</strong>
-                <p>Try a different term or add a fresh client profile.</p>
+                <strong>{isApiConnected ? 'No clients match that search.' : 'No client data available.'}</strong>
+                <p>
+                  {isApiConnected
+                    ? 'Try a different term or add a fresh client profile.'
+                    : 'Start the backend and refresh this page to load seeded data.'}
+                </p>
               </div>
             )}
           </div>
