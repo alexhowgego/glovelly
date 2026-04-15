@@ -31,6 +31,26 @@ type AuthUser = {
   email: string
 }
 
+type AdminUser = {
+  id: string
+  email: string
+  displayName: string | null
+  googleSubject: string | null
+  isEnrolled: boolean
+  role: string
+  isActive: boolean
+  createdUtc: string
+  lastLoginUtc: string | null
+}
+
+type AdminUserForm = {
+  email: string
+  displayName: string
+  googleSubject: string
+  role: 'Admin' | 'User'
+  isActive: boolean
+}
+
 const emptyForm = (): ClientForm => ({
   name: '',
   email: '',
@@ -43,6 +63,16 @@ const emptyForm = (): ClientForm => ({
     country: 'United Kingdom',
   },
 })
+
+const emptyAdminForm = (): AdminUserForm => ({
+  email: '',
+  displayName: '',
+  googleSubject: '',
+  role: 'User',
+  isActive: true,
+})
+
+const defaultAdminStatus = 'User enrolment tools ready.'
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
@@ -61,6 +91,39 @@ async function fetchWithSession(input: string, init?: RequestInit) {
   })
 }
 
+async function parseProblemDetails(response: Response) {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    return null
+  }
+
+  try {
+    return (await response.json()) as {
+      title?: string
+      detail?: string
+      errors?: Record<string, string[]>
+    }
+  } catch {
+    return null
+  }
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return 'Never'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown'
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
 function App() {
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>('')
@@ -75,8 +138,64 @@ function App() {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
 
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+  const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
+  const [adminSearchQuery, setAdminSearchQuery] = useState('')
+  const [adminMode, setAdminMode] = useState<'create' | 'edit'>('create')
+  const [adminForm, setAdminForm] = useState<AdminUserForm>(emptyAdminForm)
+  const [adminStatus, setAdminStatus] = useState(defaultAdminStatus)
+  const [isAdminLoading, setIsAdminLoading] = useState(false)
+
+  const isAdmin = authUser?.role === 'Admin'
+
+  const resetAdminWorkspace = () => {
+    setAdminUsers([])
+    setSelectedAdminUserId('')
+    setAdminSearchQuery('')
+    setAdminMode('create')
+    setAdminForm(emptyAdminForm())
+    setAdminStatus(defaultAdminStatus)
+  }
+
   useEffect(() => {
     let ignore = false
+
+    const resetSignedInState = () => {
+      setClients([])
+      setSelectedClientId('')
+      setSearchQuery('')
+      setMode('create')
+      setForm(emptyForm())
+      resetAdminWorkspace()
+    }
+
+    const loadAdminUsers = async () => {
+      const response = await fetchWithSession(buildApiUrl('/admin/users'))
+      if (response.status === 401) {
+        throw new Error('SESSION_EXPIRED')
+      }
+
+      if (response.status === 403) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error('Unable to load user enrolments.')
+      }
+
+      const users = (await response.json()) as AdminUser[]
+      if (ignore) {
+        return
+      }
+
+      setAdminUsers(users)
+      setSelectedAdminUserId((current) => current || users[0]?.id || '')
+      setAdminStatus(
+        users.length > 0
+          ? 'Manage who can sign in to Glovelly.'
+          : 'No users enrolled yet. Add the first account below.'
+      )
+    }
 
     const loadApp = async () => {
       setIsCheckingSession(true)
@@ -91,8 +210,7 @@ function App() {
           setIsAuthenticated(false)
           setAuthUser(null)
           setIsApiConnected(false)
-          setClients([])
-          setSelectedClientId('')
+          resetSignedInState()
           setShouldCloseBrowserNotice(false)
           setStatus('Sign in with Google to access Glovelly.')
           return
@@ -109,25 +227,23 @@ function App() {
 
         setIsAuthenticated(true)
         setAuthUser(user)
-
         setIsLoading(true)
 
-        const response = await fetchWithSession(buildApiUrl('/clients'))
-        if (response.status === 401) {
+        const clientsResponse = await fetchWithSession(buildApiUrl('/clients'))
+        if (clientsResponse.status === 401) {
           setIsAuthenticated(false)
           setAuthUser(null)
           setIsApiConnected(false)
-          setClients([])
-          setSelectedClientId('')
+          resetSignedInState()
           setStatus('Your session expired. Sign in again to keep working.')
           return
         }
 
-        if (!response.ok) {
+        if (!clientsResponse.ok) {
           throw new Error('Unable to load clients.')
         }
 
-        const data = (await response.json()) as Client[]
+        const data = (await clientsResponse.json()) as Client[]
         if (ignore) {
           return
         }
@@ -141,13 +257,35 @@ function App() {
             ? `Signed in as ${user.email}.`
             : `Signed in as ${user.email}. No clients yet.`
         )
-      } catch {
+
+        if (user.role === 'Admin') {
+          try {
+            await loadAdminUsers()
+          } catch {
+            if (!ignore) {
+              setAdminUsers([])
+              setSelectedAdminUserId('')
+              setAdminStatus('The admin area could not be loaded right now.')
+            }
+          }
+        }
+      } catch (error) {
         if (!ignore) {
-          setIsApiConnected(false)
-          setClients([])
-          setSelectedClientId('')
-          setShouldCloseBrowserNotice(false)
-          setStatus('API unavailable. Start the backend to finish sign-in.')
+          if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
+            setIsAuthenticated(false)
+            setAuthUser(null)
+            setIsApiConnected(false)
+            resetSignedInState()
+            setStatus('Your session expired. Sign in again to keep working.')
+          } else {
+            setIsApiConnected(false)
+            setClients([])
+            setSelectedClientId('')
+            setAdminUsers([])
+            setSelectedAdminUserId('')
+            setShouldCloseBrowserNotice(false)
+            setStatus('API unavailable. Start the backend to finish sign-in.')
+          }
         }
       } finally {
         if (!ignore) {
@@ -183,10 +321,30 @@ function App() {
     )
   }, [clients, searchQuery])
 
+  const filteredAdminUsers = useMemo(() => {
+    const query = adminSearchQuery.trim().toLowerCase()
+    if (!query) {
+      return adminUsers
+    }
+
+    return adminUsers.filter((user) =>
+      [user.email, user.displayName ?? '', user.role, user.googleSubject ?? '']
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    )
+  }, [adminSearchQuery, adminUsers])
+
   const selectedClient =
     filteredClients.find((client) => client.id === selectedClientId) ??
     clients.find((client) => client.id === selectedClientId) ??
     filteredClients[0] ??
+    null
+
+  const selectedAdminUser =
+    filteredAdminUsers.find((user) => user.id === selectedAdminUserId) ??
+    adminUsers.find((user) => user.id === selectedAdminUserId) ??
+    filteredAdminUsers[0] ??
     null
 
   useEffect(() => {
@@ -195,7 +353,14 @@ function App() {
     }
   }, [selectedClient])
 
+  useEffect(() => {
+    if (selectedAdminUser) {
+      setSelectedAdminUserId(selectedAdminUser.id)
+    }
+  }, [selectedAdminUser])
+
   const activeCities = new Set(clients.map((client) => client.billingAddress.city)).size
+  const activeUsersCount = adminUsers.filter((user) => user.isActive).length
 
   const startCreating = () => {
     setMode('create')
@@ -215,6 +380,26 @@ function App() {
     })
   }
 
+  const startAdminCreate = () => {
+    setAdminMode('create')
+    setAdminForm(emptyAdminForm())
+  }
+
+  const startAdminEdit = () => {
+    if (!selectedAdminUser) {
+      return
+    }
+
+    setAdminMode('edit')
+    setAdminForm({
+      email: selectedAdminUser.email,
+      displayName: selectedAdminUser.displayName ?? '',
+      googleSubject: selectedAdminUser.googleSubject ?? '',
+      role: selectedAdminUser.role === 'Admin' ? 'Admin' : 'User',
+      isActive: selectedAdminUser.isActive,
+    })
+  }
+
   const updateField = (field: keyof ClientForm, value: string | Address) => {
     setForm((current) => ({
       ...current,
@@ -229,6 +414,16 @@ function App() {
         ...current.billingAddress,
         [field]: value,
       },
+    }))
+  }
+
+  const updateAdminField = (
+    field: keyof AdminUserForm,
+    value: string | boolean
+  ) => {
+    setAdminForm((current) => ({
+      ...current,
+      [field]: value,
     }))
   }
 
@@ -259,6 +454,7 @@ function App() {
       setSearchQuery('')
       setMode('create')
       setForm(emptyForm())
+      resetAdminWorkspace()
       setShouldCloseBrowserNotice(true)
       setStatus('Signed out. Close your browser to fully end the Google session.')
     } catch {
@@ -395,6 +591,82 @@ function App() {
     }
   }
 
+  const handleAdminSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const payload: AdminUserForm = {
+      email: adminForm.email.trim(),
+      displayName: adminForm.displayName.trim(),
+      googleSubject: adminForm.googleSubject.trim(),
+      role: adminForm.role,
+      isActive: adminForm.isActive,
+    }
+
+    if (!payload.email) {
+      setAdminStatus('Email is required for enrolment.')
+      return
+    }
+
+    setIsAdminLoading(true)
+
+    try {
+      const isEdit = adminMode === 'edit' && selectedAdminUser
+      const endpoint = isEdit
+        ? buildApiUrl(`/admin/users/${selectedAdminUser.id}`)
+        : buildApiUrl('/admin/users')
+
+      const response = await fetchWithSession(endpoint, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setStatus('Your session expired. Sign in again to keep managing enrolments.')
+        return
+      }
+
+      if (response.status === 403) {
+        setAdminStatus('Administrator access is required to manage enrolments.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to save enrolment.')
+      }
+
+      const savedUser = (await response.json()) as AdminUser
+
+      setAdminUsers((current) => {
+        if (isEdit) {
+          return current.map((user) => (user.id === savedUser.id ? savedUser : user))
+        }
+
+        return [savedUser, ...current]
+      })
+
+      setSelectedAdminUserId(savedUser.id)
+      setAdminMode('edit')
+      setAdminStatus(isEdit ? 'User enrolment updated.' : 'User enrolled.')
+    } catch (error) {
+      setAdminStatus(
+        error instanceof Error ? error.message : 'Unable to save enrolment right now.'
+      )
+    } finally {
+      setIsAdminLoading(false)
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="app-shell auth-shell">
@@ -482,9 +754,17 @@ function App() {
             <div>
               <p className="section-label">Signed In</p>
               <strong>{authUser?.name ?? authUser?.email}</strong>
-              <span>{authUser?.email}</span>
+              <span>
+                {authUser?.email}
+                {isAdmin ? ' · Administrator' : ''}
+              </span>
             </div>
-            <button className="ghost-button" onClick={signOut} type="button" disabled={isLoading}>
+            <button
+              className="ghost-button"
+              onClick={signOut}
+              type="button"
+              disabled={isLoading || isAdminLoading}
+            >
               Sign out
             </button>
           </div>
@@ -704,6 +984,220 @@ function App() {
           </div>
         </form>
       </section>
+
+      {isAdmin && (
+        <section className="admin-zone">
+          <div className="admin-banner panel">
+            <div>
+              <p className="section-label">Administrator Area</p>
+              <h2>User enrolment</h2>
+              <p className="hero-text">
+                Control which Google accounts can access Glovelly, whether they are
+                active, and whether they should see this administrator workspace.
+              </p>
+            </div>
+
+            <div className="hero-metrics admin-metrics">
+              <article>
+                <span>{adminUsers.length}</span>
+                <p>enrolled users</p>
+              </article>
+              <article>
+                <span>{activeUsersCount}</span>
+                <p>active accounts</p>
+              </article>
+              <article>
+                <span>{adminUsers.filter((user) => user.role === 'Admin').length}</span>
+                <p>administrators</p>
+              </article>
+            </div>
+          </div>
+
+          <div className="admin-workspace">
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="section-label">Access Directory</p>
+                  <h2>Enrolled users</h2>
+                </div>
+                <button className="ghost-button" onClick={startAdminCreate} type="button">
+                  New enrolment
+                </button>
+              </div>
+
+              <label className="search-field">
+                <span>Search</span>
+                <input
+                  type="search"
+                  placeholder="Name, email, role..."
+                  value={adminSearchQuery}
+                  onChange={(event) => setAdminSearchQuery(event.target.value)}
+                />
+              </label>
+
+              <div className="client-list">
+                {filteredAdminUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    className={`client-card ${selectedAdminUser?.id === user.id ? 'selected' : ''}`}
+                    onClick={() => setSelectedAdminUserId(user.id)}
+                    type="button"
+                  >
+                    <div>
+                      <strong>{user.displayName || user.email}</strong>
+                      <span>{user.email}</span>
+                    </div>
+                    <small>
+                      {user.role} · {user.isActive ? 'Active' : 'Inactive'} ·{' '}
+                      {user.isEnrolled ? 'Bound' : 'Invited'}
+                    </small>
+                  </button>
+                ))}
+
+                {filteredAdminUsers.length === 0 && (
+                  <div className="empty-state">
+                    <strong>No enrolled users match that search.</strong>
+                    <p>Try another term or start a fresh enrolment.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="section-label">Enrolment Overview</p>
+                  <h2>{selectedAdminUser?.displayName || selectedAdminUser?.email || 'No user selected'}</h2>
+                </div>
+                <div className="actions">
+                  <button
+                    className="ghost-button"
+                    onClick={startAdminEdit}
+                    type="button"
+                    disabled={!selectedAdminUser}
+                  >
+                    Edit enrolment
+                  </button>
+                </div>
+              </div>
+
+              {selectedAdminUser ? (
+                <div className="detail-grid">
+                  <article>
+                    <p className="detail-label">Role</p>
+                    <strong>{selectedAdminUser.role}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Access</p>
+                    <strong>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Enrolment</p>
+                    <strong>{selectedAdminUser.isEnrolled ? 'Bound to Google subject' : 'Invited by email'}</strong>
+                  </article>
+                  <article className="full-width">
+                    <p className="detail-label">Google subject</p>
+                    <strong>{selectedAdminUser.googleSubject ?? 'Pending first Google sign-in'}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Created</p>
+                    <strong>{formatDateTime(selectedAdminUser.createdUtc)}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Last login</p>
+                    <strong>{formatDateTime(selectedAdminUser.lastLoginUtc)}</strong>
+                  </article>
+                </div>
+              ) : (
+                <div className="empty-state roomy">
+                  <strong>Select an enrolled user to review their access.</strong>
+                  <p>The admin area stays hidden from standard users and only appears for admins.</p>
+                </div>
+              )}
+            </div>
+
+            <form className="panel" onSubmit={handleAdminSubmit}>
+              <div className="panel-heading">
+                <div>
+                  <p className="section-label">Management Pane</p>
+                  <h2>{adminMode === 'create' ? 'Create enrolment' : 'Update enrolment'}</h2>
+                </div>
+                <span className="status-pill">{adminStatus}</span>
+              </div>
+
+              <div className="form-grid">
+                <label>
+                  <span>Email</span>
+                  <input
+                    required
+                    type="email"
+                    value={adminForm.email}
+                    onChange={(event) => updateAdminField('email', event.target.value)}
+                    placeholder="performer@example.com"
+                  />
+                </label>
+
+                <label>
+                  <span>Display name</span>
+                  <input
+                    value={adminForm.displayName}
+                    onChange={(event) => updateAdminField('displayName', event.target.value)}
+                    placeholder="Optional"
+                  />
+                </label>
+
+                <label className="full-width">
+                  <span>Google subject</span>
+                  <input
+                    value={adminForm.googleSubject}
+                    onChange={(event) => updateAdminField('googleSubject', event.target.value)}
+                    placeholder="Optional until first Google sign-in"
+                    disabled={
+                      adminMode === 'edit' &&
+                      selectedAdminUser?.isEnrolled === true
+                    }
+                  />
+                </label>
+
+                <label>
+                  <span>Role</span>
+                  <select
+                    value={adminForm.role}
+                    onChange={(event) =>
+                      updateAdminField('role', event.target.value as AdminUserForm['role'])
+                    }
+                  >
+                    <option value="User">User</option>
+                    <option value="Admin">Admin</option>
+                  </select>
+                </label>
+
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={adminForm.isActive}
+                    onChange={(event) => updateAdminField('isActive', event.target.checked)}
+                  />
+                  <span>Account is active and allowed to sign in</span>
+                </label>
+              </div>
+
+              <div className="form-actions">
+                <button className="primary-button" type="submit" disabled={isAdminLoading}>
+                  {adminMode === 'create' ? 'Enrol user' : 'Save enrolment'}
+                </button>
+                <button className="ghost-button" onClick={startAdminCreate} type="button">
+                  Reset enrolment form
+                </button>
+              </div>
+              <p className="auth-note">
+                Admins can pre-provision by email only. If Google subject is blank, Glovelly
+                will bind it on the user’s first successful Google sign-in.
+              </p>
+            </form>
+          </div>
+        </section>
+      )}
     </main>
   )
 }

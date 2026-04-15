@@ -184,12 +184,44 @@ builder.Services
                 }
 
                 var dbContext = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-                var user = await dbContext.Users.FirstOrDefaultAsync(value => value.GoogleSubject == googleSubject);
+                var normalizedGoogleSubject = googleSubject.Trim();
+                var normalizedEmail = NormalizeEmail(
+                    principal.FindFirstValue("email") ?? principal.FindFirstValue(ClaimTypes.Email));
+                var emailVerified = TryGetEmailVerified(principal);
+
+                var user = await dbContext.Users.FirstOrDefaultAsync(value => value.GoogleSubject == normalizedGoogleSubject);
 
                 if (user is null)
                 {
-                    context.Fail("You do not have access to Glovelly.");
-                    return;
+                    if (string.IsNullOrWhiteSpace(normalizedEmail))
+                    {
+                        context.Fail("Google sign-in did not include an email address.");
+                        return;
+                    }
+
+                    if (emailVerified == false)
+                    {
+                        context.Fail("Google sign-in email address is not verified.");
+                        return;
+                    }
+
+                    user = await dbContext.Users.FirstOrDefaultAsync(value =>
+                        value.GoogleSubject == null &&
+                        value.Email == normalizedEmail);
+
+                    if (user is null)
+                    {
+                        context.Fail("You do not have access to Glovelly.");
+                        return;
+                    }
+
+                    if (!user.IsActive)
+                    {
+                        context.Fail("Your Glovelly account is inactive.");
+                        return;
+                    }
+
+                    user.GoogleSubject = normalizedGoogleSubject;
                 }
 
                 if (!user.IsActive)
@@ -198,10 +230,10 @@ builder.Services
                     return;
                 }
 
-                var email = principal.FindFirstValue("email") ?? principal.FindFirstValue(ClaimTypes.Email);
-                if (!string.IsNullOrWhiteSpace(email) && !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrWhiteSpace(normalizedEmail) &&
+                    !string.Equals(user.Email, normalizedEmail, StringComparison.Ordinal))
                 {
-                    user.Email = email.Trim();
+                    user.Email = normalizedEmail;
                 }
 
                 var displayName = principal.FindFirstValue("name") ?? principal.FindFirstValue(ClaimTypes.Name);
@@ -484,6 +516,7 @@ auth.MapGet("/denied", (string? code) =>
 });
 
 app.MapCrudEndpoints();
+app.MapAdminEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();
@@ -518,6 +551,7 @@ static bool IsApiRequest(HttpRequest request)
     var path = request.Path;
 
     return path.StartsWithSegments("/auth/me") ||
+           path.StartsWithSegments("/admin") ||
            path.StartsWithSegments("/clients") ||
            path.StartsWithSegments("/gigs") ||
            path.StartsWithSegments("/invoices") ||
@@ -536,6 +570,16 @@ static string GetAuthenticationFailureCode(Exception? exception)
     if (message.Contains("subject", StringComparison.OrdinalIgnoreCase))
     {
         return "missing_subject";
+    }
+
+    if (message.Contains("email address is not verified", StringComparison.OrdinalIgnoreCase))
+    {
+        return "email_not_verified";
+    }
+
+    if (message.Contains("include an email address", StringComparison.OrdinalIgnoreCase))
+    {
+        return "missing_email";
     }
 
     if (message.Contains("access", StringComparison.OrdinalIgnoreCase))
@@ -560,6 +604,16 @@ static UnauthorizedPageCopy GetUnauthorizedPageCopy(string failureCode)
             "Glovelly could not verify this Google identity.",
             "Google signed you in, but the subject identifier needed to match your Glovelly user was missing from the response.",
             "If this happens repeatedly, it is likely a configuration issue rather than a permissions issue."),
+        "missing_email" => new UnauthorizedPageCopy(
+            "Sign-In Issue",
+            "Google did not provide a usable email address.",
+            "Glovelly can only bootstrap a pre-provisioned account when Google returns an email claim.",
+            "Check the Google account and OpenID scopes, then try signing in again."),
+        "email_not_verified" => new UnauthorizedPageCopy(
+            "Email Not Verified",
+            "This Google email address is not verified.",
+            "Glovelly only allows first-time enrolment binding when Google indicates the email address is verified.",
+            "Verify the Google account email first, then try again."),
         "sign_in_failed" => new UnauthorizedPageCopy(
             "Sign-In Issue",
             "Google sign-in did not complete.",
@@ -581,6 +635,32 @@ static void ReplaceClaim(ClaimsIdentity identity, string claimType, string value
     }
 
     identity.AddClaim(new Claim(claimType, value));
+}
+
+static string? NormalizeEmail(string? email)
+{
+    return string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
+}
+
+static bool? TryGetEmailVerified(ClaimsPrincipal principal)
+{
+    var rawValue = principal.FindFirstValue("email_verified");
+    if (string.IsNullOrWhiteSpace(rawValue))
+    {
+        return null;
+    }
+
+    if (bool.TryParse(rawValue, out var parsed))
+    {
+        return parsed;
+    }
+
+    return rawValue switch
+    {
+        "1" => true,
+        "0" => false,
+        _ => null,
+    };
 }
 
 internal sealed record UnauthorizedPageCopy(string Eyebrow, string Title, string Body, string Note);

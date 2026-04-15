@@ -17,7 +17,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.HasKey(user => user.Id);
             entity.Property(user => user.GoogleSubject)
-                .IsRequired()
                 .HasMaxLength(255);
             entity.Property(user => user.Email)
                 .IsRequired()

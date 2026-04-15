@@ -151,6 +151,26 @@
   grid-template-columns: minmax(300px, 0.95fr) minmax(320px, 1fr) minmax(360px, 1.1fr);
 }
 
+.admin-zone {
+  display: grid;
+  gap: 24px;
+}
+
+.admin-banner {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-workspace {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) minmax(360px, 1.05fr);
+}
+
+.admin-metrics {
+  align-self: stretch;
+}
+
 .panel {
   border-radius: 24px;
   padding: 24px;
@@ -323,12 +343,14 @@
 }
 
 input,
+select,
 button,
 textarea {
   font: inherit;
 }
 
-input {
+input,
+select {
   width: 100%;
   box-sizing: border-box;
   min-height: 48px;
@@ -344,9 +366,33 @@ input::placeholder {
 }
 
 input:focus-visible,
+select:focus-visible,
 button:focus-visible {
   outline: 2px solid rgba(34, 90, 122, 0.45);
   outline-offset: 2px;
+}
+
+.checkbox-field {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(34, 42, 52, 0.08);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.checkbox-field input {
+  width: 18px;
+  min-height: auto;
+  margin: 0;
+  accent-color: #1b3f61;
+}
+
+.checkbox-field span {
+  color: var(--heading);
+  font-size: 0.92rem;
 }
 
 button:disabled {
@@ -357,7 +403,8 @@ button:disabled {
 
 @media (max-width: 1180px) {
   .hero-panel,
-  .workspace {
+  .workspace,
+  .admin-workspace {
     grid-template-columns: 1fr;
   }
 
