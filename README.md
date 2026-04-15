@@ -1,5 +1,7 @@
 # Glovelly
 
+[![Build and Push Container](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml/badge.svg)](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml)
+
 Glovelly is a personal business platform for managing my self-employed music work.
 
 ## Current Scope (v1)
@@ -54,3 +56,15 @@ docker run --rm -p 8080:8080 glovelly
 
 The app will be available at `http://localhost:8080`, with the frontend served from `/` and the API endpoints served from the same origin.
 
+## CI
+
+GitHub Actions runs the `Build and Push Container` workflow on pushes to `main`, on pull requests, and on manual dispatch.
+
+The workflow:
+- Builds the React frontend and ASP.NET Core backend into a single Docker image
+- Pushes the image to Google Artifact Registry on non-PR runs
+- Tags images with `latest` on the default branch and with a commit SHA tag for each build
+
+The image is published to `europe-west1-docker.pkg.dev/glovelly-dev/glovelly/glovelly`.
+
+You can view workflow runs from the [Actions tab](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml).
