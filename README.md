@@ -45,11 +45,13 @@ Glovelly now requires Google sign-in before the SPA can call the API.
 cd backend/Glovelly.Api
 dotnet user-secrets set "Authentication:Google:ClientId" "your-client-id"
 dotnet user-secrets set "Authentication:Google:ClientSecret" "your-client-secret"
+dotnet user-secrets set "ConnectionStrings:Glovelly" "your-postgresql-connection-string"
 ```
 
 4. As an alternative, you can provide the same values via environment variables:
    - `Authentication__Google__ClientId`
    - `Authentication__Google__ClientSecret`
+   - `ConnectionStrings__Glovelly`
 
 The frontend signs users in through `/auth/login`, the backend completes the Google OpenID Connect flow, and the app stores the session in a secure cookie before allowing access to `/clients`, `/gigs`, `/invoices`, and `/invoice-lines`.
 
@@ -87,6 +89,7 @@ The workflow:
 - Builds the React frontend and ASP.NET Core backend into a single Docker image
 - Pushes the image to Google Artifact Registry on non-PR runs
 - Tags images with `latest` on the default branch and with a commit SHA tag for each build
+- Injects Google Secret Manager secrets into Cloud Run, including `Authentication__Google__ClientId`, `Authentication__Google__ClientSecret`, and `ConnectionStrings__Glovelly`
 
 The image is published to `europe-west1-docker.pkg.dev/glovelly-dev/glovelly/glovelly`.
 

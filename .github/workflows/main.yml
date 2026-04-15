@@ -106,6 +106,7 @@ jobs:
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest
+            ConnectionStrings__Glovelly=glovelly-connection-string:latest
           secrets_update_strategy: merge
           flags: >-
             --allow-unauthenticated

@@ -15,11 +15,21 @@ var googleSection = builder.Configuration.GetSection("Authentication:Google");
 var googleClientId = googleSection["ClientId"];
 var googleClientSecret = googleSection["ClientSecret"];
 var allowedCorsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var glovellyConnectionString = builder.Configuration.GetConnectionString("Glovelly");
+var usePostgres = !string.IsNullOrWhiteSpace(glovellyConnectionString);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseInMemoryDatabase("Glovelly"));
+{
+    if (usePostgres)
+    {
+        options.UseNpgsql(glovellyConnectionString);
+        return;
+    }
+
+    options.UseInMemoryDatabase("Glovelly");
+});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(devCorsPolicy, policy =>
@@ -97,7 +107,15 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await AppDbSeeder.SeedAsync(dbContext);
+
+    if (usePostgres)
+    {
+        await dbContext.Database.EnsureCreatedAsync();
+    }
+    else
+    {
+        await AppDbSeeder.SeedAsync(dbContext);
+    }
 }
 
 if (app.Environment.IsDevelopment())
