@@ -29,3 +29,28 @@ This starts:
 - Swagger UI: `http://localhost:5153/swagger`
 
 Press `Ctrl+C` to stop both services.
+
+## Docker
+
+The repository includes a single multi-stage [Dockerfile](/Users/alexhowgego/dev/glovelly/Dockerfile:1) that builds both services into one container image.
+
+The container build:
+- Builds the React frontend with Vite
+- Publishes the ASP.NET Core backend
+- Copies the frontend build output into the backend `wwwroot`
+- Serves both the API and frontend from the same ASP.NET Core process
+
+Build the image from the repo root:
+
+```bash
+docker build -t glovelly .
+```
+
+Run the container locally:
+
+```bash
+docker run --rm -p 8080:8080 glovelly
+```
+
+The app will be available at `http://localhost:8080`, with the frontend served from `/` and the API endpoints served from the same origin.
+
