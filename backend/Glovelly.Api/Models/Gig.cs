@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Glovelly.Api.Models;
 
 public sealed class Gig
@@ -12,5 +14,6 @@ public sealed class Gig
     public string? Notes { get; set; }
     public bool Invoiced { get; set; }
 
+    [JsonIgnore]
     public Client? Client { get; set; }
 }

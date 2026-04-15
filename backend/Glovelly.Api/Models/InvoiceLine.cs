@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Glovelly.Api.Models;
 
 public sealed class InvoiceLine
@@ -9,5 +11,6 @@ public sealed class InvoiceLine
     public decimal UnitPrice { get; set; }
     public decimal Total { get; set; }
 
+    [JsonIgnore]
     public Invoice? Invoice { get; set; }
 }

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Glovelly.Api.Models;
 
 public sealed class Invoice
@@ -11,6 +13,7 @@ public sealed class Invoice
     public decimal Subtotal { get; set; }
     public string? Notes { get; set; }
 
+    [JsonIgnore]
     public Client? Client { get; set; }
     public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
 }

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Glovelly.Api.Models;
 
 public sealed class Client
@@ -7,6 +9,8 @@ public sealed class Client
     public string Email { get; set; } = string.Empty;
     public Address BillingAddress { get; set; } = new();
 
+    [JsonIgnore]
     public ICollection<Gig> Gigs { get; set; } = new List<Gig>();
+    [JsonIgnore]
     public ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
 }

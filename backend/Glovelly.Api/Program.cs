@@ -1,4 +1,5 @@
 using Glovelly.Api.Data;
+using Glovelly.Api.Endpoints;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,5 +16,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.MapCrudEndpoints();
 
 app.Run();
