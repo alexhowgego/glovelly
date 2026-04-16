@@ -51,6 +51,8 @@ type AdminUserForm = {
   isActive: boolean
 }
 
+type AppSection = 'clients' | 'admin' | 'gigs'
+
 const emptyForm = (): ClientForm => ({
   name: '',
   email: '',
@@ -125,6 +127,7 @@ function formatDateTime(value: string | null) {
 }
 
 function App() {
+  const [activeSection, setActiveSection] = useState<AppSection>('clients')
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -147,6 +150,12 @@ function App() {
   const [isAdminLoading, setIsAdminLoading] = useState(false)
 
   const isAdmin = authUser?.role === 'Admin'
+
+  useEffect(() => {
+    if (!isAdmin && activeSection === 'admin') {
+      setActiveSection('clients')
+    }
+  }, [activeSection, isAdmin])
 
   const resetAdminWorkspace = () => {
     setAdminUsers([])
@@ -361,6 +370,48 @@ function App() {
 
   const activeCities = new Set(clients.map((client) => client.billingAddress.city)).size
   const activeUsersCount = adminUsers.filter((user) => user.isActive).length
+  const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
+
+  const navigationItems: Array<{
+    id: AppSection
+    label: string
+    eyebrow: string
+    description: string
+    disabled?: boolean
+  }> = [
+    {
+      id: 'clients',
+      label: 'Clients',
+      eyebrow: 'Live',
+      description: 'Booking contacts, billing details and client records.',
+    },
+    ...(isAdmin
+      ? [
+          {
+            id: 'admin' as const,
+            label: 'Admin',
+            eyebrow: 'Restricted',
+            description: 'User enrolment, roles and sign-in access.',
+          },
+        ]
+      : []),
+    {
+      id: 'gigs',
+      label: 'Gigs',
+      eyebrow: 'Next',
+      description: 'Draft home for scheduling, bookings and delivery status.',
+    },
+  ]
+
+  const currentSection = navigationItems.find((item) => item.id === activeSection)
+  const secondaryMetricValue =
+    activeSection === 'admin' ? activeUsersCount : activeSection === 'gigs' ? 'Planned' : activeCities
+  const secondaryMetricLabel =
+    activeSection === 'admin'
+      ? 'active accounts'
+      : activeSection === 'gigs'
+        ? 'workflow stage'
+        : 'active cities'
 
   const startCreating = () => {
     setMode('create')
@@ -714,64 +765,9 @@ function App() {
     )
   }
 
-  return (
-    <main className="app-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <p className="eyebrow">Client Management</p>
-          <h1>Keep booking contacts tidy without feeling like you opened an ERP.</h1>
-          <p className="hero-text">
-            A lightweight workspace for the people behind each gig, with room for
-            invoicing details and billing addresses from the start.
-          </p>
-        </div>
-
-        <div className="hero-brand">
-          <div className="hero-mascot">
-            <img src="/gordon-512.png" alt="Gordon the Glovelly mascot" />
-            <div>
-              <p className="section-label">Meet Gordon</p>
-              <strong>Mozart wig. Rubber chicken. Unreasonably good taste in admin.</strong>
-            </div>
-          </div>
-
-          <div className="hero-metrics">
-            <article>
-              <span>{clients.length}</span>
-              <p>clients on file</p>
-            </article>
-            <article>
-              <span>{activeCities}</span>
-              <p>active cities</p>
-            </article>
-            <article>
-              <span>{isApiConnected ? 'Live' : 'Offline'}</span>
-              <p>data source</p>
-            </article>
-          </div>
-
-          <div className="session-card">
-            <div>
-              <p className="section-label">Signed In</p>
-              <strong>{authUser?.name ?? authUser?.email}</strong>
-              <span>
-                {authUser?.email}
-                {isAdmin ? ' · Administrator' : ''}
-              </span>
-            </div>
-            <button
-              className="ghost-button"
-              onClick={signOut}
-              type="button"
-              disabled={isLoading || isAdminLoading}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="workspace">
+  const renderClientsSection = () => (
+    <section className="section-layout">
+      <div className="workspace">
         <div className="clients-panel panel">
           <div className="panel-heading">
             <div>
@@ -983,221 +979,346 @@ function App() {
             </button>
           </div>
         </form>
-      </section>
+      </div>
+    </section>
+  )
 
-      {isAdmin && (
-        <section className="admin-zone">
-          <div className="admin-banner panel">
+  const renderAdminSection = () => (
+    <section className="section-layout admin-zone">
+      <div className="admin-banner panel">
+        <div>
+          <p className="section-label">Administrator Area</p>
+          <h2>User enrolment</h2>
+          <p className="hero-text">
+            Control which Google accounts can access Glovelly, whether they are
+            active, and whether they should see this administrator workspace.
+          </p>
+        </div>
+
+        <div className="hero-metrics admin-metrics">
+          <article>
+            <span>{adminUsers.length}</span>
+            <p>enrolled users</p>
+          </article>
+          <article>
+            <span>{activeUsersCount}</span>
+            <p>active accounts</p>
+          </article>
+          <article>
+            <span>{totalAdmins}</span>
+            <p>administrators</p>
+          </article>
+        </div>
+      </div>
+
+      <div className="admin-workspace">
+        <div className="panel">
+          <div className="panel-heading">
             <div>
-              <p className="section-label">Administrator Area</p>
-              <h2>User enrolment</h2>
-              <p className="hero-text">
-                Control which Google accounts can access Glovelly, whether they are
-                active, and whether they should see this administrator workspace.
-              </p>
+              <p className="section-label">Access Directory</p>
+              <h2>Enrolled users</h2>
             </div>
+            <button className="ghost-button" onClick={startAdminCreate} type="button">
+              New enrolment
+            </button>
+          </div>
 
-            <div className="hero-metrics admin-metrics">
-              <article>
-                <span>{adminUsers.length}</span>
-                <p>enrolled users</p>
-              </article>
-              <article>
-                <span>{activeUsersCount}</span>
-                <p>active accounts</p>
-              </article>
-              <article>
-                <span>{adminUsers.filter((user) => user.role === 'Admin').length}</span>
-                <p>administrators</p>
-              </article>
+          <label className="search-field">
+            <span>Search</span>
+            <input
+              type="search"
+              placeholder="Name, email, role..."
+              value={adminSearchQuery}
+              onChange={(event) => setAdminSearchQuery(event.target.value)}
+            />
+          </label>
+
+          <div className="client-list">
+            {filteredAdminUsers.map((user) => (
+              <button
+                key={user.id}
+                className={`client-card ${selectedAdminUser?.id === user.id ? 'selected' : ''}`}
+                onClick={() => setSelectedAdminUserId(user.id)}
+                type="button"
+              >
+                <div>
+                  <strong>{user.displayName || user.email}</strong>
+                  <span>{user.email}</span>
+                </div>
+                <small>
+                  {user.role} · {user.isActive ? 'Active' : 'Inactive'} ·{' '}
+                  {user.isEnrolled ? 'Bound' : 'Invited'}
+                </small>
+              </button>
+            ))}
+
+            {filteredAdminUsers.length === 0 && (
+              <div className="empty-state">
+                <strong>No enrolled users match that search.</strong>
+                <p>Try another term or start a fresh enrolment.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <p className="section-label">Enrolment Overview</p>
+              <h2>{selectedAdminUser?.displayName || selectedAdminUser?.email || 'No user selected'}</h2>
+            </div>
+            <div className="actions">
+              <button
+                className="ghost-button"
+                onClick={startAdminEdit}
+                type="button"
+                disabled={!selectedAdminUser}
+              >
+                Edit enrolment
+              </button>
             </div>
           </div>
 
-          <div className="admin-workspace">
-            <div className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="section-label">Access Directory</p>
-                  <h2>Enrolled users</h2>
-                </div>
-                <button className="ghost-button" onClick={startAdminCreate} type="button">
-                  New enrolment
-                </button>
-              </div>
-
-              <label className="search-field">
-                <span>Search</span>
-                <input
-                  type="search"
-                  placeholder="Name, email, role..."
-                  value={adminSearchQuery}
-                  onChange={(event) => setAdminSearchQuery(event.target.value)}
-                />
-              </label>
-
-              <div className="client-list">
-                {filteredAdminUsers.map((user) => (
-                  <button
-                    key={user.id}
-                    className={`client-card ${selectedAdminUser?.id === user.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedAdminUserId(user.id)}
-                    type="button"
-                  >
-                    <div>
-                      <strong>{user.displayName || user.email}</strong>
-                      <span>{user.email}</span>
-                    </div>
-                    <small>
-                      {user.role} · {user.isActive ? 'Active' : 'Inactive'} ·{' '}
-                      {user.isEnrolled ? 'Bound' : 'Invited'}
-                    </small>
-                  </button>
-                ))}
-
-                {filteredAdminUsers.length === 0 && (
-                  <div className="empty-state">
-                    <strong>No enrolled users match that search.</strong>
-                    <p>Try another term or start a fresh enrolment.</p>
-                  </div>
-                )}
-              </div>
+          {selectedAdminUser ? (
+            <div className="detail-grid">
+              <article>
+                <p className="detail-label">Role</p>
+                <strong>{selectedAdminUser.role}</strong>
+              </article>
+              <article>
+                <p className="detail-label">Access</p>
+                <strong>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</strong>
+              </article>
+              <article>
+                <p className="detail-label">Enrolment</p>
+                <strong>{selectedAdminUser.isEnrolled ? 'Bound to Google subject' : 'Invited by email'}</strong>
+              </article>
+              <article className="full-width">
+                <p className="detail-label">Google subject</p>
+                <strong>{selectedAdminUser.googleSubject ?? 'Pending first Google sign-in'}</strong>
+              </article>
+              <article>
+                <p className="detail-label">Created</p>
+                <strong>{formatDateTime(selectedAdminUser.createdUtc)}</strong>
+              </article>
+              <article>
+                <p className="detail-label">Last login</p>
+                <strong>{formatDateTime(selectedAdminUser.lastLoginUtc)}</strong>
+              </article>
             </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="section-label">Enrolment Overview</p>
-                  <h2>{selectedAdminUser?.displayName || selectedAdminUser?.email || 'No user selected'}</h2>
-                </div>
-                <div className="actions">
-                  <button
-                    className="ghost-button"
-                    onClick={startAdminEdit}
-                    type="button"
-                    disabled={!selectedAdminUser}
-                  >
-                    Edit enrolment
-                  </button>
-                </div>
-              </div>
-
-              {selectedAdminUser ? (
-                <div className="detail-grid">
-                  <article>
-                    <p className="detail-label">Role</p>
-                    <strong>{selectedAdminUser.role}</strong>
-                  </article>
-                  <article>
-                    <p className="detail-label">Access</p>
-                    <strong>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</strong>
-                  </article>
-                  <article>
-                    <p className="detail-label">Enrolment</p>
-                    <strong>{selectedAdminUser.isEnrolled ? 'Bound to Google subject' : 'Invited by email'}</strong>
-                  </article>
-                  <article className="full-width">
-                    <p className="detail-label">Google subject</p>
-                    <strong>{selectedAdminUser.googleSubject ?? 'Pending first Google sign-in'}</strong>
-                  </article>
-                  <article>
-                    <p className="detail-label">Created</p>
-                    <strong>{formatDateTime(selectedAdminUser.createdUtc)}</strong>
-                  </article>
-                  <article>
-                    <p className="detail-label">Last login</p>
-                    <strong>{formatDateTime(selectedAdminUser.lastLoginUtc)}</strong>
-                  </article>
-                </div>
-              ) : (
-                <div className="empty-state roomy">
-                  <strong>Select an enrolled user to review their access.</strong>
-                  <p>The admin area stays hidden from standard users and only appears for admins.</p>
-                </div>
-              )}
+          ) : (
+            <div className="empty-state roomy">
+              <strong>Select an enrolled user to review their access.</strong>
+              <p>The admin area stays hidden from standard users and only appears for admins.</p>
             </div>
+          )}
+        </div>
 
-            <form className="panel" onSubmit={handleAdminSubmit}>
-              <div className="panel-heading">
-                <div>
-                  <p className="section-label">Management Pane</p>
-                  <h2>{adminMode === 'create' ? 'Create enrolment' : 'Update enrolment'}</h2>
-                </div>
-                <span className="status-pill">{adminStatus}</span>
-              </div>
-
-              <div className="form-grid">
-                <label>
-                  <span>Email</span>
-                  <input
-                    required
-                    type="email"
-                    value={adminForm.email}
-                    onChange={(event) => updateAdminField('email', event.target.value)}
-                    placeholder="performer@example.com"
-                  />
-                </label>
-
-                <label>
-                  <span>Display name</span>
-                  <input
-                    value={adminForm.displayName}
-                    onChange={(event) => updateAdminField('displayName', event.target.value)}
-                    placeholder="Optional"
-                  />
-                </label>
-
-                <label className="full-width">
-                  <span>Google subject</span>
-                  <input
-                    value={adminForm.googleSubject}
-                    onChange={(event) => updateAdminField('googleSubject', event.target.value)}
-                    placeholder="Optional until first Google sign-in"
-                    disabled={
-                      adminMode === 'edit' &&
-                      selectedAdminUser?.isEnrolled === true
-                    }
-                  />
-                </label>
-
-                <label>
-                  <span>Role</span>
-                  <select
-                    value={adminForm.role}
-                    onChange={(event) =>
-                      updateAdminField('role', event.target.value as AdminUserForm['role'])
-                    }
-                  >
-                    <option value="User">User</option>
-                    <option value="Admin">Admin</option>
-                  </select>
-                </label>
-
-                <label className="checkbox-field">
-                  <input
-                    type="checkbox"
-                    checked={adminForm.isActive}
-                    onChange={(event) => updateAdminField('isActive', event.target.checked)}
-                  />
-                  <span>Account is active and allowed to sign in</span>
-                </label>
-              </div>
-
-              <div className="form-actions">
-                <button className="primary-button" type="submit" disabled={isAdminLoading}>
-                  {adminMode === 'create' ? 'Enrol user' : 'Save enrolment'}
-                </button>
-                <button className="ghost-button" onClick={startAdminCreate} type="button">
-                  Reset enrolment form
-                </button>
-              </div>
-              <p className="auth-note">
-                Admins can pre-provision by email only. If Google subject is blank, Glovelly
-                will bind it on the user’s first successful Google sign-in.
-              </p>
-            </form>
+        <form className="panel" onSubmit={handleAdminSubmit}>
+          <div className="panel-heading">
+            <div>
+              <p className="section-label">Management Pane</p>
+              <h2>{adminMode === 'create' ? 'Create enrolment' : 'Update enrolment'}</h2>
+            </div>
+            <span className="status-pill">{adminStatus}</span>
           </div>
-        </section>
-      )}
+
+          <div className="form-grid">
+            <label>
+              <span>Email</span>
+              <input
+                required
+                type="email"
+                value={adminForm.email}
+                onChange={(event) => updateAdminField('email', event.target.value)}
+                placeholder="performer@example.com"
+              />
+            </label>
+
+            <label>
+              <span>Display name</span>
+              <input
+                value={adminForm.displayName}
+                onChange={(event) => updateAdminField('displayName', event.target.value)}
+                placeholder="Optional"
+              />
+            </label>
+
+            <label className="full-width">
+              <span>Google subject</span>
+              <input
+                value={adminForm.googleSubject}
+                onChange={(event) => updateAdminField('googleSubject', event.target.value)}
+                placeholder="Optional until first Google sign-in"
+                disabled={adminMode === 'edit' && selectedAdminUser?.isEnrolled === true}
+              />
+            </label>
+
+            <label>
+              <span>Role</span>
+              <select
+                value={adminForm.role}
+                onChange={(event) =>
+                  updateAdminField('role', event.target.value as AdminUserForm['role'])
+                }
+              >
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </label>
+
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={adminForm.isActive}
+                onChange={(event) => updateAdminField('isActive', event.target.checked)}
+              />
+              <span>Account is active and allowed to sign in</span>
+            </label>
+          </div>
+
+          <div className="form-actions">
+            <button className="primary-button" type="submit" disabled={isAdminLoading}>
+              {adminMode === 'create' ? 'Enrol user' : 'Save enrolment'}
+            </button>
+            <button className="ghost-button" onClick={startAdminCreate} type="button">
+              Reset enrolment form
+            </button>
+          </div>
+          <p className="auth-note">
+            Admins can pre-provision by email only. If Google subject is blank, Glovelly
+            will bind it on the user’s first successful Google sign-in.
+          </p>
+        </form>
+      </div>
+    </section>
+  )
+
+  const renderGigsSection = () => (
+    <section className="section-layout">
+      <div className="gigs-draft panel">
+        <div className="panel-heading">
+          <div>
+            <p className="section-label">Draft Section</p>
+            <h2>Gigs</h2>
+          </div>
+          <span className="status-pill">Coming next</span>
+        </div>
+
+        <p className="hero-text">
+          This space is reserved for the booking workflow that links clients,
+          dates, venues, performers and delivery status into one operational view.
+        </p>
+
+        <div className="draft-grid">
+          <article>
+            <p className="detail-label">Likely modules</p>
+            <strong>Schedule, assignment, logistics and invoicing handoff.</strong>
+          </article>
+          <article>
+            <p className="detail-label">Suggested shape</p>
+            <strong>List of gigs, timeline summary, and a detailed edit pane.</strong>
+          </article>
+          <article className="full-width">
+            <p className="detail-label">Why keep it here now</p>
+            <span>
+              The navigation is already ready for the next phase, so we can add gigs
+              without rearranging the whole app shell a second time.
+            </span>
+          </article>
+        </div>
+      </div>
+    </section>
+  )
+
+  return (
+    <main className="app-shell">
+      <section className="hero-panel app-frame">
+        <aside className="nav-panel">
+          <div className="nav-intro">
+            <p className="eyebrow">Workspace</p>
+            <h1>Glovelly keeps each area in its own lane.</h1>
+            <p className="hero-text">
+              Move between client records, admin access and the next planned gigs
+              workspace without stacking everything into one screen.
+            </p>
+          </div>
+
+          <nav className="nav-menu" aria-label="Primary">
+            {navigationItems.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-item ${activeSection === item.id ? 'selected' : ''}`}
+                onClick={() => setActiveSection(item.id)}
+                type="button"
+                disabled={item.disabled}
+              >
+                <span className="nav-meta">{item.eyebrow}</span>
+                <strong>{item.label}</strong>
+                <span>{item.description}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="hero-mascot">
+            <img src="/gordon-512.png" alt="Gordon the Glovelly mascot" />
+            <div>
+              <p className="section-label">Meet Gordon</p>
+              <strong>Mozart wig. Rubber chicken. Unreasonably good taste in admin.</strong>
+            </div>
+          </div>
+        </aside>
+
+        <div className="content-shell">
+          <div className="content-header panel">
+            <div className="content-header-copy">
+              <p className="eyebrow">{currentSection?.eyebrow ?? 'Workspace'}</p>
+              <h2>{currentSection?.label ?? 'Glovelly'}</h2>
+              <p className="hero-text">{currentSection?.description}</p>
+            </div>
+
+            <div className="content-header-aside">
+              <div className="hero-metrics">
+                <article>
+                  <span>{clients.length}</span>
+                  <p>clients on file</p>
+                </article>
+                <article>
+                  <span>{secondaryMetricValue}</span>
+                  <p>{secondaryMetricLabel}</p>
+                </article>
+                <article>
+                  <span>{activeSection === 'gigs' ? 'Draft' : isApiConnected ? 'Live' : 'Offline'}</span>
+                  <p>{activeSection === 'gigs' ? 'section status' : 'data source'}</p>
+                </article>
+              </div>
+
+              <div className="session-card">
+                <div>
+                  <p className="section-label">Signed In</p>
+                  <strong>{authUser?.name ?? authUser?.email}</strong>
+                  <span>
+                    {authUser?.email}
+                    {isAdmin ? ' · Administrator' : ''}
+                  </span>
+                </div>
+                <button
+                  className="ghost-button"
+                  onClick={signOut}
+                  type="button"
+                  disabled={isLoading || isAdminLoading}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {activeSection === 'clients' && renderClientsSection()}
+          {activeSection === 'admin' && isAdmin && renderAdminSection()}
+          {activeSection === 'gigs' && renderGigsSection()}
+        </div>
+      </section>
     </main>
   )
 }

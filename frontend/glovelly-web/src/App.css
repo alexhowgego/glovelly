@@ -5,6 +5,11 @@
   gap: 24px;
 }
 
+.section-layout {
+  display: grid;
+  gap: 24px;
+}
+
 .hero-panel,
 .panel {
   border: 1px solid rgba(34, 42, 52, 0.08);
@@ -24,6 +29,11 @@
   align-items: end;
 }
 
+.app-frame {
+  grid-template-columns: minmax(280px, 0.7fr) minmax(0, 1.45fr);
+  align-items: start;
+}
+
 .hero-copy {
   max-width: 740px;
 }
@@ -31,6 +41,79 @@
 .hero-brand {
   display: grid;
   gap: 16px;
+}
+
+.nav-panel {
+  display: grid;
+  gap: 18px;
+  align-self: stretch;
+}
+
+.nav-intro {
+  display: grid;
+  gap: 16px;
+}
+
+.nav-menu {
+  display: grid;
+  gap: 12px;
+}
+
+.nav-item {
+  text-align: left;
+  border: 1px solid rgba(34, 42, 52, 0.08);
+  border-radius: 22px;
+  padding: 18px;
+  display: grid;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  color: inherit;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.nav-item strong {
+  color: var(--heading);
+  font-size: 1.05rem;
+}
+
+.nav-item span:last-child {
+  color: var(--muted);
+}
+
+.nav-item:hover,
+.nav-item:focus-visible,
+.nav-item.selected {
+  transform: translateY(-1px);
+  border-color: rgba(27, 63, 97, 0.25);
+  background: linear-gradient(180deg, rgba(255, 250, 244, 0.95), rgba(244, 237, 228, 0.9));
+  box-shadow: 0 18px 30px rgba(52, 43, 35, 0.08);
+}
+
+.nav-meta {
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-strong);
+}
+
+.content-shell {
+  display: grid;
+  gap: 24px;
+}
+
+.content-header {
+  display: grid;
+  gap: 20px;
+}
+
+.content-header-copy,
+.content-header-aside {
+  display: grid;
+  gap: 18px;
 }
 
 .auth-shell {
@@ -165,6 +248,25 @@
   display: grid;
   gap: 24px;
   grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) minmax(360px, 1.05fr);
+}
+
+.gigs-draft {
+  min-height: 320px;
+}
+
+.draft-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.draft-grid article {
+  display: grid;
+  gap: 6px;
+  border-radius: 20px;
+  padding: 18px;
+  background: rgba(248, 242, 233, 0.72);
+  border: 1px solid rgba(34, 42, 52, 0.06);
 }
 
 .admin-metrics {
@@ -404,7 +506,8 @@ button:disabled {
 @media (max-width: 1180px) {
   .hero-panel,
   .workspace,
-  .admin-workspace {
+  .admin-workspace,
+  .app-frame {
     grid-template-columns: 1fr;
   }
 
@@ -427,7 +530,8 @@ button:disabled {
 
   .hero-metrics,
   .form-grid,
-  .detail-grid {
+  .detail-grid,
+  .draft-grid {
     grid-template-columns: 1fr;
   }
 
