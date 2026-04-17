@@ -329,6 +329,7 @@ auth.MapGet("/me", [Authorize(Policy = GlovellyPolicies.GlovellyUser)] (ClaimsPr
         role = currentUserAccessor.TryGetRole(user)?.ToString(),
         name = user.FindFirstValue(ClaimTypes.Name) ?? user.FindFirstValue("name") ?? "Signed in user",
         email = user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirstValue("email") ?? string.Empty,
+        profileImageUrl = user.FindFirstValue("picture") ?? user.FindFirstValue("profile") ?? string.Empty,
     });
 });
 

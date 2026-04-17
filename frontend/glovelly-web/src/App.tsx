@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 
@@ -29,6 +29,7 @@ type AuthUser = {
   role: string
   name: string
   email: string
+  profileImageUrl: string
 }
 
 type AdminUser = {
@@ -140,6 +141,8 @@ function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
@@ -150,12 +153,46 @@ function App() {
   const [isAdminLoading, setIsAdminLoading] = useState(false)
 
   const isAdmin = authUser?.role === 'Admin'
+  const profileDisplayName = authUser?.name?.trim() || authUser?.email || 'User'
+  const profileImageUrl = authUser?.profileImageUrl?.trim() || ''
+  const profileInitials = profileDisplayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
 
   useEffect(() => {
     if (!isAdmin && activeSection === 'admin') {
       setActiveSection('clients')
     }
   }, [activeSection, isAdmin])
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsProfileMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isProfileMenuOpen])
 
   const resetAdminWorkspace = () => {
     setAdminUsers([])
@@ -487,6 +524,7 @@ function App() {
 
   const signOut = async () => {
     setIsLoading(true)
+    setIsProfileMenuOpen(false)
 
     try {
       const response = await fetchWithSession(buildApiUrl('/auth/logout'), {
@@ -1271,10 +1309,58 @@ function App() {
 
         <div className="content-shell">
           <div className="content-header panel">
-            <div className="content-header-copy">
-              <p className="eyebrow">{currentSection?.eyebrow ?? 'Workspace'}</p>
-              <h2>{currentSection?.label ?? 'Glovelly'}</h2>
-              <p className="hero-text">{currentSection?.description}</p>
+            <div className="content-header-top">
+              <div className="content-header-copy">
+                <p className="eyebrow">{currentSection?.eyebrow ?? 'Workspace'}</p>
+                <h2>{currentSection?.label ?? 'Glovelly'}</h2>
+                <p className="hero-text">{currentSection?.description}</p>
+              </div>
+
+              <div className="profile-menu" ref={profileMenuRef}>
+                <button
+                  aria-expanded={isProfileMenuOpen}
+                  aria-haspopup="menu"
+                  aria-label="Open profile menu"
+                  className={`profile-trigger ${isProfileMenuOpen ? 'open' : ''}`}
+                  onClick={() => setIsProfileMenuOpen((current) => !current)}
+                  type="button"
+                >
+                  <span className="profile-avatar" aria-hidden="true">
+                    {profileImageUrl ? (
+                      <img
+                        className="profile-avatar-image"
+                        src={profileImageUrl}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      profileInitials || 'U'
+                    )}
+                  </span>
+                </button>
+
+                {isProfileMenuOpen && (
+                  <div className="profile-dropdown" role="menu" aria-label="Profile menu">
+                    <div className="profile-summary">
+                      <p className="section-label">Signed in</p>
+                      <strong>{profileDisplayName}</strong>
+                      <span>{authUser?.email}</span>
+                    </div>
+                    <div className="profile-meta">
+                      <span>{isAdmin ? 'Administrator' : 'Standard access'}</span>
+                    </div>
+                    <button
+                      className="ghost-button profile-signout"
+                      onClick={signOut}
+                      role="menuitem"
+                      type="button"
+                      disabled={isLoading || isAdminLoading}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="content-header-aside">
@@ -1291,25 +1377,6 @@ function App() {
                   <span>{activeSection === 'gigs' ? 'Draft' : isApiConnected ? 'Live' : 'Offline'}</span>
                   <p>{activeSection === 'gigs' ? 'section status' : 'data source'}</p>
                 </article>
-              </div>
-
-              <div className="session-card">
-                <div>
-                  <p className="section-label">Signed In</p>
-                  <strong>{authUser?.name ?? authUser?.email}</strong>
-                  <span>
-                    {authUser?.email}
-                    {isAdmin ? ' · Administrator' : ''}
-                  </span>
-                </div>
-                <button
-                  className="ghost-button"
-                  onClick={signOut}
-                  type="button"
-                  disabled={isLoading || isAdminLoading}
-                >
-                  Sign out
-                </button>
               </div>
             </div>
           </div>
