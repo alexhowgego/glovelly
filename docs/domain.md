@@ -1,4 +1,4 @@
-# Domain Model (v0)
+# Domain Model
 
 ## Client
 - id
@@ -9,13 +9,17 @@
 ## Gig
 - id
 - clientId
+- invoiceId?
 - title
 - date
 - venue
 - fee
 - travelMiles
 - notes
-- invoiced (bool)
+- wasDriving
+- status
+- invoicedAt?
+- isInvoiced (derived from invoiceId)
 
 ## Invoice
 - id

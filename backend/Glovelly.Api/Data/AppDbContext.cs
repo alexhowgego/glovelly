@@ -70,8 +70,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasMaxLength(200);
             entity.Property(gig => gig.Fee)
                 .HasPrecision(18, 2);
+            entity.Property(gig => gig.TravelMiles)
+                .HasPrecision(18, 2);
             entity.Property(gig => gig.Notes)
                 .HasMaxLength(4000);
+            entity.Property(gig => gig.Status)
+                .HasConversion<string>()
+                .HasMaxLength(50);
 
             entity.HasOne(gig => gig.CreatedByUser)
                 .WithMany(user => user.GigsCreated)
@@ -85,6 +90,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(client => client.Gigs)
                 .HasForeignKey(gig => gig.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(gig => gig.Invoice)
+                .WithMany(invoice => invoice.Gigs)
+                .HasForeignKey(gig => gig.InvoiceId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Invoice>(entity =>

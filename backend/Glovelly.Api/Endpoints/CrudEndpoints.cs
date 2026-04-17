@@ -136,11 +136,36 @@ public static class CrudEndpoints
                 });
             }
 
+            if (gig.InvoiceId.HasValue)
+            {
+                var invoice = await db.Invoices
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(value => value.Id == gig.InvoiceId.Value);
+
+                if (invoice is null)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["invoiceId"] = ["Invoice does not exist."]
+                    });
+                }
+
+                if (invoice.ClientId != gig.ClientId)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["invoiceId"] = ["Invoice client must match the gig client."]
+                    });
+                }
+            }
+
             gig.Id = Guid.NewGuid();
             gig.Title = gig.Title.Trim();
             gig.Venue = gig.Venue.Trim();
             gig.Notes = gig.Notes?.Trim();
             gig.Client = null;
+            gig.Invoice = null;
+            gig.InvoicedAt = ResolveInvoicedAt(gig.InvoiceId, null, null, gig.InvoicedAt);
             StampCreate(gig, currentUserAccessor.TryGetUserId(user));
 
             db.Gigs.Add(gig);
@@ -169,14 +194,42 @@ public static class CrudEndpoints
                 });
             }
 
+            if (request.InvoiceId.HasValue)
+            {
+                var invoice = await db.Invoices
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(value => value.Id == request.InvoiceId.Value);
+
+                if (invoice is null)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["invoiceId"] = ["Invoice does not exist."]
+                    });
+                }
+
+                if (invoice.ClientId != request.ClientId)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["invoiceId"] = ["Invoice client must match the gig client."]
+                    });
+                }
+            }
+
+            var previousInvoiceId = gig.InvoiceId;
+
             gig.ClientId = request.ClientId;
+            gig.InvoiceId = request.InvoiceId;
             gig.Title = request.Title.Trim();
             gig.Date = request.Date;
             gig.Venue = request.Venue.Trim();
             gig.Fee = request.Fee;
             gig.TravelMiles = request.TravelMiles;
             gig.Notes = request.Notes?.Trim();
-            gig.Invoiced = request.Invoiced;
+            gig.WasDriving = request.WasDriving;
+            gig.Status = request.Status;
+            gig.InvoicedAt = ResolveInvoicedAt(request.InvoiceId, previousInvoiceId, gig.InvoicedAt, request.InvoicedAt);
             StampUpdate(gig, currentUserAccessor.TryGetUserId(user));
 
             await db.SaveChangesAsync();
@@ -407,6 +460,30 @@ public static class CrudEndpoints
 
         invoice.Subtotal = invoice.Lines.Sum(line => line.Total);
         await db.SaveChangesAsync();
+    }
+
+    private static DateTimeOffset? ResolveInvoicedAt(
+        Guid? invoiceId,
+        Guid? previousInvoiceId,
+        DateTimeOffset? currentInvoicedAt,
+        DateTimeOffset? requestedInvoicedAt)
+    {
+        if (!invoiceId.HasValue)
+        {
+            return null;
+        }
+
+        if (requestedInvoicedAt.HasValue)
+        {
+            return requestedInvoicedAt.Value;
+        }
+
+        if (previousInvoiceId == invoiceId)
+        {
+            return currentInvoicedAt;
+        }
+
+        return DateTimeOffset.UtcNow;
     }
 
     private static IQueryable<Client> WhereVisibleTo(this IQueryable<Client> query, Guid? userId)

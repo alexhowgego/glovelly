@@ -142,13 +142,16 @@ public static class AppDbSeeder
             {
                 Id = Guid.Parse("387e596f-a262-4e3e-b224-493a46daf7a1"),
                 ClientId = foxAndFinchId,
+                InvoiceId = invoices[0].Id,
                 Title = "Spring Product Launch",
                 Date = new DateOnly(2026, 4, 18),
                 Venue = "Albert Hall, Manchester",
                 Fee = 650m,
                 TravelMiles = 24m,
                 Notes = "Evening set with acoustic opener.",
-                Invoiced = true
+                WasDriving = true,
+                Status = GigStatus.Confirmed,
+                InvoicedAt = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero)
             },
             new Gig
             {
@@ -160,19 +163,23 @@ public static class AppDbSeeder
                 Fee = 920m,
                 TravelMiles = 78m,
                 Notes = "Ceremony plus evening set.",
-                Invoiced = false
+                WasDriving = true,
+                Status = GigStatus.Confirmed
             },
             new Gig
             {
                 Id = Guid.Parse("51a47dea-4758-4d92-92bf-2be38a0af476"),
                 ClientId = riversideId,
+                InvoiceId = invoices[1].Id,
                 Title = "Community Residency Weekend",
                 Date = new DateOnly(2026, 5, 11),
                 Venue = "Riverside Arts Centre",
                 Fee = 360m,
                 TravelMiles = 12m,
                 Notes = "Two workshops and one closing performance.",
-                Invoiced = true
+                WasDriving = false,
+                Status = GigStatus.Draft,
+                InvoicedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero)
             }
         };
 

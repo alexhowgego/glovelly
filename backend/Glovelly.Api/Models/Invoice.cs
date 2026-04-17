@@ -21,5 +21,7 @@ public sealed class Invoice
     public User? CreatedByUser { get; set; }
     [JsonIgnore]
     public User? UpdatedByUser { get; set; }
+    [JsonIgnore]
+    public ICollection<Gig> Gigs { get; set; } = new List<Gig>();
     public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
 }
