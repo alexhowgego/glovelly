@@ -66,6 +66,36 @@ type ClientSettingsForm = {
   passengerMileageRate: string
 }
 
+type GigStatus = 'Draft' | 'Confirmed' | 'Completed' | 'Cancelled'
+
+type Gig = {
+  id: string
+  clientId: string
+  invoiceId: string | null
+  title: string
+  date: string
+  venue: string
+  fee: number
+  travelMiles: number
+  passengerCount: number | null
+  notes: string | null
+  wasDriving: boolean
+  status: GigStatus
+  invoicedAt: string | null
+  isInvoiced: boolean
+}
+
+type GigForm = {
+  clientId: string
+  title: string
+  date: string
+  venue: string
+  fee: string
+  notes: string
+  wasDriving: boolean
+  status: GigStatus
+}
+
 type AppSection = 'clients' | 'admin' | 'gigs'
 type ThemePreference = 'system' | 'light' | 'dark'
 
@@ -102,7 +132,19 @@ const emptyClientSettingsForm = (): ClientSettingsForm => ({
   passengerMileageRate: '',
 })
 
+const emptyGigForm = (): GigForm => ({
+  clientId: '',
+  title: '',
+  date: '',
+  venue: '',
+  fee: '',
+  notes: '',
+  wasDriving: true,
+  status: 'Confirmed',
+})
+
 const defaultAdminStatus = 'User enrolment tools ready.'
+const defaultGigStatus = 'Create a gig and it will show up in your gigs workspace.'
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
@@ -163,6 +205,34 @@ function formatRate(value: number | null) {
   return `${value.toFixed(2)} per mile`
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function formatDate(value: string) {
+  if (!value) {
+    return 'No date'
+  }
+
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+  }).format(date)
+}
+
+function formatGigStatus(status: GigStatus) {
+  return status === 'Confirmed' ? 'Planned' : status
+}
+
 function getStoredThemePreference(): ThemePreference {
   const rawPreference = window.localStorage.getItem(themeStorageKey)
   if (
@@ -214,6 +284,13 @@ function App() {
   const [adminForm, setAdminForm] = useState<AdminUserForm>(emptyAdminForm)
   const [adminStatus, setAdminStatus] = useState(defaultAdminStatus)
   const [isAdminLoading, setIsAdminLoading] = useState(false)
+  const [gigs, setGigs] = useState<Gig[]>([])
+  const [selectedGigId, setSelectedGigId] = useState<string>('')
+  const [gigSearchQuery, setGigSearchQuery] = useState('')
+  const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
+  const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
+  const [gigStatus, setGigStatus] = useState(defaultGigStatus)
+  const [isGigLoading, setIsGigLoading] = useState(false)
 
   const isAdmin = authUser?.role === 'Admin'
   const profileDisplayName = authUser?.name?.trim() || authUser?.email || 'User'
@@ -306,6 +383,12 @@ function App() {
       setSearchQuery('')
       setMode('create')
       setForm(emptyForm())
+      setGigs([])
+      setSelectedGigId('')
+      setGigSearchQuery('')
+      setGigMode('create')
+      setGigForm(emptyGigForm())
+      setGigStatus(defaultGigStatus)
       setIsClientSettingsOpen(false)
       setClientSettingsForm(emptyClientSettingsForm())
       setClientSettingsStatus(
@@ -379,8 +462,12 @@ function App() {
         setAuthUser(user)
         setIsLoading(true)
 
-        const clientsResponse = await fetchWithSession(buildApiUrl('/clients'))
-        if (clientsResponse.status === 401) {
+        const [clientsResponse, gigsResponse] = await Promise.all([
+          fetchWithSession(buildApiUrl('/clients')),
+          fetchWithSession(buildApiUrl('/gigs')),
+        ])
+
+        if (clientsResponse.status === 401 || gigsResponse.status === 401) {
           setIsAuthenticated(false)
           setAuthUser(null)
           setIsApiConnected(false)
@@ -393,13 +480,20 @@ function App() {
           throw new Error('Unable to load clients.')
         }
 
+        if (!gigsResponse.ok) {
+          throw new Error('Unable to load gigs.')
+        }
+
         const data = (await clientsResponse.json()) as Client[]
+        const gigData = (await gigsResponse.json()) as Gig[]
         if (ignore) {
           return
         }
 
         setClients(data)
         setSelectedClientId(data[0]?.id ?? '')
+        setGigs(gigData)
+        setSelectedGigId(gigData[0]?.id ?? '')
         setIsApiConnected(true)
         setShouldCloseBrowserNotice(false)
         setStatus(
@@ -485,6 +579,32 @@ function App() {
     )
   }, [adminSearchQuery, adminUsers])
 
+  const filteredGigs = useMemo(() => {
+    const query = gigSearchQuery.trim().toLowerCase()
+    const sortedGigs = [...gigs].sort((left, right) => {
+      const dateComparison = right.date.localeCompare(left.date)
+      if (dateComparison !== 0) {
+        return dateComparison
+      }
+
+      return left.title.localeCompare(right.title)
+    })
+
+    if (!query) {
+      return sortedGigs
+    }
+
+    return sortedGigs.filter((gig) => {
+      const clientName =
+        clients.find((client) => client.id === gig.clientId)?.name ?? ''
+
+      return [gig.title, gig.venue, gig.date, gig.status, clientName]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    })
+  }, [clients, gigSearchQuery, gigs])
+
   const selectedClient =
     filteredClients.find((client) => client.id === selectedClientId) ??
     clients.find((client) => client.id === selectedClientId) ??
@@ -495,6 +615,12 @@ function App() {
     filteredAdminUsers.find((user) => user.id === selectedAdminUserId) ??
     adminUsers.find((user) => user.id === selectedAdminUserId) ??
     filteredAdminUsers[0] ??
+    null
+
+  const selectedGig =
+    filteredGigs.find((gig) => gig.id === selectedGigId) ??
+    gigs.find((gig) => gig.id === selectedGigId) ??
+    filteredGigs[0] ??
     null
 
   useEffect(() => {
@@ -509,9 +635,28 @@ function App() {
     }
   }, [selectedAdminUser])
 
+  useEffect(() => {
+    if (selectedGig) {
+      setSelectedGigId(selectedGig.id)
+    }
+  }, [selectedGig])
+
+  useEffect(() => {
+    if (gigForm.clientId || clients.length === 0) {
+      return
+    }
+
+    setGigForm((current) => ({
+      ...current,
+      clientId: clients[0]?.id ?? '',
+    }))
+  }, [clients, gigForm.clientId])
+
   const activeCities = new Set(clients.map((client) => client.billingAddress.city)).size
   const activeUsersCount = adminUsers.filter((user) => user.isActive).length
   const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
+  const plannedGigCount = gigs.filter((gig) => gig.status === 'Confirmed').length
+  const upcomingGigCount = gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length
 
   const navigationItems: Array<{
     id: AppSection
@@ -539,19 +684,23 @@ function App() {
     {
       id: 'gigs',
       label: 'Gigs',
-      eyebrow: 'Next',
-      description: 'Draft home for scheduling, bookings and delivery status.',
+      eyebrow: 'Live',
+      description: 'Bookings, delivery status and the first invoicing-ready gig records.',
     },
   ]
 
   const currentSection = navigationItems.find((item) => item.id === activeSection)
   const secondaryMetricValue =
-    activeSection === 'admin' ? activeUsersCount : activeSection === 'gigs' ? 'Planned' : activeCities
+    activeSection === 'admin'
+      ? activeUsersCount
+      : activeSection === 'gigs'
+        ? upcomingGigCount
+        : activeCities
   const secondaryMetricLabel =
     activeSection === 'admin'
       ? 'active accounts'
       : activeSection === 'gigs'
-        ? 'workflow stage'
+        ? 'upcoming gigs'
         : 'active cities'
 
   const startCreating = () => {
@@ -592,6 +741,38 @@ function App() {
     })
   }
 
+  const startGigCreate = () => {
+    setGigMode('create')
+    setGigForm({
+      ...emptyGigForm(),
+      clientId: clients[0]?.id ?? '',
+    })
+    setGigStatus(
+      clients.length > 0
+        ? 'Capture the essentials now and we can build invoicing on top later.'
+        : 'Create a client first so the gig can be linked correctly.'
+    )
+  }
+
+  const startGigEdit = () => {
+    if (!selectedGig) {
+      return
+    }
+
+    setGigMode('edit')
+    setGigForm({
+      clientId: selectedGig.clientId,
+      title: selectedGig.title,
+      date: selectedGig.date,
+      venue: selectedGig.venue,
+      fee: String(selectedGig.fee),
+      notes: selectedGig.notes ?? '',
+      wasDriving: selectedGig.wasDriving,
+      status: selectedGig.status,
+    })
+    setGigStatus('Editing the selected gig.')
+  }
+
   const updateField = (field: keyof ClientForm, value: string | Address) => {
     setForm((current) => ({
       ...current,
@@ -614,6 +795,16 @@ function App() {
     value: string | boolean
   ) => {
     setAdminForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  const updateGigField = (
+    field: keyof GigForm,
+    value: string | boolean
+  ) => {
+    setGigForm((current) => ({
       ...current,
       [field]: value,
     }))
@@ -647,6 +838,12 @@ function App() {
       setSearchQuery('')
       setMode('create')
       setForm(emptyForm())
+      setGigs([])
+      setSelectedGigId('')
+      setGigSearchQuery('')
+      setGigMode('create')
+      setGigForm(emptyGigForm())
+      setGigStatus(defaultGigStatus)
       resetAdminWorkspace()
       setShouldCloseBrowserNotice(true)
       setStatus('Signed out. Close your browser to fully end the Google session.')
@@ -1123,6 +1320,110 @@ function App() {
       )
     } finally {
       setIsAdminLoading(false)
+    }
+  }
+
+  const handleGigSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const payload = {
+      clientId: gigForm.clientId,
+      title: gigForm.title.trim(),
+      date: gigForm.date,
+      venue: gigForm.venue.trim(),
+      fee: gigForm.fee.trim(),
+      notes: gigForm.notes.trim(),
+      wasDriving: gigForm.wasDriving,
+      status: gigForm.status,
+    }
+
+    if (!payload.clientId || !payload.title || !payload.date || !payload.venue) {
+      setGigStatus('Client, title, date and location are required.')
+      return
+    }
+
+    const fee = Number(payload.fee)
+    if (!Number.isFinite(fee) || fee < 0) {
+      setGigStatus('Fee must be a valid non-negative number.')
+      return
+    }
+
+    setIsGigLoading(true)
+
+    try {
+      const isEdit = gigMode === 'edit' && selectedGig
+      const endpoint = isEdit
+        ? buildApiUrl(`/gigs/${selectedGig.id}`)
+        : buildApiUrl('/gigs')
+
+      const response = await fetchWithSession(endpoint, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: payload.clientId,
+          title: payload.title,
+          date: payload.date,
+          venue: payload.venue,
+          fee,
+          travelMiles: 0,
+          passengerCount: null,
+          notes: payload.notes || null,
+          wasDriving: payload.wasDriving,
+          status: payload.status,
+          invoiceId: null,
+          expenses: [],
+          invoicedAt: null,
+        }),
+      })
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setStatus('Your session expired. Sign in again to keep managing gigs.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to save gig.')
+      }
+
+      const savedGig = (await response.json()) as Gig
+
+      setGigs((current) => {
+        if (isEdit) {
+          return current.map((gig) => (gig.id === savedGig.id ? savedGig : gig))
+        }
+
+        return [savedGig, ...current]
+      })
+
+      setSelectedGigId(savedGig.id)
+      setGigMode('edit')
+      setGigForm({
+        clientId: savedGig.clientId,
+        title: savedGig.title,
+        date: savedGig.date,
+        venue: savedGig.venue,
+        fee: String(savedGig.fee),
+        notes: savedGig.notes ?? '',
+        wasDriving: savedGig.wasDriving,
+        status: savedGig.status,
+      })
+      setGigStatus(isEdit ? 'Gig updated.' : 'Gig created.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error ? error.message : 'Unable to save this gig right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
     }
   }
 
@@ -1610,42 +1911,281 @@ function App() {
     </section>
   )
 
-  const renderGigsSection = () => (
-    <section className="section-layout">
-      <div className="gigs-draft panel">
-        <div className="panel-heading">
-          <div>
-            <p className="section-label">Draft Section</p>
-            <h2>Gigs</h2>
+  const renderGigsSection = () => {
+    const selectedGigClient =
+      clients.find((client) => client.id === selectedGig?.clientId) ?? null
+
+    return (
+      <section className="section-layout">
+        <div className="gig-workspace">
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Bookings</p>
+                <h2>Gigs</h2>
+              </div>
+              <button className="ghost-button" onClick={startGigCreate} type="button">
+                New gig
+              </button>
+            </div>
+
+            <label className="search-field">
+              <span>Search</span>
+              <input
+                type="search"
+                placeholder="Client, title, venue..."
+                value={gigSearchQuery}
+                onChange={(event) => setGigSearchQuery(event.target.value)}
+              />
+            </label>
+
+            <div className="gig-summary-grid">
+              <article>
+                <span>{gigs.length}</span>
+                <p>saved gigs</p>
+              </article>
+              <article>
+                <span>{plannedGigCount}</span>
+                <p>planned</p>
+              </article>
+              <article>
+                <span>{gigs.filter((gig) => gig.status === 'Completed').length}</span>
+                <p>completed</p>
+              </article>
+            </div>
+
+            <div className="client-list">
+              {filteredGigs.map((gig) => {
+                const clientName =
+                  clients.find((client) => client.id === gig.clientId)?.name ??
+                  'Unknown client'
+
+                return (
+                  <button
+                    key={gig.id}
+                    className={`client-card ${selectedGig?.id === gig.id ? 'selected' : ''}`}
+                    onClick={() => setSelectedGigId(gig.id)}
+                    type="button"
+                  >
+                    <div>
+                      <strong>{gig.title}</strong>
+                      <span>{clientName}</span>
+                    </div>
+                    <small className="gig-card-meta">
+                      {formatDate(gig.date)} · {gig.venue}
+                    </small>
+                    <small className="gig-card-meta">
+                      {formatCurrency(gig.fee)} · {formatGigStatus(gig.status)}
+                    </small>
+                  </button>
+                )
+              })}
+
+              {filteredGigs.length === 0 && (
+                <div className="empty-state">
+                  <strong>No gigs match that search.</strong>
+                  <p>Create the first gig or try a different term.</p>
+                </div>
+              )}
+            </div>
           </div>
-          <span className="status-pill">Coming next</span>
-        </div>
 
-        <p className="hero-text">
-          This space is reserved for the booking workflow that links clients,
-          dates, venues, performers and delivery status into one operational view.
-        </p>
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Gig Overview</p>
+                <h2>{selectedGig?.title ?? 'No gig selected'}</h2>
+              </div>
+              <div className="actions">
+                <button
+                  className="ghost-button"
+                  onClick={startGigEdit}
+                  type="button"
+                  disabled={!selectedGig}
+                >
+                  Edit gig
+                </button>
+              </div>
+            </div>
 
-        <div className="draft-grid">
-          <article>
-            <p className="detail-label">Likely modules</p>
-            <strong>Schedule, assignment, logistics and invoicing handoff.</strong>
-          </article>
-          <article>
-            <p className="detail-label">Suggested shape</p>
-            <strong>List of gigs, timeline summary, and a detailed edit pane.</strong>
-          </article>
-          <article className="full-width">
-            <p className="detail-label">Why keep it here now</p>
-            <span>
-              The navigation is already ready for the next phase, so we can add gigs
-              without rearranging the whole app shell a second time.
-            </span>
-          </article>
+            {selectedGig ? (
+              <>
+                <div className="detail-grid">
+                  <article>
+                    <p className="detail-label">Client</p>
+                    <strong>{selectedGigClient?.name ?? 'Unknown client'}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Status</p>
+                    <strong>{formatGigStatus(selectedGig.status)}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Date</p>
+                    <strong>{formatDate(selectedGig.date)}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Fee</p>
+                    <strong>{formatCurrency(selectedGig.fee)}</strong>
+                  </article>
+                  <article className="full-width">
+                    <p className="detail-label">Location</p>
+                    <strong>{selectedGig.venue}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Driving</p>
+                    <strong>{selectedGig.wasDriving ? 'Yes' : 'No'}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Invoice link</p>
+                    <strong>{selectedGig.isInvoiced ? 'Linked' : 'Not invoiced yet'}</strong>
+                  </article>
+                  <article className="full-width">
+                    <p className="detail-label">Notes</p>
+                    <span>{selectedGig.notes?.trim() || 'No notes yet.'}</span>
+                  </article>
+                </div>
+
+                <div className="gig-timeline-note">
+                  <p className="detail-label">Ready for future invoicing</p>
+                  <span>
+                    This record now carries the client, date, venue, fee and delivery
+                    status that invoice workflows can build on next.
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="empty-state roomy">
+                <strong>Select a gig to review its details.</strong>
+                <p>The browse pane shows the commercial snapshot that matters later.</p>
+              </div>
+            )}
+          </div>
+
+          <form className="panel" onSubmit={handleGigSubmit}>
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Management Pane</p>
+                <h2>{gigMode === 'create' ? 'Create gig' : 'Update gig'}</h2>
+              </div>
+              <span className="status-pill">{gigStatus}</span>
+            </div>
+
+            <div className="form-grid">
+              <label>
+                <span>Client</span>
+                <select
+                  required
+                  value={gigForm.clientId}
+                  onChange={(event) => updateGigField('clientId', event.target.value)}
+                >
+                  <option value="">Select a client</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>Date</span>
+                <input
+                  required
+                  type="date"
+                  value={gigForm.date}
+                  onChange={(event) => updateGigField('date', event.target.value)}
+                />
+              </label>
+
+              <label className="full-width">
+                <span>Title / description</span>
+                <input
+                  required
+                  value={gigForm.title}
+                  onChange={(event) => updateGigField('title', event.target.value)}
+                  placeholder="Spring product launch"
+                />
+              </label>
+
+              <label className="full-width">
+                <span>Location / venue</span>
+                <input
+                  required
+                  value={gigForm.venue}
+                  onChange={(event) => updateGigField('venue', event.target.value)}
+                  placeholder="Albert Hall, Manchester"
+                />
+              </label>
+
+              <label>
+                <span>Fee</span>
+                <input
+                  required
+                  inputMode="decimal"
+                  value={gigForm.fee}
+                  onChange={(event) => updateGigField('fee', event.target.value)}
+                  placeholder="650"
+                />
+              </label>
+
+              <label>
+                <span>Status</span>
+                <select
+                  value={gigForm.status}
+                  onChange={(event) =>
+                    updateGigField('status', event.target.value as GigStatus)
+                  }
+                >
+                  <option value="Confirmed">Planned</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                  <option value="Draft">Draft</option>
+                </select>
+              </label>
+
+              <label className="checkbox-field full-width">
+                <input
+                  type="checkbox"
+                  checked={gigForm.wasDriving}
+                  onChange={(event) => updateGigField('wasDriving', event.target.checked)}
+                />
+                <span>I was driving for this gig</span>
+              </label>
+
+              <label className="full-width">
+                <span>Notes</span>
+                <textarea
+                  rows={5}
+                  value={gigForm.notes}
+                  onChange={(event) => updateGigField('notes', event.target.value)}
+                  placeholder="Optional commercial or logistics notes"
+                />
+              </label>
+            </div>
+
+            <div className="form-actions">
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={isGigLoading || clients.length === 0}
+              >
+                {gigMode === 'create' ? 'Save gig' : 'Update gig'}
+              </button>
+              <button className="ghost-button" onClick={startGigCreate} type="button">
+                Reset form
+              </button>
+            </div>
+
+            {clients.length === 0 && (
+              <p className="auth-note">
+                Add a client first. Every gig is intentionally tied to a client record.
+              </p>
+            )}
+          </form>
         </div>
-      </div>
-    </section>
-  )
+      </section>
+    )
+  }
 
   return (
     <main className="app-shell">
@@ -1775,8 +2315,8 @@ function App() {
                   <p>{secondaryMetricLabel}</p>
                 </article>
                 <article>
-                  <span>{activeSection === 'gigs' ? 'Draft' : isApiConnected ? 'Live' : 'Offline'}</span>
-                  <p>{activeSection === 'gigs' ? 'section status' : 'data source'}</p>
+                  <span>{isApiConnected ? 'Live' : 'Offline'}</span>
+                  <p>{activeSection === 'gigs' ? 'workspace status' : 'data source'}</p>
                 </article>
               </div>
             </div>
