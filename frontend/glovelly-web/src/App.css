@@ -538,6 +538,36 @@
   color: var(--muted);
 }
 
+.invoice-line-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.invoice-line-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--surface-elevated);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 85%, transparent);
+}
+
+.invoice-line-item div {
+  display: grid;
+  gap: 4px;
+}
+
+.invoice-line-item strong {
+  color: var(--heading);
+}
+
+.invoice-line-item span {
+  color: var(--muted);
+}
+
 .actions,
 .form-actions {
   display: flex;

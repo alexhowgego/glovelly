@@ -85,6 +85,32 @@ type Gig = {
   isInvoiced: boolean
 }
 
+type InvoiceLine = {
+  id: string
+  sortOrder: number
+  type: string
+  description: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+  gigId: string | null
+  calculationNotes: string | null
+  isSystemGenerated: boolean
+}
+
+type Invoice = {
+  id: string
+  invoiceNumber: string
+  clientId: string
+  invoiceDate: string
+  dueDate: string
+  status: 'Draft' | 'Issued' | 'Paid' | 'Cancelled'
+  description: string | null
+  pdfBlob: string | null
+  total: number
+  lines: InvoiceLine[]
+}
+
 type GigForm = {
   clientId: string
   title: string
@@ -96,7 +122,7 @@ type GigForm = {
   status: GigStatus
 }
 
-type AppSection = 'clients' | 'admin' | 'gigs'
+type AppSection = 'clients' | 'admin' | 'gigs' | 'invoices'
 type ThemePreference = 'system' | 'light' | 'dark'
 
 const themeStorageKey = 'glovelly.theme-preference'
@@ -145,6 +171,7 @@ const emptyGigForm = (): GigForm => ({
 
 const defaultAdminStatus = 'User enrolment tools ready.'
 const defaultGigStatus = 'Create a gig and it will show up in your gigs workspace.'
+const defaultInvoiceStatus = 'Generated invoices appear here once a gig has been billed.'
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
@@ -291,6 +318,11 @@ function App() {
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
   const [gigStatus, setGigStatus] = useState(defaultGigStatus)
   const [isGigLoading, setIsGigLoading] = useState(false)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
+  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
+  const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
+  const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
 
   const isAdmin = authUser?.role === 'Admin'
   const profileDisplayName = authUser?.name?.trim() || authUser?.email || 'User'
@@ -389,6 +421,10 @@ function App() {
       setGigMode('create')
       setGigForm(emptyGigForm())
       setGigStatus(defaultGigStatus)
+      setInvoices([])
+      setSelectedInvoiceId('')
+      setInvoiceSearchQuery('')
+      setInvoiceStatus(defaultInvoiceStatus)
       setIsClientSettingsOpen(false)
       setClientSettingsForm(emptyClientSettingsForm())
       setClientSettingsStatus(
@@ -462,12 +498,17 @@ function App() {
         setAuthUser(user)
         setIsLoading(true)
 
-        const [clientsResponse, gigsResponse] = await Promise.all([
+        const [clientsResponse, gigsResponse, invoicesResponse] = await Promise.all([
           fetchWithSession(buildApiUrl('/clients')),
           fetchWithSession(buildApiUrl('/gigs')),
+          fetchWithSession(buildApiUrl('/invoices')),
         ])
 
-        if (clientsResponse.status === 401 || gigsResponse.status === 401) {
+        if (
+          clientsResponse.status === 401 ||
+          gigsResponse.status === 401 ||
+          invoicesResponse.status === 401
+        ) {
           setIsAuthenticated(false)
           setAuthUser(null)
           setIsApiConnected(false)
@@ -484,8 +525,13 @@ function App() {
           throw new Error('Unable to load gigs.')
         }
 
+        if (!invoicesResponse.ok) {
+          throw new Error('Unable to load invoices.')
+        }
+
         const data = (await clientsResponse.json()) as Client[]
         const gigData = (await gigsResponse.json()) as Gig[]
+        const invoiceData = (await invoicesResponse.json()) as Invoice[]
         if (ignore) {
           return
         }
@@ -494,6 +540,8 @@ function App() {
         setSelectedClientId(data[0]?.id ?? '')
         setGigs(gigData)
         setSelectedGigId(gigData[0]?.id ?? '')
+        setInvoices(invoiceData)
+        setSelectedInvoiceId(invoiceData[0]?.id ?? '')
         setIsApiConnected(true)
         setShouldCloseBrowserNotice(false)
         setStatus(
@@ -605,6 +653,37 @@ function App() {
     })
   }, [clients, gigSearchQuery, gigs])
 
+  const filteredInvoices = useMemo(() => {
+    const query = invoiceSearchQuery.trim().toLowerCase()
+    const sortedInvoices = [...invoices].sort((left, right) => {
+      const dateComparison = right.invoiceDate.localeCompare(left.invoiceDate)
+      if (dateComparison !== 0) {
+        return dateComparison
+      }
+
+      return left.invoiceNumber.localeCompare(right.invoiceNumber)
+    })
+
+    if (!query) {
+      return sortedInvoices
+    }
+
+    return sortedInvoices.filter((invoice) => {
+      const clientName =
+        clients.find((client) => client.id === invoice.clientId)?.name ?? ''
+
+      return [
+        invoice.invoiceNumber,
+        invoice.description ?? '',
+        invoice.status,
+        clientName,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    })
+  }, [clients, invoiceSearchQuery, invoices])
+
   const selectedClient =
     filteredClients.find((client) => client.id === selectedClientId) ??
     clients.find((client) => client.id === selectedClientId) ??
@@ -621,6 +700,12 @@ function App() {
     filteredGigs.find((gig) => gig.id === selectedGigId) ??
     gigs.find((gig) => gig.id === selectedGigId) ??
     filteredGigs[0] ??
+    null
+
+  const selectedInvoice =
+    filteredInvoices.find((invoice) => invoice.id === selectedInvoiceId) ??
+    invoices.find((invoice) => invoice.id === selectedInvoiceId) ??
+    filteredInvoices[0] ??
     null
 
   useEffect(() => {
@@ -642,6 +727,12 @@ function App() {
   }, [selectedGig])
 
   useEffect(() => {
+    if (selectedInvoice) {
+      setSelectedInvoiceId(selectedInvoice.id)
+    }
+  }, [selectedInvoice])
+
+  useEffect(() => {
     if (gigForm.clientId || clients.length === 0) {
       return
     }
@@ -657,6 +748,7 @@ function App() {
   const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
   const plannedGigCount = gigs.filter((gig) => gig.status === 'Confirmed').length
   const upcomingGigCount = gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length
+  const draftInvoiceCount = invoices.filter((invoice) => invoice.status === 'Draft').length
 
   const navigationItems: Array<{
     id: AppSection
@@ -687,6 +779,12 @@ function App() {
       eyebrow: 'Live',
       description: 'Bookings, delivery status and the first invoicing-ready gig records.',
     },
+    {
+      id: 'invoices',
+      label: 'Invoices',
+      eyebrow: 'Generated',
+      description: 'One-off invoices, line items and downloadable PDFs.',
+    },
   ]
 
   const currentSection = navigationItems.find((item) => item.id === activeSection)
@@ -695,12 +793,16 @@ function App() {
       ? activeUsersCount
       : activeSection === 'gigs'
         ? upcomingGigCount
+        : activeSection === 'invoices'
+          ? draftInvoiceCount
         : activeCities
   const secondaryMetricLabel =
     activeSection === 'admin'
       ? 'active accounts'
       : activeSection === 'gigs'
         ? 'upcoming gigs'
+        : activeSection === 'invoices'
+          ? 'draft invoices'
         : 'active cities'
 
   const startCreating = () => {
@@ -1427,6 +1529,100 @@ function App() {
     }
   }
 
+  const handleGenerateInvoice = async () => {
+    if (!selectedGig) {
+      setGigStatus('Select a gig first.')
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setGigStatus('Generating invoice and PDF...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/generate-invoice`),
+        {
+          method: 'POST',
+        }
+      )
+
+      if (response.status === 409) {
+        const conflict = (await response.json()) as {
+          message?: string
+          invoiceId?: string
+        }
+
+        const existingInvoiceId = conflict.invoiceId ?? selectedGig.invoiceId
+        if (existingInvoiceId) {
+          setSelectedInvoiceId(existingInvoiceId)
+          setActiveSection('invoices')
+        }
+
+        setGigStatus(conflict.message ?? 'This gig has already been invoiced.')
+        setInvoiceStatus('This gig already has an invoice. Reviewing the existing record.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        throw new Error(problem?.detail || problem?.title || 'Unable to generate invoice.')
+      }
+
+      const generatedInvoice = (await response.json()) as Invoice
+
+      setInvoices((current) => [generatedInvoice, ...current.filter((invoice) => invoice.id !== generatedInvoice.id)])
+      setSelectedInvoiceId(generatedInvoice.id)
+      setGigs((current) =>
+        current.map((gig) =>
+          gig.id === selectedGig.id
+            ? {
+                ...gig,
+                invoiceId: generatedInvoice.id,
+                invoicedAt: new Date().toISOString(),
+                isInvoiced: true,
+              }
+            : gig
+        )
+      )
+      setGigStatus('Invoice generated and linked to this gig.')
+      setInvoiceStatus('New invoice generated from the selected gig.')
+      setActiveSection('invoices')
+    } catch (error) {
+      setGigStatus(error instanceof Error ? error.message : 'Unable to generate invoice.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
+  const handleDownloadInvoicePdf = async (invoice: Invoice) => {
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Preparing ${invoice.invoiceNumber}.pdf...`)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/pdf`))
+      if (!response.ok) {
+        throw new Error('Unable to download the invoice PDF.')
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `${invoice.invoiceNumber}.pdf`
+      document.body.append(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(downloadUrl)
+      setInvoiceStatus(`Downloaded ${invoice.invoiceNumber}.pdf.`)
+    } catch (error) {
+      setInvoiceStatus(
+        error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
+      )
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="app-shell auth-shell">
@@ -1998,6 +2194,14 @@ function App() {
               </div>
               <div className="actions">
                 <button
+                  className="primary-button"
+                  onClick={handleGenerateInvoice}
+                  type="button"
+                  disabled={!selectedGig || selectedGig.isInvoiced || isInvoiceLoading}
+                >
+                  {selectedGig?.isInvoiced ? 'Already invoiced' : 'Generate invoice'}
+                </button>
+                <button
                   className="ghost-button"
                   onClick={startGigEdit}
                   type="button"
@@ -2046,10 +2250,11 @@ function App() {
                 </div>
 
                 <div className="gig-timeline-note">
-                  <p className="detail-label">Ready for future invoicing</p>
+                  <p className="detail-label">Invoice workflow</p>
                   <span>
-                    This record now carries the client, date, venue, fee and delivery
-                    status that invoice workflows can build on next.
+                    {selectedGig.isInvoiced
+                      ? 'This gig is already linked to an invoice. Open the invoices workspace to review or download it.'
+                      : 'This record now carries the client, date, venue and fee needed to generate a one-off invoice.'}
                   </span>
                 </div>
               </>
@@ -2182,6 +2387,164 @@ function App() {
               </p>
             )}
           </form>
+        </div>
+      </section>
+    )
+  }
+
+  const renderInvoicesSection = () => {
+    const selectedInvoiceClient =
+      clients.find((client) => client.id === selectedInvoice?.clientId) ?? null
+
+    return (
+      <section className="section-layout">
+        <div className="gig-workspace">
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Billing</p>
+                <h2>Invoices</h2>
+              </div>
+              <span className="status-pill">{invoiceStatus}</span>
+            </div>
+
+            <label className="search-field">
+              <span>Search</span>
+              <input
+                type="search"
+                placeholder="Invoice number, client or description..."
+                value={invoiceSearchQuery}
+                onChange={(event) => setInvoiceSearchQuery(event.target.value)}
+              />
+            </label>
+
+            <div className="gig-summary-grid">
+              <article>
+                <span>{invoices.length}</span>
+                <p>saved invoices</p>
+              </article>
+              <article>
+                <span>{draftInvoiceCount}</span>
+                <p>draft</p>
+              </article>
+              <article>
+                <span>{invoices.filter((invoice) => invoice.status === 'Issued').length}</span>
+                <p>issued</p>
+              </article>
+            </div>
+
+            <div className="client-list">
+              {filteredInvoices.map((invoice) => {
+                const clientName =
+                  clients.find((client) => client.id === invoice.clientId)?.name ??
+                  'Unknown client'
+
+                return (
+                  <button
+                    key={invoice.id}
+                    className={`client-card ${selectedInvoice?.id === invoice.id ? 'selected' : ''}`}
+                    onClick={() => setSelectedInvoiceId(invoice.id)}
+                    type="button"
+                  >
+                    <div>
+                      <strong>{invoice.invoiceNumber}</strong>
+                      <span>{clientName}</span>
+                    </div>
+                    <small className="gig-card-meta">
+                      {formatDate(invoice.invoiceDate)} · {invoice.status}
+                    </small>
+                    <small className="gig-card-meta">{formatCurrency(invoice.total)}</small>
+                  </button>
+                )
+              })}
+
+              {filteredInvoices.length === 0 && (
+                <div className="empty-state">
+                  <strong>No invoices yet.</strong>
+                  <p>Generate one from a gig and it will appear here immediately.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Invoice Overview</p>
+                <h2>{selectedInvoice?.invoiceNumber ?? 'No invoice selected'}</h2>
+              </div>
+              <div className="actions">
+                <button
+                  className="primary-button"
+                  onClick={() => selectedInvoice && void handleDownloadInvoicePdf(selectedInvoice)}
+                  type="button"
+                  disabled={!selectedInvoice || isInvoiceLoading}
+                >
+                  Download PDF
+                </button>
+              </div>
+            </div>
+
+            {selectedInvoice ? (
+              <>
+                <div className="detail-grid">
+                  <article>
+                    <p className="detail-label">Client</p>
+                    <strong>{selectedInvoiceClient?.name ?? 'Unknown client'}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Status</p>
+                    <strong>{selectedInvoice.status}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Invoice date</p>
+                    <strong>{formatDate(selectedInvoice.invoiceDate)}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Due date</p>
+                    <strong>{formatDate(selectedInvoice.dueDate)}</strong>
+                  </article>
+                  <article className="full-width">
+                    <p className="detail-label">In respect of</p>
+                    <span>{selectedInvoice.description?.trim() || 'No description set.'}</span>
+                  </article>
+                  <article>
+                    <p className="detail-label">Line items</p>
+                    <strong>{selectedInvoice.lines.length}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Total</p>
+                    <strong>{formatCurrency(selectedInvoice.total)}</strong>
+                  </article>
+                </div>
+
+                <div className="gig-timeline-note">
+                  <p className="detail-label">Line items</p>
+                  <div className="invoice-line-list">
+                    {selectedInvoice.lines
+                      .slice()
+                      .sort((left, right) => left.sortOrder - right.sortOrder)
+                      .map((line) => (
+                        <div className="invoice-line-item" key={line.id}>
+                          <div>
+                            <strong>{line.description}</strong>
+                            <span>
+                              {line.type} · {line.quantity} x {formatCurrency(line.unitPrice)}
+                            </span>
+                          </div>
+                          <strong>{formatCurrency(line.lineTotal)}</strong>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="empty-state roomy">
+                <strong>Select an invoice to review its details.</strong>
+                <p>The generated PDF and line items will be available here.</p>
+              </div>
+            )}
+          </div>
         </div>
       </section>
     )
@@ -2325,6 +2688,7 @@ function App() {
           {activeSection === 'clients' && renderClientsSection()}
           {activeSection === 'admin' && isAdmin && renderAdminSection()}
           {activeSection === 'gigs' && renderGigsSection()}
+          {activeSection === 'invoices' && renderInvoicesSection()}
         </div>
       </section>
 
