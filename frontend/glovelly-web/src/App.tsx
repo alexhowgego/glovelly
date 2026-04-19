@@ -92,8 +92,9 @@ function buildReturnUrl() {
 
 async function fetchWithSession(input: string, init?: RequestInit) {
   return fetch(input, {
-    credentials: 'include',
     ...init,
+    credentials: 'include',
+    cache: 'no-store',
   })
 }
 
