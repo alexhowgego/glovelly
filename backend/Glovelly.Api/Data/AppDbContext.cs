@@ -104,10 +104,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(invoice => invoice.Status)
                 .HasConversion<string>()
                 .HasMaxLength(50);
-            entity.Property(invoice => invoice.Subtotal)
-                .HasPrecision(18, 2);
-            entity.Property(invoice => invoice.Notes)
+            entity.Property(invoice => invoice.Description)
                 .HasMaxLength(4000);
+            entity.Property(invoice => invoice.PdfBlob);
 
             entity.HasOne(invoice => invoice.CreatedByUser)
                 .WithMany(user => user.InvoicesCreated)
@@ -126,19 +125,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<InvoiceLine>(entity =>
         {
             entity.HasKey(line => line.Id);
+            entity.Property(line => line.Type)
+                .HasConversion<string>()
+                .HasMaxLength(50);
             entity.Property(line => line.Description)
                 .HasMaxLength(500);
             entity.Property(line => line.Quantity)
                 .HasPrecision(18, 2);
             entity.Property(line => line.UnitPrice)
                 .HasPrecision(18, 2);
-            entity.Property(line => line.Total)
-                .HasPrecision(18, 2);
+            entity.Property(line => line.CalculationNotes)
+                .HasMaxLength(2000);
 
             entity.HasOne(line => line.Invoice)
                 .WithMany(invoice => invoice.Lines)
                 .HasForeignKey(line => line.InvoiceId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(line => line.Gig)
+                .WithMany()
+                .HasForeignKey(line => line.GigId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }
