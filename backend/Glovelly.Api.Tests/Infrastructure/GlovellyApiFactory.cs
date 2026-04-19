@@ -1,6 +1,5 @@
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -17,22 +16,12 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment("Testing");
 
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IPolicyEvaluator>();
-
-            services.AddAuthentication(options =>
-                {
-                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
-                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-                    options.DefaultScheme = TestAuthHandler.SchemeName;
-                })
-                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
-                    TestAuthHandler.SchemeName,
-                    _ => { });
 
             services.AddSingleton<IPolicyEvaluator, TestPolicyEvaluator>();
 
@@ -59,8 +48,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
                 Id = TestData.FoxAndFinchId,
                 Name = "Fox & Finch Events",
                 Email = "bookings@foxandfinch.co.uk",
-                CreatedByUserId = TestAuthHandler.UserId,
-                UpdatedByUserId = TestAuthHandler.UserId,
+                CreatedByUserId = TestAuthContext.UserId,
+                UpdatedByUserId = TestAuthContext.UserId,
                 BillingAddress = new Address
                 {
                     Line1 = "12 Chapel Street",
@@ -75,8 +64,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
                 Id = TestData.RiversideId,
                 Name = "Riverside Arts Centre",
                 Email = "finance@riversidearts.org",
-                CreatedByUserId = TestAuthHandler.UserId,
-                UpdatedByUserId = TestAuthHandler.UserId,
+                CreatedByUserId = TestAuthContext.UserId,
+                UpdatedByUserId = TestAuthContext.UserId,
                 BillingAddress = new Address
                 {
                     Line1 = "84 Mill Lane",
@@ -99,8 +88,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
                 DueDate = new DateOnly(2026, 4, 15),
                 Status = InvoiceStatus.Issued,
                 Subtotal = 650m,
-                CreatedByUserId = TestAuthHandler.UserId,
-                UpdatedByUserId = TestAuthHandler.UserId,
+                CreatedByUserId = TestAuthContext.UserId,
+                UpdatedByUserId = TestAuthContext.UserId,
             },
             new Invoice
             {
@@ -111,8 +100,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
                 DueDate = new DateOnly(2026, 4, 22),
                 Status = InvoiceStatus.Draft,
                 Subtotal = 360m,
-                CreatedByUserId = TestAuthHandler.UserId,
-                UpdatedByUserId = TestAuthHandler.UserId,
+                CreatedByUserId = TestAuthContext.UserId,
+                UpdatedByUserId = TestAuthContext.UserId,
             }
         };
 

@@ -14,16 +14,16 @@ internal sealed class TestPolicyEvaluator : IPolicyEvaluator
     {
         var claims = new[]
         {
-            new Claim(GlovellyClaimTypes.UserId, TestAuthHandler.UserId.ToString()),
-            new Claim(ClaimTypes.NameIdentifier, TestAuthHandler.UserId.ToString()),
+            new Claim(GlovellyClaimTypes.UserId, TestAuthContext.UserId.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, TestAuthContext.UserId.ToString()),
             new Claim(ClaimTypes.Name, "Test Admin"),
             new Claim(ClaimTypes.Email, "test-admin@glovelly.local"),
             new Claim(ClaimTypes.Role, UserRole.Admin.ToString()),
         };
 
-        var identity = new ClaimsIdentity(claims, TestAuthHandler.SchemeName);
+        var identity = new ClaimsIdentity(claims, TestAuthContext.SchemeName);
         var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, TestAuthHandler.SchemeName);
+        var ticket = new AuthenticationTicket(principal, TestAuthContext.SchemeName);
 
         context.User = principal;
 

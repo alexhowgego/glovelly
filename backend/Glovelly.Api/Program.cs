@@ -20,6 +20,8 @@ var allowedCorsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins")
 var glovellyConnectionString = builder.Configuration.GetConnectionString("Glovelly");
 var usePostgres = !string.IsNullOrWhiteSpace(glovellyConnectionString);
 var isDevelopment = builder.Environment.IsDevelopment();
+var isTesting = builder.Environment.IsEnvironment("Testing");
+var shouldSeedDevelopmentData = !usePostgres && !isTesting;
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -62,7 +64,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole(UserRole.Admin.ToString());
     });
 });
-builder.Services
+var authenticationBuilder = builder.Services
     .AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -121,13 +123,16 @@ builder.Services
                 return Task.CompletedTask;
             },
         };
-    })
-    .AddOpenIdConnect(options =>
+    });
+
+if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
+{
+    authenticationBuilder.AddOpenIdConnect(options =>
     {
         options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
         options.Authority = "https://accounts.google.com";
-        options.ClientId = googleClientId ?? string.Empty;
-        options.ClientSecret = googleClientSecret ?? string.Empty;
+        options.ClientId = googleClientId;
+        options.ClientSecret = googleClientSecret;
         options.ResponseType = OpenIdConnectResponseType.Code;
         options.UsePkce = true;
         options.SaveTokens = true;
@@ -267,6 +272,7 @@ builder.Services
             },
         };
     });
+}
 
 var app = builder.Build();
 
@@ -274,13 +280,13 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    if (usePostgres)
+    if (shouldSeedDevelopmentData)
     {
-        await dbContext.Database.EnsureCreatedAsync();
+        await AppDbSeeder.SeedAsync(dbContext, builder.Configuration);
     }
     else
     {
-        await AppDbSeeder.SeedAsync(dbContext, builder.Configuration);
+        await dbContext.Database.EnsureCreatedAsync();
     }
 }
 
