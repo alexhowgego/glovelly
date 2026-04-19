@@ -14,6 +14,7 @@ public sealed class Gig
     public string Venue { get; set; } = string.Empty;
     public decimal Fee { get; set; }
     public decimal TravelMiles { get; set; }
+    public int? PassengerCount { get; set; }
     public string? Notes { get; set; }
     public bool WasDriving { get; set; }
     public GigStatus Status { get; set; } = GigStatus.Draft;
@@ -24,6 +25,7 @@ public sealed class Gig
     public Client? Client { get; set; }
     [JsonIgnore]
     public Invoice? Invoice { get; set; }
+    public ICollection<GigExpense> Expenses { get; set; } = new List<GigExpense>();
     [JsonIgnore]
     public User? CreatedByUser { get; set; }
     [JsonIgnore]

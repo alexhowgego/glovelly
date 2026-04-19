@@ -8,6 +8,8 @@ public sealed class Client
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public Address BillingAddress { get; set; } = new();
+    public decimal? MileageRate { get; set; }
+    public decimal? PassengerMileageRate { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public Guid? UpdatedByUserId { get; set; }
 

@@ -14,6 +14,7 @@ public sealed class InvoiceLine
     public decimal UnitPrice { get; set; }
     public Guid? GigId { get; set; }
     public string? CalculationNotes { get; set; }
+    public bool IsSystemGenerated { get; set; }
 
     [JsonIgnore]
     public Invoice? Invoice { get; set; }

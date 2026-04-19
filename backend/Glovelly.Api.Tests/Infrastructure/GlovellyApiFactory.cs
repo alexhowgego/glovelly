@@ -41,6 +41,18 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
 
     private static void SeedTestData(AppDbContext dbContext)
     {
+        dbContext.Users.Add(new User
+        {
+            Id = TestAuthContext.UserId,
+            Email = "test-admin@glovelly.local",
+            DisplayName = "Test Admin",
+            MileageRate = 0.45m,
+            PassengerMileageRate = 0.10m,
+            Role = UserRole.Admin,
+            IsActive = true,
+            CreatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        });
+
         var clients = new[]
         {
             new Client
@@ -48,6 +60,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
                 Id = TestData.FoxAndFinchId,
                 Name = "Fox & Finch Events",
                 Email = "bookings@foxandfinch.co.uk",
+                MileageRate = 0.52m,
+                PassengerMileageRate = 0.15m,
                 CreatedByUserId = TestAuthContext.UserId,
                 UpdatedByUserId = TestAuthContext.UserId,
                 BillingAddress = new Address

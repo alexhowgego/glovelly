@@ -50,6 +50,12 @@ public static class CrudEndpoints
 
         group.MapPost("/", async (Client client, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var pricingValidation = ValidateClientPricing(client);
+            if (pricingValidation is not null)
+            {
+                return pricingValidation;
+            }
+
             client.Id = Guid.NewGuid();
             client.Name = client.Name.Trim();
             client.Email = client.Email.Trim();
@@ -73,9 +79,17 @@ public static class CrudEndpoints
                 return Results.NotFound();
             }
 
+            var pricingValidation = ValidateClientPricing(request);
+            if (pricingValidation is not null)
+            {
+                return pricingValidation;
+            }
+
             client.Name = request.Name.Trim();
             client.Email = request.Email.Trim();
             client.BillingAddress = request.BillingAddress ?? new Address();
+            client.MileageRate = request.MileageRate;
+            client.PassengerMileageRate = request.PassengerMileageRate;
             StampUpdate(client, currentUserAccessor.TryGetUserId(user));
 
             await db.SaveChangesAsync();
@@ -107,6 +121,7 @@ public static class CrudEndpoints
         {
             var gigs = await db.Gigs
                 .AsNoTracking()
+                .Include(gig => gig.Expenses)
                 .OrderBy(gig => gig.Date)
                 .ThenBy(gig => gig.Title)
                 .ToListAsync();
@@ -118,6 +133,7 @@ public static class CrudEndpoints
         {
             var gig = await db.Gigs
                 .AsNoTracking()
+                .Include(value => value.Expenses)
                 .FirstOrDefaultAsync(gig => gig.Id == id);
 
             return gig is null ? Results.NotFound() : Results.Ok(gig);
@@ -134,6 +150,12 @@ public static class CrudEndpoints
                 {
                     ["clientId"] = ["Client does not exist."]
                 });
+            }
+
+            var gigValidation = ValidateGigRequest(gig);
+            if (gigValidation is not null)
+            {
+                return gigValidation;
             }
 
             if (gig.InvoiceId.HasValue)
@@ -165,10 +187,12 @@ public static class CrudEndpoints
             gig.Notes = gig.Notes?.Trim();
             gig.Client = null;
             gig.Invoice = null;
+            gig.Expenses = NormalizeGigExpenses(gig.Expenses);
             gig.InvoicedAt = ResolveInvoicedAt(gig.InvoiceId, null, null, gig.InvoicedAt);
-            StampCreate(gig, currentUserAccessor.TryGetUserId(user));
+            StampCreate(gig, userId);
 
             db.Gigs.Add(gig);
+            await SyncGeneratedInvoiceLinesForGigAsync(gig, userId, db);
             await db.SaveChangesAsync();
 
             return Results.Created($"/gigs/{gig.Id}", gig);
@@ -177,7 +201,9 @@ public static class CrudEndpoints
         group.MapPut("/{id:guid}", async (Guid id, Gig request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
-            var gig = await db.Gigs.FirstOrDefaultAsync(value => value.Id == id);
+            var gig = await db.Gigs
+                .Include(value => value.Expenses)
+                .FirstOrDefaultAsync(value => value.Id == id);
 
             if (gig is null)
             {
@@ -192,6 +218,12 @@ public static class CrudEndpoints
                 {
                     ["clientId"] = ["Client does not exist."]
                 });
+            }
+
+            var gigValidation = ValidateGigRequest(request);
+            if (gigValidation is not null)
+            {
+                return gigValidation;
             }
 
             if (request.InvoiceId.HasValue)
@@ -217,6 +249,20 @@ public static class CrudEndpoints
                 }
             }
 
+            var normalizedExpenses = NormalizeGigExpenses(request.Expenses);
+            _ = await RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, db);
+
+            if (gig.Expenses.Count > 0)
+            {
+                db.GigExpenses.RemoveRange(gig.Expenses.ToList());
+            }
+
+            await db.SaveChangesAsync();
+
+            gig = await db.Gigs
+                .Include(value => value.Expenses)
+                .FirstAsync(value => value.Id == id);
+
             var previousInvoiceId = gig.InvoiceId;
 
             gig.ClientId = request.ClientId;
@@ -226,12 +272,19 @@ public static class CrudEndpoints
             gig.Venue = request.Venue.Trim();
             gig.Fee = request.Fee;
             gig.TravelMiles = request.TravelMiles;
+            gig.PassengerCount = request.PassengerCount;
             gig.Notes = request.Notes?.Trim();
             gig.WasDriving = request.WasDriving;
             gig.Status = request.Status;
             gig.InvoicedAt = ResolveInvoicedAt(request.InvoiceId, previousInvoiceId, gig.InvoicedAt, request.InvoicedAt);
-            StampUpdate(gig, currentUserAccessor.TryGetUserId(user));
+            gig.Expenses.Clear();
+            foreach (var expense in normalizedExpenses)
+            {
+                gig.Expenses.Add(expense);
+            }
+            StampUpdate(gig, userId);
 
+            await SyncGeneratedInvoiceLinesForGigAsync(gig, userId, db);
             await db.SaveChangesAsync();
 
             return Results.Ok(gig);
@@ -239,12 +292,15 @@ public static class CrudEndpoints
 
         group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
         {
-            var gig = await db.Gigs.FirstOrDefaultAsync(gig => gig.Id == id);
+            var gig = await db.Gigs
+                .Include(value => value.Expenses)
+                .FirstOrDefaultAsync(gig => gig.Id == id);
             if (gig is null)
             {
                 return Results.NotFound();
             }
 
+            _ = await RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, db);
             db.Gigs.Remove(gig);
             await db.SaveChangesAsync();
 
@@ -532,6 +588,249 @@ public static class CrudEndpoints
         }
 
         return null;
+    }
+
+    private static IResult? ValidateClientPricing(Client client)
+    {
+        if (client.MileageRate.HasValue && client.MileageRate.Value < 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["mileageRate"] = ["Mileage rate cannot be negative."]
+            });
+        }
+
+        if (client.PassengerMileageRate.HasValue && client.PassengerMileageRate.Value < 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["passengerMileageRate"] = ["Passenger mileage rate cannot be negative."]
+            });
+        }
+
+        return null;
+    }
+
+    private static IResult? ValidateGigRequest(Gig gig)
+    {
+        if (gig.PassengerCount.HasValue && gig.PassengerCount.Value < 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["passengerCount"] = ["Passenger count cannot be negative."]
+            });
+        }
+
+        if (gig.Expenses is null)
+        {
+            return null;
+        }
+
+        var invalidDescription = gig.Expenses.Any(expense => string.IsNullOrWhiteSpace(expense.Description));
+        if (invalidDescription)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["expenses"] = ["Each expense must include a description."]
+            });
+        }
+
+        var invalidAmount = gig.Expenses.Any(expense => expense.Amount < 0);
+        if (invalidAmount)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["expenses"] = ["Expense amounts cannot be negative."]
+            });
+        }
+
+        return null;
+    }
+
+    private static List<GigExpense> NormalizeGigExpenses(ICollection<GigExpense>? expenses)
+    {
+        if (expenses is null || expenses.Count == 0)
+        {
+            return [];
+        }
+
+        return expenses
+            .Select((expense, index) => new GigExpense
+            {
+                Id = expense.Id == Guid.Empty ? Guid.NewGuid() : expense.Id,
+                SortOrder = expense.SortOrder == 0 ? index + 1 : expense.SortOrder,
+                Description = expense.Description.Trim(),
+                Amount = expense.Amount,
+            })
+            .OrderBy(expense => expense.SortOrder)
+            .ThenBy(expense => expense.Description)
+            .ToList();
+    }
+
+    private static async Task SyncGeneratedInvoiceLinesForGigAsync(Gig gig, Guid? userId, AppDbContext db)
+    {
+        _ = await RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, db);
+
+        if (!gig.InvoiceId.HasValue)
+        {
+            return;
+        }
+
+        var lines = await BuildGeneratedInvoiceLinesForGigAsync(gig, userId, db);
+        if (lines.Count == 0)
+        {
+            return;
+        }
+
+        db.InvoiceLines.AddRange(lines);
+    }
+
+    private static async Task<bool> RemoveSystemGeneratedInvoiceLinesForGigAsync(Guid gigId, AppDbContext db)
+    {
+        var generatedLines = await db.InvoiceLines
+            .Where(line => line.GigId == gigId && line.IsSystemGenerated)
+            .ToListAsync();
+
+        if (generatedLines.Count == 0)
+        {
+            return false;
+        }
+
+        db.InvoiceLines.RemoveRange(generatedLines);
+        return true;
+    }
+
+    private static async Task<List<InvoiceLine>> BuildGeneratedInvoiceLinesForGigAsync(Gig gig, Guid? userId, AppDbContext db)
+    {
+        var lines = new List<InvoiceLine>();
+        var nextSortOrder = await GetNextSortOrderAsync(gig.InvoiceId!.Value, db);
+        var (mileageRate, passengerMileageRate) = await ResolveMileageRatesAsync(gig.ClientId, userId, db);
+
+        if (gig.Fee != 0)
+        {
+            lines.Add(CreateGeneratedLine(
+                gig,
+                nextSortOrder++,
+                InvoiceLineType.PerformanceFee,
+                $"Performance fee for {gig.Title} ({gig.Date:yyyy-MM-dd})",
+                1m,
+                gig.Fee));
+        }
+
+        if (gig.TravelMiles > 0 && mileageRate.HasValue && mileageRate.Value != 0)
+        {
+            lines.Add(CreateGeneratedLine(
+                gig,
+                nextSortOrder++,
+                InvoiceLineType.Mileage,
+                $"Mileage for {gig.Title}",
+                gig.TravelMiles,
+                mileageRate.Value,
+                $"{gig.TravelMiles:0.##} miles at {mileageRate.Value:0.##} per mile."));
+        }
+
+        var passengerCount = gig.PassengerCount.GetValueOrDefault();
+
+        if (gig.TravelMiles > 0 &&
+            passengerCount > 0 &&
+            passengerMileageRate.HasValue &&
+            passengerMileageRate.Value != 0)
+        {
+            var passengerMiles = gig.TravelMiles * passengerCount;
+            var passengerLabel = passengerCount == 1 ? "passenger" : "passengers";
+
+            lines.Add(CreateGeneratedLine(
+                gig,
+                nextSortOrder++,
+                InvoiceLineType.PassengerMileage,
+                $"Passenger mileage for {gig.Title}",
+                passengerMiles,
+                passengerMileageRate.Value,
+                $"{passengerCount} {passengerLabel} x {gig.TravelMiles:0.##} miles."));
+        }
+
+        foreach (var expense in gig.Expenses
+                     .Where(expense => expense.Amount != 0)
+                     .OrderBy(expense => expense.SortOrder)
+                     .ThenBy(expense => expense.Description))
+        {
+            lines.Add(CreateGeneratedLine(
+                gig,
+                nextSortOrder++,
+                InvoiceLineType.MiscExpense,
+                expense.Description,
+                1m,
+                expense.Amount));
+        }
+
+        return lines;
+    }
+
+    private static InvoiceLine CreateGeneratedLine(
+        Gig gig,
+        int sortOrder,
+        InvoiceLineType type,
+        string description,
+        decimal quantity,
+        decimal unitPrice,
+        string? calculationNotes = null)
+    {
+        return new InvoiceLine
+        {
+            Id = Guid.NewGuid(),
+            InvoiceId = gig.InvoiceId!.Value,
+            SortOrder = sortOrder,
+            Type = type,
+            Description = description,
+            Quantity = quantity,
+            UnitPrice = unitPrice,
+            GigId = gig.Id,
+            CalculationNotes = calculationNotes,
+            IsSystemGenerated = true,
+        };
+    }
+
+    private static async Task<int> GetNextSortOrderAsync(Guid invoiceId, AppDbContext db)
+    {
+        var currentMax = await db.InvoiceLines
+            .Where(line => line.InvoiceId == invoiceId)
+            .Select(line => (int?)line.SortOrder)
+            .MaxAsync();
+
+        return (currentMax ?? 0) + 1;
+    }
+
+    private static async Task<(decimal? MileageRate, decimal? PassengerMileageRate)> ResolveMileageRatesAsync(
+        Guid clientId,
+        Guid? userId,
+        AppDbContext db)
+    {
+        var clientRates = await db.Clients
+            .AsNoTracking()
+            .Where(client => client.Id == clientId)
+            .Select(client => new
+            {
+                client.MileageRate,
+                client.PassengerMileageRate,
+            })
+            .FirstAsync();
+
+        if (clientRates.MileageRate.HasValue || clientRates.PassengerMileageRate.HasValue || !userId.HasValue)
+        {
+            return (clientRates.MileageRate, clientRates.PassengerMileageRate);
+        }
+
+        var userRates = await db.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId.Value)
+            .Select(user => new
+            {
+                user.MileageRate,
+                user.PassengerMileageRate,
+            })
+            .FirstOrDefaultAsync();
+
+        return (userRates?.MileageRate, userRates?.PassengerMileageRate);
     }
 
     private static IQueryable<Client> WhereVisibleTo(this IQueryable<Client> query, Guid? userId)

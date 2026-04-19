@@ -28,6 +28,8 @@ public static class AppDbSeeder
                 Id = foxAndFinchId,
                 Name = "Fox & Finch Events",
                 Email = "bookings@foxandfinch.co.uk",
+                MileageRate = 0.45m,
+                PassengerMileageRate = 0.10m,
                 CreatedByUserId = seededAdminUserId,
                 UpdatedByUserId = seededAdminUserId,
                 BillingAddress = new Address
@@ -44,6 +46,7 @@ public static class AppDbSeeder
                 Id = northlightId,
                 Name = "Northlight Weddings",
                 Email = "accounts@northlightweddings.com",
+                MileageRate = 0.45m,
                 CreatedByUserId = seededAdminUserId,
                 UpdatedByUserId = seededAdminUserId,
                 BillingAddress = new Address
@@ -60,6 +63,7 @@ public static class AppDbSeeder
                 Id = riversideId,
                 Name = "Riverside Arts Centre",
                 Email = "finance@riversidearts.org",
+                PassengerMileageRate = 0.08m,
                 CreatedByUserId = seededAdminUserId,
                 UpdatedByUserId = seededAdminUserId,
                 BillingAddress = new Address
@@ -147,10 +151,21 @@ public static class AppDbSeeder
                 Venue = "Albert Hall, Manchester",
                 Fee = 650m,
                 TravelMiles = 24m,
+                PassengerCount = 1,
                 Notes = "Evening set with acoustic opener.",
                 WasDriving = true,
                 Status = GigStatus.Confirmed,
-                InvoicedAt = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero)
+                InvoicedAt = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
+                Expenses =
+                [
+                    new GigExpense
+                    {
+                        Id = Guid.Parse("2d7c95d8-d8a0-4ef2-a13a-7d9cb7065c1d"),
+                        SortOrder = 1,
+                        Description = "Parking",
+                        Amount = 18m
+                    }
+                ]
             },
             new Gig
             {
@@ -222,6 +237,8 @@ public static class AppDbSeeder
             GoogleSubject = googleSubject,
             Email = string.IsNullOrWhiteSpace(email) ? "local-admin@glovelly.local" : email,
             DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName,
+            MileageRate = 0.45m,
+            PassengerMileageRate = 0.10m,
             Role = UserRole.Admin,
             IsActive = true,
             CreatedUtc = DateTime.UtcNow,
