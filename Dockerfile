@@ -12,6 +12,7 @@ WORKDIR /src
 
 COPY glovelly.sln ./
 COPY backend/Glovelly.Api/Glovelly.Api.csproj backend/Glovelly.Api/
+COPY backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj backend/Glovelly.Api.Tests/
 RUN dotnet restore glovelly.sln
 
 COPY backend/ ./backend/
