@@ -3,6 +3,7 @@ using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Text;
 
 namespace Glovelly.Api.Endpoints;
 
@@ -137,6 +138,71 @@ public static class CrudEndpoints
                 .FirstOrDefaultAsync(gig => gig.Id == id);
 
             return gig is null ? Results.NotFound() : Results.Ok(gig);
+        });
+
+        group.MapPost("/{id:guid}/generate-invoice", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var gig = await db.Gigs
+                .Include(value => value.Client)
+                .Include(value => value.Expenses)
+                .FirstOrDefaultAsync(value => value.Id == id);
+
+            if (gig is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (gig.InvoiceId.HasValue)
+            {
+                return Results.Conflict(new
+                {
+                    message = "This gig has already been invoiced.",
+                    invoiceId = gig.InvoiceId,
+                });
+            }
+
+            var client = gig.Client;
+            if (client is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["clientId"] = ["Client does not exist."]
+                });
+            }
+
+            var invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+            var invoice = new Invoice
+            {
+                Id = Guid.NewGuid(),
+                InvoiceNumber = await GenerateInvoiceNumberAsync(invoiceDate, db),
+                ClientId = gig.ClientId,
+                InvoiceDate = invoiceDate,
+                DueDate = invoiceDate.AddDays(14),
+                Status = InvoiceStatus.Draft,
+                Description = BuildInvoiceDescription(gig),
+                Client = null,
+            };
+
+            StampCreate(invoice, userId);
+
+            gig.InvoiceId = invoice.Id;
+            gig.InvoicedAt = DateTimeOffset.UtcNow;
+            gig.Invoice = invoice;
+            StampUpdate(gig, userId);
+
+            var generatedLines = await BuildGeneratedInvoiceLinesForGigAsync(gig, userId, db);
+            invoice.Lines = generatedLines;
+            invoice.PdfBlob = GenerateInvoicePdf(invoice, client, gig, generatedLines);
+
+            db.Invoices.Add(invoice);
+            await db.SaveChangesAsync();
+
+            return Results.Created($"/invoices/{invoice.Id}", invoice);
         });
 
         group.MapPost("/", async (Gig gig, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
@@ -320,6 +386,28 @@ public static class CrudEndpoints
                 .ToListAsync();
 
             return Results.Ok(invoices);
+        });
+
+        group.MapGet("/{id:guid}/pdf", async (Guid id, AppDbContext db) =>
+        {
+            var invoice = await db.Invoices
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == id);
+
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (invoice.PdfBlob is null || invoice.PdfBlob.Length == 0)
+            {
+                return Results.NotFound();
+            }
+
+            return Results.File(
+                invoice.PdfBlob,
+                "application/pdf",
+                $"{invoice.InvoiceNumber}.pdf");
         });
 
         group.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
@@ -862,6 +950,154 @@ public static class CrudEndpoints
             .FirstOrDefaultAsync();
 
         return (userRates?.MileageRate, userRates?.PassengerMileageRate);
+    }
+
+    private static string BuildInvoiceDescription(Gig gig)
+    {
+        return $"In respect of {gig.Title} at {gig.Venue} on {gig.Date:yyyy-MM-dd}.";
+    }
+
+    private static async Task<string> GenerateInvoiceNumberAsync(DateOnly invoiceDate, AppDbContext db)
+    {
+        var yearPrefix = $"GLV-{invoiceDate.Year}-";
+        var existingNumbers = await db.Invoices
+            .AsNoTracking()
+            .Where(invoice => invoice.InvoiceNumber.StartsWith(yearPrefix))
+            .Select(invoice => invoice.InvoiceNumber)
+            .ToListAsync();
+
+        var nextSequence = existingNumbers
+            .Select(value =>
+            {
+                var suffix = value[yearPrefix.Length..];
+                return int.TryParse(suffix, out var parsed) ? parsed : 0;
+            })
+            .DefaultIfEmpty()
+            .Max() + 1;
+
+        return $"{yearPrefix}{nextSequence:000}";
+    }
+
+    private static byte[] GenerateInvoicePdf(
+        Invoice invoice,
+        Client client,
+        Gig gig,
+        IReadOnlyCollection<InvoiceLine> lines)
+    {
+        var rows = new List<string>
+        {
+            "Glovelly Invoice",
+            $"Invoice number: {invoice.InvoiceNumber}",
+            $"Invoice date: {invoice.InvoiceDate:yyyy-MM-dd}",
+            $"Due date: {invoice.DueDate:yyyy-MM-dd}",
+            string.Empty,
+            $"Bill to: {client.Name}",
+            client.Email,
+        };
+
+        if (!string.IsNullOrWhiteSpace(client.BillingAddress?.Line1))
+        {
+            rows.Add(client.BillingAddress.Line1);
+        }
+
+        if (!string.IsNullOrWhiteSpace(client.BillingAddress?.Line2))
+        {
+            rows.Add(client.BillingAddress.Line2);
+        }
+
+        var cityLine = string.Join(", ", new[]
+        {
+            client.BillingAddress?.City,
+            client.BillingAddress?.StateOrCounty
+        }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+        if (!string.IsNullOrWhiteSpace(cityLine))
+        {
+            rows.Add(cityLine);
+        }
+
+        if (!string.IsNullOrWhiteSpace(client.BillingAddress?.PostalCode))
+        {
+            rows.Add(client.BillingAddress.PostalCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(client.BillingAddress?.Country))
+        {
+            rows.Add(client.BillingAddress.Country);
+        }
+
+        rows.Add(string.Empty);
+        rows.Add(invoice.Description ?? BuildInvoiceDescription(gig));
+        rows.Add(string.Empty);
+        rows.Add("Line items:");
+
+        foreach (var line in lines.OrderBy(value => value.SortOrder))
+        {
+            rows.Add(
+                $"{line.Description} | Qty {line.Quantity:0.##} x {line.UnitPrice:0.00} = {line.LineTotal:0.00}");
+        }
+
+        rows.Add(string.Empty);
+        rows.Add($"Total due: {invoice.Total:0.00} GBP");
+
+        return BuildSimplePdf(rows);
+    }
+
+    private static byte[] BuildSimplePdf(IEnumerable<string> lines)
+    {
+        var contentBuilder = new StringBuilder();
+        var yPosition = 780;
+
+        foreach (var line in lines)
+        {
+            contentBuilder.AppendLine($"BT /F1 11 Tf 50 {yPosition} Td ({EscapePdfText(line)}) Tj ET");
+            yPosition -= 16;
+        }
+
+        var objects = new[]
+        {
+            "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+            "2 0 obj << /Type /Pages /Count 1 /Kids [3 0 R] >> endobj",
+            "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj",
+            "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+            $"5 0 obj << /Length {Encoding.ASCII.GetByteCount(contentBuilder.ToString())} >> stream\n{contentBuilder}endstream\nendobj",
+        };
+
+        var pdfBuilder = new StringBuilder();
+        pdfBuilder.Append("%PDF-1.4\n");
+
+        var offsets = new List<int> { 0 };
+        foreach (var pdfObject in objects)
+        {
+            offsets.Add(Encoding.ASCII.GetByteCount(pdfBuilder.ToString()));
+            pdfBuilder.Append(pdfObject);
+            pdfBuilder.Append('\n');
+        }
+
+        var xrefOffset = Encoding.ASCII.GetByteCount(pdfBuilder.ToString());
+        pdfBuilder.Append($"xref\n0 {objects.Length + 1}\n");
+        pdfBuilder.Append("0000000000 65535 f \n");
+
+        foreach (var offset in offsets.Skip(1))
+        {
+            pdfBuilder.Append($"{offset:D10} 00000 n \n");
+        }
+
+        pdfBuilder.Append("trailer\n");
+        pdfBuilder.Append($"<< /Size {objects.Length + 1} /Root 1 0 R >>\n");
+        pdfBuilder.Append("startxref\n");
+        pdfBuilder.Append($"{xrefOffset}\n");
+        pdfBuilder.Append("%%EOF");
+
+        return Encoding.ASCII.GetBytes(pdfBuilder.ToString());
+    }
+
+    private static string EscapePdfText(string value)
+    {
+        return value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("(", "\\(", StringComparison.Ordinal)
+            .Replace(")", "\\)", StringComparison.Ordinal);
     }
 
     private static IQueryable<Client> WhereVisibleTo(this IQueryable<Client> query, Guid? userId)
