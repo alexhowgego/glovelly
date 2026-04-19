@@ -16,6 +16,8 @@ type Client = {
   name: string
   email: string
   billingAddress: Address
+  mileageRate: number | null
+  passengerMileageRate: number | null
 }
 
 type ClientForm = {
@@ -30,6 +32,8 @@ type AuthUser = {
   name: string
   email: string
   profileImageUrl: string
+  mileageRate: number | null
+  passengerMileageRate: number | null
 }
 
 type AdminUser = {
@@ -50,6 +54,16 @@ type AdminUserForm = {
   googleSubject: string
   role: 'Admin' | 'User'
   isActive: boolean
+}
+
+type UserSettingsForm = {
+  mileageRate: string
+  passengerMileageRate: string
+}
+
+type ClientSettingsForm = {
+  mileageRate: string
+  passengerMileageRate: string
 }
 
 type AppSection = 'clients' | 'admin' | 'gigs'
@@ -76,6 +90,16 @@ const emptyAdminForm = (): AdminUserForm => ({
   googleSubject: '',
   role: 'User',
   isActive: true,
+})
+
+const emptyUserSettingsForm = (): UserSettingsForm => ({
+  mileageRate: '',
+  passengerMileageRate: '',
+})
+
+const emptyClientSettingsForm = (): ClientSettingsForm => ({
+  mileageRate: '',
+  passengerMileageRate: '',
 })
 
 const defaultAdminStatus = 'User enrolment tools ready.'
@@ -131,6 +155,14 @@ function formatDateTime(value: string | null) {
   }).format(date)
 }
 
+function formatRate(value: number | null) {
+  if (value === null) {
+    return 'Using default'
+  }
+
+  return `${value.toFixed(2)} per mile`
+}
+
 function getStoredThemePreference(): ThemePreference {
   const rawPreference = window.localStorage.getItem(themeStorageKey)
   if (
@@ -151,6 +183,12 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [mode, setMode] = useState<'create' | 'edit'>('create')
   const [form, setForm] = useState<ClientForm>(emptyForm)
+  const [isClientSettingsOpen, setIsClientSettingsOpen] = useState(false)
+  const [clientSettingsForm, setClientSettingsForm] =
+    useState<ClientSettingsForm>(emptyClientSettingsForm)
+  const [clientSettingsStatus, setClientSettingsStatus] =
+    useState('Client-specific rates override your personal defaults when set.')
+  const [isClientSettingsSaving, setIsClientSettingsSaving] = useState(false)
   const [status, setStatus] = useState('Checking your session...')
   const [isLoading, setIsLoading] = useState(false)
   const [isApiConnected, setIsApiConnected] = useState(false)
@@ -159,9 +197,15 @@ function App() {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const [themePreference, setThemePreference] =
     useState<ThemePreference>(getStoredThemePreference)
+  const [userSettingsForm, setUserSettingsForm] =
+    useState<UserSettingsForm>(emptyUserSettingsForm)
+  const [userSettingsStatus, setUserSettingsStatus] =
+    useState('Set the mileage defaults used when a client has no custom rates.')
+  const [isUserSettingsSaving, setIsUserSettingsSaving] = useState(false)
 
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
@@ -262,6 +306,16 @@ function App() {
       setSearchQuery('')
       setMode('create')
       setForm(emptyForm())
+      setIsClientSettingsOpen(false)
+      setClientSettingsForm(emptyClientSettingsForm())
+      setClientSettingsStatus(
+        'Client-specific rates override your personal defaults when set.'
+      )
+      setIsUserSettingsOpen(false)
+      setUserSettingsForm(emptyUserSettingsForm())
+      setUserSettingsStatus(
+        'Set the mileage defaults used when a client has no custom rates.'
+      )
       resetAdminWorkspace()
     }
 
@@ -607,6 +661,253 @@ function App() {
     setThemePreference(nextPreference)
   }
 
+  const openClientSettings = () => {
+    if (!selectedClient) {
+      return
+    }
+
+    setClientSettingsForm({
+      mileageRate:
+        selectedClient.mileageRate === null ? '' : String(selectedClient.mileageRate),
+      passengerMileageRate:
+        selectedClient.passengerMileageRate === null
+          ? ''
+          : String(selectedClient.passengerMileageRate),
+    })
+    setClientSettingsStatus(
+      'Client-specific rates override your personal defaults when set.'
+    )
+    setIsClientSettingsOpen(true)
+  }
+
+  const closeClientSettings = () => {
+    setIsClientSettingsOpen(false)
+  }
+
+  const updateClientSettingsField = (
+    field: keyof ClientSettingsForm,
+    value: string
+  ) => {
+    setClientSettingsForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  const handleClientSettingsSubmit = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault()
+
+    if (!selectedClient) {
+      return
+    }
+
+    const parseOptionalDecimal = (value: string) => {
+      const trimmed = value.trim()
+      if (!trimmed) {
+        return null
+      }
+
+      const parsed = Number(trimmed)
+      return Number.isFinite(parsed) ? parsed : Number.NaN
+    }
+
+    const mileageRate = parseOptionalDecimal(clientSettingsForm.mileageRate)
+    const passengerMileageRate = parseOptionalDecimal(
+      clientSettingsForm.passengerMileageRate
+    )
+
+    if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
+      setClientSettingsStatus('Rates must be valid numbers, for example 0.45.')
+      return
+    }
+
+    setIsClientSettingsSaving(true)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/clients/${selectedClient.id}`),
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: selectedClient.id,
+            name: selectedClient.name,
+            email: selectedClient.email,
+            billingAddress: selectedClient.billingAddress,
+            mileageRate,
+            passengerMileageRate,
+          }),
+        }
+      )
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setIsClientSettingsOpen(false)
+        setStatus('Your session expired. Sign in again to update client settings.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to save client settings.')
+      }
+
+      const savedClient = (await response.json()) as Client
+
+      setClients((current) =>
+        current.map((client) => (client.id === savedClient.id ? savedClient : client))
+      )
+      setClientSettingsForm({
+        mileageRate: savedClient.mileageRate === null ? '' : String(savedClient.mileageRate),
+        passengerMileageRate:
+          savedClient.passengerMileageRate === null
+            ? ''
+            : String(savedClient.passengerMileageRate),
+      })
+      setClientSettingsStatus('Client settings updated.')
+    } catch (error) {
+      setClientSettingsStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save client settings right now.'
+      )
+    } finally {
+      setIsClientSettingsSaving(false)
+    }
+  }
+
+  const openUserSettings = () => {
+    setUserSettingsForm({
+      mileageRate:
+        authUser?.mileageRate === null || authUser?.mileageRate === undefined
+          ? ''
+          : String(authUser.mileageRate),
+      passengerMileageRate:
+        authUser?.passengerMileageRate === null ||
+        authUser?.passengerMileageRate === undefined
+          ? ''
+          : String(authUser.passengerMileageRate),
+    })
+    setUserSettingsStatus(
+      'Set the mileage defaults used when a client has no custom rates.'
+    )
+    setIsProfileMenuOpen(false)
+    setIsUserSettingsOpen(true)
+  }
+
+  const closeUserSettings = () => {
+    setIsUserSettingsOpen(false)
+  }
+
+  const updateUserSettingsField = (
+    field: keyof UserSettingsForm,
+    value: string
+  ) => {
+    setUserSettingsForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  const handleUserSettingsSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const parseOptionalDecimal = (value: string) => {
+      const trimmed = value.trim()
+      if (!trimmed) {
+        return null
+      }
+
+      const parsed = Number(trimmed)
+      return Number.isFinite(parsed) ? parsed : Number.NaN
+    }
+
+    const mileageRate = parseOptionalDecimal(userSettingsForm.mileageRate)
+    const passengerMileageRate = parseOptionalDecimal(
+      userSettingsForm.passengerMileageRate
+    )
+
+    if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
+      setUserSettingsStatus('Rates must be valid numbers, for example 0.45.')
+      return
+    }
+
+    setIsUserSettingsSaving(true)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/auth/me/settings'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mileageRate,
+          passengerMileageRate,
+        }),
+      })
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setIsUserSettingsOpen(false)
+        setStatus('Your session expired. Sign in again to update your settings.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to save your settings.')
+      }
+
+      const savedSettings = (await response.json()) as {
+        mileageRate: number | null
+        passengerMileageRate: number | null
+      }
+
+      setAuthUser((current) =>
+        current
+          ? {
+              ...current,
+              mileageRate: savedSettings.mileageRate,
+              passengerMileageRate: savedSettings.passengerMileageRate,
+            }
+          : current
+      )
+      setUserSettingsForm({
+        mileageRate:
+          savedSettings.mileageRate === null ? '' : String(savedSettings.mileageRate),
+        passengerMileageRate:
+          savedSettings.passengerMileageRate === null
+            ? ''
+            : String(savedSettings.passengerMileageRate),
+      })
+      setUserSettingsStatus('Settings updated.')
+    } catch (error) {
+      setUserSettingsStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save your settings right now.'
+      )
+    } finally {
+      setIsUserSettingsSaving(false)
+    }
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -622,6 +923,17 @@ function App() {
         country: form.billingAddress.country.trim(),
       },
     }
+
+    const clientRates =
+      mode === 'edit' && selectedClient
+        ? {
+            mileageRate: selectedClient.mileageRate,
+            passengerMileageRate: selectedClient.passengerMileageRate,
+          }
+        : {
+            mileageRate: null,
+            passengerMileageRate: null,
+          }
 
     if (
       !payload.name ||
@@ -644,13 +956,17 @@ function App() {
       const endpoint = isEdit
         ? buildApiUrl(`/clients/${selectedClient.id}`)
         : buildApiUrl('/clients')
+      const requestBody = JSON.stringify({
+        ...payload,
+        ...clientRates,
+      })
 
       const response = await fetchWithSession(endpoint, {
         method: isEdit ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: requestBody,
       })
 
       if (response.status === 401) {
@@ -919,6 +1235,14 @@ function App() {
               <h2>{selectedClient?.name ?? 'No client selected'}</h2>
             </div>
             <div className="actions">
+              <button
+                className="ghost-button"
+                onClick={openClientSettings}
+                type="button"
+                disabled={!selectedClient}
+              >
+                Settings
+              </button>
               <button
                 className="ghost-button"
                 onClick={startEditing}
@@ -1418,6 +1742,15 @@ function App() {
                       </select>
                     </label>
                     <button
+                      className="ghost-button profile-settings"
+                      onClick={openUserSettings}
+                      role="menuitem"
+                      type="button"
+                      disabled={isLoading || isAdminLoading || isUserSettingsSaving}
+                    >
+                      Settings
+                    </button>
+                    <button
                       className="ghost-button profile-signout"
                       onClick={signOut}
                       role="menuitem"
@@ -1454,6 +1787,208 @@ function App() {
           {activeSection === 'gigs' && renderGigsSection()}
         </div>
       </section>
+
+      {isUserSettingsOpen && (
+        <div
+          className="settings-overlay"
+          onClick={closeUserSettings}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="user-settings-title"
+            aria-modal="true"
+            className="settings-modal panel"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">User settings</p>
+                <h2 id="user-settings-title">Mileage defaults</h2>
+              </div>
+              <button
+                className="ghost-button"
+                onClick={closeUserSettings}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <p className="hero-text settings-intro">
+              These rates are used as your personal fallback when a client does not
+              have custom mileage pricing configured.
+            </p>
+
+            <form className="settings-form" onSubmit={handleUserSettingsSubmit}>
+              <div className="form-grid">
+                <label>
+                  <span>Mileage rate</span>
+                  <input
+                    inputMode="decimal"
+                    placeholder="0.45"
+                    type="text"
+                    value={userSettingsForm.mileageRate}
+                    onChange={(event) =>
+                      updateUserSettingsField('mileageRate', event.target.value)
+                    }
+                  />
+                </label>
+
+                <label>
+                  <span>Passenger mileage rate</span>
+                  <input
+                    inputMode="decimal"
+                    placeholder="0.10"
+                    type="text"
+                    value={userSettingsForm.passengerMileageRate}
+                    onChange={(event) =>
+                      updateUserSettingsField(
+                        'passengerMileageRate',
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="settings-note">
+                Leave a field blank if you do not want a default for that rate.
+              </div>
+
+              <div className="form-actions">
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={isUserSettingsSaving}
+                >
+                  {isUserSettingsSaving ? 'Saving…' : 'Save settings'}
+                </button>
+                <span className="status-pill">{userSettingsStatus}</span>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {isClientSettingsOpen && selectedClient && (
+        <div
+          className="settings-overlay"
+          onClick={closeClientSettings}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="client-settings-title"
+            aria-modal="true"
+            className="settings-modal panel"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Client settings</p>
+                <h2 id="client-settings-title">{selectedClient.name}</h2>
+              </div>
+              <button
+                className="ghost-button"
+                onClick={closeClientSettings}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <p className="hero-text settings-intro">
+              Leave a field blank to inherit the default from your own user settings.
+              Add a value here only when this client needs a special rate.
+            </p>
+
+            <div className="detail-grid client-settings-preview">
+              <article className={selectedClient.mileageRate === null ? 'setting-card inherited' : 'setting-card override'}>
+                <p className="detail-label">Current mileage rule</p>
+                <strong>{formatRate(selectedClient.mileageRate ?? authUser?.mileageRate ?? null)}</strong>
+                <span>
+                  {selectedClient.mileageRate === null
+                    ? 'Inherited from your user settings'
+                    : 'Overriding your default'}
+                </span>
+              </article>
+              <article className={selectedClient.passengerMileageRate === null ? 'setting-card inherited' : 'setting-card override'}>
+                <p className="detail-label">Current passenger rule</p>
+                <strong>
+                  {formatRate(
+                    selectedClient.passengerMileageRate ??
+                      authUser?.passengerMileageRate ??
+                      null
+                  )}
+                </strong>
+                <span>
+                  {selectedClient.passengerMileageRate === null
+                    ? 'Inherited from your user settings'
+                    : 'Overriding your default'}
+                </span>
+              </article>
+            </div>
+
+            <form className="settings-form" onSubmit={handleClientSettingsSubmit}>
+              <div className="form-grid">
+                <label>
+                  <span>Mileage rate override</span>
+                  <input
+                    inputMode="decimal"
+                    placeholder={
+                      authUser?.mileageRate === null || authUser?.mileageRate === undefined
+                        ? 'Use default'
+                        : `Default ${authUser.mileageRate}`
+                    }
+                    type="text"
+                    value={clientSettingsForm.mileageRate}
+                    onChange={(event) =>
+                      updateClientSettingsField('mileageRate', event.target.value)
+                    }
+                  />
+                </label>
+
+                <label>
+                  <span>Passenger rate override</span>
+                  <input
+                    inputMode="decimal"
+                    placeholder={
+                      authUser?.passengerMileageRate === null ||
+                      authUser?.passengerMileageRate === undefined
+                        ? 'Use default'
+                        : `Default ${authUser.passengerMileageRate}`
+                    }
+                    type="text"
+                    value={clientSettingsForm.passengerMileageRate}
+                    onChange={(event) =>
+                      updateClientSettingsField(
+                        'passengerMileageRate',
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="settings-note">
+                Blank means inherited. A filled value becomes a client-specific override.
+              </div>
+
+              <div className="form-actions">
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={isClientSettingsSaving}
+                >
+                  {isClientSettingsSaving ? 'Saving…' : 'Save client settings'}
+                </button>
+                <span className="status-pill">{clientSettingsStatus}</span>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
