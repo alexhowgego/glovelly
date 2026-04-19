@@ -407,6 +407,12 @@
   grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) minmax(360px, 1.05fr);
 }
 
+.gig-workspace {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) minmax(360px, 1.05fr);
+}
+
 .gigs-draft {
   min-height: 320px;
 }
@@ -500,6 +506,35 @@
 .client-card small,
 .detail-grid span,
 .empty-state p {
+  color: var(--muted);
+}
+
+.gig-card-meta {
+  display: block;
+}
+
+.gig-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gig-summary-grid article,
+.gig-timeline-note {
+  border-radius: 20px;
+  padding: 18px;
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
+}
+
+.gig-summary-grid span {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.gig-summary-grid p,
+.gig-timeline-note span {
   color: var(--muted);
 }
 
@@ -650,12 +685,24 @@ select {
   color: var(--heading);
 }
 
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 95%, transparent);
+  background: var(--surface-elevated);
+  padding: 14px;
+  color: var(--heading);
+  resize: vertical;
+}
+
 input::placeholder {
   color: var(--input-placeholder);
 }
 
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
 button:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
@@ -694,6 +741,7 @@ button:disabled {
   .hero-panel,
   .workspace,
   .admin-workspace,
+  .gig-workspace,
   .app-frame {
     grid-template-columns: 1fr;
   }
@@ -722,6 +770,7 @@ button:disabled {
   .hero-metrics,
   .form-grid,
   .detail-grid,
+  .gig-summary-grid,
   .draft-grid {
     grid-template-columns: 1fr;
   }

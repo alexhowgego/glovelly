@@ -142,6 +142,12 @@ public static class CrudEndpoints
         group.MapPost("/", async (Gig gig, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
+            var gigValidation = ValidateGigRequest(gig);
+            if (gigValidation is not null)
+            {
+                return gigValidation;
+            }
+
             if (!await db.Clients
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == gig.ClientId))
@@ -150,12 +156,6 @@ public static class CrudEndpoints
                 {
                     ["clientId"] = ["Client does not exist."]
                 });
-            }
-
-            var gigValidation = ValidateGigRequest(gig);
-            if (gigValidation is not null)
-            {
-                return gigValidation;
             }
 
             if (gig.InvoiceId.HasValue)
@@ -210,6 +210,12 @@ public static class CrudEndpoints
                 return Results.NotFound();
             }
 
+            var gigValidation = ValidateGigRequest(request);
+            if (gigValidation is not null)
+            {
+                return gigValidation;
+            }
+
             if (!await db.Clients
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == request.ClientId))
@@ -218,12 +224,6 @@ public static class CrudEndpoints
                 {
                     ["clientId"] = ["Client does not exist."]
                 });
-            }
-
-            var gigValidation = ValidateGigRequest(request);
-            if (gigValidation is not null)
-            {
-                return gigValidation;
             }
 
             if (request.InvoiceId.HasValue)
@@ -613,35 +613,66 @@ public static class CrudEndpoints
 
     private static IResult? ValidateGigRequest(Gig gig)
     {
+        var errors = new Dictionary<string, string[]>();
+
+        if (gig.ClientId == Guid.Empty)
+        {
+            errors["clientId"] = ["Client is required."];
+        }
+
+        if (string.IsNullOrWhiteSpace(gig.Title))
+        {
+            errors["title"] = ["Title is required."];
+        }
+
+        if (gig.Date == default)
+        {
+            errors["date"] = ["Date is required."];
+        }
+
+        if (string.IsNullOrWhiteSpace(gig.Venue))
+        {
+            errors["venue"] = ["Location or venue is required."];
+        }
+
+        if (gig.Fee < 0)
+        {
+            errors["fee"] = ["Fee cannot be negative."];
+        }
+
+        if (gig.TravelMiles < 0)
+        {
+            errors["travelMiles"] = ["Travel miles cannot be negative."];
+        }
+
+        if (!Enum.IsDefined(gig.Status))
+        {
+            errors["status"] = ["Status is invalid."];
+        }
+
         if (gig.PassengerCount.HasValue && gig.PassengerCount.Value < 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["passengerCount"] = ["Passenger count cannot be negative."]
-            });
+            errors["passengerCount"] = ["Passenger count cannot be negative."];
         }
 
-        if (gig.Expenses is null)
+        if (gig.Expenses is not null)
         {
-            return null;
+            var invalidDescription = gig.Expenses.Any(expense => string.IsNullOrWhiteSpace(expense.Description));
+            if (invalidDescription)
+            {
+                errors["expenses"] = ["Each expense must include a description."];
+            }
+
+            var invalidAmount = gig.Expenses.Any(expense => expense.Amount < 0);
+            if (invalidAmount)
+            {
+                errors["expenses"] = ["Expense amounts cannot be negative."];
+            }
         }
 
-        var invalidDescription = gig.Expenses.Any(expense => string.IsNullOrWhiteSpace(expense.Description));
-        if (invalidDescription)
+        if (errors.Count > 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["expenses"] = ["Each expense must include a description."]
-            });
-        }
-
-        var invalidAmount = gig.Expenses.Any(expense => expense.Amount < 0);
-        if (invalidAmount)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["expenses"] = ["Expense amounts cannot be negative."]
-            });
+            return Results.ValidationProblem(errors);
         }
 
         return null;

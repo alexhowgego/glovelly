@@ -285,4 +285,69 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(9.00m, lines[3].GetProperty("lineTotal").GetDecimal());
         Assert.Equal(213.40m, invoice.GetProperty("total").GetDecimal());
     }
+
+    [Fact]
+    public async Task CreateGig_WithMissingRequiredFields_ReturnsValidationProblem()
+    {
+        var response = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = Guid.Empty,
+            title = "   ",
+            date = "0001-01-01",
+            venue = "",
+            fee = -25.00m,
+            travelMiles = -3.00m,
+            wasDriving = true,
+            status = 999,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var errors = problem.GetProperty("errors");
+
+        Assert.Equal("Client is required.", errors.GetProperty("clientId")[0].GetString());
+        Assert.Equal("Title is required.", errors.GetProperty("title")[0].GetString());
+        Assert.Equal("Date is required.", errors.GetProperty("date")[0].GetString());
+        Assert.Equal("Location or venue is required.", errors.GetProperty("venue")[0].GetString());
+        Assert.Equal("Fee cannot be negative.", errors.GetProperty("fee")[0].GetString());
+        Assert.Equal("Travel miles cannot be negative.", errors.GetProperty("travelMiles")[0].GetString());
+        Assert.Equal("Status is invalid.", errors.GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
+    public async Task CreateGig_PersistsAndAppearsInGigList()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Summer garden party",
+            date = "2026-07-11",
+            venue = "Botanical Gardens",
+            fee = 425.00m,
+            notes = "Outdoor afternoon set",
+            wasDriving = true,
+            status = 1,
+        });
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGigId = createdGig.GetProperty("id").GetGuid();
+
+        var listResponse = await _client.GetAsync("/gigs");
+
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+
+        var gigs = await listResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var savedGig = gigs.EnumerateArray().FirstOrDefault(gig => gig.GetProperty("id").GetGuid() == createdGigId);
+
+        Assert.Equal(JsonValueKind.Object, savedGig.ValueKind);
+        Assert.Equal(TestData.FoxAndFinchId, savedGig.GetProperty("clientId").GetGuid());
+        Assert.Equal("Summer garden party", savedGig.GetProperty("title").GetString());
+        Assert.Equal("2026-07-11", savedGig.GetProperty("date").GetString());
+        Assert.Equal("Botanical Gardens", savedGig.GetProperty("venue").GetString());
+        Assert.Equal(425.00m, savedGig.GetProperty("fee").GetDecimal());
+        Assert.Equal("Confirmed", savedGig.GetProperty("status").GetString());
+    }
 }
