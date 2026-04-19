@@ -53,6 +53,9 @@ type AdminUserForm = {
 }
 
 type AppSection = 'clients' | 'admin' | 'gigs'
+type ThemePreference = 'system' | 'light' | 'dark'
+
+const themeStorageKey = 'glovelly.theme-preference'
 
 const emptyForm = (): ClientForm => ({
   name: '',
@@ -127,6 +130,19 @@ function formatDateTime(value: string | null) {
   }).format(date)
 }
 
+function getStoredThemePreference(): ThemePreference {
+  const rawPreference = window.localStorage.getItem(themeStorageKey)
+  if (
+    rawPreference === 'system' ||
+    rawPreference === 'light' ||
+    rawPreference === 'dark'
+  ) {
+    return rawPreference
+  }
+
+  return 'system'
+}
+
 function App() {
   const [activeSection, setActiveSection] = useState<AppSection>('clients')
   const [clients, setClients] = useState<Client[]>([])
@@ -143,6 +159,8 @@ function App() {
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
+  const [themePreference, setThemePreference] =
+    useState<ThemePreference>(getStoredThemePreference)
 
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
@@ -193,6 +211,37 @@ function App() {
       document.removeEventListener('keydown', handleEscape)
     }
   }, [isProfileMenuOpen])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+
+    const applyTheme = () => {
+      const nextResolvedTheme =
+        themePreference === 'system'
+          ? mediaQuery.matches
+            ? 'dark'
+            : 'light'
+          : themePreference
+
+      document.documentElement.setAttribute('data-theme', nextResolvedTheme)
+    }
+
+    applyTheme()
+    window.localStorage.setItem(themeStorageKey, themePreference)
+
+    if (themePreference !== 'system') {
+      return
+    }
+
+    const handleSystemThemeChange = () => {
+      applyTheme()
+    }
+
+    mediaQuery.addEventListener('change', handleSystemThemeChange)
+    return () => {
+      mediaQuery.removeEventListener('change', handleSystemThemeChange)
+    }
+  }, [themePreference])
 
   const resetAdminWorkspace = () => {
     setAdminUsers([])
@@ -551,6 +600,10 @@ function App() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleThemePreferenceChange = (nextPreference: ThemePreference) => {
+    setThemePreference(nextPreference)
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1349,6 +1402,20 @@ function App() {
                     <div className="profile-meta">
                       <span>{isAdmin ? 'Administrator' : 'Standard access'}</span>
                     </div>
+                    <label className="theme-field" htmlFor="theme-preference-select">
+                      <span>Theme</span>
+                      <select
+                        id="theme-preference-select"
+                        value={themePreference}
+                        onChange={(event) =>
+                          handleThemePreferenceChange(event.target.value as ThemePreference)
+                        }
+                      >
+                        <option value="system">System</option>
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                      </select>
+                    </label>
                     <button
                       className="ghost-button profile-signout"
                       onClick={signOut}

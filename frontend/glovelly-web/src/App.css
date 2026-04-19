@@ -12,11 +12,9 @@
 
 .hero-panel,
 .panel {
-  border: 1px solid rgba(34, 42, 52, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 244, 237, 0.82)),
-    rgba(255, 255, 255, 0.78);
-  box-shadow: 0 24px 60px rgba(54, 50, 45, 0.08);
+  border: 1px solid var(--surface-border);
+  background: var(--surface-panel);
+  box-shadow: var(--surface-shadow);
   backdrop-filter: blur(18px);
 }
 
@@ -61,12 +59,12 @@
 
 .nav-item {
   text-align: left;
-  border: 1px solid rgba(34, 42, 52, 0.08);
+  border: 1px solid var(--surface-border);
   border-radius: 22px;
   padding: 18px;
   display: grid;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--surface-elevated);
   color: inherit;
   transition:
     transform 180ms ease,
@@ -88,9 +86,9 @@
 .nav-item:focus-visible,
 .nav-item.selected {
   transform: translateY(-1px);
-  border-color: rgba(27, 63, 97, 0.25);
-  background: linear-gradient(180deg, rgba(255, 250, 244, 0.95), rgba(244, 237, 228, 0.9));
-  box-shadow: 0 18px 30px rgba(52, 43, 35, 0.08);
+  border-color: color-mix(in srgb, var(--heading) 35%, transparent);
+  background: var(--surface-accent);
+  box-shadow: var(--surface-shadow-soft);
 }
 
 .nav-meta {
@@ -144,8 +142,8 @@
   margin: 0;
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(27, 63, 97, 0.08);
-  border: 1px solid rgba(27, 63, 97, 0.12);
+  background: color-mix(in srgb, var(--heading) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--heading) 18%, transparent);
   color: var(--heading);
   line-height: 1.5;
 }
@@ -155,8 +153,8 @@
   align-items: center;
   padding: 16px 18px;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 250, 244, 0.92), rgba(250, 238, 224, 0.84));
-  border: 1px solid rgba(122, 77, 36, 0.08);
+  background: var(--surface-accent);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 90%, transparent);
 }
 
 .session-card div {
@@ -183,9 +181,9 @@
   height: 52px;
   padding: 0;
   border-radius: 18px;
-  border: 1px solid rgba(34, 42, 52, 0.08);
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 14px 28px rgba(52, 43, 35, 0.08);
+  border: 1px solid var(--surface-border);
+  background: var(--surface-elevated);
+  box-shadow: var(--surface-shadow-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -201,9 +199,9 @@
 .profile-trigger:focus-visible,
 .profile-trigger.open {
   transform: translateY(-1px);
-  border-color: rgba(27, 63, 97, 0.22);
-  background: rgba(255, 252, 247, 0.94);
-  box-shadow: 0 18px 30px rgba(52, 43, 35, 0.12);
+  border-color: color-mix(in srgb, var(--heading) 30%, transparent);
+  background: var(--surface-accent);
+  box-shadow: var(--surface-shadow-soft);
 }
 
 .profile-avatar {
@@ -214,7 +212,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1b3f61, #346f85);
+  background: var(--brand-gradient-soft);
   color: white;
   font-size: 0.88rem;
   font-weight: 700;
@@ -235,11 +233,9 @@
   min-width: 260px;
   padding: 16px;
   border-radius: 22px;
-  border: 1px solid rgba(34, 42, 52, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(247, 242, 235, 0.96)),
-    rgba(255, 255, 255, 0.98);
-  box-shadow: 0 24px 48px rgba(40, 35, 31, 0.14);
+  border: 1px solid var(--surface-border);
+  background: var(--surface-overlay);
+  box-shadow: var(--surface-shadow-strong);
   backdrop-filter: blur(18px);
   display: grid;
   gap: 14px;
@@ -265,8 +261,18 @@
 .profile-meta {
   padding: 12px 14px;
   border-radius: 16px;
-  background: rgba(27, 63, 97, 0.06);
-  border: 1px solid rgba(27, 63, 97, 0.08);
+  background: color-mix(in srgb, var(--heading) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--heading) 16%, transparent);
+}
+
+.theme-field {
+  display: grid;
+  gap: 8px;
+}
+
+.theme-field span {
+  font-size: 0.86rem;
+  color: var(--muted-strong);
 }
 
 .profile-signout {
@@ -281,8 +287,8 @@
   align-items: center;
   padding: 16px;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 250, 244, 0.92), rgba(250, 238, 224, 0.84));
-  border: 1px solid rgba(122, 77, 36, 0.08);
+  background: var(--surface-accent);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 90%, transparent);
 }
 
 .hero-mascot img {
@@ -290,7 +296,7 @@
   height: 92px;
   object-fit: cover;
   border-radius: 22px;
-  box-shadow: 0 14px 30px rgba(59, 40, 28, 0.16);
+  box-shadow: var(--surface-shadow-soft);
 }
 
 .hero-mascot strong {
@@ -323,8 +329,8 @@
 .hero-metrics article {
   border-radius: 22px;
   padding: 18px;
-  background: linear-gradient(180deg, rgba(247, 157, 70, 0.18), rgba(255, 255, 255, 0.7));
-  border: 1px solid rgba(122, 77, 36, 0.08);
+  background: var(--surface-highlight);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 90%, transparent);
 }
 
 .hero-metrics span {
@@ -376,8 +382,8 @@
   gap: 6px;
   border-radius: 20px;
   padding: 18px;
-  background: rgba(248, 242, 233, 0.72);
-  border: 1px solid rgba(34, 42, 52, 0.06);
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
 }
 
 .admin-metrics {
@@ -420,9 +426,9 @@
 
 .client-card {
   text-align: left;
-  border: 1px solid rgba(34, 42, 52, 0.08);
+  border: 1px solid var(--surface-border);
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--surface-elevated);
   padding: 16px;
   display: grid;
   gap: 14px;
@@ -436,8 +442,8 @@
 .client-card:focus-visible,
 .client-card.selected {
   transform: translateY(-2px);
-  border-color: rgba(204, 110, 39, 0.35);
-  box-shadow: 0 16px 30px rgba(52, 43, 35, 0.08);
+  border-color: color-mix(in srgb, #f47d2a 42%, var(--surface-border));
+  box-shadow: var(--surface-shadow-soft);
 }
 
 .client-card div {
@@ -476,8 +482,8 @@
   gap: 6px;
   border-radius: 20px;
   padding: 18px;
-  background: rgba(248, 242, 233, 0.72);
-  border: 1px solid rgba(34, 42, 52, 0.06);
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
 }
 
 .detail-grid strong,
@@ -494,7 +500,7 @@
 .status-pill {
   padding: 10px 14px;
   border-radius: 999px;
-  background: rgba(240, 132, 49, 0.12);
+  background: color-mix(in srgb, #f47d2a 20%, transparent);
   color: var(--heading);
   font-size: 0.86rem;
 }
@@ -508,8 +514,8 @@
 .empty-state {
   padding: 22px;
   border-radius: 20px;
-  border: 1px dashed rgba(89, 76, 63, 0.22);
-  background: rgba(251, 248, 242, 0.8);
+  border: 1px dashed color-mix(in srgb, var(--muted-strong) 30%, transparent);
+  background: var(--surface-soft);
 }
 
 .roomy {
@@ -538,20 +544,20 @@
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #1b3f61, #255a7a);
+  background: var(--brand-gradient);
   color: white;
-  box-shadow: 0 18px 30px rgba(33, 74, 107, 0.22);
+  box-shadow: var(--surface-shadow-soft);
 }
 
 .ghost-button {
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--surface-elevated);
   color: var(--heading);
-  border-color: rgba(34, 42, 52, 0.08);
+  border-color: var(--surface-border);
 }
 
 .danger-button {
-  background: rgba(144, 36, 36, 0.08);
-  color: #812d2d;
+  background: color-mix(in srgb, #a12828 22%, transparent);
+  color: var(--danger-text);
 }
 
 .primary-button:hover,
@@ -576,20 +582,20 @@ select {
   box-sizing: border-box;
   min-height: 48px;
   border-radius: 16px;
-  border: 1px solid rgba(34, 42, 52, 0.1);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 95%, transparent);
+  background: var(--surface-elevated);
   padding: 0 14px;
   color: var(--heading);
 }
 
 input::placeholder {
-  color: #9e948b;
+  color: var(--input-placeholder);
 }
 
 input:focus-visible,
 select:focus-visible,
 button:focus-visible {
-  outline: 2px solid rgba(34, 90, 122, 0.45);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -600,15 +606,15 @@ button:focus-visible {
   min-height: 48px;
   padding: 12px 16px;
   border-radius: 16px;
-  border: 1px solid rgba(34, 42, 52, 0.08);
-  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--surface-border);
+  background: var(--surface-elevated);
 }
 
 .checkbox-field input {
   width: 18px;
   min-height: auto;
   margin: 0;
-  accent-color: #1b3f61;
+  accent-color: color-mix(in srgb, var(--heading) 72%, white);
 }
 
 .checkbox-field span {
