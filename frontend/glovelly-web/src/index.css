@@ -2,11 +2,8 @@
   font-family: var(--body);
   line-height: 1.5;
   font-weight: 400;
-  color: #4b4c4a;
-  background:
-    radial-gradient(circle at top left, rgba(236, 170, 94, 0.35), transparent 30%),
-    radial-gradient(circle at top right, rgba(37, 90, 122, 0.18), transparent 26%),
-    linear-gradient(180deg, #f5efe6 0%, #f1ede7 42%, #ece6de 100%);
+  color: var(--text);
+  background: var(--page-background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -14,9 +11,77 @@
 
   --body: "Instrument Sans", "Avenir Next", "Segoe UI", sans-serif;
   --display: "Fraunces", Georgia, serif;
+  --text: #4b4c4a;
   --heading: #1e2933;
   --muted: #6f706c;
   --muted-strong: #7c6957;
+  --page-background:
+    radial-gradient(circle at top left, rgba(236, 170, 94, 0.35), transparent 30%),
+    radial-gradient(circle at top right, rgba(37, 90, 122, 0.18), transparent 26%),
+    linear-gradient(180deg, #f5efe6 0%, #f1ede7 42%, #ece6de 100%);
+  --page-overlay:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.35), transparent 32%),
+    linear-gradient(315deg, rgba(255, 255, 255, 0.24), transparent 28%);
+
+  --surface-border: rgba(34, 42, 52, 0.08);
+  --surface-panel:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 244, 237, 0.82)),
+    rgba(255, 255, 255, 0.78);
+  --surface-elevated: rgba(255, 255, 255, 0.88);
+  --surface-subtle: rgba(248, 242, 233, 0.72);
+  --surface-soft: rgba(251, 248, 242, 0.8);
+  --surface-accent:
+    linear-gradient(180deg, rgba(255, 250, 244, 0.92), rgba(250, 238, 224, 0.84));
+  --surface-highlight:
+    linear-gradient(180deg, rgba(247, 157, 70, 0.18), rgba(255, 255, 255, 0.7));
+  --surface-overlay:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(247, 242, 235, 0.96)),
+    rgba(255, 255, 255, 0.98);
+  --surface-shadow: 0 24px 60px rgba(54, 50, 45, 0.08);
+  --surface-shadow-strong: 0 24px 48px rgba(40, 35, 31, 0.14);
+  --surface-shadow-soft: 0 16px 30px rgba(52, 43, 35, 0.08);
+  --focus-ring: 2px solid rgba(34, 90, 122, 0.45);
+  --input-placeholder: #9e948b;
+  --danger-text: #812d2d;
+  --brand-gradient: linear-gradient(135deg, #1b3f61, #255a7a);
+  --brand-gradient-soft: linear-gradient(135deg, #1b3f61, #346f85);
+}
+
+:root[data-theme='dark'] {
+  --text: #d9e0e8;
+  --heading: #f7fafc;
+  --muted: #b6c0cc;
+  --muted-strong: #9eabba;
+  --page-background:
+    radial-gradient(circle at top left, rgba(236, 170, 94, 0.09), transparent 34%),
+    radial-gradient(circle at top right, rgba(37, 90, 122, 0.16), transparent 30%),
+    linear-gradient(180deg, #11151d 0%, #0e141d 44%, #0b1018 100%);
+  --page-overlay:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 32%),
+    linear-gradient(315deg, rgba(255, 255, 255, 0.02), transparent 28%);
+
+  --surface-border: rgba(150, 169, 190, 0.18);
+  --surface-panel:
+    linear-gradient(180deg, rgba(25, 33, 44, 0.92), rgba(19, 27, 39, 0.92)),
+    rgba(17, 25, 36, 0.9);
+  --surface-elevated: rgba(24, 33, 45, 0.94);
+  --surface-subtle: rgba(34, 44, 58, 0.8);
+  --surface-soft: rgba(26, 35, 48, 0.9);
+  --surface-accent:
+    linear-gradient(180deg, rgba(38, 49, 65, 0.92), rgba(28, 39, 55, 0.92));
+  --surface-highlight:
+    linear-gradient(180deg, rgba(65, 88, 122, 0.4), rgba(31, 41, 56, 0.7));
+  --surface-overlay:
+    linear-gradient(180deg, rgba(32, 43, 59, 0.95), rgba(24, 35, 50, 0.95)),
+    rgba(22, 33, 47, 0.94);
+  --surface-shadow: 0 24px 60px rgba(4, 8, 14, 0.48);
+  --surface-shadow-strong: 0 24px 48px rgba(2, 6, 12, 0.56);
+  --surface-shadow-soft: 0 16px 30px rgba(2, 7, 14, 0.46);
+  --focus-ring: 2px solid rgba(110, 180, 226, 0.65);
+  --input-placeholder: #93a0af;
+  --danger-text: #f6a3a3;
+  --brand-gradient: linear-gradient(135deg, #4f89b6, #2f688e);
+  --brand-gradient-soft: linear-gradient(135deg, #5d90b8, #3f7298);
 }
 
 * {
@@ -38,9 +103,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.35), transparent 32%),
-    linear-gradient(315deg, rgba(255, 255, 255, 0.24), transparent 28%);
+  background: var(--page-overlay);
 }
 
 #root {
