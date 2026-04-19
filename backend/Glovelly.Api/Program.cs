@@ -665,3 +665,5 @@ static bool? TryGetEmailVerified(ClaimsPrincipal principal)
 }
 
 internal sealed record UnauthorizedPageCopy(string Eyebrow, string Title, string Body, string Note);
+
+public partial class Program;

@@ -50,6 +50,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore .NET dependencies
+        run: dotnet restore glovelly.sln
+
+      - name: Run backend tests
+        run: dotnet test glovelly.sln --no-restore -m:1
+
       - name: Authenticate to Google Cloud
         if: github.event_name != 'pull_request'
         id: auth
