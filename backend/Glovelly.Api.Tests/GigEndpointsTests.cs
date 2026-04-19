@@ -172,4 +172,117 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.False(updatedGig.GetProperty("isInvoiced").GetBoolean());
         Assert.Equal(JsonValueKind.Null, updatedGig.GetProperty("invoicedAt").ValueKind);
     }
+
+    [Fact]
+    public async Task CreateGig_WithInvoice_GeneratesMileagePassengerAndExpenseLines()
+    {
+        var response = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            invoiceId = TestData.FoxInvoiceId,
+            title = "Mileage-rich booking",
+            date = "2026-06-12",
+            venue = "Civic Hall",
+            fee = 300.00m,
+            travelMiles = 10.50m,
+            passengerCount = 2,
+            notes = "Includes two guests and parking",
+            wasDriving = true,
+            status = 1,
+            expenses = new[]
+            {
+                new
+                {
+                    description = "Parking",
+                    amount = 12.00m,
+                },
+                new
+                {
+                    description = "Fuel",
+                    amount = 20.00m,
+                },
+            },
+            invoicedAt = (string?)null,
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = gig.GetProperty("id").GetGuid();
+
+        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.FoxInvoiceId}");
+        invoiceResponse.EnsureSuccessStatusCode();
+
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
+
+        Assert.Equal(5, lines.Length);
+        Assert.All(lines, line => Assert.True(line.GetProperty("isSystemGenerated").GetBoolean()));
+        Assert.All(lines, line => Assert.Equal(gigId, line.GetProperty("gigId").GetGuid()));
+
+        Assert.Equal("PerformanceFee", lines[0].GetProperty("type").GetString());
+        Assert.Equal(300.00m, lines[0].GetProperty("lineTotal").GetDecimal());
+
+        Assert.Equal("Mileage", lines[1].GetProperty("type").GetString());
+        Assert.Equal(10.50m, lines[1].GetProperty("quantity").GetDecimal());
+        Assert.Equal(0.52m, lines[1].GetProperty("unitPrice").GetDecimal());
+        Assert.Equal(5.46m, lines[1].GetProperty("lineTotal").GetDecimal());
+
+        Assert.Equal("PassengerMileage", lines[2].GetProperty("type").GetString());
+        Assert.Equal(21.00m, lines[2].GetProperty("quantity").GetDecimal());
+        Assert.Equal(0.15m, lines[2].GetProperty("unitPrice").GetDecimal());
+        Assert.Equal(3.15m, lines[2].GetProperty("lineTotal").GetDecimal());
+
+        Assert.Equal("Parking", lines[3].GetProperty("description").GetString());
+        Assert.Equal(12.00m, lines[3].GetProperty("lineTotal").GetDecimal());
+        Assert.Equal("Fuel", lines[4].GetProperty("description").GetString());
+        Assert.Equal(20.00m, lines[4].GetProperty("lineTotal").GetDecimal());
+
+        Assert.Equal(340.61m, invoice.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
+    public async Task CreateGig_UsesUserPricingFallbackWhenClientRatesAreMissing()
+    {
+        var response = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.RiversideId,
+            invoiceId = TestData.RiversideInvoiceId,
+            title = "Residency workshop",
+            date = "2026-06-13",
+            venue = "River Room",
+            fee = 200.00m,
+            travelMiles = 8.00m,
+            passengerCount = 1,
+            notes = "Uses user fallback rates",
+            wasDriving = true,
+            status = 1,
+            expenses = new[]
+            {
+                new
+                {
+                    description = "Parking",
+                    amount = 9.00m,
+                },
+            },
+            invoicedAt = (string?)null,
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.RiversideInvoiceId}");
+        invoiceResponse.EnsureSuccessStatusCode();
+
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
+
+        Assert.Equal(4, lines.Length);
+        Assert.All(lines, line => Assert.True(line.GetProperty("isSystemGenerated").GetBoolean()));
+
+        Assert.Equal(200.00m, lines[0].GetProperty("lineTotal").GetDecimal());
+        Assert.Equal(3.60m, lines[1].GetProperty("lineTotal").GetDecimal());
+        Assert.Equal(0.80m, lines[2].GetProperty("lineTotal").GetDecimal());
+        Assert.Equal(9.00m, lines[3].GetProperty("lineTotal").GetDecimal());
+        Assert.Equal(213.40m, invoice.GetProperty("total").GetDecimal());
+    }
 }

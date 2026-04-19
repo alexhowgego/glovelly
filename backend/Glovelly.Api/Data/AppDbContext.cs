@@ -8,6 +8,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<User> Users => Set<User>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Gig> Gigs => Set<Gig>();
+    public DbSet<GigExpense> GigExpenses => Set<GigExpense>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
 
@@ -23,6 +24,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasMaxLength(320);
             entity.Property(user => user.DisplayName)
                 .HasMaxLength(200);
+            entity.Property(user => user.MileageRate)
+                .HasPrecision(18, 2);
+            entity.Property(user => user.PassengerMileageRate)
+                .HasPrecision(18, 2);
             entity.Property(user => user.Role)
                 .HasConversion<string>()
                 .HasMaxLength(20);
@@ -41,6 +46,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasMaxLength(200);
             entity.Property(client => client.Email)
                 .HasMaxLength(320);
+            entity.Property(client => client.MileageRate)
+                .HasPrecision(18, 2);
+            entity.Property(client => client.PassengerMileageRate)
+                .HasPrecision(18, 2);
             entity.HasOne(client => client.CreatedByUser)
                 .WithMany(user => user.ClientsCreated)
                 .HasForeignKey(client => client.CreatedByUserId)
@@ -72,6 +81,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasPrecision(18, 2);
             entity.Property(gig => gig.TravelMiles)
                 .HasPrecision(18, 2);
+            entity.Property(gig => gig.PassengerCount);
             entity.Property(gig => gig.Notes)
                 .HasMaxLength(4000);
             entity.Property(gig => gig.Status)
@@ -94,6 +104,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(invoice => invoice.Gigs)
                 .HasForeignKey(gig => gig.InvoiceId)
                 .OnDelete(DeleteBehavior.SetNull);
+            entity.HasMany(gig => gig.Expenses)
+                .WithOne(expense => expense.Gig)
+                .HasForeignKey(expense => expense.GigId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<GigExpense>(entity =>
+        {
+            entity.HasKey(expense => expense.Id);
+            entity.Property(expense => expense.Description)
+                .HasMaxLength(500);
+            entity.Property(expense => expense.Amount)
+                .HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Invoice>(entity =>
@@ -136,6 +159,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasPrecision(18, 2);
             entity.Property(line => line.CalculationNotes)
                 .HasMaxLength(2000);
+            entity.Property(line => line.IsSystemGenerated);
 
             entity.HasOne(line => line.Invoice)
                 .WithMany(invoice => invoice.Lines)

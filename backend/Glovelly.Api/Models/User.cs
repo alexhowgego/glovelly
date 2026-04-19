@@ -8,6 +8,8 @@ public sealed class User
     public string? GoogleSubject { get; set; }
     public string Email { get; set; } = string.Empty;
     public string? DisplayName { get; set; }
+    public decimal? MileageRate { get; set; }
+    public decimal? PassengerMileageRate { get; set; }
     public UserRole Role { get; set; } = UserRole.User;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedUtc { get; set; }

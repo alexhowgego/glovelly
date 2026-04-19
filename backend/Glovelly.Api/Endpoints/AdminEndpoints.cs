@@ -30,7 +30,9 @@ public static class AdminEndpoints
                     user.Role.ToString(),
                     user.IsActive,
                     user.CreatedUtc,
-                    user.LastLoginUtc))
+                    user.LastLoginUtc,
+                    user.MileageRate,
+                    user.PassengerMileageRate))
                 .ToListAsync();
 
             return Results.Ok(result);
@@ -51,6 +53,8 @@ public static class AdminEndpoints
                 Email = normalized.Email,
                 DisplayName = normalized.DisplayName,
                 GoogleSubject = normalized.GoogleSubject,
+                MileageRate = normalized.MileageRate,
+                PassengerMileageRate = normalized.PassengerMileageRate,
                 Role = normalized.Role,
                 IsActive = normalized.IsActive,
                 CreatedUtc = DateTime.UtcNow,
@@ -113,6 +117,8 @@ public static class AdminEndpoints
             user.Email = normalized.Email;
             user.DisplayName = normalized.DisplayName;
             user.GoogleSubject = normalized.GoogleSubject;
+            user.MileageRate = normalized.MileageRate;
+            user.PassengerMileageRate = normalized.PassengerMileageRate;
             user.Role = normalized.Role;
             user.IsActive = normalized.IsActive;
 
@@ -138,6 +144,21 @@ public static class AdminEndpoints
         else if (!request.Email.Contains('@'))
         {
             errors["email"] = ["Email must look like a valid email address."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return errors;
+        }
+
+        if (request.MileageRate.HasValue && request.MileageRate.Value < 0)
+        {
+            errors["mileageRate"] = ["Mileage rate cannot be negative."];
+        }
+
+        if (request.PassengerMileageRate.HasValue && request.PassengerMileageRate.Value < 0)
+        {
+            errors["passengerMileageRate"] = ["Passenger mileage rate cannot be negative."];
         }
 
         if (errors.Count > 0)
@@ -174,6 +195,8 @@ public static class AdminEndpoints
             request.Email.Trim().ToLowerInvariant(),
             string.IsNullOrWhiteSpace(request.DisplayName) ? null : request.DisplayName.Trim(),
             string.IsNullOrWhiteSpace(request.GoogleSubject) ? null : request.GoogleSubject.Trim(),
+            request.MileageRate,
+            request.PassengerMileageRate,
             role,
             request.IsActive);
     }
@@ -188,12 +211,16 @@ public static class AdminEndpoints
             user.Role.ToString(),
             user.IsActive,
             user.CreatedUtc,
-            user.LastLoginUtc);
+            user.LastLoginUtc,
+            user.MileageRate,
+            user.PassengerMileageRate);
 
     private sealed record AdminUserRequest(
         string Email,
         string? DisplayName,
         string? GoogleSubject,
+        decimal? MileageRate,
+        decimal? PassengerMileageRate,
         string Role,
         bool IsActive);
 
@@ -201,6 +228,8 @@ public static class AdminEndpoints
         string Email,
         string? DisplayName,
         string? GoogleSubject,
+        decimal? MileageRate,
+        decimal? PassengerMileageRate,
         UserRole Role,
         bool IsActive);
 
@@ -213,5 +242,7 @@ public static class AdminEndpoints
         string Role,
         bool IsActive,
         DateTime CreatedUtc,
-        DateTime? LastLoginUtc);
+        DateTime? LastLoginUtc,
+        decimal? MileageRate,
+        decimal? PassengerMileageRate);
 }

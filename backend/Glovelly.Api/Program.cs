@@ -347,15 +347,79 @@ auth.MapPost("/logout", async (HttpContext httpContext) =>
     return Results.NoContent();
 });
 
-auth.MapGet("/me", [Authorize(Policy = GlovellyPolicies.GlovellyUser)] (ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
+auth.MapGet("/me", [Authorize(Policy = GlovellyPolicies.GlovellyUser)] async (
+    ClaimsPrincipal user,
+    ICurrentUserAccessor currentUserAccessor,
+    AppDbContext dbContext) =>
 {
+    var userId = currentUserAccessor.TryGetUserId(user);
+    var settings = userId.HasValue
+        ? await dbContext.Users
+            .AsNoTracking()
+            .Where(value => value.Id == userId.Value)
+            .Select(value => new
+            {
+                value.MileageRate,
+                value.PassengerMileageRate,
+            })
+            .FirstOrDefaultAsync()
+        : null;
+
     return Results.Ok(new
     {
-        userId = currentUserAccessor.TryGetUserId(user),
+        userId,
         role = currentUserAccessor.TryGetRole(user)?.ToString(),
         name = user.FindFirstValue(ClaimTypes.Name) ?? user.FindFirstValue("name") ?? "Signed in user",
         email = user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirstValue("email") ?? string.Empty,
         profileImageUrl = user.FindFirstValue("picture") ?? user.FindFirstValue("profile") ?? string.Empty,
+        mileageRate = settings?.MileageRate,
+        passengerMileageRate = settings?.PassengerMileageRate,
+    });
+});
+
+auth.MapPut("/me/settings", [Authorize(Policy = GlovellyPolicies.GlovellyUser)] async (
+    UserSettingsRequest request,
+    ClaimsPrincipal user,
+    ICurrentUserAccessor currentUserAccessor,
+    AppDbContext dbContext) =>
+{
+    if (request.MileageRate.HasValue && request.MileageRate.Value < 0)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["mileageRate"] = ["Mileage rate cannot be negative."]
+        });
+    }
+
+    if (request.PassengerMileageRate.HasValue && request.PassengerMileageRate.Value < 0)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["passengerMileageRate"] = ["Passenger mileage rate cannot be negative."]
+        });
+    }
+
+    var userId = currentUserAccessor.TryGetUserId(user);
+    if (!userId.HasValue)
+    {
+        return Results.Unauthorized();
+    }
+
+    var localUser = await dbContext.Users.FirstOrDefaultAsync(value => value.Id == userId.Value);
+    if (localUser is null)
+    {
+        return Results.NotFound();
+    }
+
+    localUser.MileageRate = request.MileageRate;
+    localUser.PassengerMileageRate = request.PassengerMileageRate;
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        mileageRate = localUser.MileageRate,
+        passengerMileageRate = localUser.PassengerMileageRate,
     });
 });
 
@@ -691,5 +755,6 @@ static bool? TryGetEmailVerified(ClaimsPrincipal principal)
 }
 
 internal sealed record UnauthorizedPageCopy(string Eyebrow, string Title, string Body, string Note);
+internal sealed record UserSettingsRequest(decimal? MileageRate, decimal? PassengerMileageRate);
 
 public partial class Program;
