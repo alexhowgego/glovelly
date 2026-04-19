@@ -259,7 +259,7 @@ public static class CrudEndpoints
             var invoices = await db.Invoices
                 .AsNoTracking()
                 .Include(invoice => invoice.Lines)
-                .OrderByDescending(invoice => invoice.IssueDate)
+                .OrderByDescending(invoice => invoice.InvoiceDate)
                 .ThenBy(invoice => invoice.InvoiceNumber)
                 .ToListAsync();
 
@@ -291,7 +291,7 @@ public static class CrudEndpoints
 
             invoice.Id = Guid.NewGuid();
             invoice.InvoiceNumber = invoice.InvoiceNumber.Trim();
-            invoice.Notes = invoice.Notes?.Trim();
+            invoice.Description = invoice.Description?.Trim();
             invoice.Client = null;
             invoice.Lines = new List<InvoiceLine>();
             StampCreate(invoice, currentUserAccessor.TryGetUserId(user));
@@ -324,13 +324,30 @@ public static class CrudEndpoints
                 });
             }
 
+            var hasConflictingGigLinks = await db.InvoiceLines
+                .Where(line => line.InvoiceId == invoice.Id && line.GigId.HasValue)
+                .Join(
+                    db.Gigs,
+                    line => line.GigId!.Value,
+                    gig => gig.Id,
+                    (line, gig) => gig.ClientId)
+                .AnyAsync(clientId => clientId != request.ClientId);
+
+            if (hasConflictingGigLinks)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["clientId"] = ["Invoice client must match any linked gig line clients."]
+                });
+            }
+
             invoice.InvoiceNumber = request.InvoiceNumber.Trim();
             invoice.ClientId = request.ClientId;
-            invoice.IssueDate = request.IssueDate;
+            invoice.InvoiceDate = request.InvoiceDate;
             invoice.DueDate = request.DueDate;
             invoice.Status = request.Status;
-            invoice.Subtotal = request.Subtotal;
-            invoice.Notes = request.Notes?.Trim();
+            invoice.Description = request.Description?.Trim();
+            invoice.PdfBlob = request.PdfBlob;
             StampUpdate(invoice, currentUserAccessor.TryGetUserId(user));
 
             await db.SaveChangesAsync();
@@ -359,7 +376,9 @@ public static class CrudEndpoints
         {
             var lines = await db.InvoiceLines
                 .AsNoTracking()
-                .OrderBy(line => line.Description)
+                .OrderBy(line => line.InvoiceId)
+                .ThenBy(line => line.SortOrder)
+                .ThenBy(line => line.Description)
                 .ToListAsync();
 
             return Results.Ok(lines);
@@ -376,7 +395,11 @@ public static class CrudEndpoints
 
         group.MapPost("/", async (InvoiceLine line, AppDbContext db) =>
         {
-            if (!await db.Invoices.AnyAsync(invoice => invoice.Id == line.InvoiceId))
+            var invoice = await db.Invoices
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == line.InvoiceId);
+
+            if (invoice is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -384,14 +407,20 @@ public static class CrudEndpoints
                 });
             }
 
+            var gigValidation = await ValidateInvoiceLineGigAsync(invoice, line.GigId, db);
+            if (gigValidation is not null)
+            {
+                return gigValidation;
+            }
+
             line.Id = Guid.NewGuid();
             line.Description = line.Description.Trim();
-            line.Total = line.Quantity * line.UnitPrice;
+            line.CalculationNotes = line.CalculationNotes?.Trim();
             line.Invoice = null;
+            line.Gig = null;
 
             db.InvoiceLines.Add(line);
             await db.SaveChangesAsync();
-            await RecalculateInvoiceSubtotalAsync(line.InvoiceId, db);
 
             return Results.Created($"/invoice-lines/{line.Id}", line);
         });
@@ -404,7 +433,11 @@ public static class CrudEndpoints
                 return Results.NotFound();
             }
 
-            if (!await db.Invoices.AnyAsync(invoice => invoice.Id == request.InvoiceId))
+            var invoice = await db.Invoices
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == request.InvoiceId);
+
+            if (invoice is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -412,20 +445,22 @@ public static class CrudEndpoints
                 });
             }
 
-            var previousInvoiceId = line.InvoiceId;
+            var gigValidation = await ValidateInvoiceLineGigAsync(invoice, request.GigId, db);
+            if (gigValidation is not null)
+            {
+                return gigValidation;
+            }
 
             line.InvoiceId = request.InvoiceId;
+            line.SortOrder = request.SortOrder;
+            line.Type = request.Type;
             line.Description = request.Description.Trim();
             line.Quantity = request.Quantity;
             line.UnitPrice = request.UnitPrice;
-            line.Total = request.Quantity * request.UnitPrice;
+            line.GigId = request.GigId;
+            line.CalculationNotes = request.CalculationNotes?.Trim();
 
             await db.SaveChangesAsync();
-            await RecalculateInvoiceSubtotalAsync(previousInvoiceId, db);
-            if (previousInvoiceId != request.InvoiceId)
-            {
-                await RecalculateInvoiceSubtotalAsync(request.InvoiceId, db);
-            }
 
             return Results.Ok(line);
         });
@@ -438,28 +473,11 @@ public static class CrudEndpoints
                 return Results.NotFound();
             }
 
-            var invoiceId = line.InvoiceId;
             db.InvoiceLines.Remove(line);
             await db.SaveChangesAsync();
-            await RecalculateInvoiceSubtotalAsync(invoiceId, db);
 
             return Results.NoContent();
         });
-    }
-
-    private static async Task RecalculateInvoiceSubtotalAsync(Guid invoiceId, AppDbContext db)
-    {
-        var invoice = await db.Invoices
-            .Include(value => value.Lines)
-            .FirstOrDefaultAsync(value => value.Id == invoiceId);
-
-        if (invoice is null)
-        {
-            return;
-        }
-
-        invoice.Subtotal = invoice.Lines.Sum(line => line.Total);
-        await db.SaveChangesAsync();
     }
 
     private static DateTimeOffset? ResolveInvoicedAt(
@@ -484,6 +502,36 @@ public static class CrudEndpoints
         }
 
         return DateTimeOffset.UtcNow;
+    }
+
+    private static async Task<IResult?> ValidateInvoiceLineGigAsync(Invoice invoice, Guid? gigId, AppDbContext db)
+    {
+        if (!gigId.HasValue)
+        {
+            return null;
+        }
+
+        var gig = await db.Gigs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(value => value.Id == gigId.Value);
+
+        if (gig is null)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["gigId"] = ["Gig does not exist."]
+            });
+        }
+
+        if (gig.ClientId != invoice.ClientId)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["gigId"] = ["Gig client must match the invoice client."]
+            });
+        }
+
+        return null;
     }
 
     private static IQueryable<Client> WhereVisibleTo(this IQueryable<Client> query, Guid? userId)
