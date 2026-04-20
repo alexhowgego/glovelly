@@ -87,6 +87,8 @@ type Gig = {
 
 type InvoiceLine = {
   id: string
+  createdByUserId: string | null
+  createdUtc: string
   sortOrder: number
   type: string
   description: string
@@ -342,6 +344,8 @@ function App() {
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
   const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
+  const [adjustmentAmount, setAdjustmentAmount] = useState('')
+  const [adjustmentReason, setAdjustmentReason] = useState('')
 
   const isAdmin = authUser?.role === 'Admin'
   const profileDisplayName = authUser?.name?.trim() || authUser?.email || 'User'
@@ -1713,6 +1717,61 @@ function App() {
     }
   }
 
+  const handleAddInvoiceAdjustment = async (invoice: Invoice) => {
+    const amount = Number.parseFloat(adjustmentAmount)
+    if (!Number.isFinite(amount) || amount === 0) {
+      setInvoiceStatus('Enter a non-zero adjustment amount.')
+      return
+    }
+
+    const reason = adjustmentReason.trim()
+    if (!reason) {
+      setInvoiceStatus('Add a reason before saving an adjustment.')
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Saving adjustment on ${invoice.invoiceNumber}...`)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/adjustments`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount,
+          reason,
+        }),
+      })
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const reasonError = problem?.errors?.reason?.[0]
+        const amountError = problem?.errors?.amount?.[0]
+        throw new Error(
+          reasonError ??
+            amountError ??
+            problem?.detail ??
+            problem?.title ??
+            'Unable to add invoice adjustment.'
+        )
+      }
+
+      const updatedInvoice = (await response.json()) as Invoice
+      setInvoices((current) =>
+        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
+      )
+      setAdjustmentAmount('')
+      setAdjustmentReason('')
+      setInvoiceStatus(`Adjustment saved. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`)
+    } catch (error) {
+      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to add invoice adjustment.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="app-shell auth-shell">
@@ -2625,12 +2684,12 @@ function App() {
                     <span>{selectedInvoice.description?.trim() || 'No description set.'}</span>
                   </article>
                   <article>
-                    <p className="detail-label">Line items</p>
-                    <strong>{selectedInvoice.lines.length}</strong>
-                  </article>
-                  <article>
                     <p className="detail-label">Total</p>
                     <strong>{formatCurrency(selectedInvoice.total)}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Line items</p>
+                    <strong>{selectedInvoice.lines.length}</strong>
                   </article>
                   <article>
                     <p className="detail-label">Re-issued</p>
@@ -2643,29 +2702,94 @@ function App() {
                 </div>
 
                 <div className="gig-timeline-note">
-                  <p className="detail-label">Line items</p>
-                  <div className="invoice-line-list">
-                    {selectedInvoice.lines
-                      .slice()
-                      .sort((left, right) => left.sortOrder - right.sortOrder)
-                      .map((line) => (
-                        <div className="invoice-line-item" key={line.id}>
-                          <div>
-                            <strong>{line.description}</strong>
-                            <span>
-                              {line.type} · {line.quantity} x {formatCurrency(line.unitPrice)}
-                            </span>
-                          </div>
-                          <strong>{formatCurrency(line.lineTotal)}</strong>
-                        </div>
-                      ))}
-                  </div>
+                  <p className="detail-label">Invoice workflow</p>
+                  <span>
+                    Re-issue and PDF actions stay in the overview pane, while line-level changes now live in
+                    the docked side pane for a steadier browse flow.
+                  </span>
                 </div>
               </>
             ) : (
               <div className="empty-state roomy">
                 <strong>Select an invoice to review its details.</strong>
                 <p>The generated PDF and line items will be available here.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Management Pane</p>
+                <h2>{selectedInvoice ? 'Line items' : 'No invoice selected'}</h2>
+              </div>
+            </div>
+
+            {selectedInvoice ? (
+              <>
+                <div className="gig-timeline-note">
+                  <p className="detail-label">Adjustments</p>
+                  <span>
+                    Manual adjustments append a separate line item so the original invoice breakdown stays intact.
+                  </span>
+                </div>
+
+                <form
+                  className="invoice-adjustment-form"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void handleAddInvoiceAdjustment(selectedInvoice)
+                  }}
+                >
+                  <label>
+                    Amount
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={adjustmentAmount}
+                      onChange={(event) => setAdjustmentAmount(event.target.value)}
+                      placeholder="-25.00"
+                      disabled={isInvoiceLoading}
+                    />
+                  </label>
+                  <label>
+                    Reason
+                    <input
+                      value={adjustmentReason}
+                      onChange={(event) => setAdjustmentReason(event.target.value)}
+                      placeholder="Goodwill discount, surcharge, correction..."
+                      disabled={isInvoiceLoading}
+                    />
+                  </label>
+                  <button className="ghost-button" type="submit" disabled={isInvoiceLoading}>
+                    Add adjustment
+                  </button>
+                </form>
+
+                <div className="invoice-line-list">
+                  {selectedInvoice.lines
+                    .slice()
+                    .sort((left, right) => left.sortOrder - right.sortOrder)
+                    .map((line) => (
+                      <div className="invoice-line-item" key={line.id}>
+                        <div>
+                          <strong>{line.description}</strong>
+                          <span>
+                            {line.type} · {line.quantity} x {formatCurrency(line.unitPrice)}
+                          </span>
+                          {line.type === 'ManualAdjustment' ? (
+                            <span>Audit: {formatDateTime(line.createdUtc)}</span>
+                          ) : null}
+                        </div>
+                        <strong>{formatCurrency(line.lineTotal)}</strong>
+                      </div>
+                    ))}
+                </div>
+              </>
+            ) : (
+              <div className="empty-state roomy">
+                <strong>Select an invoice to inspect its line items.</strong>
+                <p>The right-hand pane is reserved for line breakdowns and manual adjustments.</p>
               </div>
             )}
           </div>

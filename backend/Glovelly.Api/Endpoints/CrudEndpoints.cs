@@ -2,6 +2,7 @@ using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 
@@ -594,6 +595,60 @@ public static class CrudEndpoints
             return Results.Ok(invoice);
         });
 
+        group.MapPost("/{id:guid}/adjustments", async (
+            Guid id,
+            InvoiceAdjustmentCreateRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor) =>
+        {
+            var invoice = await db.Invoices
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id);
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            var reason = request.Reason?.Trim();
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["reason"] = ["Adjustment reason is required."]
+                });
+            }
+
+            if (request.Amount == 0)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["amount"] = ["Adjustment amount must be non-zero."]
+                });
+            }
+
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var adjustmentLine = new InvoiceLine
+            {
+                Id = Guid.NewGuid(),
+                InvoiceId = invoice.Id,
+                SortOrder = await GetNextSortOrderAsync(invoice.Id, db),
+                Type = InvoiceLineType.ManualAdjustment,
+                Description = $"Manual adjustment: {reason}",
+                Quantity = 1m,
+                UnitPrice = request.Amount,
+                CalculationNotes = BuildAdjustmentAuditNote(userId),
+                IsSystemGenerated = false,
+            };
+            StampCreate(adjustmentLine, userId);
+
+            db.InvoiceLines.Add(adjustmentLine);
+            StampUpdate(invoice, userId);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(invoice);
+        });
+
         group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
         {
             var invoice = await db.Invoices.FirstOrDefaultAsync(invoice => invoice.Id == id);
@@ -655,6 +710,7 @@ public static class CrudEndpoints
             line.Id = Guid.NewGuid();
             line.Description = line.Description.Trim();
             line.CalculationNotes = line.CalculationNotes?.Trim();
+            line.CreatedUtc = DateTimeOffset.UtcNow;
             line.Invoice = null;
             line.Gig = null;
 
@@ -1233,6 +1289,19 @@ public static class CrudEndpoints
         invoice.UpdatedByUserId = userId;
     }
 
+    private static void StampCreate(InvoiceLine line, Guid? userId)
+    {
+        line.CreatedByUserId = userId;
+        line.CreatedUtc = DateTimeOffset.UtcNow;
+    }
+
+    private static string BuildAdjustmentAuditNote(Guid? userId)
+    {
+        var actor = userId?.ToString() ?? "unknown-user";
+        var timestamp = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+        return $"Created by {actor} at {timestamp}";
+    }
+
     private static IResult? ValidateInvoiceStatusTransition(InvoiceStatus currentStatus, InvoiceStatus requestedStatus)
     {
         if (currentStatus == requestedStatus)
@@ -1262,4 +1331,5 @@ public static class CrudEndpoints
     }
 
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
+    private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);
 }

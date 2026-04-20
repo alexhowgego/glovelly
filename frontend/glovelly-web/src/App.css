@@ -544,6 +544,33 @@
   margin-top: 12px;
 }
 
+.invoice-adjustment-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  grid-template-columns: minmax(0, 140px) minmax(0, 1fr);
+  align-items: end;
+}
+
+.invoice-adjustment-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.invoice-adjustment-form button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+@media (max-width: 1380px) {
+  .invoice-adjustment-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 .invoice-line-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -801,7 +828,8 @@ button:disabled {
   .form-grid,
   .detail-grid,
   .gig-summary-grid,
-  .draft-grid {
+  .draft-grid,
+  .invoice-adjustment-form {
     grid-template-columns: 1fr;
   }
 

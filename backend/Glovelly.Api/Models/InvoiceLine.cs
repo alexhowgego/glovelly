@@ -7,6 +7,8 @@ public sealed class InvoiceLine
 {
     public Guid Id { get; set; }
     public Guid InvoiceId { get; set; }
+    public Guid? CreatedByUserId { get; set; }
+    public DateTimeOffset CreatedUtc { get; set; }
     public int SortOrder { get; set; }
     public InvoiceLineType Type { get; set; }
     public string Description { get; set; } = string.Empty;
