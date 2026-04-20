@@ -11,22 +11,36 @@ internal static class AuthFlowSupport
             return "/";
         }
 
-        if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absoluteUri))
+        var sanitizedReturnUrl = returnUrl.Trim();
+
+        if (IsSafeLocalPath(sanitizedReturnUrl))
+        {
+            return sanitizedReturnUrl;
+        }
+
+        if (Uri.TryCreate(sanitizedReturnUrl, UriKind.Absolute, out var absoluteUri))
         {
             var request = httpContext.Request;
+            var sameScheme = string.Equals(absoluteUri.Scheme, request.Scheme, StringComparison.OrdinalIgnoreCase);
             var sameHost = string.Equals(absoluteUri.Host, request.Host.Host, StringComparison.OrdinalIgnoreCase);
-            var localhostRedirect =
-                absoluteUri.IsLoopback &&
-                (absoluteUri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
-                 absoluteUri.Host.Equals("127.0.0.1"));
+            var samePort = (absoluteUri.IsDefaultPort && !request.Host.Port.HasValue) ||
+                           absoluteUri.Port == request.Host.Port;
 
-            if (sameHost || localhostRedirect)
+            if (sameScheme && sameHost && samePort)
             {
-                return absoluteUri.ToString();
+                var localPath = absoluteUri.PathAndQuery + absoluteUri.Fragment;
+                return IsSafeLocalPath(localPath) ? localPath : "/";
             }
         }
 
-        return returnUrl.StartsWith('/') ? returnUrl : "/";
+        return "/";
+    }
+
+    private static bool IsSafeLocalPath(string value)
+    {
+        return value.StartsWith("/", StringComparison.Ordinal) &&
+               !value.StartsWith("//", StringComparison.Ordinal) &&
+               value.IndexOf('\\') < 0;
     }
 
     public static bool IsApiRequest(HttpRequest request)
