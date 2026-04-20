@@ -40,7 +40,7 @@ internal static class AuthFlowSupport
     {
         return value.StartsWith('/', StringComparison.Ordinal) &&
                !value.StartsWith("//", StringComparison.Ordinal) &&
-               !value.Contains('\\');
+               value.IndexOf('\\') < 0;
     }
 
     public static bool IsApiRequest(HttpRequest request)
