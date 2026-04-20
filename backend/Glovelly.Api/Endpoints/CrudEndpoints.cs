@@ -582,6 +582,8 @@ public static class CrudEndpoints
             }
 
             invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList());
+            invoice.Status = InvoiceStatus.Draft;
+            invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
             invoice.ReissueCount += 1;
             invoice.LastReissuedUtc = DateTimeOffset.UtcNow;
             invoice.LastReissuedByUserId = userId;
