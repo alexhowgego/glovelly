@@ -13,6 +13,7 @@ public sealed class Invoice
     public DateOnly InvoiceDate { get; set; }
     public DateOnly DueDate { get; set; }
     public InvoiceStatus Status { get; set; } = InvoiceStatus.Draft;
+    public DateTimeOffset? StatusUpdatedUtc { get; set; }
     public string? Description { get; set; }
     public byte[]? PdfBlob { get; set; }
 

@@ -489,11 +489,55 @@ public static class CrudEndpoints
             invoice.ClientId = request.ClientId;
             invoice.InvoiceDate = request.InvoiceDate;
             invoice.DueDate = request.DueDate;
+            var requestedStatus = request.Status;
+            var statusValidation = ValidateInvoiceStatusTransition(invoice.Status, requestedStatus);
+            if (statusValidation is not null)
+            {
+                return statusValidation;
+            }
+
+            if (invoice.Status != requestedStatus)
+            {
+                invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
+            }
+
             invoice.Status = request.Status;
             invoice.Description = request.Description?.Trim();
             invoice.PdfBlob = request.PdfBlob;
             StampUpdate(invoice, currentUserAccessor.TryGetUserId(user));
 
+            await db.SaveChangesAsync();
+
+            return Results.Ok(invoice);
+        });
+
+        group.MapPut("/{id:guid}/status", async (
+            Guid id,
+            InvoiceStatusUpdateRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor) =>
+        {
+            var invoice = await db.Invoices.FirstOrDefaultAsync(value => value.Id == id);
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            var statusValidation = ValidateInvoiceStatusTransition(invoice.Status, request.Status);
+            if (statusValidation is not null)
+            {
+                return statusValidation;
+            }
+
+            if (invoice.Status == request.Status)
+            {
+                return Results.Ok(invoice);
+            }
+
+            invoice.Status = request.Status;
+            invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
+            StampUpdate(invoice, currentUserAccessor.TryGetUserId(user));
             await db.SaveChangesAsync();
 
             return Results.Ok(invoice);
@@ -1137,4 +1181,34 @@ public static class CrudEndpoints
     {
         invoice.UpdatedByUserId = userId;
     }
+
+    private static IResult? ValidateInvoiceStatusTransition(InvoiceStatus currentStatus, InvoiceStatus requestedStatus)
+    {
+        if (currentStatus == requestedStatus)
+        {
+            return null;
+        }
+
+        var allowed = currentStatus switch
+        {
+            InvoiceStatus.Draft => requestedStatus is InvoiceStatus.Issued or InvoiceStatus.Cancelled,
+            InvoiceStatus.Issued => requestedStatus is InvoiceStatus.Paid or InvoiceStatus.Cancelled or InvoiceStatus.Overdue,
+            InvoiceStatus.Overdue => requestedStatus is InvoiceStatus.Paid or InvoiceStatus.Cancelled,
+            InvoiceStatus.Cancelled => requestedStatus is InvoiceStatus.Draft,
+            InvoiceStatus.Paid => false,
+            _ => false
+        };
+
+        if (allowed)
+        {
+            return null;
+        }
+
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["status"] = [$"Invoice status cannot move from {currentStatus} to {requestedStatus}."]
+        });
+    }
+
+    private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
 }
