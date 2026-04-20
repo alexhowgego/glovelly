@@ -98,13 +98,15 @@ type InvoiceLine = {
   isSystemGenerated: boolean
 }
 
+type InvoiceStatus = 'Draft' | 'Issued' | 'Paid' | 'Overdue' | 'Cancelled'
+
 type Invoice = {
   id: string
   invoiceNumber: string
   clientId: string
   invoiceDate: string
   dueDate: string
-  status: 'Draft' | 'Issued' | 'Paid' | 'Cancelled'
+  status: InvoiceStatus
   description: string | null
   pdfBlob: string | null
   total: number
@@ -258,6 +260,21 @@ function formatDate(value: string) {
 
 function formatGigStatus(status: GigStatus) {
   return status === 'Confirmed' ? 'Planned' : status
+}
+
+function getAllowedInvoiceStatusTransitions(status: InvoiceStatus) {
+  switch (status) {
+    case 'Draft':
+      return ['Issued', 'Cancelled'] as InvoiceStatus[]
+    case 'Issued':
+      return ['Paid', 'Overdue', 'Cancelled'] as InvoiceStatus[]
+    case 'Overdue':
+      return ['Paid', 'Cancelled'] as InvoiceStatus[]
+    case 'Cancelled':
+      return ['Draft'] as InvoiceStatus[]
+    case 'Paid':
+      return [] as InvoiceStatus[]
+  }
 }
 
 function getStoredThemePreference(): ThemePreference {
@@ -1623,6 +1640,41 @@ function App() {
     }
   }
 
+  const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus) => {
+    if (invoice.status === status) {
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Updating ${invoice.invoiceNumber} to ${status}...`)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/status`), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const fieldError = problem?.errors?.status?.[0]
+        throw new Error(fieldError ?? problem?.detail ?? problem?.title ?? 'Unable to update status.')
+      }
+
+      const updatedInvoice = (await response.json()) as Invoice
+      setInvoices((current) =>
+        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
+      )
+      setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
+    } catch (error) {
+      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to update invoice status.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="app-shell auth-shell">
@@ -2494,7 +2546,25 @@ function App() {
                   </article>
                   <article>
                     <p className="detail-label">Status</p>
-                    <strong>{selectedInvoice.status}</strong>
+                    <div className="field-with-inline-help">
+                      <select
+                        value={selectedInvoice.status}
+                        onChange={(event) =>
+                          void handleInvoiceStatusChange(
+                            selectedInvoice,
+                            event.target.value as InvoiceStatus
+                          )
+                        }
+                        disabled={isInvoiceLoading}
+                      >
+                        <option value={selectedInvoice.status}>{selectedInvoice.status}</option>
+                        {getAllowedInvoiceStatusTransitions(selectedInvoice.status).map((statusOption) => (
+                          <option key={statusOption} value={statusOption}>
+                            {statusOption}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </article>
                   <article>
                     <p className="detail-label">Invoice date</p>
