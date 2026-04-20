@@ -95,6 +95,12 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         });
         createLineResponse.EnsureSuccessStatusCode();
 
+        var markIssuedResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
+        {
+            status = "Issued",
+        });
+        markIssuedResponse.EnsureSuccessStatusCode();
+
         var markPaidResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
         {
             status = "Paid",
