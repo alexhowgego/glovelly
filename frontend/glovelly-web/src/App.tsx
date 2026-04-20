@@ -107,6 +107,8 @@ type Invoice = {
   invoiceDate: string
   dueDate: string
   status: InvoiceStatus
+  reissueCount: number
+  lastReissuedUtc: string | null
   description: string | null
   pdfBlob: string | null
   total: number
@@ -1675,6 +1677,42 @@ function App() {
     }
   }
 
+  const handleInvoiceReissue = async (invoice: Invoice) => {
+    const shouldProceed = window.confirm(
+      `Re-issue ${invoice.invoiceNumber}? This will regenerate the document and log the action.`
+    )
+    if (!shouldProceed) {
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Re-issuing ${invoice.invoiceNumber}...`)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/reissue`), {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const fieldError = problem?.errors?.recipient?.[0]
+        throw new Error(fieldError ?? problem?.detail ?? problem?.title ?? 'Unable to re-issue invoice.')
+      }
+
+      const updatedInvoice = (await response.json()) as Invoice
+      setInvoices((current) =>
+        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
+      )
+
+      const reissuedAt = formatDateTime(updatedInvoice.lastReissuedUtc)
+      setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
+    } catch (error) {
+      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to re-issue invoice.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="app-shell auth-shell">
@@ -2527,6 +2565,14 @@ function App() {
               </div>
               <div className="actions">
                 <button
+                  className="ghost-button"
+                  onClick={() => selectedInvoice && void handleInvoiceReissue(selectedInvoice)}
+                  type="button"
+                  disabled={!selectedInvoice || isInvoiceLoading}
+                >
+                  Re-issue
+                </button>
+                <button
                   className="primary-button"
                   onClick={() => selectedInvoice && void handleDownloadInvoicePdf(selectedInvoice)}
                   type="button"
@@ -2585,6 +2631,14 @@ function App() {
                   <article>
                     <p className="detail-label">Total</p>
                     <strong>{formatCurrency(selectedInvoice.total)}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Re-issued</p>
+                    <strong>{selectedInvoice.reissueCount} times</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Last re-issue</p>
+                    <strong>{formatDateTime(selectedInvoice.lastReissuedUtc)}</strong>
                   </article>
                 </div>
 

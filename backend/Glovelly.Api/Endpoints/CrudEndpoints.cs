@@ -545,6 +545,53 @@ public static class CrudEndpoints
             return Results.Ok(invoice);
         });
 
+        group.MapPost("/{id:guid}/reissue", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await db.Invoices
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id);
+
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            var client = await db.Clients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == invoice.ClientId);
+
+            if (client is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["clientId"] = ["Client does not exist."]
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(client.Email))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["recipient"] = ["Invoice recipient email is missing."]
+                });
+            }
+
+            invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList());
+            invoice.ReissueCount += 1;
+            invoice.LastReissuedUtc = DateTimeOffset.UtcNow;
+            invoice.LastReissuedByUserId = userId;
+            StampUpdate(invoice, userId);
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(invoice);
+        });
+
         group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
         {
             var invoice = await db.Invoices.FirstOrDefaultAsync(invoice => invoice.Id == id);
@@ -1027,7 +1074,7 @@ public static class CrudEndpoints
     private static byte[] GenerateInvoicePdf(
         Invoice invoice,
         Client client,
-        Gig gig,
+        Gig? gig,
         IReadOnlyCollection<InvoiceLine> lines)
     {
         var rows = new List<string>
@@ -1073,7 +1120,7 @@ public static class CrudEndpoints
         }
 
         rows.Add(string.Empty);
-        rows.Add(invoice.Description ?? BuildInvoiceDescription(gig));
+        rows.Add(invoice.Description ?? (gig is null ? "In respect of services rendered." : BuildInvoiceDescription(gig)));
         rows.Add(string.Empty);
         rows.Add("Line items:");
 
