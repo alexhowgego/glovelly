@@ -9,12 +9,14 @@ public static class ReturnUrlSanitizer
             return "/";
         }
 
-        if (returnUrl.Contains('\r') || returnUrl.Contains('\n'))
+        if (returnUrl.Contains('\r') || returnUrl.Contains('\n') || returnUrl.Contains('\0'))
         {
             return "/";
         }
 
-        if (!returnUrl.StartsWith('/') || returnUrl.StartsWith("//", StringComparison.Ordinal))
+        if (!returnUrl.StartsWith('/', StringComparison.Ordinal) ||
+            returnUrl.StartsWith("//", StringComparison.Ordinal) ||
+            returnUrl.Contains('\\'))
         {
             return "/";
         }

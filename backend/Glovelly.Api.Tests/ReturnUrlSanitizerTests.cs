@@ -15,6 +15,8 @@ public sealed class ReturnUrlSanitizerTests
     [InlineData("https://example.com/account", "/")]
     [InlineData("//evil.example.com", "/")]
     [InlineData("javascript:alert('x')", "/")]
+    [InlineData("/\\evil.example.com", "/")]
+    [InlineData("/safe\\next", "/")]
     public void BuildSafeLocalReturnPath_SanitizesUnsafeValues(string? returnUrl, string expected)
     {
         var actual = ReturnUrlSanitizer.BuildSafeLocalReturnPath(returnUrl);
@@ -25,6 +27,7 @@ public sealed class ReturnUrlSanitizerTests
     [Theory]
     [InlineData("/safe\r\nX-Injected: yes")]
     [InlineData("/safe\nX-Injected: yes")]
+    [InlineData("/safe\0X-Injected: yes")]
     public void BuildSafeLocalReturnPath_BlocksHeaderInjection(string returnUrl)
     {
         var actual = ReturnUrlSanitizer.BuildSafeLocalReturnPath(returnUrl);
