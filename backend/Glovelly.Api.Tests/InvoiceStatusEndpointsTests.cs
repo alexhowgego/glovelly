@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Glovelly.Api.Models;
 using Glovelly.Api.Tests.Infrastructure;
 using Xunit;
 
@@ -52,5 +53,31 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(
             "Invoice status cannot move from Paid to Cancelled.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
+    public async Task UpdateStatus_WhenInvoiceHasLines_ResponseKeepsLineTotals()
+    {
+        var createLineResponse = await _client.PostAsJsonAsync("/invoice-lines", new
+        {
+            invoiceId = TestData.FoxInvoiceId,
+            sortOrder = 1,
+            type = InvoiceLineType.PerformanceFee,
+            description = "Headline performance",
+            quantity = 2m,
+            unitPrice = 150m,
+        });
+        createLineResponse.EnsureSuccessStatusCode();
+
+        var response = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
+        {
+            status = "Paid",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(300m, updatedInvoice.GetProperty("total").GetDecimal());
+        Assert.Single(updatedInvoice.GetProperty("lines").EnumerateArray());
     }
 }
