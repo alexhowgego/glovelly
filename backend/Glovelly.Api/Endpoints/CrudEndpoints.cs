@@ -518,7 +518,9 @@ public static class CrudEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor) =>
         {
-            var invoice = await db.Invoices.FirstOrDefaultAsync(value => value.Id == id);
+            var invoice = await db.Invoices
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id);
             if (invoice is null)
             {
                 return Results.NotFound();
