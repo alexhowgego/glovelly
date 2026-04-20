@@ -95,11 +95,19 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         });
         createLineResponse.EnsureSuccessStatusCode();
 
+        var markPaidResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
+        {
+            status = "Paid",
+        });
+        markPaidResponse.EnsureSuccessStatusCode();
+
         var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/reissue", null);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Draft", updatedInvoice.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("statusUpdatedUtc").ValueKind);
         Assert.Equal(300m, updatedInvoice.GetProperty("total").GetDecimal());
         Assert.Equal(1, updatedInvoice.GetProperty("reissueCount").GetInt32());
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastReissuedByUserId").GetGuid());
