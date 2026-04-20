@@ -174,6 +174,90 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task UpdateGig_WithExpenses_ReplacesExpenseCollectionAndReturnsUpdatedGig()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            invoiceId = TestData.FoxInvoiceId,
+            title = "Expense refresh test",
+            date = "2026-06-08",
+            venue = "Assembly Rooms",
+            fee = 180.00m,
+            travelMiles = 0.00m,
+            notes = "Initial expense set",
+            wasDriving = true,
+            status = 1,
+            expenses = new[]
+            {
+                new
+                {
+                    description = "Parking",
+                    amount = 12.00m,
+                },
+            },
+            invoicedAt = (string?)null,
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        var updateResponse = await _client.PutAsJsonAsync($"/gigs/{gigId}", new
+        {
+            id = gigId,
+            clientId = TestData.FoxAndFinchId,
+            invoiceId = TestData.FoxInvoiceId,
+            title = "Expense refresh test",
+            date = "2026-06-08",
+            venue = "Assembly Rooms",
+            fee = 180.00m,
+            travelMiles = 0.00m,
+            passengerCount = (int?)null,
+            notes = "Updated expense set",
+            wasDriving = true,
+            status = 1,
+            expenses = new[]
+            {
+                new
+                {
+                    description = "Tolls",
+                    amount = 8.50m,
+                },
+                new
+                {
+                    description = "Parking",
+                    amount = 14.00m,
+                },
+            },
+            invoicedAt = createdGig.GetProperty("invoicedAt").GetString(),
+        });
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedExpenses = updatedGig.GetProperty("expenses").EnumerateArray().OrderBy(expense => expense.GetProperty("sortOrder").GetInt32()).ToArray();
+
+        Assert.Equal(2, updatedExpenses.Length);
+        Assert.Equal("Tolls", updatedExpenses[0].GetProperty("description").GetString());
+        Assert.Equal(8.50m, updatedExpenses[0].GetProperty("amount").GetDecimal());
+        Assert.Equal("Parking", updatedExpenses[1].GetProperty("description").GetString());
+        Assert.Equal(14.00m, updatedExpenses[1].GetProperty("amount").GetDecimal());
+
+        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.FoxInvoiceId}");
+        invoiceResponse.EnsureSuccessStatusCode();
+
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var lines = invoice.GetProperty("lines").EnumerateArray().Where(line => line.GetProperty("gigId").GetGuid() == gigId).ToArray();
+
+        Assert.Equal(3, lines.Length);
+        Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Performance fee for Expense refresh test (2026-06-08)");
+        Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Tolls");
+        Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Parking");
+    }
+
+    [Fact]
     public async Task CreateGig_WithInvoice_GeneratesMileagePassengerAndExpenseLines()
     {
         var response = await _client.PostAsJsonAsync("/gigs", new

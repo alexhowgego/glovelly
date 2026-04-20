@@ -149,6 +149,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<InvoiceLine>(entity =>
         {
             entity.HasKey(line => line.Id);
+            entity.Property(line => line.CreatedUtc)
+                .IsRequired();
             entity.Property(line => line.Type)
                 .HasConversion<string>()
                 .HasMaxLength(50);

@@ -121,4 +121,57 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("pdfBlob").ValueKind);
         Assert.Single(updatedInvoice.GetProperty("lines").EnumerateArray());
     }
+
+    [Fact]
+    public async Task AddAdjustment_WhenRequestValid_AddsManualAdjustmentLineAndUpdatesInvoiceTotal()
+    {
+        var createLineResponse = await _client.PostAsJsonAsync("/invoice-lines", new
+        {
+            invoiceId = TestData.RiversideInvoiceId,
+            sortOrder = 1,
+            type = InvoiceLineType.PerformanceFee,
+            description = "Headline performance",
+            quantity = 1m,
+            unitPrice = 200m,
+        });
+        createLineResponse.EnsureSuccessStatusCode();
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/adjustments", new
+        {
+            amount = -25m,
+            reason = "Goodwill discount",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(175m, updatedInvoice.GetProperty("total").GetDecimal());
+
+        var manualAdjustment = updatedInvoice.GetProperty("lines")
+            .EnumerateArray()
+            .Single(line => line.GetProperty("type").GetString() == "ManualAdjustment");
+
+        Assert.Equal("Manual adjustment: Goodwill discount", manualAdjustment.GetProperty("description").GetString());
+        Assert.Equal(-25m, manualAdjustment.GetProperty("lineTotal").GetDecimal());
+        Assert.Equal(TestAuthContext.UserId, manualAdjustment.GetProperty("createdByUserId").GetGuid());
+        Assert.Equal(JsonValueKind.String, manualAdjustment.GetProperty("createdUtc").ValueKind);
+        Assert.Equal(
+            JsonValueKind.String,
+            manualAdjustment.GetProperty("calculationNotes").ValueKind);
+    }
+
+    [Fact]
+    public async Task AddAdjustment_WhenReasonMissing_ReturnsValidationProblem()
+    {
+        var response = await _client.PostAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/adjustments", new
+        {
+            amount = 25m,
+            reason = "   ",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Adjustment reason is required.", problem.GetProperty("errors").GetProperty("reason")[0].GetString());
+    }
 }

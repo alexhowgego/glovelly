@@ -13,6 +13,7 @@ namespace Glovelly.Api.Tests.Infrastructure;
 public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"glovelly-tests-{Guid.NewGuid()}";
+    private readonly object _databaseResetLock = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -31,12 +32,28 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             });
 
             using var scope = services.BuildServiceProvider().CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            dbContext.Database.EnsureDeleted();
-            dbContext.Database.EnsureCreated();
-            SeedTestData(dbContext);
+            ResetDatabase(scope.ServiceProvider.GetRequiredService<AppDbContext>());
         });
+    }
+
+    public new HttpClient CreateClient()
+    {
+        var client = base.CreateClient();
+
+        lock (_databaseResetLock)
+        {
+            using var scope = Services.CreateScope();
+            ResetDatabase(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+        }
+
+        return client;
+    }
+
+    private static void ResetDatabase(AppDbContext dbContext)
+    {
+        dbContext.Database.EnsureDeleted();
+        dbContext.Database.EnsureCreated();
+        SeedTestData(dbContext);
     }
 
     private static void SeedTestData(AppDbContext dbContext)

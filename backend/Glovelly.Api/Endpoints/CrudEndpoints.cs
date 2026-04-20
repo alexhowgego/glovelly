@@ -2,6 +2,7 @@ using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 
@@ -315,21 +316,17 @@ public static class CrudEndpoints
                 }
             }
 
-            var normalizedExpenses = NormalizeGigExpenses(request.Expenses);
-            _ = await RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, db);
-
-            if (gig.Expenses.Count > 0)
+            var normalizedExpenses = NormalizeGigExpenses(request.Expenses, preserveIds: false);
+            if (await RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, db))
             {
-                db.GigExpenses.RemoveRange(gig.Expenses.ToList());
+                await db.SaveChangesAsync();
             }
 
-            await db.SaveChangesAsync();
-
-            gig = await db.Gigs
-                .Include(value => value.Expenses)
-                .FirstAsync(value => value.Id == id);
-
             var previousInvoiceId = gig.InvoiceId;
+            var existingExpenses = gig.Expenses
+                .OrderBy(expense => expense.SortOrder)
+                .ThenBy(expense => expense.Description)
+                .ToList();
 
             gig.ClientId = request.ClientId;
             gig.InvoiceId = request.InvoiceId;
@@ -343,12 +340,35 @@ public static class CrudEndpoints
             gig.WasDriving = request.WasDriving;
             gig.Status = request.Status;
             gig.InvoicedAt = ResolveInvoicedAt(request.InvoiceId, previousInvoiceId, gig.InvoicedAt, request.InvoicedAt);
-            gig.Expenses.Clear();
-            foreach (var expense in normalizedExpenses)
-            {
-                gig.Expenses.Add(expense);
-            }
+
             StampUpdate(gig, userId);
+            await db.SaveChangesAsync();
+
+            var sharedExpenseCount = Math.Min(existingExpenses.Count, normalizedExpenses.Count);
+            for (var i = 0; i < sharedExpenseCount; i++)
+            {
+                existingExpenses[i].SortOrder = normalizedExpenses[i].SortOrder;
+                existingExpenses[i].Description = normalizedExpenses[i].Description;
+                existingExpenses[i].Amount = normalizedExpenses[i].Amount;
+            }
+
+            if (existingExpenses.Count > normalizedExpenses.Count)
+            {
+                var expensesToRemove = existingExpenses.Skip(normalizedExpenses.Count).ToList();
+                db.GigExpenses.RemoveRange(expensesToRemove);
+            }
+
+            foreach (var expense in normalizedExpenses.Skip(sharedExpenseCount))
+            {
+                expense.GigId = gig.Id;
+                db.GigExpenses.Add(expense);
+            }
+
+            await db.SaveChangesAsync();
+
+            gig = await db.Gigs
+                .Include(value => value.Expenses)
+                .FirstAsync(value => value.Id == id);
 
             await SyncGeneratedInvoiceLinesForGigAsync(gig, userId, db);
             await db.SaveChangesAsync();
@@ -594,6 +614,60 @@ public static class CrudEndpoints
             return Results.Ok(invoice);
         });
 
+        group.MapPost("/{id:guid}/adjustments", async (
+            Guid id,
+            InvoiceAdjustmentCreateRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor) =>
+        {
+            var invoice = await db.Invoices
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id);
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            var reason = request.Reason?.Trim();
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["reason"] = ["Adjustment reason is required."]
+                });
+            }
+
+            if (request.Amount == 0)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["amount"] = ["Adjustment amount must be non-zero."]
+                });
+            }
+
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var adjustmentLine = new InvoiceLine
+            {
+                Id = Guid.NewGuid(),
+                InvoiceId = invoice.Id,
+                SortOrder = await GetNextSortOrderAsync(invoice.Id, db),
+                Type = InvoiceLineType.ManualAdjustment,
+                Description = $"Manual adjustment: {reason}",
+                Quantity = 1m,
+                UnitPrice = request.Amount,
+                CalculationNotes = BuildAdjustmentAuditNote(userId),
+                IsSystemGenerated = false,
+            };
+            StampCreate(adjustmentLine, userId);
+
+            db.InvoiceLines.Add(adjustmentLine);
+            StampUpdate(invoice, userId);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(invoice);
+        });
+
         group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
         {
             var invoice = await db.Invoices.FirstOrDefaultAsync(invoice => invoice.Id == id);
@@ -655,6 +729,7 @@ public static class CrudEndpoints
             line.Id = Guid.NewGuid();
             line.Description = line.Description.Trim();
             line.CalculationNotes = line.CalculationNotes?.Trim();
+            line.CreatedUtc = DateTimeOffset.UtcNow;
             line.Invoice = null;
             line.Gig = null;
 
@@ -861,7 +936,7 @@ public static class CrudEndpoints
         return null;
     }
 
-    private static List<GigExpense> NormalizeGigExpenses(ICollection<GigExpense>? expenses)
+    private static List<GigExpense> NormalizeGigExpenses(ICollection<GigExpense>? expenses, bool preserveIds = true)
     {
         if (expenses is null || expenses.Count == 0)
         {
@@ -871,7 +946,7 @@ public static class CrudEndpoints
         return expenses
             .Select((expense, index) => new GigExpense
             {
-                Id = expense.Id == Guid.Empty ? Guid.NewGuid() : expense.Id,
+                Id = preserveIds && expense.Id != Guid.Empty ? expense.Id : Guid.NewGuid(),
                 SortOrder = expense.SortOrder == 0 ? index + 1 : expense.SortOrder,
                 Description = expense.Description.Trim(),
                 Amount = expense.Amount,
@@ -1233,6 +1308,19 @@ public static class CrudEndpoints
         invoice.UpdatedByUserId = userId;
     }
 
+    private static void StampCreate(InvoiceLine line, Guid? userId)
+    {
+        line.CreatedByUserId = userId;
+        line.CreatedUtc = DateTimeOffset.UtcNow;
+    }
+
+    private static string BuildAdjustmentAuditNote(Guid? userId)
+    {
+        var actor = userId?.ToString() ?? "unknown-user";
+        var timestamp = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+        return $"Created by {actor} at {timestamp}";
+    }
+
     private static IResult? ValidateInvoiceStatusTransition(InvoiceStatus currentStatus, InvoiceStatus requestedStatus)
     {
         if (currentStatus == requestedStatus)
@@ -1262,4 +1350,5 @@ public static class CrudEndpoints
     }
 
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
+    private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);
 }
