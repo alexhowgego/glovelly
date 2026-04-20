@@ -29,6 +29,7 @@ self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url)
   if (
     requestUrl.pathname.startsWith('/auth') ||
+    requestUrl.pathname.startsWith('/admin') ||
     requestUrl.pathname.startsWith('/clients') ||
     requestUrl.pathname.startsWith('/gigs') ||
     requestUrl.pathname.startsWith('/invoices') ||

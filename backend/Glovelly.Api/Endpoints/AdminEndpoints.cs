@@ -21,18 +21,6 @@ public static class AdminEndpoints
                 .OrderByDescending(user => user.IsActive)
                 .ThenBy(user => user.Role)
                 .ThenBy(user => user.Email)
-                .Select(user => new AdminUserDto(
-                    user.Id,
-                    user.Email,
-                    user.DisplayName,
-                    user.GoogleSubject,
-                    user.GoogleSubject != null,
-                    user.Role.ToString(),
-                    user.IsActive,
-                    user.CreatedUtc,
-                    user.LastLoginUtc,
-                    user.MileageRate,
-                    user.PassengerMileageRate))
                 .ToListAsync();
 
             return Results.Ok(result);
@@ -63,7 +51,7 @@ public static class AdminEndpoints
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
-            return Results.Created($"/admin/users/{user.Id}", ToDto(user));
+            return Results.Created($"/admin/users/{user.Id}", user);
         });
 
         users.MapPut("/{id:guid}", async (
@@ -124,7 +112,7 @@ public static class AdminEndpoints
 
             await db.SaveChangesAsync();
 
-            return Results.Ok(ToDto(user));
+            return Results.Ok(user);
         });
 
         return app;
@@ -201,20 +189,6 @@ public static class AdminEndpoints
             request.IsActive);
     }
 
-    private static AdminUserDto ToDto(User user) =>
-        new(
-            user.Id,
-            user.Email,
-            user.DisplayName,
-            user.GoogleSubject,
-            user.GoogleSubject is not null,
-            user.Role.ToString(),
-            user.IsActive,
-            user.CreatedUtc,
-            user.LastLoginUtc,
-            user.MileageRate,
-            user.PassengerMileageRate);
-
     private sealed record AdminUserRequest(
         string Email,
         string? DisplayName,
@@ -232,17 +206,4 @@ public static class AdminEndpoints
         decimal? PassengerMileageRate,
         UserRole Role,
         bool IsActive);
-
-    private sealed record AdminUserDto(
-        Guid Id,
-        string Email,
-        string? DisplayName,
-        string? GoogleSubject,
-        bool IsEnrolled,
-        string Role,
-        bool IsActive,
-        DateTime CreatedUtc,
-        DateTime? LastLoginUtc,
-        decimal? MileageRate,
-        decimal? PassengerMileageRate);
 }

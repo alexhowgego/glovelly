@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Glovelly.Api.Models;
 
@@ -10,10 +11,13 @@ public sealed class User
     public string? DisplayName { get; set; }
     public decimal? MileageRate { get; set; }
     public decimal? PassengerMileageRate { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public UserRole Role { get; set; } = UserRole.User;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedUtc { get; set; }
     public DateTime? LastLoginUtc { get; set; }
+    [NotMapped]
+    public bool IsEnrolled => GoogleSubject is not null;
 
     [JsonIgnore]
     public ICollection<Client> ClientsCreated { get; set; } = new List<Client>();
