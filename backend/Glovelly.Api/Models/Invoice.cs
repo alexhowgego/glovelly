@@ -14,6 +14,9 @@ public sealed class Invoice
     public DateOnly DueDate { get; set; }
     public InvoiceStatus Status { get; set; } = InvoiceStatus.Draft;
     public DateTimeOffset? StatusUpdatedUtc { get; set; }
+    public int ReissueCount { get; set; }
+    public DateTimeOffset? LastReissuedUtc { get; set; }
+    public Guid? LastReissuedByUserId { get; set; }
     public string? Description { get; set; }
     public byte[]? PdfBlob { get; set; }
 

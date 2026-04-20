@@ -80,4 +80,31 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(300m, updatedInvoice.GetProperty("total").GetDecimal());
         Assert.Single(updatedInvoice.GetProperty("lines").EnumerateArray());
     }
+
+    [Fact]
+    public async Task Reissue_WhenInvoiceExists_RegeneratesPdfAndLogsActionWithoutChangingFinancials()
+    {
+        var createLineResponse = await _client.PostAsJsonAsync("/invoice-lines", new
+        {
+            invoiceId = TestData.FoxInvoiceId,
+            sortOrder = 1,
+            type = InvoiceLineType.PerformanceFee,
+            description = "Headline performance",
+            quantity = 2m,
+            unitPrice = 150m,
+        });
+        createLineResponse.EnsureSuccessStatusCode();
+
+        var response = await _client.PostAsync($"/invoices/{TestData.FoxInvoiceId}/reissue", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(300m, updatedInvoice.GetProperty("total").GetDecimal());
+        Assert.Equal(1, updatedInvoice.GetProperty("reissueCount").GetInt32());
+        Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastReissuedByUserId").GetGuid());
+        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("lastReissuedUtc").ValueKind);
+        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Single(updatedInvoice.GetProperty("lines").EnumerateArray());
+    }
 }
