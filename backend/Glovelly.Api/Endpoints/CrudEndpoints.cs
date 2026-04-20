@@ -316,21 +316,17 @@ public static class CrudEndpoints
                 }
             }
 
-            var normalizedExpenses = NormalizeGigExpenses(request.Expenses);
-            _ = await RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, db);
-
-            if (gig.Expenses.Count > 0)
+            var normalizedExpenses = NormalizeGigExpenses(request.Expenses, preserveIds: false);
+            if (await RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, db))
             {
-                db.GigExpenses.RemoveRange(gig.Expenses.ToList());
+                await db.SaveChangesAsync();
             }
 
-            await db.SaveChangesAsync();
-
-            gig = await db.Gigs
-                .Include(value => value.Expenses)
-                .FirstAsync(value => value.Id == id);
-
             var previousInvoiceId = gig.InvoiceId;
+            var existingExpenses = gig.Expenses
+                .OrderBy(expense => expense.SortOrder)
+                .ThenBy(expense => expense.Description)
+                .ToList();
 
             gig.ClientId = request.ClientId;
             gig.InvoiceId = request.InvoiceId;
@@ -344,12 +340,35 @@ public static class CrudEndpoints
             gig.WasDriving = request.WasDriving;
             gig.Status = request.Status;
             gig.InvoicedAt = ResolveInvoicedAt(request.InvoiceId, previousInvoiceId, gig.InvoicedAt, request.InvoicedAt);
-            gig.Expenses.Clear();
-            foreach (var expense in normalizedExpenses)
-            {
-                gig.Expenses.Add(expense);
-            }
+
             StampUpdate(gig, userId);
+            await db.SaveChangesAsync();
+
+            var sharedExpenseCount = Math.Min(existingExpenses.Count, normalizedExpenses.Count);
+            for (var i = 0; i < sharedExpenseCount; i++)
+            {
+                existingExpenses[i].SortOrder = normalizedExpenses[i].SortOrder;
+                existingExpenses[i].Description = normalizedExpenses[i].Description;
+                existingExpenses[i].Amount = normalizedExpenses[i].Amount;
+            }
+
+            if (existingExpenses.Count > normalizedExpenses.Count)
+            {
+                var expensesToRemove = existingExpenses.Skip(normalizedExpenses.Count).ToList();
+                db.GigExpenses.RemoveRange(expensesToRemove);
+            }
+
+            foreach (var expense in normalizedExpenses.Skip(sharedExpenseCount))
+            {
+                expense.GigId = gig.Id;
+                db.GigExpenses.Add(expense);
+            }
+
+            await db.SaveChangesAsync();
+
+            gig = await db.Gigs
+                .Include(value => value.Expenses)
+                .FirstAsync(value => value.Id == id);
 
             await SyncGeneratedInvoiceLinesForGigAsync(gig, userId, db);
             await db.SaveChangesAsync();
@@ -917,7 +936,7 @@ public static class CrudEndpoints
         return null;
     }
 
-    private static List<GigExpense> NormalizeGigExpenses(ICollection<GigExpense>? expenses)
+    private static List<GigExpense> NormalizeGigExpenses(ICollection<GigExpense>? expenses, bool preserveIds = true)
     {
         if (expenses is null || expenses.Count == 0)
         {
@@ -927,7 +946,7 @@ public static class CrudEndpoints
         return expenses
             .Select((expense, index) => new GigExpense
             {
-                Id = expense.Id == Guid.Empty ? Guid.NewGuid() : expense.Id,
+                Id = preserveIds && expense.Id != Guid.Empty ? expense.Id : Guid.NewGuid(),
                 SortOrder = expense.SortOrder == 0 ? index + 1 : expense.SortOrder,
                 Description = expense.Description.Trim(),
                 Amount = expense.Amount,

@@ -68,6 +68,20 @@ type ClientSettingsForm = {
 
 type GigStatus = 'Draft' | 'Confirmed' | 'Completed' | 'Cancelled'
 
+type GigExpense = {
+  id: string
+  sortOrder: number
+  description: string
+  amount: number
+}
+
+type GigExpenseForm = {
+  id: string
+  sortOrder: number
+  description: string
+  amount: string
+}
+
 type Gig = {
   id: string
   clientId: string
@@ -83,6 +97,7 @@ type Gig = {
   status: GigStatus
   invoicedAt: string | null
   isInvoiced: boolean
+  expenses: GigExpense[]
 }
 
 type InvoiceLine = {
@@ -126,6 +141,7 @@ type GigForm = {
   notes: string
   wasDriving: boolean
   status: GigStatus
+  expenses: GigExpenseForm[]
 }
 
 type AppSection = 'clients' | 'admin' | 'gigs' | 'invoices'
@@ -173,6 +189,7 @@ const emptyGigForm = (): GigForm => ({
   notes: '',
   wasDriving: true,
   status: 'Confirmed',
+  expenses: [],
 })
 
 const defaultAdminStatus = 'User enrolment tools ready.'
@@ -262,6 +279,19 @@ function formatDate(value: string) {
   }).format(date)
 }
 
+function formatEditableAmount(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
+
+function toGigExpenseForm(expense: GigExpense): GigExpenseForm {
+  return {
+    id: expense.id,
+    sortOrder: expense.sortOrder,
+    description: expense.description,
+    amount: formatEditableAmount(expense.amount),
+  }
+}
+
 function formatGigStatus(status: GigStatus) {
   return status === 'Confirmed' ? 'Planned' : status
 }
@@ -339,6 +369,8 @@ function App() {
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
   const [gigStatus, setGigStatus] = useState(defaultGigStatus)
   const [isGigLoading, setIsGigLoading] = useState(false)
+  const [gigExpenseAmount, setGigExpenseAmount] = useState('')
+  const [gigExpenseDescription, setGigExpenseDescription] = useState('')
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
@@ -877,6 +909,8 @@ function App() {
         ? 'Capture the essentials now and we can build invoicing on top later.'
         : 'Create a client first so the gig can be linked correctly.'
     )
+    setGigExpenseAmount('')
+    setGigExpenseDescription('')
   }
 
   const startGigEdit = () => {
@@ -894,8 +928,14 @@ function App() {
       notes: selectedGig.notes ?? '',
       wasDriving: selectedGig.wasDriving,
       status: selectedGig.status,
+      expenses: selectedGig.expenses
+        .slice()
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map(toGigExpenseForm),
     })
     setGigStatus('Editing the selected gig.')
+    setGigExpenseAmount('')
+    setGigExpenseDescription('')
   }
 
   const updateField = (field: keyof ClientForm, value: string | Address) => {
@@ -927,11 +967,72 @@ function App() {
 
   const updateGigField = (
     field: keyof GigForm,
-    value: string | boolean
+    value: string | boolean | GigExpenseForm[]
   ) => {
     setGigForm((current) => ({
       ...current,
       [field]: value,
+    }))
+  }
+
+  const handleAddGigExpense = () => {
+    const description = gigExpenseDescription.trim()
+    const amount = Number(gigExpenseAmount)
+
+    if (!description) {
+      setGigStatus('Add an expense description before saving it to the gig.')
+      return
+    }
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      setGigStatus('Expense amount must be a valid non-negative number.')
+      return
+    }
+
+    setGigForm((current) => ({
+      ...current,
+      expenses: [
+        ...current.expenses,
+        {
+          id: '',
+          sortOrder: current.expenses.length + 1,
+          description,
+          amount: gigExpenseAmount,
+        },
+      ],
+    }))
+    setGigExpenseAmount('')
+    setGigExpenseDescription('')
+    setGigStatus('Expense added to the gig form. Save the gig to persist it.')
+  }
+
+  const updateGigExpenseField = (
+    index: number,
+    field: keyof Pick<GigExpenseForm, 'description' | 'amount'>,
+    value: string
+  ) => {
+    setGigForm((current) => ({
+      ...current,
+      expenses: current.expenses.map((expense, expenseIndex) =>
+        expenseIndex === index
+          ? {
+              ...expense,
+              [field]: value,
+            }
+          : expense
+      ),
+    }))
+  }
+
+  const removeGigExpense = (index: number) => {
+    setGigForm((current) => ({
+      ...current,
+      expenses: current.expenses
+        .filter((_, expenseIndex) => expenseIndex !== index)
+        .map((expense, expenseIndex) => ({
+          ...expense,
+          sortOrder: expenseIndex + 1,
+        })),
     }))
   }
 
@@ -1460,6 +1561,7 @@ function App() {
       notes: gigForm.notes.trim(),
       wasDriving: gigForm.wasDriving,
       status: gigForm.status,
+      expenses: gigForm.expenses,
     }
 
     if (!payload.clientId || !payload.title || !payload.date || !payload.venue) {
@@ -1471,6 +1573,28 @@ function App() {
     if (!Number.isFinite(fee) || fee < 0) {
       setGigStatus('Fee must be a valid non-negative number.')
       return
+    }
+
+    const normalizedExpenses = []
+    for (const [index, expense] of payload.expenses.entries()) {
+      const description = expense.description.trim()
+      const amount = Number(expense.amount)
+
+      if (!description) {
+        setGigStatus(`Expense ${index + 1} needs a description.`)
+        return
+      }
+
+      if (!Number.isFinite(amount) || amount < 0) {
+        setGigStatus(`Expense ${index + 1} must have a valid non-negative amount.`)
+        return
+      }
+
+      normalizedExpenses.push({
+        sortOrder: index + 1,
+        description,
+        amount,
+      })
     }
 
     setIsGigLoading(true)
@@ -1498,7 +1622,7 @@ function App() {
           wasDriving: payload.wasDriving,
           status: payload.status,
           invoiceId: null,
-          expenses: [],
+          expenses: normalizedExpenses,
           invoicedAt: null,
         }),
       })
@@ -1541,7 +1665,13 @@ function App() {
         notes: savedGig.notes ?? '',
         wasDriving: savedGig.wasDriving,
         status: savedGig.status,
+        expenses: savedGig.expenses
+          .slice()
+          .sort((left, right) => left.sortOrder - right.sortOrder)
+          .map(toGigExpenseForm),
       })
+      setGigExpenseAmount('')
+      setGigExpenseDescription('')
       setGigStatus(isEdit ? 'Gig updated.' : 'Gig created.')
     } catch (error) {
       setGigStatus(
@@ -2516,6 +2646,86 @@ function App() {
                 />
               </label>
             </div>
+
+            <div className="gig-timeline-note">
+              <p className="detail-label">Expenses</p>
+              <span>
+                Add chargeable out-of-pocket costs here and they will flow through when the gig is invoiced.
+              </span>
+            </div>
+
+            <div className="invoice-adjustment-form">
+              <label>
+                Amount
+                <input
+                  inputMode="decimal"
+                  value={gigExpenseAmount}
+                  onChange={(event) => setGigExpenseAmount(event.target.value)}
+                  placeholder="45.00"
+                  disabled={isGigLoading}
+                />
+              </label>
+              <label>
+                Description
+                <input
+                  value={gigExpenseDescription}
+                  onChange={(event) => setGigExpenseDescription(event.target.value)}
+                  placeholder="Parking, hotel, equipment hire..."
+                  disabled={isGigLoading}
+                />
+              </label>
+              <button
+                className="ghost-button"
+                onClick={handleAddGigExpense}
+                type="button"
+                disabled={isGigLoading}
+              >
+                Add expense
+              </button>
+            </div>
+
+            {gigForm.expenses.length > 0 ? (
+              <div className="gig-expense-list">
+                {gigForm.expenses.map((expense, index) => (
+                  <div className="gig-expense-item" key={`${expense.id || 'new'}-${index}`}>
+                    <label>
+                      <span>Description</span>
+                      <input
+                        value={expense.description}
+                        onChange={(event) =>
+                          updateGigExpenseField(index, 'description', event.target.value)
+                        }
+                        disabled={isGigLoading}
+                      />
+                    </label>
+                    <label>
+                      <span>Amount</span>
+                      <input
+                        inputMode="decimal"
+                        value={expense.amount}
+                        onChange={(event) =>
+                          updateGigExpenseField(index, 'amount', event.target.value)
+                        }
+                        disabled={isGigLoading}
+                      />
+                    </label>
+                    <button
+                      className="ghost-button"
+                      onClick={() => removeGigExpense(index)}
+                      type="button"
+                      disabled={isGigLoading}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <strong>No expenses added yet.</strong>
+                <p>Use the fields above to add chargeable costs to this gig.</p>
+              </div>
+            )}
 
             <div className="form-actions">
               <button

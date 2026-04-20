@@ -544,6 +544,38 @@
   margin-top: 12px;
 }
 
+.gig-expense-list {
+  display: grid;
+  gap: 12px;
+}
+
+.gig-expense-item {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 140px);
+  align-items: end;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--surface-elevated);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 85%, transparent);
+}
+
+.gig-expense-item label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.gig-expense-item span {
+  font-size: 0.86rem;
+  color: var(--muted-strong);
+}
+
+.gig-expense-item button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
 .invoice-adjustment-form {
   display: grid;
   gap: 10px;
@@ -829,7 +861,8 @@ button:disabled {
   .detail-grid,
   .gig-summary-grid,
   .draft-grid,
-  .invoice-adjustment-form {
+  .invoice-adjustment-form,
+  .gig-expense-item {
     grid-template-columns: 1fr;
   }
 
