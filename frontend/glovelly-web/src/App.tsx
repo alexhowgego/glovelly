@@ -203,7 +203,7 @@ function buildApiUrl(path: string) {
 }
 
 function buildReturnUrl() {
-  return window.location.href
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`
 }
 
 async function fetchWithSession(input: string, init?: RequestInit) {

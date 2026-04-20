@@ -268,8 +268,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
                 context.HandleResponse();
 
                 var failureCode = GetAuthenticationFailureCode(context.Failure);
-                var redirectUri = BuildSafeRedirectUri(
-                    context.HttpContext,
+                var redirectUri = ReturnUrlSanitizer.BuildSafeLocalReturnPath(
                     $"/auth/denied?code={Uri.EscapeDataString(failureCode)}");
 
                 context.Response.Redirect(redirectUri);
@@ -335,7 +334,7 @@ auth.MapGet("/login", (HttpContext httpContext, string? returnUrl) =>
             statusCode: StatusCodes.Status500InternalServerError);
     }
 
-    var redirectUri = BuildSafeRedirectUri(httpContext, returnUrl);
+    var redirectUri = ReturnUrlSanitizer.BuildSafeLocalReturnPath(returnUrl);
     return Results.Challenge(
         new AuthenticationProperties { RedirectUri = redirectUri },
         authenticationSchemes: [OpenIdConnectDefaults.AuthenticationScheme]);
@@ -611,31 +610,6 @@ app.MapAdminEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();
-
-static string BuildSafeRedirectUri(HttpContext httpContext, string? returnUrl)
-{
-    if (string.IsNullOrWhiteSpace(returnUrl))
-    {
-        return "/";
-    }
-
-    if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absoluteUri))
-    {
-        var request = httpContext.Request;
-        var sameHost = string.Equals(absoluteUri.Host, request.Host.Host, StringComparison.OrdinalIgnoreCase);
-        var localhostRedirect =
-            absoluteUri.IsLoopback &&
-            (absoluteUri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
-             absoluteUri.Host.Equals("127.0.0.1"));
-
-        if (sameHost || localhostRedirect)
-        {
-            return absoluteUri.ToString();
-        }
-    }
-
-    return returnUrl.StartsWith('/') ? returnUrl : "/";
-}
 
 static bool IsApiRequest(HttpRequest request)
 {
