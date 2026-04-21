@@ -38,10 +38,8 @@ export function SessionCheckingScreen({
       <section className="hero-panel auth-panel">
         <div className="hero-copy">
           <p className="eyebrow">Security</p>
-          <h1>Checking your Google session.</h1>
-          <p className="hero-text">
-            Glovelly now protects client and invoice data behind OpenID Connect.
-          </p>
+          <h1>Checking your sign-in.</h1>
+          <p className="hero-text">Just a moment while we open your workspace.</p>
         </div>
         <span className="status-pill">{status}</span>
       </section>
@@ -68,10 +66,9 @@ export function SignInScreen({
       <section className="hero-panel auth-panel">
         <div className="hero-copy">
           <p className="eyebrow">Secure Sign-In</p>
-          <h1>Glovelly now uses Google to verify who’s allowed in.</h1>
+          <h1>Sign in to open Glovelly.</h1>
           <p className="hero-text">
-            Sign in with the Google account attached to your deployment so the API
-            can issue a secure app session before any business data is loaded.
+            Use your usual account to access clients, gigs and invoices.
           </p>
         </div>
 
@@ -79,8 +76,8 @@ export function SignInScreen({
           <span className="status-pill">{status}</span>
           {shouldCloseBrowserNotice && (
             <p className="auth-note">
-              The Glovelly session cookie has been cleared. Close your browser if you
-              want to fully end the Google sign-in session too.
+              You have been signed out of Glovelly. Close your browser too if you are
+              using a shared device.
             </p>
           )}
           <button className="primary-button" onClick={onSignIn} type="button">
@@ -94,18 +91,19 @@ export function SignInScreen({
 }
 
 type ClientsSectionProps = {
-  clients: Client[]
   filteredClients: Client[]
   form: ClientForm
   isApiConnected: boolean
+  isEditorOpen: boolean
+  isMonthlyInvoiceReady: boolean
   isInvoiceLoading: boolean
   isLoading: boolean
-  monthlyInvoiceClientId: string
+  monthlyInvoiceHelperText: string
   monthlyInvoiceMonth: string
+  onCloseEditor: () => void
   mode: 'create' | 'edit'
   onDelete: () => void
   onGenerateMonthlyInvoice: () => void
-  onMonthlyInvoiceClientChange: (value: string) => void
   onMonthlyInvoiceMonthChange: (value: string) => void
   onOpenClientSettings: () => void
   onResetForm: () => void
@@ -121,18 +119,19 @@ type ClientsSectionProps = {
 }
 
 export function ClientsSection({
-  clients,
   filteredClients,
   form,
   isApiConnected,
+  isEditorOpen,
+  isMonthlyInvoiceReady,
   isInvoiceLoading,
   isLoading,
-  monthlyInvoiceClientId,
+  monthlyInvoiceHelperText,
   monthlyInvoiceMonth,
+  onCloseEditor,
   mode,
   onDelete,
   onGenerateMonthlyInvoice,
-  onMonthlyInvoiceClientChange,
   onMonthlyInvoiceMonthChange,
   onOpenClientSettings,
   onResetForm,
@@ -198,7 +197,7 @@ export function ClientsSection({
                 <p>
                   {isApiConnected
                     ? 'Try a different term or add a fresh client profile.'
-                    : 'Start the backend and refresh this page to complete sign-in.'}
+                    : 'We could not load client details right now. Refresh and try again.'}
                 </p>
               </div>
             )}
@@ -245,23 +244,6 @@ export function ClientsSection({
                 <p className="detail-label">Monthly invoice run</p>
                 <div className="invoice-adjustment-form">
                   <label>
-                    Client
-                    <select
-                      value={monthlyInvoiceClientId}
-                      onChange={(event) =>
-                        onMonthlyInvoiceClientChange(event.target.value)
-                      }
-                      disabled={isInvoiceLoading}
-                    >
-                      <option value="">Select client</option>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
                     Month
                     <input
                       type="month"
@@ -276,11 +258,12 @@ export function ClientsSection({
                     className="primary-button"
                     onClick={onGenerateMonthlyInvoice}
                     type="button"
-                    disabled={isInvoiceLoading}
+                    disabled={isInvoiceLoading || !isMonthlyInvoiceReady}
                   >
                     Generate monthly invoice
                   </button>
                 </div>
+                <span>{monthlyInvoiceHelperText}</span>
               </div>
 
               <div className="detail-grid">
@@ -314,110 +297,116 @@ export function ClientsSection({
           ) : (
             <div className="empty-state roomy">
               <strong>Select a client to see billing details.</strong>
-              <p>The right-hand panel is set up for a fuller CRM-style summary later on.</p>
+              <p>Billing details and contact information will appear here.</p>
             </div>
           )}
         </div>
 
-        <form className="editor-panel panel" onSubmit={onSubmit}>
-          <div className="panel-heading">
-            <div>
-              <p className="section-label">Editor</p>
-              <h2>{mode === 'create' ? 'Add client' : 'Edit client'}</h2>
+        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+          <form
+            aria-hidden={!isEditorOpen}
+            className="editor-panel panel"
+            onSubmit={onSubmit}
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Editor</p>
+                <h2>{mode === 'create' ? 'Add client' : 'Edit client'}</h2>
+              </div>
+              <span className="status-pill">{status}</span>
             </div>
-            <span className="status-pill">{status}</span>
-          </div>
 
-          <div className="form-grid">
-            <label>
-              <span>Client name</span>
-              <input
-                required
-                value={form.name}
-                onChange={(event) => onUpdateField('name', event.target.value)}
-                placeholder="Fox & Finch Events"
-              />
-            </label>
+            <div className="form-grid">
+              <label>
+                <span>Client name</span>
+                <input
+                  required
+                  value={form.name}
+                  onChange={(event) => onUpdateField('name', event.target.value)}
+                  placeholder="Fox & Finch Events"
+                />
+              </label>
 
-            <label>
-              <span>Email</span>
-              <input
-                required
-                type="email"
-                value={form.email}
-                onChange={(event) => onUpdateField('email', event.target.value)}
-                placeholder="accounts@example.com"
-              />
-            </label>
+              <label>
+                <span>Email</span>
+                <input
+                  required
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => onUpdateField('email', event.target.value)}
+                  placeholder="accounts@example.com"
+                />
+              </label>
 
-            <label className="full-width">
-              <span>Address line 1</span>
-              <input
-                required
-                value={form.billingAddress.line1}
-                onChange={(event) => onUpdateAddressField('line1', event.target.value)}
-                placeholder="12 Chapel Street"
-              />
-            </label>
+              <label className="full-width">
+                <span>Address line 1</span>
+                <input
+                  required
+                  value={form.billingAddress.line1}
+                  onChange={(event) => onUpdateAddressField('line1', event.target.value)}
+                  placeholder="12 Chapel Street"
+                />
+              </label>
 
-            <label className="full-width">
-              <span>Address line 2</span>
-              <input
-                value={form.billingAddress.line2}
-                onChange={(event) => onUpdateAddressField('line2', event.target.value)}
-                placeholder="Optional"
-              />
-            </label>
+              <label className="full-width">
+                <span>Address line 2</span>
+                <input
+                  value={form.billingAddress.line2 ?? ''}
+                  onChange={(event) => onUpdateAddressField('line2', event.target.value)}
+                  placeholder="Optional"
+                />
+              </label>
 
-            <label>
-              <span>City</span>
-              <input
-                required
-                value={form.billingAddress.city}
-                onChange={(event) => onUpdateAddressField('city', event.target.value)}
-                placeholder="Manchester"
-              />
-            </label>
+              <label>
+                <span>City</span>
+                <input
+                  required
+                  value={form.billingAddress.city}
+                  onChange={(event) => onUpdateAddressField('city', event.target.value)}
+                  placeholder="Manchester"
+                />
+              </label>
 
-            <label>
-              <span>County / state</span>
-              <input
-                value={form.billingAddress.stateOrCounty}
-                onChange={(event) =>
-                  onUpdateAddressField('stateOrCounty', event.target.value)
-                }
-                placeholder="Greater Manchester"
-              />
-            </label>
+              <label>
+                <span>County / state</span>
+                <input
+                  value={form.billingAddress.stateOrCounty ?? ''}
+                  onChange={(event) =>
+                    onUpdateAddressField('stateOrCounty', event.target.value)
+                  }
+                  placeholder="Greater Manchester"
+                />
+              </label>
 
-            <label>
-              <span>Postal code</span>
-              <input
-                value={form.billingAddress.postalCode}
-                onChange={(event) => onUpdateAddressField('postalCode', event.target.value)}
-                placeholder="M3 5JZ"
-              />
-            </label>
+              <label>
+                <span>Postal code</span>
+                <input
+                  value={form.billingAddress.postalCode ?? ''}
+                  onChange={(event) => onUpdateAddressField('postalCode', event.target.value)}
+                  placeholder="M3 5JZ"
+                />
+              </label>
 
-            <label>
-              <span>Country</span>
-              <input
-                value={form.billingAddress.country}
-                onChange={(event) => onUpdateAddressField('country', event.target.value)}
-                placeholder="United Kingdom"
-              />
-            </label>
-          </div>
+              <label>
+                <span>Country</span>
+                <input
+                  value={form.billingAddress.country ?? ''}
+                  onChange={(event) => onUpdateAddressField('country', event.target.value)}
+                  placeholder="United Kingdom"
+                />
+              </label>
+            </div>
 
-          <div className="form-actions">
-            <button className="primary-button" type="submit" disabled={isLoading}>
-              {mode === 'create' ? 'Save client' : 'Update client'}
-            </button>
-            <button className="ghost-button" onClick={onResetForm} type="button">
-              Reset form
-            </button>
-          </div>
-        </form>
+            <div className="form-actions">
+              <button className="primary-button" type="submit" disabled={isLoading}>
+                {mode === 'create' ? 'Save client' : 'Update client'}
+              </button>
+              <button className="ghost-button" onClick={onCloseEditor} type="button">
+                Done
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </section>
   )
@@ -425,6 +414,7 @@ export function ClientsSection({
 
 type AdminSectionProps = {
   adminForm: AdminUserForm
+  isEditorOpen: boolean
   adminMode: 'create' | 'edit'
   adminSearchQuery: string
   adminStatus: string
@@ -432,6 +422,7 @@ type AdminSectionProps = {
   activeUsersCount: number
   filteredAdminUsers: AdminUser[]
   isAdminLoading: boolean
+  onCloseEditor: () => void
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
   onSelectUser: (userId: string) => void
@@ -444,6 +435,7 @@ type AdminSectionProps = {
 
 export function AdminSection({
   adminForm,
+  isEditorOpen,
   adminMode,
   adminSearchQuery,
   adminStatus,
@@ -451,6 +443,7 @@ export function AdminSection({
   activeUsersCount,
   filteredAdminUsers,
   isAdminLoading,
+  onCloseEditor,
   onResetForm,
   onSearchQueryChange,
   onSelectUser,
@@ -465,17 +458,16 @@ export function AdminSection({
       <div className="admin-banner panel">
         <div>
           <p className="section-label">Administrator Area</p>
-          <h2>User enrolment</h2>
+          <h2>User access</h2>
           <p className="hero-text">
-            Control which Google accounts can access Glovelly, whether they are
-            active, and whether they should see this administrator workspace.
+            Manage who can sign in, which role they have, and whether their account is active.
           </p>
         </div>
 
         <div className="hero-metrics admin-metrics">
           <article>
             <span>{adminUsers.length}</span>
-            <p>enrolled users</p>
+            <p>users with access</p>
           </article>
           <article>
             <span>{activeUsersCount}</span>
@@ -493,10 +485,10 @@ export function AdminSection({
           <div className="panel-heading">
             <div>
               <p className="section-label">Access Directory</p>
-              <h2>Enrolled users</h2>
+              <h2>People with access</h2>
             </div>
             <button className="ghost-button" onClick={onResetForm} type="button">
-              New enrolment
+              Add user
             </button>
           </div>
 
@@ -531,8 +523,8 @@ export function AdminSection({
 
             {filteredAdminUsers.length === 0 && (
               <div className="empty-state">
-                <strong>No enrolled users match that search.</strong>
-                <p>Try another term or start a fresh enrolment.</p>
+                <strong>No users match that search.</strong>
+                <p>Try another term or add someone new.</p>
               </div>
             )}
           </div>
@@ -541,7 +533,7 @@ export function AdminSection({
         <div className="panel">
           <div className="panel-heading">
             <div>
-              <p className="section-label">Enrolment Overview</p>
+              <p className="section-label">Access Overview</p>
               <h2>
                 {selectedAdminUser?.displayName ||
                   selectedAdminUser?.email ||
@@ -555,7 +547,7 @@ export function AdminSection({
                 type="button"
                 disabled={!selectedAdminUser}
               >
-                Edit enrolment
+                Edit access
               </button>
             </div>
           </div>
@@ -571,17 +563,15 @@ export function AdminSection({
                 <strong>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</strong>
               </article>
               <article>
-                <p className="detail-label">Enrolment</p>
+                <p className="detail-label">Sign-in status</p>
                 <strong>
-                  {selectedAdminUser.isEnrolled
-                    ? 'Bound to Google subject'
-                    : 'Invited by email'}
+                  {selectedAdminUser.isEnrolled ? 'Ready to sign in' : 'Waiting for first sign-in'}
                 </strong>
               </article>
               <article className="full-width">
-                <p className="detail-label">Google subject</p>
+                <p className="detail-label">Account reference</p>
                 <strong>
-                  {selectedAdminUser.googleSubject ?? 'Pending first Google sign-in'}
+                  {selectedAdminUser.googleSubject ?? 'Added by email only so far'}
                 </strong>
               </article>
               <article>
@@ -595,99 +585,108 @@ export function AdminSection({
             </div>
           ) : (
             <div className="empty-state roomy">
-              <strong>Select an enrolled user to review their access.</strong>
-              <p>The admin area stays hidden from standard users and only appears for admins.</p>
+              <strong>Select a user to review their access.</strong>
+              <p>You can update their role, status and sign-in details here.</p>
             </div>
           )}
         </div>
 
-        <form className="panel" onSubmit={onSubmit}>
-          <div className="panel-heading">
-            <div>
-              <p className="section-label">Management Pane</p>
-              <h2>{adminMode === 'create' ? 'Create enrolment' : 'Update enrolment'}</h2>
+        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+          <form
+            aria-hidden={!isEditorOpen}
+            className="editor-panel panel"
+            onSubmit={onSubmit}
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Management Pane</p>
+                <h2>{adminMode === 'create' ? 'Add user' : 'Update access'}</h2>
+              </div>
+              <span className="status-pill">{adminStatus}</span>
             </div>
-            <span className="status-pill">{adminStatus}</span>
-          </div>
 
-          <div className="form-grid">
-            <label>
-              <span>Email</span>
-              <input
-                required
-                type="email"
-                value={adminForm.email}
-                onChange={(event) => onUpdateField('email', event.target.value)}
-                placeholder="performer@example.com"
-              />
-            </label>
+            <div className="form-grid">
+              <label>
+                <span>Email</span>
+                <input
+                  required
+                  type="email"
+                  value={adminForm.email}
+                  onChange={(event) => onUpdateField('email', event.target.value)}
+                  placeholder="performer@example.com"
+                />
+              </label>
 
-            <label>
-              <span>Display name</span>
-              <input
-                value={adminForm.displayName}
-                onChange={(event) => onUpdateField('displayName', event.target.value)}
-                placeholder="Optional"
-              />
-            </label>
+              <label>
+                <span>Display name</span>
+                <input
+                  value={adminForm.displayName}
+                  onChange={(event) => onUpdateField('displayName', event.target.value)}
+                  placeholder="Optional"
+                />
+              </label>
 
-            <label className="full-width">
-              <span>Google subject</span>
-              <input
-                value={adminForm.googleSubject}
-                onChange={(event) => onUpdateField('googleSubject', event.target.value)}
-                placeholder="Optional until first Google sign-in"
-                disabled={adminMode === 'edit' && selectedAdminUser?.isEnrolled === true}
-              />
-            </label>
+              <label className="full-width">
+                <span>Account reference</span>
+                <input
+                  value={adminForm.googleSubject}
+                  onChange={(event) => onUpdateField('googleSubject', event.target.value)}
+                  placeholder="Optional"
+                  disabled={adminMode === 'edit' && selectedAdminUser?.isEnrolled === true}
+                />
+              </label>
 
-            <label>
-              <span>Role</span>
-              <select
-                value={adminForm.role}
-                onChange={(event) =>
-                  onUpdateField('role', event.target.value as AdminUserForm['role'])
-                }
-              >
-                <option value="User">User</option>
-                <option value="Admin">Admin</option>
-              </select>
-            </label>
+              <label>
+                <span>Role</span>
+                <select
+                  value={adminForm.role}
+                  onChange={(event) =>
+                    onUpdateField('role', event.target.value as AdminUserForm['role'])
+                  }
+                >
+                  <option value="User">User</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </label>
 
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={adminForm.isActive}
-                onChange={(event) => onUpdateField('isActive', event.target.checked)}
-              />
-              <span>Account is active and allowed to sign in</span>
-            </label>
-          </div>
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={adminForm.isActive}
+                  onChange={(event) => onUpdateField('isActive', event.target.checked)}
+                />
+                <span>Account is active and allowed to sign in</span>
+              </label>
+            </div>
 
-          <div className="form-actions">
-            <button className="primary-button" type="submit" disabled={isAdminLoading}>
-              {adminMode === 'create' ? 'Enrol user' : 'Save enrolment'}
-            </button>
-            <button className="ghost-button" onClick={onResetForm} type="button">
-              Reset enrolment form
-            </button>
-          </div>
-          <p className="auth-note">
-            Admins can pre-provision by email only. If Google subject is blank, Glovelly
-            will bind it on the user’s first successful Google sign-in.
-          </p>
-        </form>
+            <div className="form-actions">
+              <button className="primary-button" type="submit" disabled={isAdminLoading}>
+                {adminMode === 'create' ? 'Add user' : 'Save changes'}
+              </button>
+              <button className="ghost-button" onClick={onCloseEditor} type="button">
+                Done
+              </button>
+            </div>
+            <p className="auth-note">
+              Adding an email address is enough to let someone get started. You can fill in
+              the account reference later if needed.
+            </p>
+          </form>
+        </div>
       </div>
     </section>
   )
 }
 
 type GigsSectionProps = {
+  clientNamesById: ReadonlyMap<string, string>
   clients: Client[]
+  completedGigCount: number
   filteredGigs: Gig[]
   gigExpenseAmount: string
   gigExpenseDescription: string
   gigForm: GigForm
+  isEditorOpen: boolean
   gigMode: 'create' | 'edit'
   gigSearchQuery: string
   gigStatus: string
@@ -695,9 +694,11 @@ type GigsSectionProps = {
   isGigLoading: boolean
   isInvoiceLoading: boolean
   onAddGigExpense: () => void
+  onCloseEditor: () => void
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
   onGenerateInvoice: () => void
+  onOpenLinkedInvoice: () => void
   onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
@@ -721,11 +722,14 @@ type GigsSectionProps = {
 }
 
 export function GigsSection({
+  clientNamesById,
   clients,
+  completedGigCount,
   filteredGigs,
   gigExpenseAmount,
   gigExpenseDescription,
   gigForm,
+  isEditorOpen,
   gigMode,
   gigSearchQuery,
   gigStatus,
@@ -733,9 +737,11 @@ export function GigsSection({
   isGigLoading,
   isInvoiceLoading,
   onAddGigExpense,
+  onCloseEditor,
   onExpenseAmountChange,
   onExpenseDescriptionChange,
   onGenerateInvoice,
+  onOpenLinkedInvoice,
   onRemoveGigExpense,
   onResetForm,
   onSearchQueryChange,
@@ -750,8 +756,8 @@ export function GigsSection({
   selectedGigIds,
   selectedGigs,
 }: GigsSectionProps) {
-  const selectedGigClient =
-    clients.find((client) => client.id === selectedGig?.clientId) ?? null
+  const selectedGigClientName =
+    (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
   const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
 
   return (
@@ -788,16 +794,14 @@ export function GigsSection({
               <p>planned</p>
             </article>
             <article>
-              <span>{gigs.filter((gig) => gig.status === 'Completed').length}</span>
+              <span>{completedGigCount}</span>
               <p>completed</p>
             </article>
           </div>
 
           <div className="client-list">
             {filteredGigs.map((gig) => {
-              const clientName =
-                clients.find((client) => client.id === gig.clientId)?.name ??
-                'Unknown client'
+              const clientName = clientNamesById.get(gig.clientId) ?? 'Unknown client'
 
               return (
                 <button
@@ -806,7 +810,10 @@ export function GigsSection({
                   onClick={() => onSelectGig(gig.id)}
                   type="button"
                 >
-                  <label onClick={(event) => event.stopPropagation()}>
+                  <label
+                    className="gig-select-toggle"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedGigIds.includes(gig.id)}
@@ -878,7 +885,7 @@ export function GigsSection({
               <div className="detail-grid">
                 <article>
                   <p className="detail-label">Client</p>
-                  <strong>{selectedGigClient?.name ?? 'Unknown client'}</strong>
+                  <strong>{selectedGigClientName}</strong>
                 </article>
                 <article>
                   <p className="detail-label">Status</p>
@@ -902,7 +909,13 @@ export function GigsSection({
                 </article>
                 <article>
                   <p className="detail-label">Invoice link</p>
-                  <strong>{selectedGig.isInvoiced ? 'Linked' : 'Not invoiced yet'}</strong>
+                  {selectedGig.isInvoiced ? (
+                    <button className="ghost-button" onClick={onOpenLinkedInvoice} type="button">
+                      Open invoice
+                    </button>
+                  ) : (
+                    <strong>Not invoiced yet</strong>
+                  )}
                 </article>
                 <article className="full-width">
                   <p className="detail-label">Notes</p>
@@ -914,14 +927,14 @@ export function GigsSection({
                 <p className="detail-label">Invoice workflow</p>
                 <span>
                   {selectedGig.isInvoiced
-                    ? 'This gig is already linked to an invoice. Open the invoices workspace to review or download it.'
-                    : 'This record now carries the client, date, venue and fee needed to generate a one-off invoice.'}
+                    ? 'This gig is already linked to an invoice. Open Invoices to review or download it.'
+                    : 'This gig has everything needed to create an invoice when you are ready.'}
                 </span>
                 {selectedGigIds.length > 0 && (
                   <span>
                     {hasCrossClientSelection
-                      ? 'Selected gigs must share the same client before invoice generation is allowed.'
-                      : `${selectedGigIds.length} gig(s) selected for a combined invoice.`}
+                      ? ' Selected gigs need to belong to the same client before they can be invoiced together.'
+                      : ` ${selectedGigIds.length} gig(s) selected for a combined invoice.`}
                   </span>
                 )}
               </div>
@@ -929,212 +942,218 @@ export function GigsSection({
           ) : (
             <div className="empty-state roomy">
               <strong>Select a gig to review its details.</strong>
-              <p>The browse pane shows the commercial snapshot that matters later.</p>
+              <p>Key booking and billing details will appear here.</p>
             </div>
           )}
         </div>
 
-        <form className="panel" onSubmit={onSubmit}>
-          <div className="panel-heading">
-            <div>
-              <p className="section-label">Management Pane</p>
-              <h2>{gigMode === 'create' ? 'Create gig' : 'Update gig'}</h2>
+        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+          <form
+            aria-hidden={!isEditorOpen}
+            className="editor-panel panel"
+            onSubmit={onSubmit}
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Management Pane</p>
+                <h2>{gigMode === 'create' ? 'Create gig' : 'Update gig'}</h2>
+              </div>
+              <span className="status-pill">{gigStatus}</span>
             </div>
-            <span className="status-pill">{gigStatus}</span>
-          </div>
 
-          <div className="form-grid">
-            <label>
-              <span>Client</span>
-              <select
-                required
-                value={gigForm.clientId}
-                onChange={(event) => onUpdateGigField('clientId', event.target.value)}
+            <div className="form-grid">
+              <label>
+                <span>Client</span>
+                <select
+                  required
+                  value={gigForm.clientId}
+                  onChange={(event) => onUpdateGigField('clientId', event.target.value)}
+                >
+                  <option value="">Select a client</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>Date</span>
+                <input
+                  required
+                  type="date"
+                  value={gigForm.date}
+                  onChange={(event) => onUpdateGigField('date', event.target.value)}
+                />
+              </label>
+
+              <label className="full-width">
+                <span>Title / description</span>
+                <input
+                  required
+                  value={gigForm.title}
+                  onChange={(event) => onUpdateGigField('title', event.target.value)}
+                  placeholder="Spring product launch"
+                />
+              </label>
+
+              <label className="full-width">
+                <span>Location / venue</span>
+                <input
+                  required
+                  value={gigForm.venue}
+                  onChange={(event) => onUpdateGigField('venue', event.target.value)}
+                  placeholder="Albert Hall, Manchester"
+                />
+              </label>
+
+              <label>
+                <span>Fee</span>
+                <input
+                  required
+                  inputMode="decimal"
+                  value={gigForm.fee}
+                  onChange={(event) => onUpdateGigField('fee', event.target.value)}
+                  placeholder="650"
+                />
+              </label>
+
+              <label>
+                <span>Status</span>
+                <select
+                  value={gigForm.status}
+                  onChange={(event) =>
+                    onUpdateGigField('status', event.target.value as GigStatus)
+                  }
+                >
+                  <option value="Confirmed">Planned</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                  <option value="Draft">Draft</option>
+                </select>
+              </label>
+
+              <label className="checkbox-field full-width">
+                <input
+                  type="checkbox"
+                  checked={gigForm.wasDriving}
+                  onChange={(event) => onUpdateGigField('wasDriving', event.target.checked)}
+                />
+                <span>I was driving for this gig</span>
+              </label>
+
+              <label className="full-width">
+                <span>Notes</span>
+                <textarea
+                  rows={5}
+                  value={gigForm.notes}
+                  onChange={(event) => onUpdateGigField('notes', event.target.value)}
+                  placeholder="Optional commercial or logistics notes"
+                />
+              </label>
+            </div>
+
+            <div className="gig-timeline-note">
+              <p className="detail-label">Expenses</p>
+              <span>
+                Add chargeable out-of-pocket costs here and they will flow through when the gig is invoiced.
+              </span>
+            </div>
+
+            <div className="invoice-adjustment-form">
+              <label>
+                Amount
+                <input
+                  inputMode="decimal"
+                  value={gigExpenseAmount}
+                  onChange={(event) => onExpenseAmountChange(event.target.value)}
+                  placeholder="45.00"
+                  disabled={isGigLoading}
+                />
+              </label>
+              <label>
+                Description
+                <input
+                  value={gigExpenseDescription}
+                  onChange={(event) => onExpenseDescriptionChange(event.target.value)}
+                  placeholder="Parking, hotel, equipment hire..."
+                  disabled={isGigLoading}
+                />
+              </label>
+              <button
+                className="ghost-button"
+                onClick={onAddGigExpense}
+                type="button"
+                disabled={isGigLoading}
               >
-                <option value="">Select a client</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
+                Add expense
+              </button>
+            </div>
+
+            {gigForm.expenses.length > 0 ? (
+              <div className="gig-expense-list">
+                {gigForm.expenses.map((expense, index) => (
+                  <div className="gig-expense-item" key={`${expense.id || 'new'}-${index}`}>
+                    <label>
+                      <span>Description</span>
+                      <input
+                        value={expense.description}
+                        onChange={(event) =>
+                          onUpdateGigExpenseField(index, 'description', event.target.value)
+                        }
+                        disabled={isGigLoading}
+                      />
+                    </label>
+                    <label>
+                      <span>Amount</span>
+                      <input
+                        inputMode="decimal"
+                        value={expense.amount}
+                        onChange={(event) =>
+                          onUpdateGigExpenseField(index, 'amount', event.target.value)
+                        }
+                        disabled={isGigLoading}
+                      />
+                    </label>
+                    <button
+                      className="ghost-button"
+                      onClick={() => onRemoveGigExpense(index)}
+                      type="button"
+                      disabled={isGigLoading}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 ))}
-              </select>
-            </label>
+              </div>
+            ) : (
+              <div className="empty-state">
+                <strong>No expenses added yet.</strong>
+                <p>Use the fields above to add chargeable costs to this gig.</p>
+              </div>
+            )}
 
-            <label>
-              <span>Date</span>
-              <input
-                required
-                type="date"
-                value={gigForm.date}
-                onChange={(event) => onUpdateGigField('date', event.target.value)}
-              />
-            </label>
-
-            <label className="full-width">
-              <span>Title / description</span>
-              <input
-                required
-                value={gigForm.title}
-                onChange={(event) => onUpdateGigField('title', event.target.value)}
-                placeholder="Spring product launch"
-              />
-            </label>
-
-            <label className="full-width">
-              <span>Location / venue</span>
-              <input
-                required
-                value={gigForm.venue}
-                onChange={(event) => onUpdateGigField('venue', event.target.value)}
-                placeholder="Albert Hall, Manchester"
-              />
-            </label>
-
-            <label>
-              <span>Fee</span>
-              <input
-                required
-                inputMode="decimal"
-                value={gigForm.fee}
-                onChange={(event) => onUpdateGigField('fee', event.target.value)}
-                placeholder="650"
-              />
-            </label>
-
-            <label>
-              <span>Status</span>
-              <select
-                value={gigForm.status}
-                onChange={(event) =>
-                  onUpdateGigField('status', event.target.value as GigStatus)
-                }
+            <div className="form-actions">
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={isGigLoading || clients.length === 0}
               >
-                <option value="Confirmed">Planned</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-                <option value="Draft">Draft</option>
-              </select>
-            </label>
-
-            <label className="checkbox-field full-width">
-              <input
-                type="checkbox"
-                checked={gigForm.wasDriving}
-                onChange={(event) => onUpdateGigField('wasDriving', event.target.checked)}
-              />
-              <span>I was driving for this gig</span>
-            </label>
-
-            <label className="full-width">
-              <span>Notes</span>
-              <textarea
-                rows={5}
-                value={gigForm.notes}
-                onChange={(event) => onUpdateGigField('notes', event.target.value)}
-                placeholder="Optional commercial or logistics notes"
-              />
-            </label>
-          </div>
-
-          <div className="gig-timeline-note">
-            <p className="detail-label">Expenses</p>
-            <span>
-              Add chargeable out-of-pocket costs here and they will flow through when the gig is invoiced.
-            </span>
-          </div>
-
-          <div className="invoice-adjustment-form">
-            <label>
-              Amount
-              <input
-                inputMode="decimal"
-                value={gigExpenseAmount}
-                onChange={(event) => onExpenseAmountChange(event.target.value)}
-                placeholder="45.00"
-                disabled={isGigLoading}
-              />
-            </label>
-            <label>
-              Description
-              <input
-                value={gigExpenseDescription}
-                onChange={(event) => onExpenseDescriptionChange(event.target.value)}
-                placeholder="Parking, hotel, equipment hire..."
-                disabled={isGigLoading}
-              />
-            </label>
-            <button
-              className="ghost-button"
-              onClick={onAddGigExpense}
-              type="button"
-              disabled={isGigLoading}
-            >
-              Add expense
-            </button>
-          </div>
-
-          {gigForm.expenses.length > 0 ? (
-            <div className="gig-expense-list">
-              {gigForm.expenses.map((expense, index) => (
-                <div className="gig-expense-item" key={`${expense.id || 'new'}-${index}`}>
-                  <label>
-                    <span>Description</span>
-                    <input
-                      value={expense.description}
-                      onChange={(event) =>
-                        onUpdateGigExpenseField(index, 'description', event.target.value)
-                      }
-                      disabled={isGigLoading}
-                    />
-                  </label>
-                  <label>
-                    <span>Amount</span>
-                    <input
-                      inputMode="decimal"
-                      value={expense.amount}
-                      onChange={(event) =>
-                        onUpdateGigExpenseField(index, 'amount', event.target.value)
-                      }
-                      disabled={isGigLoading}
-                    />
-                  </label>
-                  <button
-                    className="ghost-button"
-                    onClick={() => onRemoveGigExpense(index)}
-                    type="button"
-                    disabled={isGigLoading}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
+                {gigMode === 'create' ? 'Save gig' : 'Update gig'}
+              </button>
+              <button className="ghost-button" onClick={onCloseEditor} type="button">
+                Done
+              </button>
             </div>
-          ) : (
-            <div className="empty-state">
-              <strong>No expenses added yet.</strong>
-              <p>Use the fields above to add chargeable costs to this gig.</p>
-            </div>
-          )}
 
-          <div className="form-actions">
-            <button
-              className="primary-button"
-              type="submit"
-              disabled={isGigLoading || clients.length === 0}
-            >
-              {gigMode === 'create' ? 'Save gig' : 'Update gig'}
-            </button>
-            <button className="ghost-button" onClick={onResetForm} type="button">
-              Reset form
-            </button>
-          </div>
-
-          {clients.length === 0 && (
-            <p className="auth-note">
-              Add a client first. Every gig is intentionally tied to a client record.
-            </p>
-          )}
-        </form>
+            {clients.length === 0 && (
+              <p className="auth-note">
+                Add a client first so this gig can be linked to the right account.
+              </p>
+            )}
+          </form>
+        </div>
       </div>
     </section>
   )
@@ -1143,48 +1162,57 @@ export function GigsSection({
 type InvoicesSectionProps = {
   adjustmentAmount: string
   adjustmentReason: string
-  clients: Client[]
+  clientNamesById: ReadonlyMap<string, string>
   draftInvoiceCount: number
   filteredInvoices: Invoice[]
+  isEditorOpen: boolean
   invoiceSearchQuery: string
   invoiceStatus: string
   invoices: Invoice[]
+  issuedInvoiceCount: number
   isInvoiceLoading: boolean
   onAdjustmentAmountChange: (value: string) => void
   onAdjustmentReasonChange: (value: string) => void
   onAddAdjustment: (invoice: Invoice) => Promise<void>
+  onCloseEditor: () => void
   onDeleteInvoice: (invoice: Invoice) => Promise<void>
   onDownloadPdf: (invoice: Invoice) => Promise<void>
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<void>
   onReissue: (invoice: Invoice) => Promise<void>
   onSearchQueryChange: (value: string) => void
   onSelectInvoice: (invoiceId: string) => void
+  onStartEditing: () => void
   selectedInvoice: Invoice | null
 }
 
 export function InvoicesSection({
   adjustmentAmount,
   adjustmentReason,
-  clients,
+  clientNamesById,
   draftInvoiceCount,
   filteredInvoices,
+  isEditorOpen,
   invoiceSearchQuery,
   invoiceStatus,
   invoices,
+  issuedInvoiceCount,
   isInvoiceLoading,
   onAdjustmentAmountChange,
   onAdjustmentReasonChange,
   onAddAdjustment,
+  onCloseEditor,
   onDeleteInvoice,
   onDownloadPdf,
   onInvoiceStatusChange,
   onReissue,
   onSearchQueryChange,
   onSelectInvoice,
+  onStartEditing,
   selectedInvoice,
 }: InvoicesSectionProps) {
-  const selectedInvoiceClient =
-    clients.find((client) => client.id === selectedInvoice?.clientId) ?? null
+  const selectedInvoiceClientName =
+    (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
+    'Unknown client'
 
   return (
     <section className="section-layout">
@@ -1218,16 +1246,14 @@ export function InvoicesSection({
               <p>draft</p>
             </article>
             <article>
-              <span>{invoices.filter((invoice) => invoice.status === 'Issued').length}</span>
+              <span>{issuedInvoiceCount}</span>
               <p>issued</p>
             </article>
           </div>
 
           <div className="client-list">
             {filteredInvoices.map((invoice) => {
-              const clientName =
-                clients.find((client) => client.id === invoice.clientId)?.name ??
-                'Unknown client'
+              const clientName = clientNamesById.get(invoice.clientId) ?? 'Unknown client'
 
               return (
                 <button
@@ -1266,6 +1292,14 @@ export function InvoicesSection({
             <div className="actions">
               <button
                 className="ghost-button"
+                onClick={onStartEditing}
+                type="button"
+                disabled={!selectedInvoice}
+              >
+                Line items
+              </button>
+              <button
+                className="ghost-button"
                 onClick={() => selectedInvoice && void onReissue(selectedInvoice)}
                 type="button"
                 disabled={!selectedInvoice || isInvoiceLoading}
@@ -1301,7 +1335,7 @@ export function InvoicesSection({
               <div className="detail-grid">
                 <article>
                   <p className="detail-label">Client</p>
-                  <strong>{selectedInvoiceClient?.name ?? 'Unknown client'}</strong>
+                  <strong>{selectedInvoiceClientName}</strong>
                 </article>
                 <article>
                   <p className="detail-label">Status</p>
@@ -1360,8 +1394,7 @@ export function InvoicesSection({
               <div className="gig-timeline-note">
                 <p className="detail-label">Invoice workflow</p>
                 <span>
-                  Re-issue and PDF actions stay in the overview pane, while line-level changes now live in
-                  the docked side pane for a steadier browse flow.
+                  Review invoice details here, then open line items when you need to make changes.
                 </span>
               </div>
             </>
@@ -1373,81 +1406,88 @@ export function InvoicesSection({
           )}
         </div>
 
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <p className="section-label">Management Pane</p>
-              <h2>{selectedInvoice ? 'Line items' : 'No invoice selected'}</h2>
-            </div>
-          </div>
-
-          {selectedInvoice ? (
-            <>
-              <div className="gig-timeline-note">
-                <p className="detail-label">Adjustments</p>
-                <span>
-                  Manual adjustments append a separate line item so the original invoice breakdown stays intact.
-                </span>
+        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+          <div aria-hidden={!isEditorOpen} className="panel editor-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Management Pane</p>
+                <h2>{selectedInvoice ? 'Line items' : 'No invoice selected'}</h2>
               </div>
-
-              <form
-                className="invoice-adjustment-form"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  void onAddAdjustment(selectedInvoice)
-                }}
-              >
-                <label>
-                  Amount
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={adjustmentAmount}
-                    onChange={(event) => onAdjustmentAmountChange(event.target.value)}
-                    placeholder="-25.00"
-                    disabled={isInvoiceLoading}
-                  />
-                </label>
-                <label>
-                  Reason
-                  <input
-                    value={adjustmentReason}
-                    onChange={(event) => onAdjustmentReasonChange(event.target.value)}
-                    placeholder="Goodwill discount, surcharge, correction..."
-                    disabled={isInvoiceLoading}
-                  />
-                </label>
-                <button className="ghost-button" type="submit" disabled={isInvoiceLoading}>
-                  Add adjustment
+              <div className="actions">
+                <button className="ghost-button" onClick={onCloseEditor} type="button">
+                  Done
                 </button>
-              </form>
-
-              <div className="invoice-line-list">
-                {selectedInvoice.lines
-                  .slice()
-                  .sort((left, right) => left.sortOrder - right.sortOrder)
-                  .map((line) => (
-                    <div className="invoice-line-item" key={line.id}>
-                      <div>
-                        <strong>{line.description}</strong>
-                        <span>
-                          {line.type} · {line.quantity} x {formatCurrency(line.unitPrice)}
-                        </span>
-                        {line.type === 'ManualAdjustment' ? (
-                          <span>Audit: {formatDateTime(line.createdUtc)}</span>
-                        ) : null}
-                      </div>
-                      <strong>{formatCurrency(line.lineTotal)}</strong>
-                    </div>
-                  ))}
               </div>
-            </>
-          ) : (
-            <div className="empty-state roomy">
-              <strong>Select an invoice to inspect its line items.</strong>
-              <p>The right-hand pane is reserved for line breakdowns and manual adjustments.</p>
             </div>
-          )}
+
+            {selectedInvoice ? (
+              <>
+                <div className="gig-timeline-note">
+                  <p className="detail-label">Adjustments</p>
+                  <span>
+                    Add adjustments as separate line items so the invoice stays clear and easy to follow.
+                  </span>
+                </div>
+
+                <form
+                  className="invoice-adjustment-form"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void onAddAdjustment(selectedInvoice)
+                  }}
+                >
+                  <label>
+                    Amount
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={adjustmentAmount}
+                      onChange={(event) => onAdjustmentAmountChange(event.target.value)}
+                      placeholder="-25.00"
+                      disabled={isInvoiceLoading}
+                    />
+                  </label>
+                  <label>
+                    Reason
+                    <input
+                      value={adjustmentReason}
+                      onChange={(event) => onAdjustmentReasonChange(event.target.value)}
+                      placeholder="Goodwill discount, surcharge, correction..."
+                      disabled={isInvoiceLoading}
+                    />
+                  </label>
+                  <button className="ghost-button" type="submit" disabled={isInvoiceLoading}>
+                    Add adjustment
+                  </button>
+                </form>
+
+                <div className="invoice-line-list">
+                  {selectedInvoice.lines
+                    .slice()
+                    .sort((left, right) => left.sortOrder - right.sortOrder)
+                    .map((line) => (
+                      <div className="invoice-line-item" key={line.id}>
+                        <div>
+                          <strong>{line.description}</strong>
+                          <span>
+                            {line.type} · {line.quantity} x {formatCurrency(line.unitPrice)}
+                          </span>
+                          {line.type === 'ManualAdjustment' ? (
+                            <span>Audit: {formatDateTime(line.createdUtc)}</span>
+                          ) : null}
+                        </div>
+                        <strong>{formatCurrency(line.lineTotal)}</strong>
+                      </div>
+                    ))}
+                </div>
+              </>
+            ) : (
+              <div className="empty-state roomy">
+                <strong>Select an invoice to inspect its line items.</strong>
+                <p>Line items and adjustments will appear here.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>

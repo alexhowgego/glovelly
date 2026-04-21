@@ -260,35 +260,35 @@ internal static class AuthFlowSupport
         return failureCode switch
         {
             "inactive_user" => new UnauthorizedPageCopy(
-                "User Inactive",
-                "Your Glovelly user is currently inactive.",
-                "Authentication succeeded, but this Glovelly user has been disabled and cannot sign in right now.",
-                "Ask an admin to re-enable your user, then try signing in again."),
+                "Account Inactive",
+                "Your account is currently inactive.",
+                "You cannot sign in right now because this account has been turned off.",
+                "Ask an admin to re-enable your access, then try again."),
             "missing_subject" => new UnauthorizedPageCopy(
                 "Sign-In Issue",
-                "Glovelly could not verify this Google identity.",
-                "Google signed you in, but the subject identifier needed to match your Glovelly user was missing from the response.",
-                "If this happens repeatedly, it is likely a configuration issue rather than a permissions issue."),
+                "We could not complete your sign-in.",
+                "Your account could not be matched correctly this time.",
+                "Try again. If this keeps happening, ask an admin for help."),
             "missing_email" => new UnauthorizedPageCopy(
                 "Sign-In Issue",
-                "Google did not provide a usable email address.",
-                "Glovelly can only bootstrap a pre-provisioned account when Google returns an email claim.",
-                "Check the Google account and OpenID scopes, then try signing in again."),
+                "We could not read your email address.",
+                "Glovelly needs an email address to sign you in.",
+                "Check the account you used, then try again."),
             "email_not_verified" => new UnauthorizedPageCopy(
                 "Email Not Verified",
-                "This Google email address is not verified.",
-                "Glovelly only allows first-time enrolment binding when Google indicates the email address is verified.",
-                "Verify the Google account email first, then try again."),
+                "This email address is not verified.",
+                "You need a verified email address before you can sign in.",
+                "Verify the email address on your account, then try again."),
             "sign_in_failed" => new UnauthorizedPageCopy(
                 "Sign-In Issue",
-                "Google sign-in did not complete.",
-                "The authentication flow was interrupted before Glovelly could create an application session.",
-                "Try again first. If it keeps happening, check the Google OIDC configuration and callback settings."),
+                "Sign-in did not complete.",
+                "Something interrupted the sign-in process before it finished.",
+                "Try again. If it keeps happening, ask an admin for help."),
             _ => new UnauthorizedPageCopy(
-                "User Not Authorised",
-                "This Google account is not enrolled for Glovelly access.",
-                "Authentication succeeded, but Glovelly could not find an active local user linked to this Google account.",
-                "Ask an admin to enrol this user in Glovelly, then try signing in again."),
+                "Access Needed",
+                "This account does not currently have access to Glovelly.",
+                "You have signed in successfully, but this account is not set up to use Glovelly yet.",
+                "Ask an admin to grant access, then try again."),
         };
     }
 

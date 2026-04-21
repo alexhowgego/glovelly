@@ -200,6 +200,59 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
+    public async Task DeleteInvoice_WhenDraft_UnlinksAssociatedGigs()
+    {
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "INV-DELETE-LINKED",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-06-02",
+            dueDate = "2026-06-16",
+            status = "Draft",
+            description = "Draft invoice linked to a gig",
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
+
+        var createGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            invoiceId,
+            title = "Invoice deletion unlink test",
+            date = "2026-06-10",
+            venue = "Town Hall",
+            fee = 250.00m,
+            travelMiles = 0m,
+            passengerCount = (int?)null,
+            notes = "Should be unlinked when invoice is deleted",
+            wasDriving = false,
+            status = "Completed",
+            expenses = Array.Empty<object>(),
+            invoicedAt = (string?)null,
+        });
+        createGigResponse.EnsureSuccessStatusCode();
+
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+        Assert.Equal(invoiceId, createdGig.GetProperty("invoiceId").GetGuid());
+        Assert.True(createdGig.GetProperty("isInvoiced").GetBoolean());
+        Assert.Equal(JsonValueKind.String, createdGig.GetProperty("invoicedAt").ValueKind);
+
+        var deleteResponse = await _client.DeleteAsync($"/invoices/{invoiceId}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var gigResponse = await _client.GetAsync($"/gigs/{gigId}");
+        gigResponse.EnsureSuccessStatusCode();
+
+        var gig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(JsonValueKind.Null, gig.GetProperty("invoiceId").ValueKind);
+        Assert.False(gig.GetProperty("isInvoiced").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, gig.GetProperty("invoicedAt").ValueKind);
+    }
+
+    [Fact]
     public async Task DeleteInvoice_WhenNotDraft_ReturnsValidationProblem()
     {
         var response = await _client.DeleteAsync($"/invoices/{TestData.FoxInvoiceId}");
