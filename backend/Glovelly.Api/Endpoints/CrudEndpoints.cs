@@ -26,6 +26,11 @@ public static class CrudEndpoints
             .RequireAuthorization(GlovellyPolicies.GlovellyUser)
             .MapInvoiceLineEndpoints();
 
+        app.MapGroup("/seller-profile")
+            .WithTags("SellerProfile")
+            .RequireAuthorization(GlovellyPolicies.GlovellyUser)
+            .MapSellerProfileEndpoints();
+
         return app;
     }
 }

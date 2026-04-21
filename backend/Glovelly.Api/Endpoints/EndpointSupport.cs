@@ -26,6 +26,11 @@ internal static class EndpointSupport
         return query.Where(line => line.CreatedByUserId == null || line.CreatedByUserId == userId);
     }
 
+    public static IQueryable<SellerProfile> WhereVisibleTo(this IQueryable<SellerProfile> query, Guid? userId)
+    {
+        return query.Where(profile => profile.UserId == userId);
+    }
+
     public static void StampCreate(Client client, Guid? userId)
     {
         client.CreatedByUserId = userId;
@@ -108,6 +113,20 @@ internal static class EndpointSupport
         }
 
         return null;
+    }
+
+    public static void StampCreate(SellerProfile profile, Guid? userId)
+    {
+        profile.CreatedByUserId = userId;
+        profile.UpdatedByUserId = userId;
+        profile.CreatedUtc = DateTimeOffset.UtcNow;
+        profile.UpdatedUtc = profile.CreatedUtc;
+    }
+
+    public static void StampUpdate(SellerProfile profile, Guid? userId)
+    {
+        profile.UpdatedByUserId = userId;
+        profile.UpdatedUtc = DateTimeOffset.UtcNow;
     }
 
     public static IResult? ValidateGigRequest(Gig gig)

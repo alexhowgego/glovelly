@@ -6,6 +6,7 @@ import {
   ClientsSection,
   GigsSection,
   InvoicesSection,
+  SellerProfileModal,
   SessionCheckingScreen,
   SignInScreen,
   UserSettingsModal,
@@ -20,6 +21,7 @@ import {
   emptyClientSettingsForm,
   emptyForm,
   emptyGigForm,
+  emptySellerProfileForm,
   emptyUserSettingsForm,
   fetchWithSession,
   formatCurrency,
@@ -45,6 +47,8 @@ import type {
   GigForm,
   Invoice,
   InvoiceStatus,
+  SellerProfile,
+  SellerProfileForm,
   ThemePreference,
   UserSettingsForm,
 } from './appShared'
@@ -56,6 +60,46 @@ function getCurrentMonthValue() {
 
 function buildMonthlyInvoiceNumber(month: string, sequence: number) {
   return `GLV-${month.replace('-', '')}-${String(sequence).padStart(3, '0')}`
+}
+
+function toSellerProfileForm(profile: SellerProfile): SellerProfileForm {
+  return {
+    sellerName: profile.sellerName ?? '',
+    addressLine1: profile.addressLine1 ?? '',
+    addressLine2: profile.addressLine2 ?? '',
+    city: profile.city ?? '',
+    region: profile.region ?? '',
+    postcode: profile.postcode ?? '',
+    country: profile.country ?? 'United Kingdom',
+    email: profile.email ?? '',
+    phone: profile.phone ?? '',
+    accountName: profile.accountName ?? '',
+    sortCode: profile.sortCode ?? '',
+    accountNumber: profile.accountNumber ?? '',
+    paymentReferenceNote: profile.paymentReferenceNote ?? '',
+  }
+}
+
+function emptySellerProfile(): SellerProfile {
+  return {
+    id: null,
+    sellerName: null,
+    addressLine1: null,
+    addressLine2: null,
+    city: null,
+    region: null,
+    postcode: null,
+    country: 'United Kingdom',
+    email: null,
+    phone: null,
+    accountName: null,
+    sortCode: null,
+    accountNumber: null,
+    paymentReferenceNote: null,
+    isConfigured: false,
+    isInvoiceReady: false,
+    missingFields: ['sellerName', 'addressLine1', 'city', 'country'],
+  }
 }
 
 type AppProps = {
@@ -93,6 +137,14 @@ function App({ appMetadata }: AppProps) {
   const [userSettingsStatus, setUserSettingsStatus] =
     useState('Set the mileage defaults used when a client has no custom rates.')
   const [isUserSettingsSaving, setIsUserSettingsSaving] = useState(false)
+  const [sellerProfile, setSellerProfile] = useState<SellerProfile>(emptySellerProfile)
+  const [sellerProfileForm, setSellerProfileForm] =
+    useState<SellerProfileForm>(emptySellerProfileForm)
+  const [sellerProfileStatus, setSellerProfileStatus] = useState(
+    'Add the seller details that should appear on your invoices.'
+  )
+  const [isSellerProfileOpen, setIsSellerProfileOpen] = useState(false)
+  const [isSellerProfileSaving, setIsSellerProfileSaving] = useState(false)
 
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
@@ -245,6 +297,12 @@ function App({ appMetadata }: AppProps) {
       setUserSettingsStatus(
         'Set the mileage defaults used when a client has no custom rates.'
       )
+      setIsSellerProfileOpen(false)
+      setSellerProfile(emptySellerProfile())
+      setSellerProfileForm(emptySellerProfileForm())
+      setSellerProfileStatus(
+        'Add the seller details that should appear on your invoices.'
+      )
       resetAdminWorkspace()
     }
 
@@ -308,16 +366,18 @@ function App({ appMetadata }: AppProps) {
         setAuthUser(user)
         setIsLoading(true)
 
-        const [clientsResponse, gigsResponse, invoicesResponse] = await Promise.all([
+        const [clientsResponse, gigsResponse, invoicesResponse, sellerProfileResponse] = await Promise.all([
           fetchWithSession(buildApiUrl('/clients')),
           fetchWithSession(buildApiUrl('/gigs')),
           fetchWithSession(buildApiUrl('/invoices')),
+          fetchWithSession(buildApiUrl('/seller-profile')),
         ])
 
         if (
           clientsResponse.status === 401 ||
           gigsResponse.status === 401 ||
-          invoicesResponse.status === 401
+          invoicesResponse.status === 401 ||
+          sellerProfileResponse.status === 401
         ) {
           setIsAuthenticated(false)
           setAuthUser(null)
@@ -339,9 +399,14 @@ function App({ appMetadata }: AppProps) {
           throw new Error('Unable to load invoices.')
         }
 
+        if (!sellerProfileResponse.ok) {
+          throw new Error('Unable to load seller profile.')
+        }
+
         const data = (await clientsResponse.json()) as Client[]
         const gigData = (await gigsResponse.json()) as Gig[]
         const invoiceData = (await invoicesResponse.json()) as Invoice[]
+        const sellerProfileData = (await sellerProfileResponse.json()) as SellerProfile
         if (ignore) {
           return
         }
@@ -352,6 +417,8 @@ function App({ appMetadata }: AppProps) {
         setSelectedGigId(gigData[0]?.id ?? '')
         setInvoices(invoiceData)
         setSelectedInvoiceId(invoiceData[0]?.id ?? '')
+        setSellerProfile(sellerProfileData)
+        setSellerProfileForm(toSellerProfileForm(sellerProfileData))
         setIsApiConnected(true)
         setShouldCloseBrowserNotice(false)
         setStatus(
@@ -630,6 +697,24 @@ function App({ appMetadata }: AppProps) {
   const issuedInvoiceCount = invoices.filter((invoice) => invoice.status === 'Issued').length
   const overdueInvoiceCount = invoices.filter((invoice) => invoice.status === 'Overdue').length
   const outstandingInvoiceCount = issuedInvoiceCount + overdueInvoiceCount
+  const sellerProfileMissingLabels = useMemo(() => {
+    const labels: Record<string, string> = {
+      sellerName: 'seller name',
+      addressLine1: 'address line 1',
+      city: 'city',
+      country: 'country',
+      accountName: 'account name',
+      sortCode: 'sort code',
+      accountNumber: 'account number',
+    }
+
+    return sellerProfile.missingFields.map((field) => labels[field] ?? field)
+  }, [sellerProfile.missingFields])
+  const sellerProfileNotice = sellerProfile.isInvoiceReady
+    ? ' Seller profile is invoice-ready, so PDFs will include your sender and payment details.'
+    : sellerProfile.isConfigured
+      ? ` Seller profile is incomplete. Missing: ${sellerProfileMissingLabels.join(', ')}. You can still generate invoices, but some sender details may be omitted.`
+      : ' Seller profile is not set up yet. You can still generate invoices, but sender and payment details will be missing until you configure them.'
 
   const navigationItems: Array<{
     id: AppSection
@@ -957,6 +1042,11 @@ function App({ appMetadata }: AppProps) {
       setIsInvoiceEditorOpen(false)
       setInvoiceSearchQuery('')
       setInvoiceStatus(defaultInvoiceStatus)
+      setSellerProfile(emptySellerProfile())
+      setSellerProfileForm(emptySellerProfileForm())
+      setSellerProfileStatus(
+        'Add the seller details that should appear on your invoices.'
+      )
       resetAdminWorkspace()
       setShouldCloseBrowserNotice(true)
       setStatus('Signed out successfully.')
@@ -1115,6 +1205,31 @@ function App({ appMetadata }: AppProps) {
     setIsUserSettingsOpen(true)
   }
 
+  const openSellerProfile = () => {
+    setSellerProfileForm(toSellerProfileForm(sellerProfile))
+    setSellerProfileStatus(
+      sellerProfile.isConfigured
+        ? sellerProfileNotice
+        : 'Add the seller details that should appear on your invoices.'
+    )
+    setIsProfileMenuOpen(false)
+    setIsSellerProfileOpen(true)
+  }
+
+  const closeSellerProfile = () => {
+    setIsSellerProfileOpen(false)
+  }
+
+  const updateSellerProfileField = (
+    field: keyof SellerProfileForm,
+    value: string
+  ) => {
+    setSellerProfileForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
   const closeUserSettings = () => {
     setIsUserSettingsOpen(false)
   }
@@ -1215,6 +1330,70 @@ function App({ appMetadata }: AppProps) {
       )
     } finally {
       setIsUserSettingsSaving(false)
+    }
+  }
+
+  const handleSellerProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsSellerProfileSaving(true)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/seller-profile'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sellerName: sellerProfileForm.sellerName.trim() || null,
+          addressLine1: sellerProfileForm.addressLine1.trim() || null,
+          addressLine2: sellerProfileForm.addressLine2.trim() || null,
+          city: sellerProfileForm.city.trim() || null,
+          region: sellerProfileForm.region.trim() || null,
+          postcode: sellerProfileForm.postcode.trim() || null,
+          country: sellerProfileForm.country.trim() || null,
+          email: sellerProfileForm.email.trim() || null,
+          phone: sellerProfileForm.phone.trim() || null,
+          accountName: sellerProfileForm.accountName.trim() || null,
+          sortCode: sellerProfileForm.sortCode.trim() || null,
+          accountNumber: sellerProfileForm.accountNumber.trim() || null,
+          paymentReferenceNote: sellerProfileForm.paymentReferenceNote.trim() || null,
+        }),
+      })
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setIsSellerProfileOpen(false)
+        setStatus('Your session expired. Sign in again to update your seller profile.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to save seller profile.')
+      }
+
+      const savedProfile = (await response.json()) as SellerProfile
+      setSellerProfile(savedProfile)
+      setSellerProfileForm(toSellerProfileForm(savedProfile))
+      setSellerProfileStatus(
+        savedProfile.isInvoiceReady
+          ? 'Seller profile updated and ready for invoice generation.'
+          : `Seller profile saved. Missing: ${savedProfile.missingFields.join(', ')}.`
+      )
+    } catch (error) {
+      setSellerProfileStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save your seller profile right now.'
+      )
+    } finally {
+      setIsSellerProfileSaving(false)
     }
   }
 
@@ -1641,7 +1820,11 @@ function App({ appMetadata }: AppProps) {
         setGigStatus(
           `Invoice ${generatedInvoice.invoiceNumber} generated from ${selectedGigs.length} selected gig(s).`
         )
-        setInvoiceStatus(`Invoice ${generatedInvoice.invoiceNumber} is ready for review.`)
+        setInvoiceStatus(
+          sellerProfile.isInvoiceReady
+            ? `Invoice ${generatedInvoice.invoiceNumber} is ready for review.`
+            : `Invoice ${generatedInvoice.invoiceNumber} is ready for review. ${sellerProfileNotice}`
+        )
         setActiveSection('invoices')
       } catch (error) {
         setGigStatus(error instanceof Error ? error.message : 'Unable to generate invoice.')
@@ -1707,7 +1890,11 @@ function App({ appMetadata }: AppProps) {
         )
       )
       setGigStatus('Invoice generated and linked to this gig.')
-      setInvoiceStatus('New invoice generated from the selected gig.')
+      setInvoiceStatus(
+        sellerProfile.isInvoiceReady
+          ? 'New invoice generated from the selected gig.'
+          : `New invoice generated from the selected gig. ${sellerProfileNotice}`
+      )
       setActiveSection('invoices')
     } catch (error) {
       setGigStatus(error instanceof Error ? error.message : 'Unable to generate invoice.')
@@ -2160,6 +2347,7 @@ function App({ appMetadata }: AppProps) {
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateInvoice={handleGenerateInvoice}
         onOpenLinkedInvoice={openSelectedGigInvoice}
+        onOpenSellerProfile={openSellerProfile}
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
         onSearchQueryChange={setGigSearchQuery}
@@ -2170,6 +2358,8 @@ function App({ appMetadata }: AppProps) {
         onUpdateGigExpenseField={updateGigExpenseField}
         onUpdateGigField={updateGigField}
         plannedGigCount={plannedGigCount}
+        sellerProfile={sellerProfile}
+        sellerProfileNotice={sellerProfileNotice}
         selectedGig={selectedGig}
         selectedGigIds={selectedGigIds}
         selectedGigs={selectedGigs}
@@ -2187,6 +2377,7 @@ function App({ appMetadata }: AppProps) {
         invoices={invoices}
         issuedInvoiceCount={issuedInvoiceCount}
         isInvoiceLoading={isInvoiceLoading}
+        isSellerProfileConfigured={sellerProfile.isConfigured}
         onAdjustmentAmountChange={setAdjustmentAmount}
         onAdjustmentReasonChange={setAdjustmentReason}
         onAddAdjustment={handleAddInvoiceAdjustment}
@@ -2194,10 +2385,12 @@ function App({ appMetadata }: AppProps) {
         onDeleteInvoice={handleDeleteInvoice}
         onDownloadPdf={handleDownloadInvoicePdf}
         onInvoiceStatusChange={handleInvoiceStatusChange}
+        onOpenSellerProfile={openSellerProfile}
         onReissue={handleInvoiceReissue}
         onSearchQueryChange={setInvoiceSearchQuery}
         onSelectInvoice={setSelectedInvoiceId}
         onStartEditing={startInvoiceEdit}
+        sellerProfileNotice={sellerProfileNotice}
         selectedInvoice={selectedInvoice}
       />
     )
@@ -2250,6 +2443,15 @@ function App({ appMetadata }: AppProps) {
                     <div className="profile-meta">
                       <span>{isAdmin ? 'Administrator' : 'Standard access'}</span>
                     </div>
+                    <div className="profile-meta">
+                      <span>
+                        {sellerProfile.isInvoiceReady
+                          ? 'Seller profile ready'
+                          : sellerProfile.isConfigured
+                            ? 'Seller profile needs attention'
+                            : 'Seller profile not set up'}
+                      </span>
+                    </div>
                     <label className="theme-field" htmlFor="theme-preference-select">
                       <span>Theme</span>
                       <select
@@ -2264,6 +2466,15 @@ function App({ appMetadata }: AppProps) {
                         <option value="dark">Dark</option>
                       </select>
                     </label>
+                    <button
+                      className="ghost-button profile-settings"
+                      onClick={openSellerProfile}
+                      role="menuitem"
+                      type="button"
+                      disabled={isLoading || isAdminLoading || isSellerProfileSaving}
+                    >
+                      Seller profile
+                    </button>
                     <button
                       className="ghost-button profile-settings"
                       onClick={openUserSettings}
@@ -2353,6 +2564,17 @@ function App({ appMetadata }: AppProps) {
         onSubmit={handleUserSettingsSubmit}
         onUpdateField={updateUserSettingsField}
         status={userSettingsStatus}
+      />
+
+      <SellerProfileModal
+        form={sellerProfileForm}
+        isOpen={isSellerProfileOpen}
+        isSaving={isSellerProfileSaving}
+        onClose={closeSellerProfile}
+        onSubmit={handleSellerProfileSubmit}
+        onUpdateField={updateSellerProfileField}
+        profile={sellerProfile}
+        status={sellerProfileStatus}
       />
 
       <ClientSettingsModal

@@ -330,6 +330,69 @@
   gap: 18px;
 }
 
+.seller-profile-layout {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
+}
+
+.seller-profile-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.seller-profile-section {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 90%, transparent);
+}
+
+.seller-profile-section h3,
+.seller-profile-preview h3 {
+  margin: 4px 0 0;
+  color: var(--heading);
+}
+
+.seller-profile-preview {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 18px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 88%, white 12%), var(--surface-accent));
+  border: 1px solid color-mix(in srgb, var(--surface-border) 90%, transparent);
+}
+
+.seller-profile-preview-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.seller-preview-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--surface-panel);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 88%, transparent);
+}
+
+.seller-preview-card strong {
+  color: var(--heading);
+}
+
+.seller-preview-card span {
+  color: var(--muted-strong);
+}
+
+.seller-profile-empty {
+  margin-bottom: 4px;
+}
+
 .settings-note {
   padding: 14px 16px;
   border-radius: 18px;
@@ -981,6 +1044,7 @@ button:disabled {
   .form-grid,
   .detail-grid,
   .gig-summary-grid,
+  .seller-profile-layout,
   .draft-grid,
   .invoice-adjustment-form,
   .gig-expense-item {

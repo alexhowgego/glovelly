@@ -31,4 +31,10 @@ public sealed class User
     public ICollection<Invoice> InvoicesCreated { get; set; } = new List<Invoice>();
     [JsonIgnore]
     public ICollection<Invoice> InvoicesUpdated { get; set; } = new List<Invoice>();
+    [JsonIgnore]
+    public ICollection<SellerProfile> SellerProfilesCreated { get; set; } = new List<SellerProfile>();
+    [JsonIgnore]
+    public ICollection<SellerProfile> SellerProfilesUpdated { get; set; } = new List<SellerProfile>();
+    [JsonIgnore]
+    public SellerProfile? SellerProfile { get; set; }
 }

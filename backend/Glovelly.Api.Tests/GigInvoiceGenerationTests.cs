@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Glovelly.Api.Tests.Infrastructure;
 using Xunit;
@@ -19,6 +20,20 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
     [Fact]
     public async Task GenerateInvoice_FromGig_CreatesInvoiceLinesPdfAndGigLink()
     {
+        var sellerProfileResponse = await _client.PutAsJsonAsync("/seller-profile", new
+        {
+            sellerName = "Glovelly Music Ltd",
+            addressLine1 = "1 Chapel Street",
+            city = "Manchester",
+            country = "United Kingdom",
+            email = "accounts@glovelly.test",
+            accountName = "Glovelly Music Ltd",
+            sortCode = "12-34-56",
+            accountNumber = "12345678",
+            paymentReferenceNote = "Use the invoice number as your reference.",
+        });
+        sellerProfileResponse.EnsureSuccessStatusCode();
+
         var createGigResponse = await _client.PostAsJsonAsync("/gigs", new
         {
             clientId = TestData.FoxAndFinchId,
@@ -50,6 +65,11 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal("In respect of One-off corporate booking at King's House on 2026-06-20.", invoice.GetProperty("description").GetString());
         Assert.False(string.IsNullOrWhiteSpace(invoice.GetProperty("invoiceNumber").GetString()));
         Assert.False(string.IsNullOrWhiteSpace(invoice.GetProperty("pdfBlob").GetString()));
+        var pdfText = Encoding.ASCII.GetString(
+            Convert.FromBase64String(invoice.GetProperty("pdfBlob").GetString()!));
+        Assert.Contains("From: Glovelly Music Ltd", pdfText);
+        Assert.Contains("Account number: 12345678", pdfText);
+        Assert.Contains("Payment note: Use the invoice number as your reference.", pdfText);
 
         var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
         Assert.Equal(3, lines.Length);
