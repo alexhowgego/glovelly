@@ -12,10 +12,11 @@ internal sealed class TestPolicyEvaluator : IPolicyEvaluator
 {
     public Task<AuthenticateResult> AuthenticateAsync(AuthorizationPolicy policy, HttpContext context)
     {
+        var userId = ResolveUserId(context);
         var claims = new[]
         {
-            new Claim(GlovellyClaimTypes.UserId, TestAuthContext.UserId.ToString()),
-            new Claim(ClaimTypes.NameIdentifier, TestAuthContext.UserId.ToString()),
+            new Claim(GlovellyClaimTypes.UserId, userId.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
             new Claim(ClaimTypes.Name, "Test Admin"),
             new Claim(ClaimTypes.Email, "test-admin@glovelly.local"),
             new Claim(ClaimTypes.Role, UserRole.Admin.ToString()),
@@ -37,5 +38,16 @@ internal sealed class TestPolicyEvaluator : IPolicyEvaluator
         object? resource)
     {
         return Task.FromResult(PolicyAuthorizationResult.Success());
+    }
+
+    private static Guid ResolveUserId(HttpContext context)
+    {
+        if (!context.Request.Headers.TryGetValue("X-Test-UserId", out var values))
+        {
+            return TestAuthContext.UserId;
+        }
+
+        var value = values.FirstOrDefault();
+        return Guid.TryParse(value, out var parsed) ? parsed : TestAuthContext.UserId;
     }
 }
