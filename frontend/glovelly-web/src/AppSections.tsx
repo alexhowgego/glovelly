@@ -632,6 +632,7 @@ type GigsSectionProps = {
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
   onGenerateInvoice: () => void
+  onGenerateMonthlyInvoice: () => void
   onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
@@ -647,6 +648,10 @@ type GigsSectionProps = {
     field: keyof GigForm,
     value: string | boolean | GigExpenseForm[]
   ) => void
+  monthlyInvoiceClientId: string
+  monthlyInvoiceMonth: string
+  onMonthlyInvoiceClientChange: (value: string) => void
+  onMonthlyInvoiceMonthChange: (value: string) => void
   plannedGigCount: number
   selectedGig: Gig | null
 }
@@ -667,6 +672,7 @@ export function GigsSection({
   onExpenseAmountChange,
   onExpenseDescriptionChange,
   onGenerateInvoice,
+  onGenerateMonthlyInvoice,
   onRemoveGigExpense,
   onResetForm,
   onSearchQueryChange,
@@ -675,6 +681,10 @@ export function GigsSection({
   onSubmit,
   onUpdateGigExpenseField,
   onUpdateGigField,
+  monthlyInvoiceClientId,
+  monthlyInvoiceMonth,
+  onMonthlyInvoiceClientChange,
+  onMonthlyInvoiceMonthChange,
   plannedGigCount,
   selectedGig,
 }: GigsSectionProps) {
@@ -778,6 +788,44 @@ export function GigsSection({
                 disabled={!selectedGig}
               >
                 Edit gig
+              </button>
+            </div>
+          </div>
+
+          <div className="gig-timeline-note">
+            <p className="detail-label">Monthly invoice run</p>
+            <div className="invoice-adjustment-form">
+              <label>
+                Client
+                <select
+                  value={monthlyInvoiceClientId}
+                  onChange={(event) => onMonthlyInvoiceClientChange(event.target.value)}
+                  disabled={isInvoiceLoading}
+                >
+                  <option value="">Select client</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Month
+                <input
+                  type="month"
+                  value={monthlyInvoiceMonth}
+                  onChange={(event) => onMonthlyInvoiceMonthChange(event.target.value)}
+                  disabled={isInvoiceLoading}
+                />
+              </label>
+              <button
+                className="primary-button"
+                onClick={onGenerateMonthlyInvoice}
+                type="button"
+                disabled={isInvoiceLoading}
+              >
+                Generate monthly invoice
               </button>
             </div>
           </div>

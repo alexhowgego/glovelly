@@ -11,9 +11,11 @@ public static class GigEndpoints
 {
     public static RouteGroupBuilder MapGigEndpoints(this RouteGroupBuilder group)
     {
-        group.MapGet("/", async (AppDbContext db) =>
+        group.MapGet("/", async (AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var gigs = await db.Gigs
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .Include(gig => gig.Expenses)
                 .OrderBy(gig => gig.Date)
@@ -23,9 +25,11 @@ public static class GigEndpoints
             return Results.Ok(gigs);
         });
 
-        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
+        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .Include(value => value.Expenses)
                 .FirstOrDefaultAsync(gig => gig.Id == id);
@@ -42,6 +46,7 @@ public static class GigEndpoints
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
+                .WhereVisibleTo(userId)
                 .Include(value => value.Client)
                 .Include(value => value.Expenses)
                 .FirstOrDefaultAsync(value => value.Id == id);
@@ -102,6 +107,7 @@ public static class GigEndpoints
             if (gig.InvoiceId.HasValue)
             {
                 var invoice = await db.Invoices
+                    .WhereVisibleTo(userId)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(value => value.Id == gig.InvoiceId.Value);
 
@@ -149,6 +155,7 @@ public static class GigEndpoints
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
+                .WhereVisibleTo(userId)
                 .Include(value => value.Expenses)
                 .FirstOrDefaultAsync(value => value.Id == id);
 
@@ -176,6 +183,7 @@ public static class GigEndpoints
             if (request.InvoiceId.HasValue)
             {
                 var invoice = await db.Invoices
+                    .WhereVisibleTo(userId)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(value => value.Id == request.InvoiceId.Value);
 
@@ -255,9 +263,16 @@ public static class GigEndpoints
             return Results.Ok(gig);
         });
 
-        group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db, IInvoiceWorkflowService invoiceWorkflowService) =>
+        group.MapDelete("/{id:guid}", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceWorkflowService invoiceWorkflowService) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
+                .WhereVisibleTo(userId)
                 .Include(value => value.Expenses)
                 .FirstOrDefaultAsync(gig => gig.Id == id);
             if (gig is null)

@@ -11,9 +11,11 @@ public static class InvoiceEndpoints
 {
     public static RouteGroupBuilder MapInvoiceEndpoints(this RouteGroupBuilder group)
     {
-        group.MapGet("/", async (AppDbContext db) =>
+        group.MapGet("/", async (AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var invoices = await db.Invoices
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .Include(invoice => invoice.Lines)
                 .OrderByDescending(invoice => invoice.InvoiceDate)
@@ -23,9 +25,11 @@ public static class InvoiceEndpoints
             return Results.Ok(invoices);
         });
 
-        group.MapGet("/{id:guid}/pdf", async (Guid id, AppDbContext db) =>
+        group.MapGet("/{id:guid}/pdf", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(value => value.Id == id);
 
@@ -42,9 +46,11 @@ public static class InvoiceEndpoints
             return Results.File(invoice.PdfBlob, "application/pdf", $"{invoice.InvoiceNumber}.pdf");
         });
 
-        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
+        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
@@ -82,6 +88,7 @@ public static class InvoiceEndpoints
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
 
@@ -150,7 +157,9 @@ public static class InvoiceEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
             if (invoice is null)
@@ -186,6 +195,7 @@ public static class InvoiceEndpoints
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
 
@@ -228,7 +238,9 @@ public static class InvoiceEndpoints
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceWorkflowService invoiceWorkflowService) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
             if (invoice is null)
@@ -253,7 +265,6 @@ public static class InvoiceEndpoints
                 });
             }
 
-            var userId = currentUserAccessor.TryGetUserId(user);
             _ = await invoiceWorkflowService.CreateManualAdjustmentAsync(invoice, request.Amount, reason, userId);
             await db.SaveChangesAsync();
 
@@ -268,7 +279,10 @@ public static class InvoiceEndpoints
             ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
-            var invoice = await db.Invoices.FirstOrDefaultAsync(invoice => invoice.Id == id);
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
+                .FirstOrDefaultAsync(invoice => invoice.Id == id);
             if (invoice is null)
             {
                 return Results.NotFound();
@@ -282,7 +296,6 @@ public static class InvoiceEndpoints
                 });
             }
 
-            var userId = currentUserAccessor.TryGetUserId(user);
             var deletedAtUtc = DateTimeOffset.UtcNow;
             logger.LogInformation(
                 "Invoice {InvoiceId} ({InvoiceNumber}) deleted by user {UserId} at {DeletedAtUtc}.",
