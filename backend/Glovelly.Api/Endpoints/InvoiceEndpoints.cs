@@ -260,13 +260,35 @@ public static class InvoiceEndpoints
             return Results.Ok(invoice);
         });
 
-        group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
+        group.MapDelete("/{id:guid}", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            ILogger<InvoiceEndpoints> logger) =>
         {
             var invoice = await db.Invoices.FirstOrDefaultAsync(invoice => invoice.Id == id);
             if (invoice is null)
             {
                 return Results.NotFound();
             }
+
+            if (invoice.Status is not InvoiceStatus.Draft)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["status"] = [$"Only Draft invoices can be deleted. {invoice.Status} invoices must be retained for reporting."]
+                });
+            }
+
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var deletedAtUtc = DateTimeOffset.UtcNow;
+            logger.LogInformation(
+                "Invoice {InvoiceId} ({InvoiceNumber}) deleted by user {UserId} at {DeletedAtUtc}.",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                userId,
+                deletedAtUtc);
 
             db.Invoices.Remove(invoice);
             await db.SaveChangesAsync();

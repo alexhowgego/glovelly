@@ -1633,6 +1633,47 @@ function App() {
     }
   }
 
+  const handleDeleteInvoice = async (invoice: Invoice) => {
+    if (invoice.status !== 'Draft') {
+      setInvoiceStatus(
+        `Only Draft invoices can be deleted. ${invoice.invoiceNumber} is currently ${invoice.status}.`
+      )
+      return
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete ${invoice.invoiceNumber}? This cannot be undone and should only be used for draft mistakes.`
+    )
+    if (!shouldDelete) {
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Deleting ${invoice.invoiceNumber}...`)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}`), {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const statusError = problem?.errors?.status?.[0]
+        throw new Error(
+          statusError ?? problem?.detail ?? problem?.title ?? 'Unable to delete invoice.'
+        )
+      }
+
+      setInvoices((current) => current.filter((value) => value.id !== invoice.id))
+      setSelectedInvoiceId((current) => (current === invoice.id ? '' : current))
+      setInvoiceStatus(`Invoice ${invoice.invoiceNumber} deleted.`)
+    } catch (error) {
+      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to delete invoice.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
   if (isCheckingSession) {
     return <SessionCheckingScreen status={status} />
   }
@@ -1728,6 +1769,7 @@ function App() {
         onAdjustmentAmountChange={setAdjustmentAmount}
         onAdjustmentReasonChange={setAdjustmentReason}
         onAddAdjustment={handleAddInvoiceAdjustment}
+        onDeleteInvoice={handleDeleteInvoice}
         onDownloadPdf={handleDownloadInvoicePdf}
         onInvoiceStatusChange={handleInvoiceStatusChange}
         onReissue={handleInvoiceReissue}
