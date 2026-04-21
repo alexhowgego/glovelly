@@ -86,12 +86,19 @@ export function SignInScreen({
 }
 
 type ClientsSectionProps = {
+  clients: Client[]
   filteredClients: Client[]
   form: ClientForm
   isApiConnected: boolean
+  isInvoiceLoading: boolean
   isLoading: boolean
+  monthlyInvoiceClientId: string
+  monthlyInvoiceMonth: string
   mode: 'create' | 'edit'
   onDelete: () => void
+  onGenerateMonthlyInvoice: () => void
+  onMonthlyInvoiceClientChange: (value: string) => void
+  onMonthlyInvoiceMonthChange: (value: string) => void
   onOpenClientSettings: () => void
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
@@ -106,12 +113,19 @@ type ClientsSectionProps = {
 }
 
 export function ClientsSection({
+  clients,
   filteredClients,
   form,
   isApiConnected,
+  isInvoiceLoading,
   isLoading,
+  monthlyInvoiceClientId,
+  monthlyInvoiceMonth,
   mode,
   onDelete,
+  onGenerateMonthlyInvoice,
+  onMonthlyInvoiceClientChange,
+  onMonthlyInvoiceMonthChange,
   onOpenClientSettings,
   onResetForm,
   onSearchQueryChange,
@@ -218,33 +232,77 @@ export function ClientsSection({
           </div>
 
           {selectedClient ? (
-            <div className="detail-grid">
-              <article>
-                <p className="detail-label">Primary email</p>
-                <strong>{selectedClient.email}</strong>
-              </article>
-              <article>
-                <p className="detail-label">Billing city</p>
-                <strong>{selectedClient.billingAddress.city}</strong>
-              </article>
-              <article className="full-width">
-                <p className="detail-label">Billing address</p>
-                <strong>{selectedClient.billingAddress.line1}</strong>
-                {selectedClient.billingAddress.line2 && (
-                  <span>{selectedClient.billingAddress.line2}</span>
-                )}
-                <span>
-                  {selectedClient.billingAddress.city}
-                  {selectedClient.billingAddress.stateOrCounty
-                    ? `, ${selectedClient.billingAddress.stateOrCounty}`
-                    : ''}
-                </span>
-                <span>
-                  {selectedClient.billingAddress.postalCode},{' '}
-                  {selectedClient.billingAddress.country}
-                </span>
-              </article>
-            </div>
+            <>
+              <div className="gig-timeline-note">
+                <p className="detail-label">Monthly invoice run</p>
+                <div className="invoice-adjustment-form">
+                  <label>
+                    Client
+                    <select
+                      value={monthlyInvoiceClientId}
+                      onChange={(event) =>
+                        onMonthlyInvoiceClientChange(event.target.value)
+                      }
+                      disabled={isInvoiceLoading}
+                    >
+                      <option value="">Select client</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Month
+                    <input
+                      type="month"
+                      value={monthlyInvoiceMonth}
+                      onChange={(event) =>
+                        onMonthlyInvoiceMonthChange(event.target.value)
+                      }
+                      disabled={isInvoiceLoading}
+                    />
+                  </label>
+                  <button
+                    className="primary-button"
+                    onClick={onGenerateMonthlyInvoice}
+                    type="button"
+                    disabled={isInvoiceLoading}
+                  >
+                    Generate monthly invoice
+                  </button>
+                </div>
+              </div>
+
+              <div className="detail-grid">
+                <article>
+                  <p className="detail-label">Primary email</p>
+                  <strong>{selectedClient.email}</strong>
+                </article>
+                <article>
+                  <p className="detail-label">Billing city</p>
+                  <strong>{selectedClient.billingAddress.city}</strong>
+                </article>
+                <article className="full-width">
+                  <p className="detail-label">Billing address</p>
+                  <strong>{selectedClient.billingAddress.line1}</strong>
+                  {selectedClient.billingAddress.line2 && (
+                    <span>{selectedClient.billingAddress.line2}</span>
+                  )}
+                  <span>
+                    {selectedClient.billingAddress.city}
+                    {selectedClient.billingAddress.stateOrCounty
+                      ? `, ${selectedClient.billingAddress.stateOrCounty}`
+                      : ''}
+                  </span>
+                  <span>
+                    {selectedClient.billingAddress.postalCode},{' '}
+                    {selectedClient.billingAddress.country}
+                  </span>
+                </article>
+              </div>
+            </>
           ) : (
             <div className="empty-state roomy">
               <strong>Select a client to see billing details.</strong>
@@ -632,7 +690,6 @@ type GigsSectionProps = {
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
   onGenerateInvoice: () => void
-  onGenerateMonthlyInvoice: () => void
   onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
@@ -648,10 +705,6 @@ type GigsSectionProps = {
     field: keyof GigForm,
     value: string | boolean | GigExpenseForm[]
   ) => void
-  monthlyInvoiceClientId: string
-  monthlyInvoiceMonth: string
-  onMonthlyInvoiceClientChange: (value: string) => void
-  onMonthlyInvoiceMonthChange: (value: string) => void
   plannedGigCount: number
   selectedGig: Gig | null
 }
@@ -672,7 +725,6 @@ export function GigsSection({
   onExpenseAmountChange,
   onExpenseDescriptionChange,
   onGenerateInvoice,
-  onGenerateMonthlyInvoice,
   onRemoveGigExpense,
   onResetForm,
   onSearchQueryChange,
@@ -681,10 +733,6 @@ export function GigsSection({
   onSubmit,
   onUpdateGigExpenseField,
   onUpdateGigField,
-  monthlyInvoiceClientId,
-  monthlyInvoiceMonth,
-  onMonthlyInvoiceClientChange,
-  onMonthlyInvoiceMonthChange,
   plannedGigCount,
   selectedGig,
 }: GigsSectionProps) {
@@ -788,44 +836,6 @@ export function GigsSection({
                 disabled={!selectedGig}
               >
                 Edit gig
-              </button>
-            </div>
-          </div>
-
-          <div className="gig-timeline-note">
-            <p className="detail-label">Monthly invoice run</p>
-            <div className="invoice-adjustment-form">
-              <label>
-                Client
-                <select
-                  value={monthlyInvoiceClientId}
-                  onChange={(event) => onMonthlyInvoiceClientChange(event.target.value)}
-                  disabled={isInvoiceLoading}
-                >
-                  <option value="">Select client</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Month
-                <input
-                  type="month"
-                  value={monthlyInvoiceMonth}
-                  onChange={(event) => onMonthlyInvoiceMonthChange(event.target.value)}
-                  disabled={isInvoiceLoading}
-                />
-              </label>
-              <button
-                className="primary-button"
-                onClick={onGenerateMonthlyInvoice}
-                type="button"
-                disabled={isInvoiceLoading}
-              >
-                Generate monthly invoice
               </button>
             </div>
           </div>
