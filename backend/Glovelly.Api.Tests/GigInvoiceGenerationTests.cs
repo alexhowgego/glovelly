@@ -196,7 +196,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 
         var riversideGigResponse = await _client.PostAsJsonAsync("/gigs", new
         {
-            clientId = TestData.RiversideCateringId,
+            clientId = TestData.RiversideId,
             title = "Riverside gig",
             date = "2026-06-02",
             venue = "Venue B",
