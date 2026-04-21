@@ -578,14 +578,16 @@ function App({ appMetadata }: AppProps) {
     setMonthlyInvoiceClientId(clients[0]?.id ?? '')
   }, [clients, monthlyInvoiceClientId])
 
-  const activeCities = new Set(clients.map((client) => client.billingAddress.city)).size
   const activeUsersCount = adminUsers.filter((user) => user.isActive).length
   const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
   const plannedGigCount = gigs.filter((gig) => gig.status === 'Confirmed').length
   const completedGigCount = gigs.filter((gig) => gig.status === 'Completed').length
   const upcomingGigCount = gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length
+  const uninvoicedGigCount = gigs.filter((gig) => !gig.isInvoiced && gig.status !== 'Cancelled').length
   const draftInvoiceCount = invoices.filter((invoice) => invoice.status === 'Draft').length
   const issuedInvoiceCount = invoices.filter((invoice) => invoice.status === 'Issued').length
+  const overdueInvoiceCount = invoices.filter((invoice) => invoice.status === 'Overdue').length
+  const outstandingInvoiceCount = issuedInvoiceCount + overdueInvoiceCount
 
   const navigationItems: Array<{
     id: AppSection
@@ -600,16 +602,6 @@ function App({ appMetadata }: AppProps) {
       eyebrow: 'Live',
       description: 'Booking contacts, billing details and client records.',
     },
-    ...(isAdmin
-      ? [
-          {
-            id: 'admin' as const,
-            label: 'Admin',
-            eyebrow: 'Restricted',
-            description: 'Manage access, roles and account status.',
-          },
-        ]
-      : []),
     {
       id: 'gigs',
       label: 'Gigs',
@@ -622,25 +614,37 @@ function App({ appMetadata }: AppProps) {
       eyebrow: 'Generated',
       description: 'One-off invoices, line items and downloadable PDFs.',
     },
+    ...(isAdmin
+      ? [
+          {
+            id: 'admin' as const,
+            label: 'Admin',
+            eyebrow: 'Restricted',
+            description: 'Manage access, roles and account status.',
+          },
+        ]
+      : []),
   ]
 
   const currentSection = navigationItems.find((item) => item.id === activeSection)
-  const secondaryMetricValue =
-    activeSection === 'admin'
-      ? activeUsersCount
-      : activeSection === 'gigs'
-        ? upcomingGigCount
-        : activeSection === 'invoices'
-          ? draftInvoiceCount
-        : activeCities
-  const secondaryMetricLabel =
-    activeSection === 'admin'
-      ? 'active accounts'
-      : activeSection === 'gigs'
-        ? 'upcoming gigs'
-        : activeSection === 'invoices'
-          ? 'draft invoices'
-        : 'active cities'
+  const headerMetrics = [
+    {
+      value: upcomingGigCount,
+      label: 'upcoming gigs',
+    },
+    {
+      value: uninvoicedGigCount,
+      label: 'uninvoiced gigs',
+    },
+    {
+      value: outstandingInvoiceCount,
+      label: 'outstanding invoices',
+    },
+    {
+      value: draftInvoiceCount,
+      label: 'draft invoices',
+    },
+  ]
 
   const startCreating = () => {
     setMode('create')
@@ -2148,52 +2152,15 @@ function App({ appMetadata }: AppProps) {
   return (
     <main className="app-shell">
       <section className="hero-panel app-frame">
-        <aside className="nav-panel">
-          <div className="nav-intro">
-            <p className="eyebrow">Workspace</p>
-            <h1>Your work, all in one place.</h1>
-            <p className="hero-text">
-              Move between clients, gigs, invoices and admin tools with everything easy to find.
-            </p>
-          </div>
-
-          <nav className="nav-menu" aria-label="Primary">
-            {navigationItems.map((item) => (
-              <button
-                key={item.id}
-                className={`nav-item ${activeSection === item.id ? 'selected' : ''}`}
-                onClick={() => setActiveSection(item.id)}
-                type="button"
-                disabled={item.disabled}
-              >
-                <span className="nav-meta">{item.eyebrow}</span>
-                <strong>{item.label}</strong>
-                <span>{item.description}</span>
-              </button>
-            ))}
-          </nav>
-
-          <div className="hero-mascot">
-            <img
-              src="/gordon-192.png"
-              alt="Gordon the Glovelly mascot"
-              decoding="async"
-              loading="lazy"
-            />
-            <div>
-              <p className="section-label">Meet Gordon</p>
-              <strong>Mozart wig. Rubber chicken. Unreasonably good taste in admin.</strong>
-            </div>
-          </div>
-        </aside>
-
         <div className="content-shell">
           <div className="content-header panel">
             <div className="content-header-top">
               <div className="content-header-copy">
-                <p className="eyebrow">{currentSection?.eyebrow ?? 'Workspace'}</p>
-                <h2>{currentSection?.label ?? 'Glovelly'}</h2>
-                <p className="hero-text">{currentSection?.description}</p>
+                <p className="eyebrow">Workspace</p>
+                <h1>Your work, all in one place.</h1>
+                <p className="hero-text">
+                  Move between clients, gigs, invoices and admin tools with everything easy to find.
+                </p>
               </div>
 
               <div className="profile-menu" ref={profileMenuRef}>
@@ -2267,20 +2234,51 @@ function App({ appMetadata }: AppProps) {
               </div>
             </div>
 
+            <div className="content-header-body">
+              <div className="content-header-copy">
+                <p className="eyebrow">{currentSection?.eyebrow ?? 'Workspace'}</p>
+                <h2>{currentSection?.label ?? 'Glovelly'}</h2>
+                <p className="hero-text">{currentSection?.description}</p>
+              </div>
+
+              <div className="hero-mascot header-mascot">
+                <img
+                  src="/gordon-192.png"
+                  alt="Gordon the Glovelly mascot"
+                  decoding="async"
+                  loading="lazy"
+                />
+                <div>
+                  <p className="section-label">Meet Gordon</p>
+                  <strong>Mozart wig. Rubber chicken. Unreasonably good taste in admin.</strong>
+                </div>
+              </div>
+            </div>
+
+            <nav className="charm-bar" aria-label="Primary">
+              {navigationItems.map((item) => (
+                <button
+                  key={item.id}
+                  className={`charm-item ${activeSection === item.id ? 'selected' : ''}`}
+                  onClick={() => setActiveSection(item.id)}
+                  type="button"
+                  disabled={item.disabled}
+                >
+                  <span className="charm-meta">{item.eyebrow}</span>
+                  <strong>{item.label}</strong>
+                  <span>{item.description}</span>
+                </button>
+              ))}
+            </nav>
+
             <div className="content-header-aside">
               <div className="hero-metrics">
-                <article>
-                  <span>{clients.length}</span>
-                  <p>clients on file</p>
-                </article>
-                <article>
-                  <span>{secondaryMetricValue}</span>
-                  <p>{secondaryMetricLabel}</p>
-                </article>
-                <article>
-                  <span>{isApiConnected ? 'Live' : 'Offline'}</span>
-                  <p>{activeSection === 'gigs' ? 'section status' : 'connection'}</p>
-                </article>
+                {headerMetrics.map((metric) => (
+                  <article key={metric.label}>
+                    <span>{metric.value}</span>
+                    <p>{metric.label}</p>
+                  </article>
+                ))}
               </div>
             </div>
           </div>
