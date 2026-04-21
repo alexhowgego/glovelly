@@ -5,6 +5,18 @@
   gap: 24px;
 }
 
+.build-meta {
+  margin: 0;
+  justify-self: end;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-panel) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 92%, transparent);
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
 .section-layout {
   display: grid;
   gap: 24px;

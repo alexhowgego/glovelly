@@ -23,7 +23,12 @@ COPY --from=frontend-build /src/frontend/glovelly-web/dist/ /app/publish/wwwroot
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
+ARG BUILD_COMMIT_ID=unknown
+ARG BUILD_TIMESTAMP=unknown
+
 ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+ENV App__BuildCommitId=${BUILD_COMMIT_ID}
+ENV App__BuildTimestamp=${BUILD_TIMESTAMP}
 EXPOSE 8080
 
 COPY --from=backend-build /app/publish ./

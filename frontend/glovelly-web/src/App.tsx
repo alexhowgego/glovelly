@@ -23,6 +23,7 @@ import {
   emptyUserSettingsForm,
   fetchWithSession,
   formatCurrency,
+  formatBuildMetadata,
   formatDateTime,
   getStoredThemePreference,
   parseProblemDetails,
@@ -33,6 +34,7 @@ import type {
   Address,
   AdminUser,
   AdminUserForm,
+  AppMetadata,
   AppSection,
   AuthUser,
   Client,
@@ -56,7 +58,11 @@ function buildMonthlyInvoiceNumber(month: string, sequence: number) {
   return `GLV-${month.replace('-', '')}-${String(sequence).padStart(3, '0')}`
 }
 
-function App() {
+type AppProps = {
+  appMetadata: AppMetadata
+}
+
+function App({ appMetadata }: AppProps) {
   const [activeSection, setActiveSection] = useState<AppSection>('clients')
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>('')
@@ -1936,12 +1942,13 @@ function App() {
   }
 
   if (isCheckingSession) {
-    return <SessionCheckingScreen status={status} />
+    return <SessionCheckingScreen appMetadata={appMetadata} status={status} />
   }
 
   if (!isAuthenticated) {
     return (
       <SignInScreen
+        appMetadata={appMetadata}
         onSignIn={signIn}
         shouldCloseBrowserNotice={shouldCloseBrowserNotice}
         status={status}
@@ -2194,6 +2201,11 @@ function App() {
           {currentSectionContent}
         </div>
       </section>
+
+      <p className="build-meta">
+        {appMetadata.deploymentName ? `${appMetadata.deploymentName} • ` : ''}
+        {formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}
+      </p>
 
       <UserSettingsModal
         form={userSettingsForm}

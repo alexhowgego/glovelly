@@ -142,6 +142,12 @@ export type GigForm = {
 
 export type AppSection = 'clients' | 'admin' | 'gigs' | 'invoices'
 export type ThemePreference = 'system' | 'light' | 'dark'
+export type AppMetadata = {
+  title: string
+  deploymentName: string | null
+  commitId: string | null
+  buildTimestamp: string | null
+}
 
 export const themeStorageKey = 'glovelly.theme-preference'
 
@@ -204,6 +210,34 @@ export function buildReturnUrl() {
   return window.location.href
 }
 
+export async function loadAppMetadata(): Promise<AppMetadata> {
+  try {
+    const response = await fetch(buildApiUrl('/app/metadata'), {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    })
+
+    if (!response.ok) {
+      throw new Error('Unable to load app metadata.')
+    }
+
+    const metadata = (await response.json()) as Partial<AppMetadata>
+    return {
+      title: metadata.title?.trim() || 'Glovelly',
+      deploymentName: metadata.deploymentName?.trim() || null,
+      commitId: metadata.commitId?.trim() || null,
+      buildTimestamp: metadata.buildTimestamp?.trim() || null,
+    }
+  } catch {
+    return {
+      title: 'Glovelly',
+      deploymentName: null,
+      commitId: null,
+      buildTimestamp: null,
+    }
+  }
+}
+
 export async function fetchWithSession(input: string, init?: RequestInit) {
   return fetch(input, {
     ...init,
@@ -243,6 +277,28 @@ export function formatDateTime(value: string | null) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+export function formatCommitId(value: string | null) {
+  if (!value) {
+    return 'Unknown commit'
+  }
+
+  return value.slice(0, 7)
+}
+
+export function formatBuildMetadata(commitId: string | null, buildTimestamp: string | null) {
+  const parts: string[] = []
+
+  if (commitId) {
+    parts.push(`Build ${formatCommitId(commitId)}`)
+  }
+
+  if (buildTimestamp) {
+    parts.push(formatDateTime(buildTimestamp))
+  }
+
+  return parts.length > 0 ? parts.join(' • ') : 'Build details unavailable'
 }
 
 export function formatRate(value: number | null) {

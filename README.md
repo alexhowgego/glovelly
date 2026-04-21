@@ -115,9 +115,11 @@ GitHub Actions runs the `Build and Push Container` workflow on pushes to `main`,
 
 The workflow:
 - Builds the React frontend and ASP.NET Core backend into a single Docker image
-- Pushes the image to Google Artifact Registry on non-PR runs
+- Pushes the image to Google Artifact Registry for main and internal pull request runs
 - Tags images with `latest` on the default branch and with a commit SHA tag for each build
 - Injects Google Secret Manager secrets into Cloud Run, including `Authentication__Google__ClientId`, `Authentication__Google__ClientSecret`, and `ConnectionStrings__Glovelly`
+- Deploys `main` to the `glovelly` Cloud Run service
+- Deploys each internal pull request to the shared `glovelly-staging` Cloud Run service and comments the preview URL on the PR
 
 The image is published to `europe-west1-docker.pkg.dev/glovelly-dev/glovelly/glovelly`.
 
