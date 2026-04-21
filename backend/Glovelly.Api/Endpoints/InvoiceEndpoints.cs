@@ -265,8 +265,9 @@ public static class InvoiceEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
-            ILogger<InvoiceEndpoints> logger) =>
+            ILoggerFactory loggerFactory) =>
         {
+            var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
             var invoice = await db.Invoices.FirstOrDefaultAsync(invoice => invoice.Id == id);
             if (invoice is null)
             {
