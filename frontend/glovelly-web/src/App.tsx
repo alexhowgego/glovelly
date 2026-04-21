@@ -271,8 +271,8 @@ function App({ appMetadata }: AppProps) {
       setSelectedAdminUserId((current) => current || users[0]?.id || '')
       setAdminStatus(
         users.length > 0
-          ? 'Manage who can sign in to Glovelly.'
-          : 'No users enrolled yet. Add the first account below.'
+          ? 'Manage access, roles and account status.'
+          : 'No users added yet. Add the first one below.'
       )
     }
 
@@ -291,7 +291,7 @@ function App({ appMetadata }: AppProps) {
           setIsApiConnected(false)
           resetSignedInState()
           setShouldCloseBrowserNotice(false)
-          setStatus('Sign in with Google to access Glovelly.')
+          setStatus('Sign in to access Glovelly.')
           return
         }
 
@@ -386,7 +386,7 @@ function App({ appMetadata }: AppProps) {
             setAdminUsers([])
             setSelectedAdminUserId('')
             setShouldCloseBrowserNotice(false)
-            setStatus('API unavailable. Start the backend to finish sign-in.')
+            setStatus('We could not load your workspace right now. Please try again.')
           }
         }
       } finally {
@@ -606,7 +606,7 @@ function App({ appMetadata }: AppProps) {
             id: 'admin' as const,
             label: 'Admin',
             eyebrow: 'Restricted',
-            description: 'User enrolment, roles and sign-in access.',
+            description: 'Manage access, roles and account status.',
           },
         ]
       : []),
@@ -913,7 +913,7 @@ function App({ appMetadata }: AppProps) {
       setInvoiceStatus(defaultInvoiceStatus)
       resetAdminWorkspace()
       setShouldCloseBrowserNotice(true)
-      setStatus('Signed out. Close your browser to fully end the Google session.')
+      setStatus('Signed out successfully.')
     } catch {
       setStatus('Unable to sign out right now.')
     } finally {
@@ -1262,7 +1262,7 @@ function App({ appMetadata }: AppProps) {
       setStatus(isEdit ? 'Client updated.' : 'Client created.')
       setIsClientEditorOpen(false)
     } catch {
-      setStatus('Unable to save right now. Check that the API is running.')
+      setStatus('Unable to save right now. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -1328,7 +1328,7 @@ function App({ appMetadata }: AppProps) {
     }
 
     if (!payload.email) {
-      setAdminStatus('Email is required for enrolment.')
+      setAdminStatus('Email is required.')
       return
     }
 
@@ -1352,12 +1352,12 @@ function App({ appMetadata }: AppProps) {
         setIsAuthenticated(false)
         setAuthUser(null)
         setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing enrolments.')
+        setStatus('Your session expired. Sign in again to keep managing access.')
         return
       }
 
       if (response.status === 403) {
-        setAdminStatus('Administrator access is required to manage enrolments.')
+        setAdminStatus('Administrator access is required to manage users.')
         return
       }
 
@@ -1382,11 +1382,11 @@ function App({ appMetadata }: AppProps) {
 
       setSelectedAdminUserId(savedUser.id)
       setAdminMode('edit')
-      setAdminStatus(isEdit ? 'User enrolment updated.' : 'User enrolled.')
+      setAdminStatus(isEdit ? 'User updated.' : 'User added.')
       setIsAdminEditorOpen(false)
     } catch (error) {
       setAdminStatus(
-        error instanceof Error ? error.message : 'Unable to save enrolment right now.'
+        error instanceof Error ? error.message : 'Unable to save right now.'
       )
     } finally {
       setIsAdminLoading(false)
@@ -2151,10 +2151,9 @@ function App({ appMetadata }: AppProps) {
         <aside className="nav-panel">
           <div className="nav-intro">
             <p className="eyebrow">Workspace</p>
-            <h1>Glovelly keeps each area in its own lane.</h1>
+            <h1>Your work, all in one place.</h1>
             <p className="hero-text">
-              Move between client records, admin access and the next planned gigs
-              workspace without stacking everything into one screen.
+              Move between clients, gigs, invoices and admin tools with everything easy to find.
             </p>
           </div>
 
@@ -2280,7 +2279,7 @@ function App({ appMetadata }: AppProps) {
                 </article>
                 <article>
                   <span>{isApiConnected ? 'Live' : 'Offline'}</span>
-                  <p>{activeSection === 'gigs' ? 'workspace status' : 'data source'}</p>
+                  <p>{activeSection === 'gigs' ? 'section status' : 'connection'}</p>
                 </article>
               </div>
             </div>

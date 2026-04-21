@@ -38,10 +38,8 @@ export function SessionCheckingScreen({
       <section className="hero-panel auth-panel">
         <div className="hero-copy">
           <p className="eyebrow">Security</p>
-          <h1>Checking your Google session.</h1>
-          <p className="hero-text">
-            Glovelly now protects client and invoice data behind OpenID Connect.
-          </p>
+          <h1>Checking your sign-in.</h1>
+          <p className="hero-text">Just a moment while we open your workspace.</p>
         </div>
         <span className="status-pill">{status}</span>
       </section>
@@ -68,10 +66,9 @@ export function SignInScreen({
       <section className="hero-panel auth-panel">
         <div className="hero-copy">
           <p className="eyebrow">Secure Sign-In</p>
-          <h1>Glovelly now uses Google to verify who’s allowed in.</h1>
+          <h1>Sign in to open Glovelly.</h1>
           <p className="hero-text">
-            Sign in with the Google account attached to your deployment so the API
-            can issue a secure app session before any business data is loaded.
+            Use your usual account to access clients, gigs and invoices.
           </p>
         </div>
 
@@ -79,8 +76,8 @@ export function SignInScreen({
           <span className="status-pill">{status}</span>
           {shouldCloseBrowserNotice && (
             <p className="auth-note">
-              The Glovelly session cookie has been cleared. Close your browser if you
-              want to fully end the Google sign-in session too.
+              You have been signed out of Glovelly. Close your browser too if you are
+              using a shared device.
             </p>
           )}
           <button className="primary-button" onClick={onSignIn} type="button">
@@ -202,7 +199,7 @@ export function ClientsSection({
                 <p>
                   {isApiConnected
                     ? 'Try a different term or add a fresh client profile.'
-                    : 'Start the backend and refresh this page to complete sign-in.'}
+                    : 'We could not load client details right now. Refresh and try again.'}
                 </p>
               </div>
             )}
@@ -318,7 +315,7 @@ export function ClientsSection({
           ) : (
             <div className="empty-state roomy">
               <strong>Select a client to see billing details.</strong>
-              <p>The right-hand panel is set up for a fuller CRM-style summary later on.</p>
+              <p>Billing details and contact information will appear here.</p>
             </div>
           )}
         </div>
@@ -479,17 +476,16 @@ export function AdminSection({
       <div className="admin-banner panel">
         <div>
           <p className="section-label">Administrator Area</p>
-          <h2>User enrolment</h2>
+          <h2>User access</h2>
           <p className="hero-text">
-            Control which Google accounts can access Glovelly, whether they are
-            active, and whether they should see this administrator workspace.
+            Manage who can sign in, which role they have, and whether their account is active.
           </p>
         </div>
 
         <div className="hero-metrics admin-metrics">
           <article>
             <span>{adminUsers.length}</span>
-            <p>enrolled users</p>
+            <p>users with access</p>
           </article>
           <article>
             <span>{activeUsersCount}</span>
@@ -507,10 +503,10 @@ export function AdminSection({
           <div className="panel-heading">
             <div>
               <p className="section-label">Access Directory</p>
-              <h2>Enrolled users</h2>
+              <h2>People with access</h2>
             </div>
             <button className="ghost-button" onClick={onResetForm} type="button">
-              New enrolment
+              Add user
             </button>
           </div>
 
@@ -545,8 +541,8 @@ export function AdminSection({
 
             {filteredAdminUsers.length === 0 && (
               <div className="empty-state">
-                <strong>No enrolled users match that search.</strong>
-                <p>Try another term or start a fresh enrolment.</p>
+                <strong>No users match that search.</strong>
+                <p>Try another term or add someone new.</p>
               </div>
             )}
           </div>
@@ -555,7 +551,7 @@ export function AdminSection({
         <div className="panel">
           <div className="panel-heading">
             <div>
-              <p className="section-label">Enrolment Overview</p>
+              <p className="section-label">Access Overview</p>
               <h2>
                 {selectedAdminUser?.displayName ||
                   selectedAdminUser?.email ||
@@ -569,7 +565,7 @@ export function AdminSection({
                 type="button"
                 disabled={!selectedAdminUser}
               >
-                Edit enrolment
+                Edit access
               </button>
             </div>
           </div>
@@ -585,17 +581,15 @@ export function AdminSection({
                 <strong>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</strong>
               </article>
               <article>
-                <p className="detail-label">Enrolment</p>
+                <p className="detail-label">Sign-in status</p>
                 <strong>
-                  {selectedAdminUser.isEnrolled
-                    ? 'Bound to Google subject'
-                    : 'Invited by email'}
+                  {selectedAdminUser.isEnrolled ? 'Ready to sign in' : 'Waiting for first sign-in'}
                 </strong>
               </article>
               <article className="full-width">
-                <p className="detail-label">Google subject</p>
+                <p className="detail-label">Account reference</p>
                 <strong>
-                  {selectedAdminUser.googleSubject ?? 'Pending first Google sign-in'}
+                  {selectedAdminUser.googleSubject ?? 'Added by email only so far'}
                 </strong>
               </article>
               <article>
@@ -609,8 +603,8 @@ export function AdminSection({
             </div>
           ) : (
             <div className="empty-state roomy">
-              <strong>Select an enrolled user to review their access.</strong>
-              <p>The admin area stays hidden from standard users and only appears for admins.</p>
+              <strong>Select a user to review their access.</strong>
+              <p>You can update their role, status and sign-in details here.</p>
             </div>
           )}
         </div>
@@ -624,7 +618,7 @@ export function AdminSection({
             <div className="panel-heading">
               <div>
                 <p className="section-label">Management Pane</p>
-                <h2>{adminMode === 'create' ? 'Create enrolment' : 'Update enrolment'}</h2>
+                <h2>{adminMode === 'create' ? 'Add user' : 'Update access'}</h2>
               </div>
               <span className="status-pill">{adminStatus}</span>
             </div>
@@ -651,11 +645,11 @@ export function AdminSection({
               </label>
 
               <label className="full-width">
-                <span>Google subject</span>
+                <span>Account reference</span>
                 <input
                   value={adminForm.googleSubject}
                   onChange={(event) => onUpdateField('googleSubject', event.target.value)}
-                  placeholder="Optional until first Google sign-in"
+                  placeholder="Optional"
                   disabled={adminMode === 'edit' && selectedAdminUser?.isEnrolled === true}
                 />
               </label>
@@ -685,15 +679,15 @@ export function AdminSection({
 
             <div className="form-actions">
               <button className="primary-button" type="submit" disabled={isAdminLoading}>
-                {adminMode === 'create' ? 'Enrol user' : 'Save enrolment'}
+                {adminMode === 'create' ? 'Add user' : 'Save changes'}
               </button>
               <button className="ghost-button" onClick={onCloseEditor} type="button">
                 Done
               </button>
             </div>
             <p className="auth-note">
-              Admins can pre-provision by email only. If Google subject is blank, Glovelly
-              will bind it on the user’s first successful Google sign-in.
+              Adding an email address is enough to let someone get started. You can fill in
+              the account reference later if needed.
             </p>
           </form>
         </div>
@@ -943,13 +937,13 @@ export function GigsSection({
                 <p className="detail-label">Invoice workflow</p>
                 <span>
                   {selectedGig.isInvoiced
-                    ? 'This gig is already linked to an invoice. Open the invoices workspace to review or download it.'
-                    : 'This record now carries the client, date, venue and fee needed to generate a one-off invoice.'}
+                    ? 'This gig is already linked to an invoice. Open Invoices to review or download it.'
+                    : 'This gig has everything needed to create an invoice when you are ready.'}
                 </span>
                 {selectedGigIds.length > 0 && (
                   <span>
                     {hasCrossClientSelection
-                      ? 'Selected gigs must share the same client before invoice generation is allowed.'
+                      ? 'Selected gigs need to belong to the same client before they can be invoiced together.'
                       : `${selectedGigIds.length} gig(s) selected for a combined invoice.`}
                   </span>
                 )}
@@ -958,7 +952,7 @@ export function GigsSection({
           ) : (
             <div className="empty-state roomy">
               <strong>Select a gig to review its details.</strong>
-              <p>The browse pane shows the commercial snapshot that matters later.</p>
+              <p>Key booking and billing details will appear here.</p>
             </div>
           )}
         </div>
@@ -1165,7 +1159,7 @@ export function GigsSection({
 
             {clients.length === 0 && (
               <p className="auth-note">
-                Add a client first. Every gig is intentionally tied to a client record.
+                Add a client first so this gig can be linked to the right account.
               </p>
             )}
           </form>
@@ -1410,8 +1404,7 @@ export function InvoicesSection({
               <div className="gig-timeline-note">
                 <p className="detail-label">Invoice workflow</p>
                 <span>
-                  Re-issue and PDF actions stay in the overview pane, while line-level changes now live in
-                  the docked side pane for a steadier browse flow.
+                  Review invoice details here, then open line items when you need to make changes.
                 </span>
               </div>
             </>
@@ -1442,7 +1435,7 @@ export function InvoicesSection({
                 <div className="gig-timeline-note">
                   <p className="detail-label">Adjustments</p>
                   <span>
-                    Manual adjustments append a separate line item so the original invoice breakdown stays intact.
+                    Add adjustments as separate line items so the invoice stays clear and easy to follow.
                   </span>
                 </div>
 
@@ -1501,7 +1494,7 @@ export function InvoicesSection({
             ) : (
               <div className="empty-state roomy">
                 <strong>Select an invoice to inspect its line items.</strong>
-                <p>The right-hand pane is reserved for line breakdowns and manual adjustments.</p>
+                <p>Line items and adjustments will appear here.</p>
               </div>
             )}
           </div>
