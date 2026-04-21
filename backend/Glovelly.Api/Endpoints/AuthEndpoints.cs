@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
 namespace Glovelly.Api.Endpoints;
@@ -74,20 +75,10 @@ internal static class AuthEndpoints
             ICurrentUserAccessor currentUserAccessor,
             AppDbContext dbContext) =>
         {
-            if (request.MileageRate.HasValue && request.MileageRate.Value < 0)
+            var validationErrors = ValidateUserSettingsRequest(request);
+            if (validationErrors is not null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["mileageRate"] = ["Mileage rate cannot be negative."]
-                });
-            }
-
-            if (request.PassengerMileageRate.HasValue && request.PassengerMileageRate.Value < 0)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["passengerMileageRate"] = ["Passenger mileage rate cannot be negative."]
-                });
+                return Results.ValidationProblem(validationErrors);
             }
 
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -158,5 +149,36 @@ internal static class AuthEndpoints
         return app;
     }
 
-    internal sealed record UserSettingsRequest(decimal? MileageRate, decimal? PassengerMileageRate);
+    private static Dictionary<string, string[]>? ValidateUserSettingsRequest(UserSettingsRequest request)
+    {
+        var validationResults = new List<ValidationResult>();
+        var validationContext = new ValidationContext(request);
+        var isValid = Validator.TryValidateObject(request, validationContext, validationResults, validateAllProperties: true);
+        if (isValid)
+        {
+            return null;
+        }
+
+        return validationResults
+            .GroupBy(result => ToCamelCase(result.MemberNames.FirstOrDefault() ?? string.Empty))
+            .ToDictionary(
+                grouping => grouping.Key,
+                grouping => grouping.Select(result => result.ErrorMessage ?? "Invalid value.").ToArray());
+    }
+
+    private static string ToCamelCase(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        return char.ToLowerInvariant(value[0]) + value[1..];
+    }
+
+    internal sealed record UserSettingsRequest(
+        [Range(0, double.MaxValue, ErrorMessage = "Mileage rate cannot be negative.")]
+        decimal? MileageRate,
+        [Range(0, double.MaxValue, ErrorMessage = "Passenger mileage rate cannot be negative.")]
+        decimal? PassengerMileageRate);
 }
