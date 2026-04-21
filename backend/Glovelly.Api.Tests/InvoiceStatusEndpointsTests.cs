@@ -210,4 +210,18 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             "Only Draft invoices can be deleted. Issued invoices must be retained for reporting.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
     }
+
+    [Fact]
+    public async Task GetInvoices_WhenSignedInAsDifferentUser_ReturnsOnlyVisibleInvoices()
+    {
+        _client.DefaultRequestHeaders.Remove("X-Test-UserId");
+        _client.DefaultRequestHeaders.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
+
+        var response = await _client.GetAsync("/invoices");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var invoices = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(JsonValueKind.Array, invoices.ValueKind);
+        Assert.Empty(invoices.EnumerateArray());
+    }
 }

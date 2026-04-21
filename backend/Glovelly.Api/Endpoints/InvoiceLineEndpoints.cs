@@ -1,6 +1,8 @@
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Auth;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Glovelly.Api.Endpoints;
 
@@ -8,9 +10,11 @@ public static class InvoiceLineEndpoints
 {
     public static RouteGroupBuilder MapInvoiceLineEndpoints(this RouteGroupBuilder group)
     {
-        group.MapGet("/", async (AppDbContext db) =>
+        group.MapGet("/", async (AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var lines = await db.InvoiceLines
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .OrderBy(line => line.InvoiceId)
                 .ThenBy(line => line.SortOrder)
@@ -20,18 +24,22 @@ public static class InvoiceLineEndpoints
             return Results.Ok(lines);
         });
 
-        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
+        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var line = await db.InvoiceLines
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(line => line.Id == id);
 
             return line is null ? Results.NotFound() : Results.Ok(line);
         });
 
-        group.MapPost("/", async (InvoiceLine line, AppDbContext db) =>
+        group.MapPost("/", async (InvoiceLine line, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
+            var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(value => value.Id == line.InvoiceId);
 
@@ -52,9 +60,9 @@ public static class InvoiceLineEndpoints
             line.Id = Guid.NewGuid();
             line.Description = line.Description.Trim();
             line.CalculationNotes = line.CalculationNotes?.Trim();
-            line.CreatedUtc = DateTimeOffset.UtcNow;
             line.Invoice = null;
             line.Gig = null;
+            EndpointSupport.StampCreate(line, userId);
 
             db.InvoiceLines.Add(line);
             await db.SaveChangesAsync();
@@ -62,15 +70,19 @@ public static class InvoiceLineEndpoints
             return Results.Created($"/invoice-lines/{line.Id}", line);
         });
 
-        group.MapPut("/{id:guid}", async (Guid id, InvoiceLine request, AppDbContext db) =>
+        group.MapPut("/{id:guid}", async (Guid id, InvoiceLine request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
-            var line = await db.InvoiceLines.FirstOrDefaultAsync(value => value.Id == id);
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var line = await db.InvoiceLines
+                .WhereVisibleTo(userId)
+                .FirstOrDefaultAsync(value => value.Id == id);
             if (line is null)
             {
                 return Results.NotFound();
             }
 
             var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(value => value.Id == request.InvoiceId);
 
@@ -102,9 +114,12 @@ public static class InvoiceLineEndpoints
             return Results.Ok(line);
         });
 
-        group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
+        group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
-            var line = await db.InvoiceLines.FirstOrDefaultAsync(value => value.Id == id);
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var line = await db.InvoiceLines
+                .WhereVisibleTo(userId)
+                .FirstOrDefaultAsync(value => value.Id == id);
             if (line is null)
             {
                 return Results.NotFound();

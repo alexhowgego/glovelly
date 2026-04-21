@@ -11,6 +11,21 @@ internal static class EndpointSupport
         return query.Where(client => client.CreatedByUserId == null || client.CreatedByUserId == userId);
     }
 
+    public static IQueryable<Gig> WhereVisibleTo(this IQueryable<Gig> query, Guid? userId)
+    {
+        return query.Where(gig => gig.CreatedByUserId == null || gig.CreatedByUserId == userId);
+    }
+
+    public static IQueryable<Invoice> WhereVisibleTo(this IQueryable<Invoice> query, Guid? userId)
+    {
+        return query.Where(invoice => invoice.CreatedByUserId == null || invoice.CreatedByUserId == userId);
+    }
+
+    public static IQueryable<InvoiceLine> WhereVisibleTo(this IQueryable<InvoiceLine> query, Guid? userId)
+    {
+        return query.Where(line => line.CreatedByUserId == null || line.CreatedByUserId == userId);
+    }
+
     public static void StampCreate(Client client, Guid? userId)
     {
         client.CreatedByUserId = userId;
