@@ -96,6 +96,7 @@ function App() {
   const [isAdminLoading, setIsAdminLoading] = useState(false)
   const [gigs, setGigs] = useState<Gig[]>([])
   const [selectedGigId, setSelectedGigId] = useState<string>('')
+  const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
   const [gigSearchQuery, setGigSearchQuery] = useState('')
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
@@ -500,6 +501,14 @@ function App() {
     filteredGigs[0] ??
     null
 
+  const selectedGigs = useMemo(
+    () =>
+      gigs
+        .filter((gig) => selectedGigIds.includes(gig.id))
+        .sort((left, right) => left.date.localeCompare(right.date)),
+    [gigs, selectedGigIds]
+  )
+
   const selectedInvoice =
     filteredInvoices.find((invoice) => invoice.id === selectedInvoiceId) ??
     invoices.find((invoice) => invoice.id === selectedInvoiceId) ??
@@ -523,6 +532,10 @@ function App() {
       setSelectedGigId(selectedGig.id)
     }
   }, [selectedGig])
+
+  useEffect(() => {
+    setSelectedGigIds((current) => current.filter((gigId) => gigs.some((gig) => gig.id === gigId)))
+  }, [gigs])
 
   useEffect(() => {
     if (selectedInvoice) {
@@ -662,6 +675,7 @@ function App() {
     )
     setGigExpenseAmount('')
     setGigExpenseDescription('')
+    setSelectedGigIds([])
   }
 
   const startGigEdit = () => {
@@ -1434,8 +1448,86 @@ function App() {
   }
 
   const handleGenerateInvoice = async () => {
+    if (selectedGigs.length > 0) {
+      const distinctClientIds = new Set(selectedGigs.map((gig) => gig.clientId))
+      if (distinctClientIds.size > 1) {
+        setGigStatus('Selected gigs must all belong to the same client.')
+        return
+      }
+
+      const alreadyInvoicedGig = selectedGigs.find((gig) => gig.isInvoiced)
+      if (alreadyInvoicedGig) {
+        setGigStatus(`"${alreadyInvoicedGig.title}" is already linked to an invoice.`)
+        return
+      }
+
+      setIsInvoiceLoading(true)
+      setGigStatus(`Generating invoice for ${selectedGigs.length} selected gig(s)...`)
+
+      try {
+        const response = await fetchWithSession(buildApiUrl('/gigs/generate-invoice'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            gigIds: selectedGigs.map((gig) => gig.id),
+          }),
+        })
+
+        if (response.status === 409) {
+          const conflict = (await response.json()) as { message?: string }
+          throw new Error(
+            conflict.message ?? 'Selected gigs must all be uninvoiced before generating.'
+          )
+        }
+
+        if (!response.ok) {
+          const problem = await parseProblemDetails(response)
+          const validationMessages = problem?.errors
+            ? Object.values(problem.errors).flat().join(' ')
+            : problem?.detail ?? problem?.title
+          throw new Error(validationMessages || 'Unable to generate invoice.')
+        }
+
+        const generatedInvoice = (await response.json()) as Invoice
+        const nowIso = new Date().toISOString()
+        const selectedIds = new Set(selectedGigs.map((gig) => gig.id))
+
+        setInvoices((current) => [
+          generatedInvoice,
+          ...current.filter((invoice) => invoice.id !== generatedInvoice.id),
+        ])
+        setSelectedInvoiceId(generatedInvoice.id)
+        setGigs((current) =>
+          current.map((gig) =>
+            selectedIds.has(gig.id)
+              ? {
+                  ...gig,
+                  invoiceId: generatedInvoice.id,
+                  invoicedAt: gig.invoicedAt ?? nowIso,
+                  isInvoiced: true,
+                }
+              : gig
+          )
+        )
+        setSelectedGigIds([])
+        setGigStatus(
+          `Invoice ${generatedInvoice.invoiceNumber} generated from ${selectedGigs.length} selected gig(s).`
+        )
+        setInvoiceStatus(`Invoice ${generatedInvoice.invoiceNumber} is ready for review.`)
+        setActiveSection('invoices')
+      } catch (error) {
+        setGigStatus(error instanceof Error ? error.message : 'Unable to generate invoice.')
+      } finally {
+        setIsInvoiceLoading(false)
+      }
+
+      return
+    }
+
     if (!selectedGig) {
-      setGigStatus('Select a gig first.')
+      setGigStatus('Select one or more gigs first.')
       return
     }
 
@@ -1496,6 +1588,14 @@ function App() {
     } finally {
       setIsInvoiceLoading(false)
     }
+  }
+
+  const handleToggleGigSelection = (gigId: string) => {
+    setSelectedGigIds((current) =>
+      current.includes(gigId)
+        ? current.filter((value) => value !== gigId)
+        : [...current, gigId]
+    )
   }
 
   const handleGenerateMonthlyInvoice = async () => {
@@ -1916,12 +2016,15 @@ function App() {
         onResetForm={startGigCreate}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={setSelectedGigId}
+        onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
         onSubmit={handleGigSubmit}
         onUpdateGigExpenseField={updateGigExpenseField}
         onUpdateGigField={updateGigField}
         plannedGigCount={plannedGigCount}
         selectedGig={selectedGig}
+        selectedGigIds={selectedGigIds}
+        selectedGigs={selectedGigs}
       />
     ) : (
       <InvoicesSection
