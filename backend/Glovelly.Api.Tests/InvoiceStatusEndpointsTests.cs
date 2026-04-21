@@ -174,4 +174,40 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         Assert.Equal("Adjustment reason is required.", problem.GetProperty("errors").GetProperty("reason")[0].GetString());
     }
+
+    [Fact]
+    public async Task DeleteInvoice_WhenDraft_DeletesInvoice()
+    {
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "INV-DELETE-DRAFT",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-06-01",
+            dueDate = "2026-06-15",
+            status = "Draft",
+            description = "Draft invoice to delete",
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
+
+        var deleteResponse = await _client.DeleteAsync($"/invoices/{invoiceId}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var getResponse = await _client.GetAsync($"/invoices/{invoiceId}");
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteInvoice_WhenNotDraft_ReturnsValidationProblem()
+    {
+        var response = await _client.DeleteAsync($"/invoices/{TestData.FoxInvoiceId}");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Only Draft invoices can be deleted. Issued invoices must be retained for reporting.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
 }

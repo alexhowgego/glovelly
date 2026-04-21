@@ -1055,6 +1055,7 @@ type InvoicesSectionProps = {
   onAdjustmentAmountChange: (value: string) => void
   onAdjustmentReasonChange: (value: string) => void
   onAddAdjustment: (invoice: Invoice) => Promise<void>
+  onDeleteInvoice: (invoice: Invoice) => Promise<void>
   onDownloadPdf: (invoice: Invoice) => Promise<void>
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<void>
   onReissue: (invoice: Invoice) => Promise<void>
@@ -1076,6 +1077,7 @@ export function InvoicesSection({
   onAdjustmentAmountChange,
   onAdjustmentReasonChange,
   onAddAdjustment,
+  onDeleteInvoice,
   onDownloadPdf,
   onInvoiceStatusChange,
   onReissue,
@@ -1171,6 +1173,19 @@ export function InvoicesSection({
                 disabled={!selectedInvoice || isInvoiceLoading}
               >
                 Re-issue
+              </button>
+              <button
+                className="danger-button"
+                onClick={() => selectedInvoice && void onDeleteInvoice(selectedInvoice)}
+                type="button"
+                disabled={!selectedInvoice || isInvoiceLoading || selectedInvoice?.status !== 'Draft'}
+                title={
+                  selectedInvoice?.status !== 'Draft'
+                    ? 'Only Draft invoices can be deleted.'
+                    : 'Delete draft invoice'
+                }
+              >
+                Delete draft
               </button>
               <button
                 className="primary-button"
