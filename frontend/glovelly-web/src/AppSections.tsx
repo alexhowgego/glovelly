@@ -694,6 +694,7 @@ type GigsSectionProps = {
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
   onSelectGig: (gigId: string) => void
+  onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
   onUpdateGigExpenseField: (
@@ -707,6 +708,8 @@ type GigsSectionProps = {
   ) => void
   plannedGigCount: number
   selectedGig: Gig | null
+  selectedGigIds: string[]
+  selectedGigs: Gig[]
 }
 
 export function GigsSection({
@@ -729,15 +732,19 @@ export function GigsSection({
   onResetForm,
   onSearchQueryChange,
   onSelectGig,
+  onToggleGigSelection,
   onStartEditing,
   onSubmit,
   onUpdateGigExpenseField,
   onUpdateGigField,
   plannedGigCount,
   selectedGig,
+  selectedGigIds,
+  selectedGigs,
 }: GigsSectionProps) {
   const selectedGigClient =
     clients.find((client) => client.id === selectedGig?.clientId) ?? null
+  const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
 
   return (
     <section className="section-layout">
@@ -791,6 +798,15 @@ export function GigsSection({
                   onClick={() => onSelectGig(gig.id)}
                   type="button"
                 >
+                  <label onClick={(event) => event.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedGigIds.includes(gig.id)}
+                      disabled={gig.isInvoiced}
+                      onChange={() => onToggleGigSelection(gig.id)}
+                    />
+                    <span>{gig.isInvoiced ? 'Invoiced' : 'Select'}</span>
+                  </label>
                   <div>
                     <strong>{gig.title}</strong>
                     <span>{clientName}</span>
@@ -825,9 +841,18 @@ export function GigsSection({
                 className="primary-button"
                 onClick={onGenerateInvoice}
                 type="button"
-                disabled={!selectedGig || selectedGig.isInvoiced || isInvoiceLoading}
+                disabled={
+                  isInvoiceLoading ||
+                  (selectedGigIds.length === 0 &&
+                    (!selectedGig || selectedGig.isInvoiced)) ||
+                  hasCrossClientSelection
+                }
               >
-                {selectedGig?.isInvoiced ? 'Already invoiced' : 'Generate invoice'}
+                {selectedGigIds.length > 0
+                  ? `Generate invoice (${selectedGigIds.length})`
+                  : selectedGig?.isInvoiced
+                    ? 'Already invoiced'
+                    : 'Generate invoice'}
               </button>
               <button
                 className="ghost-button"
@@ -884,6 +909,13 @@ export function GigsSection({
                     ? 'This gig is already linked to an invoice. Open the invoices workspace to review or download it.'
                     : 'This record now carries the client, date, venue and fee needed to generate a one-off invoice.'}
                 </span>
+                {selectedGigIds.length > 0 && (
+                  <span>
+                    {hasCrossClientSelection
+                      ? 'Selected gigs must share the same client before invoice generation is allowed.'
+                      : `${selectedGigIds.length} gig(s) selected for a combined invoice.`}
+                  </span>
+                )}
               </div>
             </>
           ) : (

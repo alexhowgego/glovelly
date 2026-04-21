@@ -109,4 +109,118 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal("This gig has already been invoiced.", conflict.GetProperty("message").GetString());
         Assert.Equal(JsonValueKind.String, conflict.GetProperty("invoiceId").ValueKind);
     }
+
+    [Fact]
+    public async Task GenerateInvoice_FromSelectedGigs_CreatesCombinedInvoiceOrderedByDate()
+    {
+        var firstGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Second date gig",
+            date = "2026-05-20",
+            venue = "Bridge Hall",
+            fee = 200.00m,
+            travelMiles = 0m,
+            notes = "Later in month",
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        firstGigResponse.EnsureSuccessStatusCode();
+        var firstGig = await firstGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var secondGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "First date gig",
+            date = "2026-05-10",
+            venue = "Park Room",
+            fee = 300.00m,
+            travelMiles = 0m,
+            notes = "Earlier in month",
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        secondGigResponse.EnsureSuccessStatusCode();
+        var secondGig = await secondGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsJsonAsync("/gigs/generate-invoice", new
+        {
+            gigIds = new[]
+            {
+                firstGig.GetProperty("id").GetGuid(),
+                secondGig.GetProperty("id").GetGuid(),
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var invoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
+        Assert.Equal(2, lines.Length);
+        Assert.Contains("First date gig (2026-05-10)", lines[0].GetProperty("description").GetString());
+        Assert.Contains("Second date gig (2026-05-20)", lines[1].GetProperty("description").GetString());
+
+        var invoiceId = invoice.GetProperty("id").GetGuid();
+        foreach (var gigId in new[] { firstGig.GetProperty("id").GetGuid(), secondGig.GetProperty("id").GetGuid() })
+        {
+            var gigResponse = await _client.GetAsync($"/gigs/{gigId}");
+            gigResponse.EnsureSuccessStatusCode();
+            var refreshedGig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+            Assert.Equal(invoiceId, refreshedGig.GetProperty("invoiceId").GetGuid());
+        }
+
+        var pdfResponse = await _client.GetAsync($"/invoices/{invoiceId}/pdf");
+        Assert.Equal(HttpStatusCode.OK, pdfResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task GenerateInvoice_FromSelectedGigs_WhenDifferentClients_ReturnsValidationError()
+    {
+        var foxGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Fox gig",
+            date = "2026-06-01",
+            venue = "Venue A",
+            fee = 100.00m,
+            travelMiles = 0m,
+            notes = "Fox notes",
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        foxGigResponse.EnsureSuccessStatusCode();
+        var foxGig = await foxGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var riversideGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.RiversideId,
+            title = "Riverside gig",
+            date = "2026-06-02",
+            venue = "Venue B",
+            fee = 120.00m,
+            travelMiles = 0m,
+            notes = "Riverside notes",
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        riversideGigResponse.EnsureSuccessStatusCode();
+        var riversideGig = await riversideGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsJsonAsync("/gigs/generate-invoice", new
+        {
+            gigIds = new[]
+            {
+                foxGig.GetProperty("id").GetGuid(),
+                riversideGig.GetProperty("id").GetGuid(),
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Selected gigs must all belong to the same client.", problem.GetProperty("errors").GetProperty("gigIds")[0].GetString());
+    }
 }
