@@ -30,6 +30,10 @@ export default defineConfig({
         target: 'http://localhost:5153',
         changeOrigin: true,
       },
+      '/app': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
       '/swagger': {
         target: 'http://localhost:5153',
         changeOrigin: true,

@@ -6,6 +6,9 @@ internal sealed record StartupSettings(
     string? GoogleClientSecret,
     string[] AllowedCorsOrigins,
     string? GlovellyConnectionString,
+    string? DeploymentName,
+    string? BuildCommitId,
+    string? BuildTimestamp,
     bool UsePostgres,
     bool IsDevelopment,
     bool IsTesting,
@@ -20,6 +23,9 @@ internal sealed record StartupSettings(
         var googleClientSecret = googleSection["ClientSecret"];
         var allowedCorsOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
         var glovellyConnectionString = configuration.GetConnectionString("Glovelly");
+        var deploymentName = configuration["App:DeploymentName"];
+        var buildCommitId = configuration["App:BuildCommitId"];
+        var buildTimestamp = configuration["App:BuildTimestamp"];
         var usePostgres = !string.IsNullOrWhiteSpace(glovellyConnectionString);
         var isDevelopment = environment.IsDevelopment();
         var isTesting = environment.IsEnvironment("Testing");
@@ -30,6 +36,9 @@ internal sealed record StartupSettings(
             googleClientSecret,
             allowedCorsOrigins,
             glovellyConnectionString,
+            deploymentName,
+            buildCommitId,
+            buildTimestamp,
             usePostgres,
             isDevelopment,
             isTesting,

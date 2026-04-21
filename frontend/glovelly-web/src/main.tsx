@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { loadAppMetadata } from './appShared'
 
 const THEME_STORAGE_KEY = 'glovelly.theme-preference'
 
@@ -22,11 +23,20 @@ const applyInitialTheme = () => {
 
 applyInitialTheme()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+const root = createRoot(document.getElementById('root')!)
+
+async function bootstrap() {
+  const appMetadata = await loadAppMetadata()
+  document.title = appMetadata.title
+
+  root.render(
+    <StrictMode>
+      <App appMetadata={appMetadata} />
+    </StrictMode>,
+  )
+}
+
+void bootstrap()
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

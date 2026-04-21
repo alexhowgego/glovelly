@@ -1,6 +1,7 @@
 import type {
   AdminUser,
   AdminUserForm,
+  AppMetadata,
   AuthUser,
   Client,
   ClientForm,
@@ -14,6 +15,7 @@ import type {
   UserSettingsForm,
 } from './appShared'
 import {
+  formatBuildMetadata,
   formatCurrency,
   formatDate,
   formatDateTime,
@@ -23,10 +25,12 @@ import {
 } from './appShared'
 
 type SessionCheckingScreenProps = {
+  appMetadata: AppMetadata
   status: string
 }
 
 export function SessionCheckingScreen({
+  appMetadata,
   status,
 }: SessionCheckingScreenProps) {
   return (
@@ -41,17 +45,20 @@ export function SessionCheckingScreen({
         </div>
         <span className="status-pill">{status}</span>
       </section>
+      <p className="build-meta">{formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}</p>
     </main>
   )
 }
 
 type SignInScreenProps = {
+  appMetadata: AppMetadata
   onSignIn: () => void
   shouldCloseBrowserNotice: boolean
   status: string
 }
 
 export function SignInScreen({
+  appMetadata,
   onSignIn,
   shouldCloseBrowserNotice,
   status,
@@ -81,6 +88,7 @@ export function SignInScreen({
           </button>
         </div>
       </section>
+      <p className="build-meta">{formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}</p>
     </main>
   )
 }
