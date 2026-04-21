@@ -67,6 +67,7 @@ function App({ appMetadata }: AppProps) {
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [isClientEditorOpen, setIsClientEditorOpen] = useState(false)
   const [mode, setMode] = useState<'create' | 'edit'>('create')
   const [form, setForm] = useState<ClientForm>(emptyForm)
   const [isClientSettingsOpen, setIsClientSettingsOpen] = useState(false)
@@ -96,6 +97,7 @@ function App({ appMetadata }: AppProps) {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
   const [adminSearchQuery, setAdminSearchQuery] = useState('')
+  const [isAdminEditorOpen, setIsAdminEditorOpen] = useState(false)
   const [adminMode, setAdminMode] = useState<'create' | 'edit'>('create')
   const [adminForm, setAdminForm] = useState<AdminUserForm>(emptyAdminForm)
   const [adminStatus, setAdminStatus] = useState(defaultAdminStatus)
@@ -104,6 +106,7 @@ function App({ appMetadata }: AppProps) {
   const [selectedGigId, setSelectedGigId] = useState<string>('')
   const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
   const [gigSearchQuery, setGigSearchQuery] = useState('')
+  const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
   const [gigStatus, setGigStatus] = useState(defaultGigStatus)
@@ -114,6 +117,7 @@ function App({ appMetadata }: AppProps) {
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
+  const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
   const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
@@ -201,6 +205,7 @@ function App({ appMetadata }: AppProps) {
     setAdminUsers([])
     setSelectedAdminUserId('')
     setAdminSearchQuery('')
+    setIsAdminEditorOpen(false)
     setAdminMode('create')
     setAdminForm(emptyAdminForm())
     setAdminStatus(defaultAdminStatus)
@@ -213,11 +218,13 @@ function App({ appMetadata }: AppProps) {
       setClients([])
       setSelectedClientId('')
       setSearchQuery('')
+      setIsClientEditorOpen(false)
       setMode('create')
       setForm(emptyForm())
       setGigs([])
       setSelectedGigId('')
       setGigSearchQuery('')
+      setIsGigEditorOpen(false)
       setGigMode('create')
       setGigForm(emptyGigForm())
       setGigStatus(defaultGigStatus)
@@ -225,6 +232,7 @@ function App({ appMetadata }: AppProps) {
       setMonthlyInvoiceMonth(getCurrentMonthValue())
       setInvoices([])
       setSelectedInvoiceId('')
+      setIsInvoiceEditorOpen(false)
       setInvoiceSearchQuery('')
       setInvoiceStatus(defaultInvoiceStatus)
       setIsClientSettingsOpen(false)
@@ -633,6 +641,7 @@ function App({ appMetadata }: AppProps) {
   const startCreating = () => {
     setMode('create')
     setForm(emptyForm())
+    setIsClientEditorOpen(true)
   }
 
   const startEditing = () => {
@@ -644,13 +653,22 @@ function App({ appMetadata }: AppProps) {
     setForm({
       name: selectedClient.name,
       email: selectedClient.email,
-      billingAddress: { ...selectedClient.billingAddress },
+      billingAddress: {
+        line1: selectedClient.billingAddress.line1 ?? '',
+        line2: selectedClient.billingAddress.line2 ?? '',
+        city: selectedClient.billingAddress.city ?? '',
+        stateOrCounty: selectedClient.billingAddress.stateOrCounty ?? '',
+        postalCode: selectedClient.billingAddress.postalCode ?? '',
+        country: selectedClient.billingAddress.country ?? '',
+      },
     })
+    setIsClientEditorOpen(true)
   }
 
   const startAdminCreate = () => {
     setAdminMode('create')
     setAdminForm(emptyAdminForm())
+    setIsAdminEditorOpen(true)
   }
 
   const startAdminEdit = () => {
@@ -666,6 +684,7 @@ function App({ appMetadata }: AppProps) {
       role: selectedAdminUser.role === 'Admin' ? 'Admin' : 'User',
       isActive: selectedAdminUser.isActive,
     })
+    setIsAdminEditorOpen(true)
   }
 
   const startGigCreate = () => {
@@ -682,6 +701,7 @@ function App({ appMetadata }: AppProps) {
     setGigExpenseAmount('')
     setGigExpenseDescription('')
     setSelectedGigIds([])
+    setIsGigEditorOpen(true)
   }
 
   const startGigEdit = () => {
@@ -707,6 +727,45 @@ function App({ appMetadata }: AppProps) {
     setGigStatus('Editing the selected gig.')
     setGigExpenseAmount('')
     setGigExpenseDescription('')
+    setIsGigEditorOpen(true)
+  }
+
+  const closeClientEditor = () => {
+    setIsClientEditorOpen(false)
+    setMode('create')
+    setForm(emptyForm())
+  }
+
+  const closeAdminEditor = () => {
+    setIsAdminEditorOpen(false)
+    setAdminMode('create')
+    setAdminForm(emptyAdminForm())
+  }
+
+  const closeGigEditor = () => {
+    setIsGigEditorOpen(false)
+    setGigMode('create')
+    setGigForm({
+      ...emptyGigForm(),
+      clientId: clients[0]?.id ?? '',
+    })
+    setGigExpenseAmount('')
+    setGigExpenseDescription('')
+    setGigStatus(defaultGigStatus)
+  }
+
+  const startInvoiceEdit = () => {
+    if (!selectedInvoice) {
+      return
+    }
+
+    setIsInvoiceEditorOpen(true)
+  }
+
+  const closeInvoiceEditor = () => {
+    setIsInvoiceEditorOpen(false)
+    setAdjustmentAmount('')
+    setAdjustmentReason('')
   }
 
   const updateField = (field: keyof ClientForm, value: string | Address) => {
@@ -833,14 +892,21 @@ function App({ appMetadata }: AppProps) {
       setClients([])
       setSelectedClientId('')
       setSearchQuery('')
+      setIsClientEditorOpen(false)
       setMode('create')
       setForm(emptyForm())
       setGigs([])
       setSelectedGigId('')
       setGigSearchQuery('')
+      setIsGigEditorOpen(false)
       setGigMode('create')
       setGigForm(emptyGigForm())
       setGigStatus(defaultGigStatus)
+      setInvoices([])
+      setSelectedInvoiceId('')
+      setIsInvoiceEditorOpen(false)
+      setInvoiceSearchQuery('')
+      setInvoiceStatus(defaultInvoiceStatus)
       resetAdminWorkspace()
       setShouldCloseBrowserNotice(true)
       setStatus('Signed out. Close your browser to fully end the Google session.')
@@ -1190,6 +1256,7 @@ function App({ appMetadata }: AppProps) {
       setSelectedClientId(savedClient.id)
       setMode('edit')
       setStatus(isEdit ? 'Client updated.' : 'Client created.')
+      setIsClientEditorOpen(false)
     } catch {
       setStatus('Unable to save right now. Check that the API is running.')
     } finally {
@@ -1237,6 +1304,7 @@ function App({ appMetadata }: AppProps) {
       setMode('create')
       setForm(emptyForm())
       setStatus('Client deleted.')
+      setIsClientEditorOpen(false)
     } catch {
       setStatus('Unable to delete right now.')
     } finally {
@@ -1311,6 +1379,7 @@ function App({ appMetadata }: AppProps) {
       setSelectedAdminUserId(savedUser.id)
       setAdminMode('edit')
       setAdminStatus(isEdit ? 'User enrolment updated.' : 'User enrolled.')
+      setIsAdminEditorOpen(false)
     } catch (error) {
       setAdminStatus(
         error instanceof Error ? error.message : 'Unable to save enrolment right now.'
@@ -1444,6 +1513,7 @@ function App({ appMetadata }: AppProps) {
       setGigExpenseAmount('')
       setGigExpenseDescription('')
       setGigStatus(isEdit ? 'Gig updated.' : 'Gig created.')
+      setIsGigEditorOpen(false)
     } catch (error) {
       setGigStatus(
         error instanceof Error ? error.message : 'Unable to save this gig right now.'
@@ -1893,6 +1963,7 @@ function App({ appMetadata }: AppProps) {
       setAdjustmentAmount('')
       setAdjustmentReason('')
       setInvoiceStatus(`Adjustment saved. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`)
+      setIsInvoiceEditorOpen(false)
     } catch (error) {
       setInvoiceStatus(error instanceof Error ? error.message : 'Unable to add invoice adjustment.')
     } finally {
@@ -1934,6 +2005,7 @@ function App({ appMetadata }: AppProps) {
       setInvoices((current) => current.filter((value) => value.id !== invoice.id))
       setSelectedInvoiceId((current) => (current === invoice.id ? '' : current))
       setInvoiceStatus(`Invoice ${invoice.invoiceNumber} deleted.`)
+      setIsInvoiceEditorOpen(false)
     } catch (error) {
       setInvoiceStatus(error instanceof Error ? error.message : 'Unable to delete invoice.')
     } finally {
@@ -1962,11 +2034,13 @@ function App({ appMetadata }: AppProps) {
         filteredClients={filteredClients}
         form={form}
         isApiConnected={isApiConnected}
+        isEditorOpen={isClientEditorOpen}
         isInvoiceLoading={isInvoiceLoading}
         isLoading={isLoading}
         monthlyInvoiceClientId={monthlyInvoiceClientId}
         monthlyInvoiceMonth={monthlyInvoiceMonth}
         mode={mode}
+        onCloseEditor={closeClientEditor}
         onDelete={handleDelete}
         onGenerateMonthlyInvoice={handleGenerateMonthlyInvoice}
         onMonthlyInvoiceClientChange={setMonthlyInvoiceClientId}
@@ -1986,6 +2060,7 @@ function App({ appMetadata }: AppProps) {
     ) : activeSection === 'admin' && isAdmin ? (
       <AdminSection
         adminForm={adminForm}
+        isEditorOpen={isAdminEditorOpen}
         adminMode={adminMode}
         adminSearchQuery={adminSearchQuery}
         adminStatus={adminStatus}
@@ -1993,6 +2068,7 @@ function App({ appMetadata }: AppProps) {
         activeUsersCount={activeUsersCount}
         filteredAdminUsers={filteredAdminUsers}
         isAdminLoading={isAdminLoading}
+        onCloseEditor={closeAdminEditor}
         onResetForm={startAdminCreate}
         onSearchQueryChange={setAdminSearchQuery}
         onSelectUser={setSelectedAdminUserId}
@@ -2009,6 +2085,7 @@ function App({ appMetadata }: AppProps) {
         gigExpenseAmount={gigExpenseAmount}
         gigExpenseDescription={gigExpenseDescription}
         gigForm={gigForm}
+        isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
         gigSearchQuery={gigSearchQuery}
         gigStatus={gigStatus}
@@ -2016,6 +2093,7 @@ function App({ appMetadata }: AppProps) {
         isGigLoading={isGigLoading}
         isInvoiceLoading={isInvoiceLoading}
         onAddGigExpense={handleAddGigExpense}
+        onCloseEditor={closeGigEditor}
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateInvoice={handleGenerateInvoice}
@@ -2040,6 +2118,7 @@ function App({ appMetadata }: AppProps) {
         clients={clients}
         draftInvoiceCount={draftInvoiceCount}
         filteredInvoices={filteredInvoices}
+        isEditorOpen={isInvoiceEditorOpen}
         invoiceSearchQuery={invoiceSearchQuery}
         invoiceStatus={invoiceStatus}
         invoices={invoices}
@@ -2047,12 +2126,14 @@ function App({ appMetadata }: AppProps) {
         onAdjustmentAmountChange={setAdjustmentAmount}
         onAdjustmentReasonChange={setAdjustmentReason}
         onAddAdjustment={handleAddInvoiceAdjustment}
+        onCloseEditor={closeInvoiceEditor}
         onDeleteInvoice={handleDeleteInvoice}
         onDownloadPdf={handleDownloadInvoicePdf}
         onInvoiceStatusChange={handleInvoiceStatusChange}
         onReissue={handleInvoiceReissue}
         onSearchQueryChange={setInvoiceSearchQuery}
         onSelectInvoice={setSelectedInvoiceId}
+        onStartEditing={startInvoiceEdit}
         selectedInvoice={selectedInvoice}
       />
     )

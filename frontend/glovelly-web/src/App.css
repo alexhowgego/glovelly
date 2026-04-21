@@ -400,7 +400,7 @@
 .workspace {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(300px, 0.95fr) minmax(320px, 1fr) minmax(360px, 1.1fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1fr) auto;
 }
 
 .admin-zone {
@@ -416,13 +416,13 @@
 .admin-workspace {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) minmax(360px, 1.05fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) auto;
 }
 
 .gig-workspace {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) minmax(360px, 1.05fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) auto;
 }
 
 .gigs-draft {
@@ -454,6 +454,57 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.editor-panel {
+  animation: editor-panel-enter 220ms ease;
+}
+
+.editor-slot {
+  width: 0;
+  min-width: 0;
+  overflow: clip;
+  opacity: 0;
+  transition:
+    width 280ms ease,
+    opacity 180ms ease;
+}
+
+.editor-slot.open {
+  width: clamp(320px, 30vw, 480px);
+  opacity: 1;
+}
+
+.editor-slot > .panel {
+  width: clamp(320px, 30vw, 480px);
+  min-width: 320px;
+  transform: translateX(14px);
+  transition:
+    transform 280ms ease,
+    opacity 180ms ease,
+    visibility 0s linear 180ms;
+  visibility: hidden;
+}
+
+.editor-slot.open > .panel {
+  transform: translateX(0);
+  visibility: visible;
+  transition:
+    transform 280ms ease,
+    opacity 180ms ease,
+    visibility 0s linear 0s;
+}
+
+@keyframes editor-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .panel-heading {
@@ -875,6 +926,29 @@ button:disabled {
 
   .content-header-top {
     align-items: stretch;
+  }
+
+  .editor-slot {
+    width: 100%;
+    max-height: 0;
+    min-width: 0;
+    opacity: 0;
+    transform: none;
+    visibility: hidden;
+  }
+
+  .editor-slot.open {
+    width: 100%;
+    max-height: 2000px;
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .editor-slot > .panel,
+  .editor-slot.open > .panel {
+    width: 100%;
+    min-width: 0;
+    transform: none;
   }
 }
 
