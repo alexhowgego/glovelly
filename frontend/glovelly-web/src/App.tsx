@@ -1851,12 +1851,19 @@ function App() {
   const currentSectionContent =
     activeSection === 'clients' ? (
       <ClientsSection
+        clients={clients}
         filteredClients={filteredClients}
         form={form}
         isApiConnected={isApiConnected}
+        isInvoiceLoading={isInvoiceLoading}
         isLoading={isLoading}
+        monthlyInvoiceClientId={monthlyInvoiceClientId}
+        monthlyInvoiceMonth={monthlyInvoiceMonth}
         mode={mode}
         onDelete={handleDelete}
+        onGenerateMonthlyInvoice={handleGenerateMonthlyInvoice}
+        onMonthlyInvoiceClientChange={setMonthlyInvoiceClientId}
+        onMonthlyInvoiceMonthChange={setMonthlyInvoiceMonth}
         onOpenClientSettings={openClientSettings}
         onResetForm={startCreating}
         onSearchQueryChange={setSearchQuery}
@@ -1905,11 +1912,6 @@ function App() {
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateInvoice={handleGenerateInvoice}
-        onGenerateMonthlyInvoice={handleGenerateMonthlyInvoice}
-        monthlyInvoiceClientId={monthlyInvoiceClientId}
-        monthlyInvoiceMonth={monthlyInvoiceMonth}
-        onMonthlyInvoiceClientChange={setMonthlyInvoiceClientId}
-        onMonthlyInvoiceMonthChange={setMonthlyInvoiceMonth}
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
         onSearchQueryChange={setGigSearchQuery}
