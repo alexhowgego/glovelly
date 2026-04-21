@@ -509,6 +509,25 @@
   gap: 4px;
 }
 
+.gig-select-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: var(--muted-strong);
+  font-size: 0.84rem;
+}
+
+.gig-select-toggle input {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: color-mix(in srgb, var(--heading) 72%, white);
+}
+
 .client-card strong,
 .detail-grid strong {
   color: var(--heading);
@@ -592,7 +611,7 @@
   display: grid;
   gap: 10px;
   margin-top: 10px;
-  grid-template-columns: minmax(0, 140px) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
 }
 
@@ -778,6 +797,7 @@ input,
 select {
   width: 100%;
   box-sizing: border-box;
+  min-width: 0;
   min-height: 48px;
   border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--surface-border) 95%, transparent);
@@ -789,6 +809,7 @@ select {
 textarea {
   width: 100%;
   box-sizing: border-box;
+  min-width: 0;
   border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--surface-border) 95%, transparent);
   background: var(--surface-elevated);

@@ -806,7 +806,10 @@ export function GigsSection({
                   onClick={() => onSelectGig(gig.id)}
                   type="button"
                 >
-                  <label onClick={(event) => event.stopPropagation()}>
+                  <label
+                    className="gig-select-toggle"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedGigIds.includes(gig.id)}
