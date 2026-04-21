@@ -703,7 +703,9 @@ export function AdminSection({
 }
 
 type GigsSectionProps = {
+  clientNamesById: ReadonlyMap<string, string>
   clients: Client[]
+  completedGigCount: number
   filteredGigs: Gig[]
   gigExpenseAmount: string
   gigExpenseDescription: string
@@ -743,7 +745,9 @@ type GigsSectionProps = {
 }
 
 export function GigsSection({
+  clientNamesById,
   clients,
+  completedGigCount,
   filteredGigs,
   gigExpenseAmount,
   gigExpenseDescription,
@@ -774,8 +778,8 @@ export function GigsSection({
   selectedGigIds,
   selectedGigs,
 }: GigsSectionProps) {
-  const selectedGigClient =
-    clients.find((client) => client.id === selectedGig?.clientId) ?? null
+  const selectedGigClientName =
+    (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
   const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
 
   return (
@@ -812,16 +816,14 @@ export function GigsSection({
               <p>planned</p>
             </article>
             <article>
-              <span>{gigs.filter((gig) => gig.status === 'Completed').length}</span>
+              <span>{completedGigCount}</span>
               <p>completed</p>
             </article>
           </div>
 
           <div className="client-list">
             {filteredGigs.map((gig) => {
-              const clientName =
-                clients.find((client) => client.id === gig.clientId)?.name ??
-                'Unknown client'
+              const clientName = clientNamesById.get(gig.clientId) ?? 'Unknown client'
 
               return (
                 <button
@@ -905,7 +907,7 @@ export function GigsSection({
               <div className="detail-grid">
                 <article>
                   <p className="detail-label">Client</p>
-                  <strong>{selectedGigClient?.name ?? 'Unknown client'}</strong>
+                  <strong>{selectedGigClientName}</strong>
                 </article>
                 <article>
                   <p className="detail-label">Status</p>
@@ -1176,13 +1178,14 @@ export function GigsSection({
 type InvoicesSectionProps = {
   adjustmentAmount: string
   adjustmentReason: string
-  clients: Client[]
+  clientNamesById: ReadonlyMap<string, string>
   draftInvoiceCount: number
   filteredInvoices: Invoice[]
   isEditorOpen: boolean
   invoiceSearchQuery: string
   invoiceStatus: string
   invoices: Invoice[]
+  issuedInvoiceCount: number
   isInvoiceLoading: boolean
   onAdjustmentAmountChange: (value: string) => void
   onAdjustmentReasonChange: (value: string) => void
@@ -1201,13 +1204,14 @@ type InvoicesSectionProps = {
 export function InvoicesSection({
   adjustmentAmount,
   adjustmentReason,
-  clients,
+  clientNamesById,
   draftInvoiceCount,
   filteredInvoices,
   isEditorOpen,
   invoiceSearchQuery,
   invoiceStatus,
   invoices,
+  issuedInvoiceCount,
   isInvoiceLoading,
   onAdjustmentAmountChange,
   onAdjustmentReasonChange,
@@ -1222,8 +1226,9 @@ export function InvoicesSection({
   onStartEditing,
   selectedInvoice,
 }: InvoicesSectionProps) {
-  const selectedInvoiceClient =
-    clients.find((client) => client.id === selectedInvoice?.clientId) ?? null
+  const selectedInvoiceClientName =
+    (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
+    'Unknown client'
 
   return (
     <section className="section-layout">
@@ -1257,16 +1262,14 @@ export function InvoicesSection({
               <p>draft</p>
             </article>
             <article>
-              <span>{invoices.filter((invoice) => invoice.status === 'Issued').length}</span>
+              <span>{issuedInvoiceCount}</span>
               <p>issued</p>
             </article>
           </div>
 
           <div className="client-list">
             {filteredInvoices.map((invoice) => {
-              const clientName =
-                clients.find((client) => client.id === invoice.clientId)?.name ??
-                'Unknown client'
+              const clientName = clientNamesById.get(invoice.clientId) ?? 'Unknown client'
 
               return (
                 <button
@@ -1348,7 +1351,7 @@ export function InvoicesSection({
               <div className="detail-grid">
                 <article>
                   <p className="detail-label">Client</p>
-                  <strong>{selectedInvoiceClient?.name ?? 'Unknown client'}</strong>
+                  <strong>{selectedInvoiceClientName}</strong>
                 </article>
                 <article>
                   <p className="detail-label">Status</p>

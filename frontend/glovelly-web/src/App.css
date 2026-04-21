@@ -27,7 +27,6 @@
   border: 1px solid var(--surface-border);
   background: var(--surface-panel);
   box-shadow: var(--surface-shadow);
-  backdrop-filter: blur(18px);
 }
 
 .hero-panel {
@@ -248,7 +247,6 @@
   border: 1px solid var(--surface-border);
   background: var(--surface-overlay);
   box-shadow: var(--surface-shadow-strong);
-  backdrop-filter: blur(18px);
   display: grid;
   gap: 14px;
   z-index: 40;
@@ -302,7 +300,6 @@
   inset: 0;
   z-index: 80;
   background: color-mix(in srgb, #1a1410 42%, transparent);
-  backdrop-filter: blur(10px);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -468,6 +465,7 @@
   transition:
     width 280ms ease,
     opacity 180ms ease;
+  contain: layout paint;
 }
 
 .editor-slot.open {
@@ -531,6 +529,8 @@
   gap: 12px;
   overflow: auto;
   padding-right: 4px;
+  content-visibility: auto;
+  contain-intrinsic-size: 500px;
 }
 
 .client-card {

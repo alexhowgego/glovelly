@@ -273,10 +273,7 @@ export function formatDateTime(value: string | null) {
     return 'Unknown'
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
+  return dateTimeFormatter.format(date)
 }
 
 export function formatCommitId(value: string | null) {
@@ -310,12 +307,7 @@ export function formatRate(value: number | null) {
 }
 
 export function formatCurrency(value: number) {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+  return currencyFormatter.format(value)
 }
 
 export function formatDate(value: string) {
@@ -328,9 +320,7 @@ export function formatDate(value: string) {
     return value
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-  }).format(date)
+  return dateFormatter.format(date)
 }
 
 function formatEditableAmount(value: number) {
@@ -364,6 +354,22 @@ export function getAllowedInvoiceStatusTransitions(status: InvoiceStatus) {
       return [] as InvoiceStatus[]
   }
 }
+
+const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
+
+const currencyFormatter = new Intl.NumberFormat(undefined, {
+  style: 'currency',
+  currency: 'GBP',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+})
 
 export function getStoredThemePreference(): ThemePreference {
   const rawPreference = window.localStorage.getItem(themeStorageKey)

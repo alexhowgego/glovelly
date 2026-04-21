@@ -408,6 +408,19 @@ function App({ appMetadata }: AppProps) {
     () => new Map(clients.map((client) => [client.id, client.name])),
     [clients]
   )
+  const clientsById = useMemo(
+    () => new Map(clients.map((client) => [client.id, client])),
+    [clients]
+  )
+  const adminUsersById = useMemo(
+    () => new Map(adminUsers.map((user) => [user.id, user])),
+    [adminUsers]
+  )
+  const gigsById = useMemo(() => new Map(gigs.map((gig) => [gig.id, gig])), [gigs])
+  const invoicesById = useMemo(
+    () => new Map(invoices.map((invoice) => [invoice.id, invoice])),
+    [invoices]
+  )
 
   const filteredClients = useMemo(() => {
     const query = deferredSearchQuery.trim().toLowerCase()
@@ -497,37 +510,26 @@ function App({ appMetadata }: AppProps) {
     })
   }, [clientNamesById, deferredInvoiceSearchQuery, invoices])
 
-  const selectedClient =
-    filteredClients.find((client) => client.id === selectedClientId) ??
-    clients.find((client) => client.id === selectedClientId) ??
-    filteredClients[0] ??
-    null
+  const selectedClient = clientsById.get(selectedClientId) ?? filteredClients[0] ?? null
 
   const selectedAdminUser =
-    filteredAdminUsers.find((user) => user.id === selectedAdminUserId) ??
-    adminUsers.find((user) => user.id === selectedAdminUserId) ??
-    filteredAdminUsers[0] ??
-    null
+    adminUsersById.get(selectedAdminUserId) ?? filteredAdminUsers[0] ?? null
 
-  const selectedGig =
-    filteredGigs.find((gig) => gig.id === selectedGigId) ??
-    gigs.find((gig) => gig.id === selectedGigId) ??
-    filteredGigs[0] ??
-    null
+  const selectedGig = gigsById.get(selectedGigId) ?? filteredGigs[0] ?? null
 
   const selectedGigs = useMemo(
-    () =>
-      gigs
-        .filter((gig) => selectedGigIds.includes(gig.id))
-        .sort((left, right) => left.date.localeCompare(right.date)),
+    () => {
+      const selectedGigIdSet = new Set(selectedGigIds)
+
+      return gigs
+        .filter((gig) => selectedGigIdSet.has(gig.id))
+        .sort((left, right) => left.date.localeCompare(right.date))
+    },
     [gigs, selectedGigIds]
   )
 
   const selectedInvoice =
-    filteredInvoices.find((invoice) => invoice.id === selectedInvoiceId) ??
-    invoices.find((invoice) => invoice.id === selectedInvoiceId) ??
-    filteredInvoices[0] ??
-    null
+    invoicesById.get(selectedInvoiceId) ?? filteredInvoices[0] ?? null
 
   useEffect(() => {
     if (selectedClient) {
@@ -580,8 +582,10 @@ function App({ appMetadata }: AppProps) {
   const activeUsersCount = adminUsers.filter((user) => user.isActive).length
   const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
   const plannedGigCount = gigs.filter((gig) => gig.status === 'Confirmed').length
+  const completedGigCount = gigs.filter((gig) => gig.status === 'Completed').length
   const upcomingGigCount = gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length
   const draftInvoiceCount = invoices.filter((invoice) => invoice.status === 'Draft').length
+  const issuedInvoiceCount = invoices.filter((invoice) => invoice.status === 'Issued').length
 
   const navigationItems: Array<{
     id: AppSection
@@ -2080,7 +2084,9 @@ function App({ appMetadata }: AppProps) {
       />
     ) : activeSection === 'gigs' ? (
       <GigsSection
+        clientNamesById={clientNamesById}
         clients={clients}
+        completedGigCount={completedGigCount}
         filteredGigs={filteredGigs}
         gigExpenseAmount={gigExpenseAmount}
         gigExpenseDescription={gigExpenseDescription}
@@ -2115,13 +2121,14 @@ function App({ appMetadata }: AppProps) {
       <InvoicesSection
         adjustmentAmount={adjustmentAmount}
         adjustmentReason={adjustmentReason}
-        clients={clients}
+        clientNamesById={clientNamesById}
         draftInvoiceCount={draftInvoiceCount}
         filteredInvoices={filteredInvoices}
         isEditorOpen={isInvoiceEditorOpen}
         invoiceSearchQuery={invoiceSearchQuery}
         invoiceStatus={invoiceStatus}
         invoices={invoices}
+        issuedInvoiceCount={issuedInvoiceCount}
         isInvoiceLoading={isInvoiceLoading}
         onAdjustmentAmountChange={setAdjustmentAmount}
         onAdjustmentReasonChange={setAdjustmentReason}
