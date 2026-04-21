@@ -113,8 +113,8 @@ function App({ appMetadata }: AppProps) {
   const [isGigLoading, setIsGigLoading] = useState(false)
   const [gigExpenseAmount, setGigExpenseAmount] = useState('')
   const [gigExpenseDescription, setGigExpenseDescription] = useState('')
-  const [monthlyInvoiceClientId, setMonthlyInvoiceClientId] = useState('')
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
+  const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
@@ -228,8 +228,8 @@ function App({ appMetadata }: AppProps) {
       setGigMode('create')
       setGigForm(emptyGigForm())
       setGigStatus(defaultGigStatus)
-      setMonthlyInvoiceClientId('')
       setMonthlyInvoiceMonth(getCurrentMonthValue())
+      setMonthlyInvoiceStatus('')
       setInvoices([])
       setSelectedInvoiceId('')
       setIsInvoiceEditorOpen(false)
@@ -531,6 +531,52 @@ function App({ appMetadata }: AppProps) {
   const selectedInvoice =
     invoicesById.get(selectedInvoiceId) ?? filteredInvoices[0] ?? null
 
+  const monthlyInvoiceEligibleGigs = useMemo(() => {
+    if (!selectedClient || !monthlyInvoiceMonth) {
+      return []
+    }
+
+    return gigs
+      .filter(
+        (gig) =>
+          gig.clientId === selectedClient.id &&
+          !gig.isInvoiced &&
+          gig.date.startsWith(`${monthlyInvoiceMonth}-`) &&
+          gig.status !== 'Cancelled'
+      )
+      .sort((left, right) => left.date.localeCompare(right.date))
+  }, [gigs, monthlyInvoiceMonth, selectedClient])
+
+  const isMonthlyInvoiceReady =
+    Boolean(selectedClient) &&
+    Boolean(monthlyInvoiceMonth) &&
+    monthlyInvoiceEligibleGigs.length > 0
+
+  const monthlyInvoiceHelperText = monthlyInvoiceStatus || (() => {
+    if (!selectedClient) {
+      return 'Select a client to review monthly invoice eligibility.'
+    }
+
+    if (!monthlyInvoiceMonth) {
+      return 'Choose a month to check which gigs are ready to invoice.'
+    }
+
+    if (monthlyInvoiceEligibleGigs.length === 0) {
+      return `No eligible gigs found for ${selectedClient.name} in ${monthlyInvoiceMonth}.`
+    }
+
+    return `${monthlyInvoiceEligibleGigs.length} eligible gig(s) ready to invoice for ${selectedClient.name} in ${monthlyInvoiceMonth}.`
+  })()
+
+  const openSelectedGigInvoice = () => {
+    if (!selectedGig?.invoiceId) {
+      return
+    }
+
+    setSelectedInvoiceId(selectedGig.invoiceId)
+    setActiveSection('invoices')
+  }
+
   useEffect(() => {
     if (selectedClient) {
       setSelectedClientId(selectedClient.id)
@@ -560,6 +606,10 @@ function App({ appMetadata }: AppProps) {
   }, [selectedInvoice])
 
   useEffect(() => {
+    setMonthlyInvoiceStatus('')
+  }, [selectedClient?.id, monthlyInvoiceMonth])
+
+  useEffect(() => {
     if (gigForm.clientId || clients.length === 0) {
       return
     }
@@ -569,14 +619,6 @@ function App({ appMetadata }: AppProps) {
       clientId: clients[0]?.id ?? '',
     }))
   }, [clients, gigForm.clientId])
-
-  useEffect(() => {
-    if (monthlyInvoiceClientId || clients.length === 0) {
-      return
-    }
-
-    setMonthlyInvoiceClientId(clients[0]?.id ?? '')
-  }, [clients, monthlyInvoiceClientId])
 
   const activeUsersCount = adminUsers.filter((user) => user.isActive).length
   const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
@@ -1683,34 +1725,30 @@ function App({ appMetadata }: AppProps) {
   }
 
   const handleGenerateMonthlyInvoice = async () => {
-    const clientId = monthlyInvoiceClientId.trim()
-    if (!clientId) {
-      setGigStatus('Choose a client for the monthly invoice run.')
+    if (!selectedClient) {
+      setMonthlyInvoiceStatus('Choose a client before running a monthly invoice.')
       return
     }
 
     if (!monthlyInvoiceMonth) {
-      setGigStatus('Choose a month for the monthly invoice run.')
+      setMonthlyInvoiceStatus('Choose a month for the monthly invoice run.')
       return
     }
 
-    const gigsToInvoice = gigs
-      .filter(
-        (gig) =>
-          gig.clientId === clientId &&
-          !gig.isInvoiced &&
-          gig.date.startsWith(`${monthlyInvoiceMonth}-`) &&
-          gig.status !== 'Cancelled'
-      )
-      .sort((left, right) => left.date.localeCompare(right.date))
+    const clientId = selectedClient.id
+    const gigsToInvoice = monthlyInvoiceEligibleGigs
 
     if (gigsToInvoice.length === 0) {
-      setGigStatus('No uninvoiced gigs found for that client/month.')
+      setMonthlyInvoiceStatus(
+        `No eligible gigs found for ${selectedClient.name} in ${monthlyInvoiceMonth}.`
+      )
       return
     }
 
     setIsInvoiceLoading(true)
-    setGigStatus(`Creating monthly invoice for ${gigsToInvoice.length} gig(s)...`)
+    setMonthlyInvoiceStatus(
+      `Creating monthly invoice for ${gigsToInvoice.length} gig(s)...`
+    )
 
     try {
       const issueDate = `${monthlyInvoiceMonth}-01`
@@ -1812,10 +1850,13 @@ function App({ appMetadata }: AppProps) {
       setGigStatus(
         `Monthly invoice ${updatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
       )
+      setMonthlyInvoiceStatus(
+        `Monthly invoice ${updatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
+      )
       setInvoiceStatus(`Monthly invoice ${updatedInvoice.invoiceNumber} is ready for review.`)
       setActiveSection('invoices')
     } catch (error) {
-      setGigStatus(
+      setMonthlyInvoiceStatus(
         error instanceof Error ? error.message : 'Unable to generate monthly invoice.'
       )
     } finally {
@@ -2011,6 +2052,18 @@ function App({ appMetadata }: AppProps) {
       }
 
       setInvoices((current) => current.filter((value) => value.id !== invoice.id))
+      setGigs((current) =>
+        current.map((gig) =>
+          gig.invoiceId === invoice.id
+            ? {
+                ...gig,
+                invoiceId: null,
+                invoicedAt: null,
+                isInvoiced: false,
+              }
+            : gig
+        )
+      )
       setSelectedInvoiceId((current) => (current === invoice.id ? '' : current))
       setInvoiceStatus(`Invoice ${invoice.invoiceNumber} deleted.`)
       setIsInvoiceEditorOpen(false)
@@ -2038,20 +2091,19 @@ function App({ appMetadata }: AppProps) {
   const currentSectionContent =
     activeSection === 'clients' ? (
       <ClientsSection
-        clients={clients}
         filteredClients={filteredClients}
         form={form}
         isApiConnected={isApiConnected}
         isEditorOpen={isClientEditorOpen}
+        isMonthlyInvoiceReady={isMonthlyInvoiceReady}
         isInvoiceLoading={isInvoiceLoading}
         isLoading={isLoading}
-        monthlyInvoiceClientId={monthlyInvoiceClientId}
+        monthlyInvoiceHelperText={monthlyInvoiceHelperText}
         monthlyInvoiceMonth={monthlyInvoiceMonth}
         mode={mode}
         onCloseEditor={closeClientEditor}
         onDelete={handleDelete}
         onGenerateMonthlyInvoice={handleGenerateMonthlyInvoice}
-        onMonthlyInvoiceClientChange={setMonthlyInvoiceClientId}
         onMonthlyInvoiceMonthChange={setMonthlyInvoiceMonth}
         onOpenClientSettings={openClientSettings}
         onResetForm={startCreating}
@@ -2107,6 +2159,7 @@ function App({ appMetadata }: AppProps) {
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateInvoice={handleGenerateInvoice}
+        onOpenLinkedInvoice={openSelectedGigInvoice}
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
         onSearchQueryChange={setGigSearchQuery}

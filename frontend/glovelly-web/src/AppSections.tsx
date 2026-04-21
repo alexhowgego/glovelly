@@ -91,20 +91,19 @@ export function SignInScreen({
 }
 
 type ClientsSectionProps = {
-  clients: Client[]
   filteredClients: Client[]
   form: ClientForm
   isApiConnected: boolean
   isEditorOpen: boolean
+  isMonthlyInvoiceReady: boolean
   isInvoiceLoading: boolean
   isLoading: boolean
-  monthlyInvoiceClientId: string
+  monthlyInvoiceHelperText: string
   monthlyInvoiceMonth: string
   onCloseEditor: () => void
   mode: 'create' | 'edit'
   onDelete: () => void
   onGenerateMonthlyInvoice: () => void
-  onMonthlyInvoiceClientChange: (value: string) => void
   onMonthlyInvoiceMonthChange: (value: string) => void
   onOpenClientSettings: () => void
   onResetForm: () => void
@@ -120,20 +119,19 @@ type ClientsSectionProps = {
 }
 
 export function ClientsSection({
-  clients,
   filteredClients,
   form,
   isApiConnected,
   isEditorOpen,
+  isMonthlyInvoiceReady,
   isInvoiceLoading,
   isLoading,
-  monthlyInvoiceClientId,
+  monthlyInvoiceHelperText,
   monthlyInvoiceMonth,
   onCloseEditor,
   mode,
   onDelete,
   onGenerateMonthlyInvoice,
-  onMonthlyInvoiceClientChange,
   onMonthlyInvoiceMonthChange,
   onOpenClientSettings,
   onResetForm,
@@ -246,23 +244,6 @@ export function ClientsSection({
                 <p className="detail-label">Monthly invoice run</p>
                 <div className="invoice-adjustment-form">
                   <label>
-                    Client
-                    <select
-                      value={monthlyInvoiceClientId}
-                      onChange={(event) =>
-                        onMonthlyInvoiceClientChange(event.target.value)
-                      }
-                      disabled={isInvoiceLoading}
-                    >
-                      <option value="">Select client</option>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
                     Month
                     <input
                       type="month"
@@ -277,11 +258,12 @@ export function ClientsSection({
                     className="primary-button"
                     onClick={onGenerateMonthlyInvoice}
                     type="button"
-                    disabled={isInvoiceLoading}
+                    disabled={isInvoiceLoading || !isMonthlyInvoiceReady}
                   >
                     Generate monthly invoice
                   </button>
                 </div>
+                <span>{monthlyInvoiceHelperText}</span>
               </div>
 
               <div className="detail-grid">
@@ -716,6 +698,7 @@ type GigsSectionProps = {
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
   onGenerateInvoice: () => void
+  onOpenLinkedInvoice: () => void
   onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
@@ -758,6 +741,7 @@ export function GigsSection({
   onExpenseAmountChange,
   onExpenseDescriptionChange,
   onGenerateInvoice,
+  onOpenLinkedInvoice,
   onRemoveGigExpense,
   onResetForm,
   onSearchQueryChange,
@@ -925,7 +909,13 @@ export function GigsSection({
                 </article>
                 <article>
                   <p className="detail-label">Invoice link</p>
-                  <strong>{selectedGig.isInvoiced ? 'Linked' : 'Not invoiced yet'}</strong>
+                  {selectedGig.isInvoiced ? (
+                    <button className="ghost-button" onClick={onOpenLinkedInvoice} type="button">
+                      Open invoice
+                    </button>
+                  ) : (
+                    <strong>Not invoiced yet</strong>
+                  )}
                 </article>
                 <article className="full-width">
                   <p className="detail-label">Notes</p>
@@ -943,8 +933,8 @@ export function GigsSection({
                 {selectedGigIds.length > 0 && (
                   <span>
                     {hasCrossClientSelection
-                      ? 'Selected gigs need to belong to the same client before they can be invoiced together.'
-                      : `${selectedGigIds.length} gig(s) selected for a combined invoice.`}
+                      ? ' Selected gigs need to belong to the same client before they can be invoiced together.'
+                      : ` ${selectedGigIds.length} gig(s) selected for a combined invoice.`}
                   </span>
                 )}
               </div>

@@ -297,6 +297,19 @@ public static class InvoiceEndpoints
             }
 
             var deletedAtUtc = DateTimeOffset.UtcNow;
+            var linkedGigs = await db.Gigs
+                .WhereVisibleTo(userId)
+                .Where(gig => gig.InvoiceId == invoice.Id)
+                .ToListAsync();
+
+            foreach (var gig in linkedGigs)
+            {
+                gig.InvoiceId = null;
+                gig.Invoice = null;
+                gig.InvoicedAt = null;
+                EndpointSupport.StampUpdate(gig, userId);
+            }
+
             logger.LogInformation(
                 "Invoice {InvoiceId} ({InvoiceNumber}) deleted by user {UserId} at {DeletedAtUtc}.",
                 invoice.Id,
