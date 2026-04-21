@@ -33,7 +33,8 @@ self.addEventListener('fetch', (event) => {
     requestUrl.pathname.startsWith('/clients') ||
     requestUrl.pathname.startsWith('/gigs') ||
     requestUrl.pathname.startsWith('/invoices') ||
-    requestUrl.pathname.startsWith('/invoice-lines')
+    requestUrl.pathname.startsWith('/invoice-lines') ||
+    requestUrl.pathname.startsWith('/seller-profile')
   ) {
     return
   }

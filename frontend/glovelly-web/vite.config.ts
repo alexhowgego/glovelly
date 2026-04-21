@@ -26,6 +26,10 @@ export default defineConfig({
         target: 'http://localhost:5153',
         changeOrigin: true,
       },
+      '/seller-profile': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
       '/admin': {
         target: 'http://localhost:5153',
         changeOrigin: true,

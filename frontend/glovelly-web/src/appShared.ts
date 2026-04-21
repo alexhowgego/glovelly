@@ -62,6 +62,42 @@ export type ClientSettingsForm = {
   passengerMileageRate: string
 }
 
+export type SellerProfile = {
+  id: string | null
+  sellerName: string | null
+  addressLine1: string | null
+  addressLine2: string | null
+  city: string | null
+  region: string | null
+  postcode: string | null
+  country: string | null
+  email: string | null
+  phone: string | null
+  accountName: string | null
+  sortCode: string | null
+  accountNumber: string | null
+  paymentReferenceNote: string | null
+  isConfigured: boolean
+  isInvoiceReady: boolean
+  missingFields: string[]
+}
+
+export type SellerProfileForm = {
+  sellerName: string
+  addressLine1: string
+  addressLine2: string
+  city: string
+  region: string
+  postcode: string
+  country: string
+  email: string
+  phone: string
+  accountName: string
+  sortCode: string
+  accountNumber: string
+  paymentReferenceNote: string
+}
+
 export type GigStatus = 'Draft' | 'Confirmed' | 'Completed' | 'Cancelled'
 
 export type GigExpense = {
@@ -180,6 +216,22 @@ export const emptyUserSettingsForm = (): UserSettingsForm => ({
 export const emptyClientSettingsForm = (): ClientSettingsForm => ({
   mileageRate: '',
   passengerMileageRate: '',
+})
+
+export const emptySellerProfileForm = (): SellerProfileForm => ({
+  sellerName: '',
+  addressLine1: '',
+  addressLine2: '',
+  city: '',
+  region: '',
+  postcode: '',
+  country: 'United Kingdom',
+  email: '',
+  phone: '',
+  accountName: '',
+  sortCode: '',
+  accountNumber: '',
+  paymentReferenceNote: '',
 })
 
 export const emptyGigForm = (): GigForm => ({

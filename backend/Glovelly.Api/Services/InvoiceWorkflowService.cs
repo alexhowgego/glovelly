@@ -36,7 +36,8 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
 
         var generatedLines = await BuildGeneratedInvoiceLinesForGigAsync(gig, userId, cancellationToken);
         invoice.Lines = generatedLines;
-        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, gig, generatedLines);
+        var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
+        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, gig, generatedLines, sellerProfile);
 
         dbContext.Invoices.Add(invoice);
 
@@ -77,15 +78,23 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         Guid? userId,
         CancellationToken cancellationToken = default)
     {
-        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList());
+        return ReissueInvoiceInternalAsync(invoice, client, userId, cancellationToken);
+    }
+
+    private async Task ReissueInvoiceInternalAsync(
+        Invoice invoice,
+        Client client,
+        Guid? userId,
+        CancellationToken cancellationToken)
+    {
+        var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
+        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
         invoice.Status = InvoiceStatus.Draft;
         invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
         invoice.ReissueCount += 1;
         invoice.LastReissuedUtc = DateTimeOffset.UtcNow;
         invoice.LastReissuedByUserId = userId;
         StampUpdate(invoice, userId);
-
-        return Task.CompletedTask;
     }
 
     public async Task<InvoiceLine> CreateManualAdjustmentAsync(
@@ -295,11 +304,26 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         return $"{yearPrefix}{nextSequence:000}";
     }
 
+    private Task<SellerProfile?> ResolveSellerProfileAsync(
+        Guid? userId,
+        CancellationToken cancellationToken)
+    {
+        if (!userId.HasValue)
+        {
+            return Task.FromResult<SellerProfile?>(null);
+        }
+
+        return dbContext.SellerProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(profile => profile.UserId == userId.Value, cancellationToken);
+    }
+
     private static byte[] GenerateInvoicePdf(
         Invoice invoice,
         Client client,
         Gig? gig,
-        IReadOnlyCollection<InvoiceLine> lines)
+        IReadOnlyCollection<InvoiceLine> lines,
+        SellerProfile? sellerProfile)
     {
         var rows = new List<string>
         {
@@ -308,9 +332,18 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
             $"Invoice date: {invoice.InvoiceDate:yyyy-MM-dd}",
             $"Due date: {invoice.DueDate:yyyy-MM-dd}",
             string.Empty,
+        };
+
+        if (sellerProfile is not null)
+        {
+            AppendSellerProfileRows(rows, sellerProfile);
+        }
+
+        rows.AddRange(
+        [
             $"Bill to: {client.Name}",
             client.Email,
-        };
+        ]);
 
         if (!string.IsNullOrWhiteSpace(client.BillingAddress?.Line1))
         {
@@ -357,7 +390,101 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         rows.Add(string.Empty);
         rows.Add($"Total due: {invoice.Total:0.00} GBP");
 
+        if (sellerProfile is not null)
+        {
+            AppendPaymentDetailsRows(rows, sellerProfile);
+        }
+
         return BuildSimplePdf(rows);
+    }
+
+    private static void AppendSellerProfileRows(List<string> rows, SellerProfile sellerProfile)
+    {
+        var sellerRows = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.SellerName))
+        {
+            sellerRows.Add($"From: {sellerProfile.SellerName}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.Address.Line1))
+        {
+            sellerRows.Add(sellerProfile.Address.Line1);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.Address.Line2))
+        {
+            sellerRows.Add(sellerProfile.Address.Line2);
+        }
+
+        var cityLine = string.Join(", ", new[]
+        {
+            sellerProfile.Address.City,
+            sellerProfile.Address.StateOrCounty,
+        }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+        if (!string.IsNullOrWhiteSpace(cityLine))
+        {
+            sellerRows.Add(cityLine);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.Address.PostalCode))
+        {
+            sellerRows.Add(sellerProfile.Address.PostalCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.Address.Country))
+        {
+            sellerRows.Add(sellerProfile.Address.Country);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.Email))
+        {
+            sellerRows.Add($"Email: {sellerProfile.Email}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.Phone))
+        {
+            sellerRows.Add($"Phone: {sellerProfile.Phone}");
+        }
+
+        if (sellerRows.Count > 0)
+        {
+            rows.AddRange(sellerRows);
+            rows.Add(string.Empty);
+        }
+    }
+
+    private static void AppendPaymentDetailsRows(List<string> rows, SellerProfile sellerProfile)
+    {
+        var paymentRows = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.AccountName))
+        {
+            paymentRows.Add($"Account name: {sellerProfile.AccountName}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.SortCode))
+        {
+            paymentRows.Add($"Sort code: {sellerProfile.SortCode}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.AccountNumber))
+        {
+            paymentRows.Add($"Account number: {sellerProfile.AccountNumber}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sellerProfile.PaymentReferenceNote))
+        {
+            paymentRows.Add($"Payment note: {sellerProfile.PaymentReferenceNote}");
+        }
+
+        if (paymentRows.Count > 0)
+        {
+            rows.Add(string.Empty);
+            rows.Add("Payment details:");
+            rows.AddRange(paymentRows);
+        }
     }
 
     private static byte[] BuildSimplePdf(IEnumerable<string> lines)
