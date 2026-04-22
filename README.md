@@ -42,9 +42,14 @@ Then set at least your Google subject claim in `.glovelly.dev.local`:
 export DevelopmentSeeding__AdminGoogleSubject="your-google-subject-claim"
 export DevelopmentSeeding__AdminEmail="you@example.com"
 export DevelopmentSeeding__AdminDisplayName="Your Name"
+export Email__Mode="Resend"
+export Email__Resend__DefaultFromAddress="your-verified-from@example.com"
+export Email__Resend__DefaultFromDisplayName="Glovelly"
 ```
 
 `run-dev.sh` sources this file automatically before starting the backend. The admin user is only seeded when no `ConnectionStrings:Glovelly` value is configured and Glovelly is using the in-memory development database.
+
+Keep secrets such as `Email__Resend__ApiKey` out of `.glovelly.dev.local`. Store those with `dotnet user-secrets` instead.
 
 #### Finding your Google subject claim locally
 
@@ -77,11 +82,22 @@ dotnet user-secrets set "ConnectionStrings:Glovelly" "your-postgresql-connection
 dotnet user-secrets set "Email:Resend:ApiKey" "your-resend-api-key"
 ```
 
-4. As an alternative, you can provide the same values via environment variables:
+4. To make outbound email work locally with Resend, also add these non-secret values to `.glovelly.dev.local`:
+
+```bash
+export Email__Mode="Resend"
+export Email__Resend__DefaultFromAddress="your-verified-from@example.com"
+export Email__Resend__DefaultFromDisplayName="Glovelly"
+```
+
+5. As an alternative, you can provide the same values via environment variables:
    - `Authentication__Google__ClientId`
    - `Authentication__Google__ClientSecret`
    - `ConnectionStrings__Glovelly`
    - `Email__Resend__ApiKey`
+   - `Email__Mode`
+   - `Email__Resend__DefaultFromAddress`
+   - `Email__Resend__DefaultFromDisplayName`
 
 The frontend signs users in through `/auth/login`, the backend completes the Google OpenID Connect flow, and the app stores the session in a secure cookie before allowing access to `/clients`, `/gigs`, `/invoices`, and `/invoice-lines`.
 
