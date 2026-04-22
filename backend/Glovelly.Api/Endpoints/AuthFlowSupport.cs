@@ -34,6 +34,7 @@ internal static class AuthFlowSupport
         var path = request.Path;
 
         return path.StartsWithSegments("/auth/me") ||
+               path.StartsWithSegments("/access") ||
                path.StartsWithSegments("/admin") ||
                path.StartsWithSegments("/clients") ||
                path.StartsWithSegments("/gigs") ||

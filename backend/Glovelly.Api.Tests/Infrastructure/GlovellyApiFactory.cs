@@ -1,5 +1,6 @@
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -14,6 +15,9 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"glovelly-tests-{Guid.NewGuid()}";
     private readonly object _databaseResetLock = new();
+    private readonly FakeEmailSender _fakeEmailSender = new();
+
+    internal FakeEmailSender Emails => _fakeEmailSender;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -23,8 +27,10 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IPolicyEvaluator>();
+            services.RemoveAll<IEmailSender>();
 
             services.AddSingleton<IPolicyEvaluator, TestPolicyEvaluator>();
+            services.AddSingleton<IEmailSender>(_fakeEmailSender);
 
             services.AddDbContext<AppDbContext>(options =>
             {
@@ -44,6 +50,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
         {
             using var scope = Services.CreateScope();
             ResetDatabase(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+            _fakeEmailSender.SentEmails.Clear();
+            _fakeEmailSender.ExceptionToThrow = null;
         }
 
         return client;
