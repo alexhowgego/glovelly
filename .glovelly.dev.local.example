@@ -1,3 +1,6 @@
 export DevelopmentSeeding__AdminGoogleSubject="your-google-subject-claim"
 export DevelopmentSeeding__AdminEmail="you@example.com"
 export DevelopmentSeeding__AdminDisplayName="Your Name"
+export Email__Mode="Resend"
+export Email__Resend__DefaultFromAddress="your-verified-from@example.com"
+export Email__Resend__DefaultFromDisplayName="Glovelly"

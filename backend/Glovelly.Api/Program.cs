@@ -4,7 +4,7 @@ using Glovelly.Api.Endpoints;
 var builder = WebApplication.CreateBuilder(args);
 var startupSettings = StartupSettings.From(builder.Configuration, builder.Environment);
 
-builder.Services.AddGlovellyInfrastructure(startupSettings);
+builder.Services.AddGlovellyInfrastructure(builder.Configuration, startupSettings);
 builder.Services.AddGlovellyAuthentication(startupSettings);
 
 var app = builder.Build();

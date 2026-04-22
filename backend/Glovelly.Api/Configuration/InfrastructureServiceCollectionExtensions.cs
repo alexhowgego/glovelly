@@ -10,10 +10,15 @@ namespace Glovelly.Api.Configuration;
 
 internal static class InfrastructureServiceCollectionExtensions
 {
-    public static IServiceCollection AddGlovellyInfrastructure(this IServiceCollection services, StartupSettings settings)
+    public static IServiceCollection AddGlovellyInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        StartupSettings settings)
     {
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
+        services.AddOptions<EmailSettings>()
+            .Bind(configuration.GetSection("Email"));
         services.AddGlovellyApplicationServices();
         services.ConfigureHttpJsonOptions(options =>
         {
