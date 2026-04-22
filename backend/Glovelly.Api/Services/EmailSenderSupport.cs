@@ -1,5 +1,3 @@
-using System.Net.Mail;
-
 namespace Glovelly.Api.Services;
 
 internal static class EmailSenderSupport
@@ -33,23 +31,7 @@ internal static class EmailSenderSupport
 
         if (string.IsNullOrWhiteSpace(address))
         {
-            throw new InvalidOperationException("Outbound email requires Email:DefaultFromAddress or Email:Smtp:DefaultFromAddress to be configured.");
-        }
-
-        return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
-    }
-
-    public static EmailAddress ResolveSmtpFromAddress(EmailSettings settings)
-    {
-        var address = settings.Smtp.DefaultFromAddress
-            ?? settings.DefaultFromAddress;
-
-        var displayName = settings.Smtp.DefaultFromDisplayName
-            ?? settings.DefaultFromDisplayName;
-
-        if (string.IsNullOrWhiteSpace(address))
-        {
-            throw new InvalidOperationException("Outbound email requires Email:DefaultFromAddress or Email:Smtp:DefaultFromAddress to be configured.");
+            throw new InvalidOperationException("Outbound email requires Email:DefaultFromAddress or Email:Resend:DefaultFromAddress to be configured.");
         }
 
         return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
@@ -58,7 +40,6 @@ internal static class EmailSenderSupport
     public static EmailAddress? TryResolveFromAddress(EmailSettings settings)
     {
         var address = settings.DefaultFromAddress;
-
         if (string.IsNullOrWhiteSpace(address))
         {
             return null;
@@ -66,18 +47,6 @@ internal static class EmailSenderSupport
 
         var displayName = settings.DefaultFromDisplayName;
         return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
-    }
-
-    public static MailAddress ToMailAddress(EmailAddress address)
-    {
-        if (string.IsNullOrWhiteSpace(address.Address))
-        {
-            throw new InvalidOperationException("Email address cannot be blank.");
-        }
-
-        return string.IsNullOrWhiteSpace(address.DisplayName)
-            ? new MailAddress(address.Address.Trim())
-            : new MailAddress(address.Address.Trim(), address.DisplayName.Trim());
     }
 
     public static string FormatAddress(EmailAddress address)

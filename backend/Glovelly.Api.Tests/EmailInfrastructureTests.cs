@@ -36,21 +36,6 @@ public sealed class EmailInfrastructureTests
     }
 
     [Fact]
-    public void SmtpMode_ResolvesSmtpSender()
-    {
-        using var services = BuildServices(settings =>
-        {
-            settings.Mode = "smtp";
-            settings.Smtp.Host = "smtp.glovelly.test";
-            settings.Smtp.DefaultFromAddress = "hello@glovelly.test";
-        });
-
-        var sender = services.GetRequiredService<IEmailSender>();
-
-        Assert.IsType<SmtpEmailSender>(sender);
-    }
-
-    [Fact]
     public void ResendMode_ResolvesResendSender()
     {
         using var services = BuildServices(settings =>
@@ -63,23 +48,6 @@ public sealed class EmailInfrastructureTests
         var sender = services.GetRequiredService<IEmailSender>();
 
         Assert.IsType<ResendApiEmailSender>(sender);
-    }
-
-    [Fact]
-    public async Task SmtpSender_RejectsMissingTransportConfiguration()
-    {
-        var sender = new SmtpEmailSender(new EmailSettings
-        {
-            Mode = EmailModes.Smtp,
-        });
-
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => sender.SendAsync(
-            new EmailMessage(
-                To: [new EmailAddress("user@example.com")],
-                Subject: "Test subject",
-                PlainTextBody: "Hello from Glovelly.")));
-
-        Assert.Contains("Email:Smtp:Host", error.Message);
     }
 
     [Fact]

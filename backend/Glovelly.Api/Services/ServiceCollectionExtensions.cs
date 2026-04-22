@@ -24,7 +24,6 @@ public static class ServiceCollectionExtensions
             {
                 EmailModes.Disabled => ActivatorUtilities.CreateInstance<NullEmailSender>(provider),
                 EmailModes.Resend => ActivatorUtilities.CreateInstance<ResendApiEmailSender>(provider, emailSettings),
-                EmailModes.Smtp => ActivatorUtilities.CreateInstance<SmtpEmailSender>(provider, emailSettings),
                 _ => ActivatorUtilities.CreateInstance<LoggingEmailSender>(provider, emailSettings),
             };
         });
@@ -37,11 +36,6 @@ public static class ServiceCollectionExtensions
         if (string.Equals(mode, EmailModes.Disabled, StringComparison.OrdinalIgnoreCase))
         {
             return EmailModes.Disabled;
-        }
-
-        if (string.Equals(mode, EmailModes.Smtp, StringComparison.OrdinalIgnoreCase))
-        {
-            return EmailModes.Smtp;
         }
 
         if (string.Equals(mode, EmailModes.Resend, StringComparison.OrdinalIgnoreCase))
