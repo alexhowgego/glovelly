@@ -26,7 +26,7 @@ public sealed class SmtpEmailSender(EmailSettings settings) : IEmailSender
     {
         var mailMessage = new MailMessage
         {
-            From = EmailSenderSupport.ToMailAddress(EmailSenderSupport.ResolveFromAddress(settings)),
+            From = EmailSenderSupport.ToMailAddress(EmailSenderSupport.ResolveSmtpFromAddress(settings)),
             Subject = message.Subject,
             Body = message.PlainTextBody,
             IsBodyHtml = false,

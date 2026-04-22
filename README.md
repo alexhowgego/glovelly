@@ -74,12 +74,14 @@ cd backend/Glovelly.Api
 dotnet user-secrets set "Authentication:Google:ClientId" "your-client-id"
 dotnet user-secrets set "Authentication:Google:ClientSecret" "your-client-secret"
 dotnet user-secrets set "ConnectionStrings:Glovelly" "your-postgresql-connection-string"
+dotnet user-secrets set "Email:Resend:ApiKey" "your-resend-api-key"
 ```
 
 4. As an alternative, you can provide the same values via environment variables:
    - `Authentication__Google__ClientId`
    - `Authentication__Google__ClientSecret`
    - `ConnectionStrings__Glovelly`
+   - `Email__Resend__ApiKey`
 
 The frontend signs users in through `/auth/login`, the backend completes the Google OpenID Connect flow, and the app stores the session in a secure cookie before allowing access to `/clients`, `/gigs`, `/invoices`, and `/invoice-lines`.
 
@@ -118,6 +120,7 @@ The workflow:
 - Pushes the image to Google Artifact Registry for main and internal pull request runs
 - Tags images with `latest` on the default branch and with a commit SHA tag for each build
 - Injects Google Secret Manager secrets into Cloud Run, including `Authentication__Google__ClientId`, `Authentication__Google__ClientSecret`, and `ConnectionStrings__Glovelly`
+- Injects the Resend API key into Cloud Run as `Email__Resend__ApiKey`
 - Deploys `main` to the `glovelly` Cloud Run service
 - Deploys each internal pull request to the shared `glovelly-staging` Cloud Run service and comments the preview URL on the PR
 

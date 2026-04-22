@@ -51,6 +51,21 @@ public sealed class EmailInfrastructureTests
     }
 
     [Fact]
+    public void ResendMode_ResolvesResendSender()
+    {
+        using var services = BuildServices(settings =>
+        {
+            settings.Mode = "resend";
+            settings.Resend.ApiKey = "re_test_key";
+            settings.Resend.DefaultFromAddress = "hello@glovelly.test";
+        });
+
+        var sender = services.GetRequiredService<IEmailSender>();
+
+        Assert.IsType<ResendApiEmailSender>(sender);
+    }
+
+    [Fact]
     public async Task SmtpSender_RejectsMissingTransportConfiguration()
     {
         var sender = new SmtpEmailSender(new EmailSettings
@@ -65,6 +80,25 @@ public sealed class EmailInfrastructureTests
                 PlainTextBody: "Hello from Glovelly.")));
 
         Assert.Contains("Email:Smtp:Host", error.Message);
+    }
+
+    [Fact]
+    public async Task ResendSender_RejectsMissingApiConfiguration()
+    {
+        using var services = BuildServices(settings =>
+        {
+            settings.Mode = EmailModes.Resend;
+        });
+
+        var sender = services.GetRequiredService<IEmailSender>();
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => sender.SendAsync(
+            new EmailMessage(
+                To: [new EmailAddress("user@example.com")],
+                Subject: "Test subject",
+                PlainTextBody: "Hello from Glovelly.")));
+
+        Assert.Contains("Email:Resend:ApiKey", error.Message);
     }
 
     private static ServiceProvider BuildServices(Action<EmailSettings>? configure = null)

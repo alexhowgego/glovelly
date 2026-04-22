@@ -24,10 +24,28 @@ internal static class EmailSenderSupport
         }
     }
 
-    public static EmailAddress ResolveFromAddress(EmailSettings settings)
+    public static EmailAddress ResolveResendFromAddress(EmailSettings settings)
     {
-        var address = settings.Smtp.DefaultFromAddress ?? settings.DefaultFromAddress;
-        var displayName = settings.Smtp.DefaultFromDisplayName ?? settings.DefaultFromDisplayName;
+        var address = settings.Resend.DefaultFromAddress
+            ?? settings.DefaultFromAddress;
+        var displayName = settings.Resend.DefaultFromDisplayName
+            ?? settings.DefaultFromDisplayName;
+
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            throw new InvalidOperationException("Outbound email requires Email:DefaultFromAddress or Email:Smtp:DefaultFromAddress to be configured.");
+        }
+
+        return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
+    }
+
+    public static EmailAddress ResolveSmtpFromAddress(EmailSettings settings)
+    {
+        var address = settings.Smtp.DefaultFromAddress
+            ?? settings.DefaultFromAddress;
+
+        var displayName = settings.Smtp.DefaultFromDisplayName
+            ?? settings.DefaultFromDisplayName;
 
         if (string.IsNullOrWhiteSpace(address))
         {
@@ -39,14 +57,14 @@ internal static class EmailSenderSupport
 
     public static EmailAddress? TryResolveFromAddress(EmailSettings settings)
     {
-        var address = settings.Smtp.DefaultFromAddress ?? settings.DefaultFromAddress;
+        var address = settings.DefaultFromAddress;
 
         if (string.IsNullOrWhiteSpace(address))
         {
             return null;
         }
 
-        var displayName = settings.Smtp.DefaultFromDisplayName ?? settings.DefaultFromDisplayName;
+        var displayName = settings.DefaultFromDisplayName;
         return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
     }
 
