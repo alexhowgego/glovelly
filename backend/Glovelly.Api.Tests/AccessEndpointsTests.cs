@@ -52,17 +52,27 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
             {
                 Assert.Equal("second-admin@glovelly.local", message.To.Single().Address);
                 Assert.Equal("Glovelly access request", message.Subject);
+                Assert.Contains("Environment: Testing", message.PlainTextBody);
                 Assert.Contains("User email: new-user@glovelly.local", message.PlainTextBody);
                 Assert.Contains("User display name: New User", message.PlainTextBody);
                 Assert.Contains("Timestamp:", message.PlainTextBody);
+                Assert.Contains("Identity subject: google-sub-new-user", message.PlainTextBody);
+                Assert.NotNull(message.HtmlBody);
+                Assert.Contains("Glovelly", message.HtmlBody);
+                Assert.Contains("Testing", message.HtmlBody);
             },
             message =>
             {
                 Assert.Equal("test-admin@glovelly.local", message.To.Single().Address);
                 Assert.Equal("Glovelly access request", message.Subject);
+                Assert.Contains("Environment: Testing", message.PlainTextBody);
                 Assert.Contains("User email: new-user@glovelly.local", message.PlainTextBody);
                 Assert.Contains("User display name: New User", message.PlainTextBody);
                 Assert.Contains("Timestamp:", message.PlainTextBody);
+                Assert.Contains("Identity subject: google-sub-new-user", message.PlainTextBody);
+                Assert.NotNull(message.HtmlBody);
+                Assert.Contains("Glovelly", message.HtmlBody);
+                Assert.Contains("Testing", message.HtmlBody);
             });
     }
 
