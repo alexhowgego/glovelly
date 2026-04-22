@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Glovelly.Api.Tests.Infrastructure;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -9,10 +11,12 @@ namespace Glovelly.Api.Tests;
 public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly GlovellyApiFactory _factory;
     private readonly HttpClient _client;
 
     public AuthEndpointsTests(GlovellyApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -82,5 +86,36 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "Invoice filename pattern cannot be empty or whitespace.",
             problem.GetProperty("errors").GetProperty("invoiceFilenamePattern")[0].GetString());
+    }
+
+    [Fact]
+    public async Task DeniedPage_ShowsRequestAccessUi_WhenSignedRequestTokenProvided()
+    {
+        var token = CreateAccessRequestToken("new-user@glovelly.local", "New User", "google-sub-new-user");
+
+        var response = await _client.GetAsync($"/auth/denied?code=not_authorized&request={Uri.EscapeDataString(token)}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Request access", html);
+        Assert.Contains("data-access-request-button", html);
+    }
+
+    private string CreateAccessRequestToken(string email, string displayName, string subject)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dataProtectionProvider = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
+        var protector = dataProtectionProvider
+            .CreateProtector("Glovelly.AccessRequest")
+            .ToTimeLimitedDataProtector();
+
+        return protector.Protect(
+            JsonSerializer.Serialize(new
+            {
+                email,
+                displayName,
+                subject,
+            }),
+            lifetime: TimeSpan.FromMinutes(15));
     }
 }

@@ -1,6 +1,7 @@
 using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Endpoints;
+using Microsoft.AspNetCore.DataProtection;
 using Glovelly.Api.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -85,9 +86,12 @@ internal static class AuthenticationServiceCollectionExtensions
                         context.HandleResponse();
 
                         var failureCode = AuthFlowSupport.GetAuthenticationFailureCode(context.Failure);
+                        string? requestToken = null;
+                        context.Properties?.Items.TryGetValue("access_request_token", out requestToken);
+                        var deniedPath = AuthFlowSupport.BuildDeniedPath(failureCode, requestToken);
                         var redirectUri = AuthFlowSupport.BuildSafeRedirectUri(
                             context.HttpContext,
-                            $"/auth/denied?code={Uri.EscapeDataString(failureCode)}");
+                            deniedPath);
 
                         context.Response.Redirect(redirectUri);
                         return Task.CompletedTask;
@@ -168,7 +172,15 @@ internal static class AuthenticationServiceCollectionExtensions
 
             if (user is null)
             {
-                context.Fail("You do not have access to Glovelly.");
+                var requestToken = AuthFlowSupport.CreateAccessRequestToken(
+                    principal,
+                    context.HttpContext.RequestServices.GetRequiredService<IDataProtectionProvider>());
+                var redirectUri = AuthFlowSupport.BuildSafeRedirectUri(
+                    context.HttpContext,
+                    AuthFlowSupport.BuildDeniedPath("not_authorized", requestToken));
+
+                context.HandleResponse();
+                context.Response.Redirect(redirectUri);
                 return;
             }
 

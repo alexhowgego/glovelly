@@ -144,10 +144,11 @@ internal static class AuthEndpoints
             });
         }
 
-        auth.MapGet("/denied", (string? code) =>
+        auth.MapGet("/denied", (HttpContext httpContext, string? code) =>
         {
             var failureCode = string.IsNullOrWhiteSpace(code) ? "not_authorized" : code;
-            var html = AuthFlowSupport.RenderUnauthorizedPage(failureCode);
+            var accessRequestToken = httpContext.Request.Query["request"].FirstOrDefault();
+            var html = AuthFlowSupport.RenderUnauthorizedPage(failureCode, accessRequestToken);
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
