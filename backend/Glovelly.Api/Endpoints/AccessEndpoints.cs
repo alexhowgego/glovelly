@@ -6,11 +6,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Glovelly.Api.Endpoints;
 
 internal static class AccessEndpoints
 {
+    private const string GenericSuccessMessage = "Access request submitted.";
+
     public static IEndpointRouteBuilder MapAccessEndpoints(this IEndpointRouteBuilder app, StartupSettings settings)
     {
         var access = app.MapGroup("/access")
@@ -22,12 +26,13 @@ internal static class AccessEndpoints
             ClaimsPrincipal user,
             AppDbContext dbContext,
             IEmailSender emailSender,
+            AccessRequestWorkflowService workflowService,
+            HttpContext httpContext,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
             var logger = loggerFactory.CreateLogger("Glovelly.AccessRequests");
-            var requestedAtUtc = DateTimeOffset.UtcNow;
-            var requester = AccessRequestEmailRequest.FromClaims(user, requestedAtUtc);
+            var requester = AccessRequestEmailRequest.FromClaims(user);
 
             if (string.IsNullOrWhiteSpace(requester.Email))
             {
@@ -36,6 +41,17 @@ internal static class AccessEndpoints
                     requester.Subject ?? "(missing)");
                 return Results.BadRequest(new { message = "A verified email address is required to request access." });
             }
+
+            var workflowResult = await workflowService.RecordAsync(
+                requester.Email,
+                requester.DisplayName,
+                requester.Subject,
+                AccessRequestRequestContext.ResolveRemoteIpAddress(httpContext),
+                cancellationToken);
+            var notificationRequest = requester with
+            {
+                RequestedAtUtc = workflowResult.AccessRequest.RequestedAtUtc
+            };
 
             var administrators = await dbContext.Users
                 .AsNoTracking()
@@ -57,18 +73,40 @@ internal static class AccessEndpoints
                     skippedAdminCount);
             }
 
+            if (!workflowResult.ShouldSendNotification)
+            {
+                logger.LogInformation(
+                    "Access request notification suppressed.");
+                return Results.Ok(new { message = GenericSuccessMessage });
+            }
+
+            if (recipients.Length == 0)
+            {
+                logger.LogWarning(
+                    "Access request recorded, but no administrator recipients were available for notification.");
+                return Results.Ok(new { message = GenericSuccessMessage });
+            }
+
             try
             {
+                logger.LogInformation(
+                    "Attempting access request notification send to {RecipientCount} administrator recipients.",
+                    recipients.Length);
+
                 foreach (var recipient in recipients)
                 {
                     await emailSender.SendAsync(
                         new EmailMessage(
                             To: [new EmailAddress(recipient)],
                             Subject: "Glovelly access request",
-                            PlainTextBody: BuildPlainTextBody(requester, environmentLabel),
-                            HtmlBody: BuildHtmlBody(requester, environmentLabel)),
+                            PlainTextBody: BuildPlainTextBody(notificationRequest, environmentLabel),
+                            HtmlBody: BuildHtmlBody(notificationRequest, environmentLabel)),
                         cancellationToken);
                 }
+
+                await workflowService.MarkNotificationSentAsync(
+                    workflowResult.AccessRequest.Id,
+                    cancellationToken);
             }
             catch (Exception exception)
             {
@@ -87,8 +125,9 @@ internal static class AccessEndpoints
                 requester.Subject ?? "(missing)",
                 recipients.Length);
 
-            return Results.Ok(new { message = "Access request submitted." });
-        });
+            return Results.Ok(new { message = GenericSuccessMessage });
+        })
+        .RequireRateLimiting("PublicAccessRequest");
 
         return app;
     }
@@ -203,14 +242,14 @@ internal static class AccessEndpoints
         string? Subject,
         DateTimeOffset RequestedAtUtc)
     {
-        public static AccessRequestEmailRequest FromClaims(ClaimsPrincipal user, DateTimeOffset requestedAtUtc)
+        public static AccessRequestEmailRequest FromClaims(ClaimsPrincipal user)
         {
             var email = AuthFlowSupport.NormalizeEmail(
                 user.FindFirstValue("email") ?? user.FindFirstValue(ClaimTypes.Email)) ?? string.Empty;
             var displayName = Normalize(user.FindFirstValue("name") ?? user.FindFirstValue(ClaimTypes.Name));
             var subject = Normalize(user.FindFirstValue("sub") ?? user.FindFirstValue(ClaimTypes.NameIdentifier));
 
-            return new AccessRequestEmailRequest(email, displayName, subject, requestedAtUtc);
+            return new AccessRequestEmailRequest(email, displayName, subject, DateTimeOffset.MinValue);
         }
 
         private static string? Normalize(string? value)

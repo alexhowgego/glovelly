@@ -8,6 +8,8 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddGlovellyApplicationServices(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<AccessRequestWorkflowService>();
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddOptions<ResendClientOptions>()
             .Configure<IOptions<EmailSettings>>((resendOptions, emailOptions) =>

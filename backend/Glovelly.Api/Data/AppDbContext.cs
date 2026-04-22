@@ -5,6 +5,7 @@ namespace Glovelly.Api.Data;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<AccessRequest> AccessRequests => Set<AccessRequest>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Gig> Gigs => Set<Gig>();
@@ -15,6 +16,30 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AccessRequest>(entity =>
+        {
+            entity.HasKey(accessRequest => accessRequest.Id);
+            entity.Property(accessRequest => accessRequest.Email)
+                .IsRequired()
+                .HasMaxLength(320);
+            entity.Property(accessRequest => accessRequest.NormalizedEmail)
+                .IsRequired()
+                .HasMaxLength(320);
+            entity.Property(accessRequest => accessRequest.DisplayName)
+                .HasMaxLength(200);
+            entity.Property(accessRequest => accessRequest.Subject)
+                .HasMaxLength(255);
+            entity.Property(accessRequest => accessRequest.RequestedAtUtc)
+                .IsRequired();
+            entity.Property(accessRequest => accessRequest.RequestIpHash)
+                .HasMaxLength(128);
+            entity.Property(accessRequest => accessRequest.NotificationSuppressionReason)
+                .HasMaxLength(100);
+            entity.HasIndex(accessRequest => accessRequest.NormalizedEmail);
+            entity.HasIndex(accessRequest => accessRequest.NotificationSentAtUtc);
+            entity.HasIndex(accessRequest => accessRequest.RequestedAtUtc);
+        });
+
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(user => user.Id);

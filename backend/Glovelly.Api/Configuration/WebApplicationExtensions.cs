@@ -33,6 +33,7 @@ internal static class WebApplicationExtensions
             app.UseCors(settings.DevCorsPolicy);
         }
 
+        app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseDefaultFiles();

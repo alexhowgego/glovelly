@@ -3,8 +3,10 @@ using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 namespace Glovelly.Api.Configuration;
 
@@ -15,10 +17,15 @@ internal static class InfrastructureServiceCollectionExtensions
         IConfiguration configuration,
         StartupSettings settings)
     {
+        var accessRequestSettings = configuration.GetSection(AccessRequestProtectionSettings.SectionName)
+            .Get<AccessRequestProtectionSettings>() ?? new AccessRequestProtectionSettings();
+
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddOptions<EmailSettings>()
             .Bind(configuration.GetSection("Email"));
+        services.AddOptions<AccessRequestProtectionSettings>()
+            .Bind(configuration.GetSection(AccessRequestProtectionSettings.SectionName));
         services.AddGlovellyApplicationServices();
         services.ConfigureHttpJsonOptions(options =>
         {
@@ -61,6 +68,36 @@ internal static class InfrastructureServiceCollectionExtensions
                 policy.RequireAuthenticatedUser();
                 policy.RequireClaim(GlovellyClaimTypes.UserId);
                 policy.RequireRole(UserRole.Admin.ToString());
+            });
+        });
+        services.AddRateLimiter(options =>
+        {
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("Glovelly.AccessRequests");
+                logger.LogWarning(
+                    "Access request rate limit triggered for IP {RemoteIpAddress}.",
+                    context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "(unknown)");
+                context.HttpContext.Response.StatusCode = StatusCodes.Status200OK;
+                context.HttpContext.Response.ContentType = "application/json";
+                await context.HttpContext.Response.WriteAsync(
+                    "{\"message\":\"Access request submitted.\"}",
+                    cancellationToken);
+            };
+            options.AddPolicy<string>("PublicAccessRequest", httpContext =>
+            {
+                var remoteIp = AccessRequestRequestContext.ResolveRateLimitPartitionKey(httpContext);
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    remoteIp,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = accessRequestSettings.PerIpShortWindowPermitLimit,
+                        Window = accessRequestSettings.PerIpShortWindow,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
             });
         });
 

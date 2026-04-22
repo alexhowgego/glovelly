@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -37,15 +39,15 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         });
         await dbContext.SaveChangesAsync();
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "/access/request");
+        var request = CreateAccessRequest("new-user@glovelly.local", "198.51.100.10");
         request.Headers.Add("X-Test-Include-UserId", "false");
-        request.Headers.Add("X-Test-Email", "new-user@glovelly.local");
         request.Headers.Add("X-Test-Name", "New User");
         request.Headers.Add("X-Test-Subject", "google-sub-new-user");
 
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
         Assert.Collection(
             _factory.Emails.SentEmails.OrderBy(value => value.To.Single().Address),
             message =>
@@ -92,9 +94,10 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         });
         await dbContext.SaveChangesAsync();
 
-        var response = await _client.PostAsync("/access/request", JsonContent.Create(new { }));
+        var response = await _client.SendAsync(CreateAccessRequest(TestAuthContext.DefaultEmail, "198.51.100.11"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
         Assert.Single(_factory.Emails.SentEmails);
         Assert.Equal("test-admin@glovelly.local", _factory.Emails.SentEmails[0].To.Single().Address);
     }
@@ -102,8 +105,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task RequestAccess_ReturnsBadRequest_WhenEmailClaimMissing()
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/access/request");
-        request.Headers.Add("X-Test-Email", "   ");
+        var request = CreateAccessRequest("   ", "198.51.100.12");
 
         var response = await _client.SendAsync(request);
 
@@ -116,7 +118,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         _factory.Emails.ExceptionToThrow = new InvalidOperationException("SMTP unavailable");
 
-        var response = await _client.PostAsync("/access/request", JsonContent.Create(new { }));
+        var response = await _client.SendAsync(CreateAccessRequest(TestAuthContext.DefaultEmail, "198.51.100.13"));
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
 
@@ -125,5 +127,117 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "We couldn't submit your access request right now. Please try again shortly.",
             problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task RequestAccess_SuppressesRepeatNotificationsForSameEmailWithinWindow()
+    {
+        var firstRequest = CreateAccessRequest("repeat-user@glovelly.local", "198.51.100.14");
+        var secondRequest = CreateAccessRequest("REPEAT-USER@glovelly.local", "198.51.100.14");
+
+        var firstResponse = await _client.SendAsync(firstRequest);
+        var secondResponse = await _client.SendAsync(secondRequest);
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        Assert.Equal("Access request submitted.", await ReadMessageAsync(firstResponse));
+        Assert.Equal("Access request submitted.", await ReadMessageAsync(secondResponse));
+        Assert.Single(_factory.Emails.SentEmails);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var storedRequests = await dbContext.AccessRequests
+            .OrderBy(value => value.RequestedAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, storedRequests.Count);
+        Assert.NotNull(storedRequests[0].NotificationSentAtUtc);
+        Assert.Null(storedRequests[0].NotificationSuppressionReason);
+        Assert.Null(storedRequests[1].NotificationSentAtUtc);
+        Assert.Equal(
+            AccessRequestWorkflowService.DuplicateEmailSuppressionReason,
+            storedRequests[1].NotificationSuppressionReason);
+    }
+
+    [Fact]
+    public async Task RequestAccess_SuppressesNotificationWhenDailyCapReached()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var now = DateTimeOffset.UtcNow;
+
+            for (var index = 0; index < 50; index++)
+            {
+                dbContext.AccessRequests.Add(new AccessRequest
+                {
+                    Id = Guid.NewGuid(),
+                    Email = $"existing-{index}@glovelly.local",
+                    NormalizedEmail = $"existing-{index}@glovelly.local",
+                    RequestedAtUtc = now.AddMinutes(-index),
+                    NotificationSentAtUtc = now.AddMinutes(-index)
+                });
+            }
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        var request = CreateAccessRequest("quota-target@glovelly.local", "198.51.100.15");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
+        Assert.Empty(_factory.Emails.SentEmails);
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDbContext = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var storedRequest = await verificationDbContext.AccessRequests
+            .OrderByDescending(value => value.RequestedAtUtc)
+            .FirstAsync(value => value.NormalizedEmail == "quota-target@glovelly.local");
+
+        Assert.Null(storedRequest.NotificationSentAtUtc);
+        Assert.Equal(
+            AccessRequestWorkflowService.DailyNotificationCapSuppressionReason,
+            storedRequest.NotificationSuppressionReason);
+    }
+
+    [Fact]
+    public async Task RequestAccess_ReturnsGenericSuccess_WhenRateLimited()
+    {
+        var responses = new List<HttpResponseMessage>();
+
+        for (var index = 0; index < 6; index++)
+        {
+            var request = CreateAccessRequest($"rate-limit-{index}@glovelly.local", "198.51.100.16");
+            responses.Add(await _client.SendAsync(request));
+        }
+
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+
+        foreach (var response in responses)
+        {
+            Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
+        }
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        Assert.Equal(5, await dbContext.AccessRequests.CountAsync());
+        Assert.Equal(5, _factory.Emails.SentEmails.Count);
+    }
+
+    private static async Task<string?> ReadMessageAsync(HttpResponseMessage response)
+    {
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        return payload.GetProperty("message").GetString();
+    }
+
+    private static HttpRequestMessage CreateAccessRequest(string email, string remoteIp)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/access/request");
+        request.Headers.Add("X-Test-Email", email);
+        request.Headers.Add("X-Test-Remote-Ip", remoteIp);
+        return request;
     }
 }
