@@ -94,6 +94,9 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         var pdfResponse = await _client.GetAsync($"/invoices/{invoice.GetProperty("id").GetGuid()}/pdf");
         Assert.Equal(HttpStatusCode.OK, pdfResponse.StatusCode);
         Assert.Equal("application/pdf", pdfResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            $"{invoice.GetProperty("invoiceNumber").GetString()}.pdf",
+            pdfResponse.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
         var pdfBytes = await pdfResponse.Content.ReadAsByteArrayAsync();
         Assert.True(pdfBytes.Length > 0);
 
@@ -267,5 +270,123 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         Assert.Equal("Selected gigs must all belong to the same client.", problem.GetProperty("errors").GetProperty("gigIds")[0].GetString());
+    }
+
+    [Fact]
+    public async Task DownloadInvoicePdf_WithClientFilenamePattern_UsesResolvedSanitizedFilename()
+    {
+        var sellerProfileResponse = await _client.PutAsJsonAsync("/seller-profile", new
+        {
+            sellerName = "Glovelly Music Ltd",
+            addressLine1 = "1 Chapel Street",
+            city = "Manchester",
+            country = "United Kingdom",
+            email = "accounts@glovelly.test",
+            accountName = "Glovelly Music Ltd",
+            sortCode = "12-34-56",
+            accountNumber = "12345678",
+        });
+        sellerProfileResponse.EnsureSuccessStatusCode();
+
+        var createGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Filename pattern booking",
+            date = "2026-04-20",
+            venue = "Albert Hall",
+            fee = 250.00m,
+            travelMiles = 0m,
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createGigResponse.EnsureSuccessStatusCode();
+
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var generateInvoiceResponse = await _client.PostAsync(
+            $"/gigs/{createdGig.GetProperty("id").GetGuid()}/generate-invoice",
+            content: null);
+        generateInvoiceResponse.EnsureSuccessStatusCode();
+
+        var generatedInvoice = await generateInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var updateClientResponse = await _client.PutAsJsonAsync($"/clients/{TestData.FoxAndFinchId}", new
+        {
+            id = TestData.FoxAndFinchId,
+            name = "Fox & Finch Events",
+            email = "bookings@foxandfinch.co.uk",
+            billingAddress = new
+            {
+                line1 = "12 Chapel Street",
+                city = "Manchester",
+                stateOrCounty = "Greater Manchester",
+                postalCode = "M3 5JZ",
+                country = "United Kingdom",
+            },
+            mileageRate = 0.52m,
+            passengerMileageRate = 0.15m,
+            invoiceFilenamePattern = "{ClientName}: {MonthName} {Year} {InvoiceNumber}",
+        });
+        updateClientResponse.EnsureSuccessStatusCode();
+
+        var response = await _client.GetAsync($"/invoices/{generatedInvoice.GetProperty("id").GetGuid()}/pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            $"Fox & Finch Events- April 2026 {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
+            response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+    }
+
+    [Fact]
+    public async Task DownloadInvoicePdf_WithoutClientPattern_UsesUserDefaultFilenamePattern()
+    {
+        var sellerProfileResponse = await _client.PutAsJsonAsync("/seller-profile", new
+        {
+            sellerName = "Glovelly Music Ltd",
+            addressLine1 = "1 Chapel Street",
+            city = "Manchester",
+            country = "United Kingdom",
+            email = "accounts@glovelly.test",
+            accountName = "Glovelly Music Ltd",
+            sortCode = "12-34-56",
+            accountNumber = "12345678",
+        });
+        sellerProfileResponse.EnsureSuccessStatusCode();
+
+        var updateUserSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            invoiceFilenamePattern = "{MonthName} {Year} {InvoiceNumber}",
+        });
+        updateUserSettingsResponse.EnsureSuccessStatusCode();
+
+        var createGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.RiversideId,
+            title = "User default filename booking",
+            date = "2026-04-21",
+            venue = "Riverside Hall",
+            fee = 250.00m,
+            travelMiles = 0m,
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createGigResponse.EnsureSuccessStatusCode();
+
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var generateInvoiceResponse = await _client.PostAsync(
+            $"/gigs/{createdGig.GetProperty("id").GetGuid()}/generate-invoice",
+            content: null);
+        generateInvoiceResponse.EnsureSuccessStatusCode();
+
+        var generatedInvoice = await generateInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var response = await _client.GetAsync($"/invoices/{generatedInvoice.GetProperty("id").GetGuid()}/pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            $"April 2026 {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
+            response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
     }
 }

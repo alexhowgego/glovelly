@@ -14,6 +14,7 @@ export type Client = {
   billingAddress: Address
   mileageRate: number | null
   passengerMileageRate: number | null
+  invoiceFilenamePattern: string | null
 }
 
 export type ClientForm = {
@@ -30,6 +31,7 @@ export type AuthUser = {
   profileImageUrl: string
   mileageRate: number | null
   passengerMileageRate: number | null
+  invoiceFilenamePattern: string | null
 }
 
 export type AdminUser = {
@@ -55,11 +57,13 @@ export type AdminUserForm = {
 export type UserSettingsForm = {
   mileageRate: string
   passengerMileageRate: string
+  invoiceFilenamePattern: string
 }
 
 export type ClientSettingsForm = {
   mileageRate: string
   passengerMileageRate: string
+  invoiceFilenamePattern: string
 }
 
 export type SellerProfile = {
@@ -211,12 +215,70 @@ export const emptyAdminForm = (): AdminUserForm => ({
 export const emptyUserSettingsForm = (): UserSettingsForm => ({
   mileageRate: '',
   passengerMileageRate: '',
+  invoiceFilenamePattern: '',
 })
 
 export const emptyClientSettingsForm = (): ClientSettingsForm => ({
   mileageRate: '',
   passengerMileageRate: '',
+  invoiceFilenamePattern: '',
 })
+
+export const invoiceFilenameTokens = [
+  '{InvoiceNumber}',
+  '{InvoiceId}',
+  '{ClientName}',
+  '{Month}',
+  '{MonthName}',
+  '{Year}',
+  '{InvoiceDate}',
+]
+
+const previewInvoiceNumber = 'INV-2026-001'
+const previewInvoiceId = '11111111-1111-1111-1111-111111111111'
+
+export function buildInvoiceFilenamePreview(
+  pattern: string | null | undefined,
+  clientName: string | null | undefined,
+  invoiceDate = new Date()
+) {
+  const trimmedPattern = pattern?.trim() ?? ''
+  const effectivePattern = trimmedPattern || '{InvoiceNumber}'
+
+  const replacements = new Map<string, string>([
+    ['{InvoiceNumber}', previewInvoiceNumber],
+    ['{InvoiceId}', previewInvoiceId],
+    ['{ClientName}', (clientName?.trim() || 'Client Name')],
+    ['{Month}', String(invoiceDate.getMonth() + 1).padStart(2, '0')],
+    [
+      '{MonthName}',
+      new Intl.DateTimeFormat('en-GB', { month: 'long' }).format(invoiceDate),
+    ],
+    ['{Year}', String(invoiceDate.getFullYear())],
+    ['{InvoiceDate}', invoiceDate.toISOString().slice(0, 10)],
+  ])
+
+  const containsUnsupportedToken = Array.from(
+    effectivePattern.matchAll(/\{[^{}]+\}/g)
+  ).some(([token]) => !replacements.has(token))
+
+  if (containsUnsupportedToken) {
+    return `${previewInvoiceNumber}.pdf`
+  }
+
+  let resolved = effectivePattern
+  for (const [token, replacement] of replacements) {
+    resolved = resolved.replaceAll(token, replacement)
+  }
+
+  const sanitized = resolved
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[. ]+|[. ]+$/g, '')
+
+  return `${sanitized || previewInvoiceNumber}.pdf`
+}
 
 export const emptySellerProfileForm = (): SellerProfileForm => ({
   sellerName: '',

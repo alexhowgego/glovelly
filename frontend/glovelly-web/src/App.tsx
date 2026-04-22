@@ -13,6 +13,7 @@ import {
 } from './AppSections'
 import {
   buildApiUrl,
+  buildInvoiceFilenamePreview,
   buildReturnUrl,
   defaultAdminStatus,
   defaultGigStatus,
@@ -23,6 +24,7 @@ import {
   emptyGigForm,
   emptySellerProfileForm,
   emptyUserSettingsForm,
+  invoiceFilenameTokens,
   fetchWithSession,
   formatCurrency,
   formatBuildMetadata,
@@ -1073,6 +1075,7 @@ function App({ appMetadata }: AppProps) {
         selectedClient.passengerMileageRate === null
           ? ''
           : String(selectedClient.passengerMileageRate),
+      invoiceFilenamePattern: selectedClient.invoiceFilenamePattern ?? '',
     })
     setClientSettingsStatus(
       'Client-specific rates override your personal defaults when set.'
@@ -1117,6 +1120,7 @@ function App({ appMetadata }: AppProps) {
     const passengerMileageRate = parseOptionalDecimal(
       clientSettingsForm.passengerMileageRate
     )
+    const invoiceFilenamePattern = clientSettingsForm.invoiceFilenamePattern.trim()
 
     if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
       setClientSettingsStatus('Rates must be valid numbers, for example 0.45.')
@@ -1140,6 +1144,7 @@ function App({ appMetadata }: AppProps) {
             billingAddress: selectedClient.billingAddress,
             mileageRate,
             passengerMileageRate,
+            invoiceFilenamePattern: invoiceFilenamePattern || null,
           }),
         }
       )
@@ -1173,6 +1178,7 @@ function App({ appMetadata }: AppProps) {
           savedClient.passengerMileageRate === null
             ? ''
             : String(savedClient.passengerMileageRate),
+        invoiceFilenamePattern: savedClient.invoiceFilenamePattern ?? '',
       })
       setClientSettingsStatus('Client settings updated.')
     } catch (error) {
@@ -1197,9 +1203,10 @@ function App({ appMetadata }: AppProps) {
         authUser?.passengerMileageRate === undefined
           ? ''
           : String(authUser.passengerMileageRate),
+      invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? '',
     })
     setUserSettingsStatus(
-      'Set the mileage defaults used when a client has no custom rates.'
+      'Set the defaults used when a client does not provide its own overrides.'
     )
     setIsProfileMenuOpen(false)
     setIsUserSettingsOpen(true)
@@ -1261,6 +1268,7 @@ function App({ appMetadata }: AppProps) {
     const passengerMileageRate = parseOptionalDecimal(
       userSettingsForm.passengerMileageRate
     )
+    const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
 
     if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
       setUserSettingsStatus('Rates must be valid numbers, for example 0.45.')
@@ -1278,6 +1286,7 @@ function App({ appMetadata }: AppProps) {
         body: JSON.stringify({
           mileageRate,
           passengerMileageRate,
+          invoiceFilenamePattern: invoiceFilenamePattern || null,
         }),
       })
 
@@ -1302,6 +1311,7 @@ function App({ appMetadata }: AppProps) {
       const savedSettings = (await response.json()) as {
         mileageRate: number | null
         passengerMileageRate: number | null
+        invoiceFilenamePattern: string | null
       }
 
       setAuthUser((current) =>
@@ -1310,6 +1320,7 @@ function App({ appMetadata }: AppProps) {
               ...current,
               mileageRate: savedSettings.mileageRate,
               passengerMileageRate: savedSettings.passengerMileageRate,
+              invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
             }
           : current
       )
@@ -1320,6 +1331,7 @@ function App({ appMetadata }: AppProps) {
           savedSettings.passengerMileageRate === null
             ? ''
             : String(savedSettings.passengerMileageRate),
+        invoiceFilenamePattern: savedSettings.invoiceFilenamePattern ?? '',
       })
       setUserSettingsStatus('Settings updated.')
     } catch (error) {
@@ -2052,8 +2064,9 @@ function App({ appMetadata }: AppProps) {
   }
 
   const handleDownloadInvoicePdf = async (invoice: Invoice) => {
+    const fallbackFilename = `${invoice.invoiceNumber}.pdf`
     setIsInvoiceLoading(true)
-    setInvoiceStatus(`Preparing ${invoice.invoiceNumber}.pdf...`)
+    setInvoiceStatus(`Preparing ${fallbackFilename}...`)
 
     try {
       const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/pdf`))
@@ -2061,16 +2074,17 @@ function App({ appMetadata }: AppProps) {
         throw new Error('Unable to download the invoice PDF.')
       }
 
+      const contentDisposition = response.headers.get('Content-Disposition')
       const blob = await response.blob()
       const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = downloadUrl
-      link.download = `${invoice.invoiceNumber}.pdf`
+      link.download = extractDownloadFilename(contentDisposition) ?? fallbackFilename
       document.body.append(link)
       link.click()
       link.remove()
       window.URL.revokeObjectURL(downloadUrl)
-      setInvoiceStatus(`Downloaded ${invoice.invoiceNumber}.pdf.`)
+      setInvoiceStatus(`Downloaded ${link.download}.`)
     } catch (error) {
       setInvoiceStatus(
         error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
@@ -2078,6 +2092,29 @@ function App({ appMetadata }: AppProps) {
     } finally {
       setIsInvoiceLoading(false)
     }
+  }
+
+  const extractDownloadFilename = (contentDisposition: string | null) => {
+    if (!contentDisposition) {
+      return null
+    }
+
+    const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+    if (encodedMatch?.[1]) {
+      try {
+        return decodeURIComponent(encodedMatch[1])
+      } catch {
+        return encodedMatch[1]
+      }
+    }
+
+    const quotedMatch = contentDisposition.match(/filename=\"([^\"]+)\"/i)
+    if (quotedMatch?.[1]) {
+      return quotedMatch[1]
+    }
+
+    const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
+    return plainMatch?.[1]?.trim() ?? null
   }
 
   const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus) => {
@@ -2558,6 +2595,11 @@ function App({ appMetadata }: AppProps) {
 
       <UserSettingsModal
         form={userSettingsForm}
+        invoiceFilenamePreview={buildInvoiceFilenamePreview(
+          userSettingsForm.invoiceFilenamePattern,
+          null
+        )}
+        invoiceFilenameTokens={invoiceFilenameTokens}
         isOpen={isUserSettingsOpen}
         isSaving={isUserSettingsSaving}
         onClose={closeUserSettings}
@@ -2580,6 +2622,11 @@ function App({ appMetadata }: AppProps) {
       <ClientSettingsModal
         authUser={authUser}
         form={clientSettingsForm}
+        invoiceFilenamePreview={buildInvoiceFilenamePreview(
+          clientSettingsForm.invoiceFilenamePattern || authUser?.invoiceFilenamePattern,
+          selectedClient?.name
+        )}
+        invoiceFilenameTokens={invoiceFilenameTokens}
         isOpen={isClientSettingsOpen}
         isSaving={isClientSettingsSaving}
         onClose={closeClientSettings}

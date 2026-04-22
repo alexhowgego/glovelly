@@ -10,6 +10,7 @@ public sealed class Client
     public Address BillingAddress { get; set; } = new();
     public decimal? MileageRate { get; set; }
     public decimal? PassengerMileageRate { get; set; }
+    public string? InvoiceFilenamePattern { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public Guid? UpdatedByUserId { get; set; }
 

@@ -11,6 +11,7 @@ public sealed class User
     public string? DisplayName { get; set; }
     public decimal? MileageRate { get; set; }
     public decimal? PassengerMileageRate { get; set; }
+    public string? InvoiceFilenamePattern { get; set; }
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public UserRole Role { get; set; } = UserRole.User;
     public bool IsActive { get; set; } = true;
