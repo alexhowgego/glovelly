@@ -45,27 +45,29 @@ internal static class AuthEndpoints
             AppDbContext dbContext) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
-            var settingsResponse = userId.HasValue
-                ? await dbContext.Users
-                    .AsNoTracking()
-                    .Where(value => value.Id == userId.Value)
-                    .Select(value => new
-                    {
-                        value.MileageRate,
-                        value.PassengerMileageRate,
-                    })
-                    .FirstOrDefaultAsync()
-                : null;
+            if (!userId.HasValue)
+            {
+                return Results.Unauthorized();
+            }
+
+            var localUser = await dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == userId.Value && value.IsActive);
+
+            if (localUser is null)
+            {
+                return Results.Unauthorized();
+            }
 
             return Results.Ok(new
             {
                 userId,
-                role = currentUserAccessor.TryGetRole(user)?.ToString(),
-                name = user.FindFirstValue(ClaimTypes.Name) ?? user.FindFirstValue("name") ?? "Signed in user",
-                email = user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirstValue("email") ?? string.Empty,
+                role = localUser.Role.ToString(),
+                name = localUser.DisplayName ?? localUser.Email,
+                email = localUser.Email,
                 profileImageUrl = user.FindFirstValue("picture") ?? user.FindFirstValue("profile") ?? string.Empty,
-                mileageRate = settingsResponse?.MileageRate,
-                passengerMileageRate = settingsResponse?.PassengerMileageRate,
+                mileageRate = localUser.MileageRate,
+                passengerMileageRate = localUser.PassengerMileageRate,
             });
         });
 
