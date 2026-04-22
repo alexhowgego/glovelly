@@ -68,6 +68,7 @@ internal static class AuthEndpoints
                 profileImageUrl = user.FindFirstValue("picture") ?? user.FindFirstValue("profile") ?? string.Empty,
                 mileageRate = localUser.MileageRate,
                 passengerMileageRate = localUser.PassengerMileageRate,
+                invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
             });
         });
 
@@ -97,6 +98,7 @@ internal static class AuthEndpoints
 
             localUser.MileageRate = request.MileageRate;
             localUser.PassengerMileageRate = request.PassengerMileageRate;
+            localUser.InvoiceFilenamePattern = request.InvoiceFilenamePattern?.Trim();
 
             await dbContext.SaveChangesAsync();
 
@@ -104,6 +106,7 @@ internal static class AuthEndpoints
             {
                 mileageRate = localUser.MileageRate,
                 passengerMileageRate = localUser.PassengerMileageRate,
+                invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
             });
         });
 
@@ -153,6 +156,13 @@ internal static class AuthEndpoints
 
     private static Dictionary<string, string[]>? ValidateUserSettingsRequest(UserSettingsRequest request)
     {
+        if (EndpointSupport.TryValidateInvoiceFilenamePattern(
+                request.InvoiceFilenamePattern,
+                out var patternErrors))
+        {
+            return patternErrors;
+        }
+
         var validationResults = new List<ValidationResult>();
         var validationContext = new ValidationContext(request);
         var isValid = Validator.TryValidateObject(request, validationContext, validationResults, validateAllProperties: true);
@@ -182,5 +192,6 @@ internal static class AuthEndpoints
         [Range(0, double.MaxValue, ErrorMessage = "Mileage rate cannot be negative.")]
         decimal? MileageRate,
         [Range(0, double.MaxValue, ErrorMessage = "Passenger mileage rate cannot be negative.")]
-        decimal? PassengerMileageRate);
+        decimal? PassengerMileageRate,
+        string? InvoiceFilenamePattern);
 }

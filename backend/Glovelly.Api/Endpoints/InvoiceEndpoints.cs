@@ -31,6 +31,7 @@ public static class InvoiceEndpoints
             var invoice = await db.Invoices
                 .WhereVisibleTo(userId)
                 .AsNoTracking()
+                .Include(value => value.Client)
                 .FirstOrDefaultAsync(value => value.Id == id);
 
             if (invoice is null)
@@ -43,7 +44,18 @@ public static class InvoiceEndpoints
                 return Results.NotFound();
             }
 
-            return Results.File(invoice.PdfBlob, "application/pdf", $"{invoice.InvoiceNumber}.pdf");
+            var userDefaultPattern = userId.HasValue
+                ? await db.Users
+                    .AsNoTracking()
+                    .Where(value => value.Id == userId.Value && value.IsActive)
+                    .Select(value => value.InvoiceFilenamePattern)
+                    .FirstOrDefaultAsync()
+                : null;
+
+            return Results.File(
+                invoice.PdfBlob,
+                "application/pdf",
+                InvoicePdfFilenameBuilder.Build(invoice, invoice.Client, userDefaultPattern));
         });
 
         group.MapGet("/{id:guid}", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>

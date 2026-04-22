@@ -1847,6 +1847,8 @@ export function InvoicesSection({
 
 type UserSettingsModalProps = {
   form: UserSettingsForm
+  invoiceFilenamePreview: string
+  invoiceFilenameTokens: string[]
   isOpen: boolean
   isSaving: boolean
   onClose: () => void
@@ -1857,6 +1859,8 @@ type UserSettingsModalProps = {
 
 export function UserSettingsModal({
   form,
+  invoiceFilenamePreview,
+  invoiceFilenameTokens,
   isOpen,
   isSaving,
   onClose,
@@ -1880,7 +1884,7 @@ export function UserSettingsModal({
         <div className="panel-heading">
           <div>
             <p className="section-label">User settings</p>
-            <h2 id="user-settings-title">Mileage defaults</h2>
+            <h2 id="user-settings-title">Default invoice settings</h2>
           </div>
           <button className="ghost-button" onClick={onClose} type="button">
             Close
@@ -1888,8 +1892,8 @@ export function UserSettingsModal({
         </div>
 
         <p className="hero-text settings-intro">
-          These rates are used as your personal fallback when a client does not
-          have custom mileage pricing configured.
+          These defaults are used when a client does not provide its own pricing
+          or invoice filename pattern.
         </p>
 
         <form className="settings-form" onSubmit={onSubmit}>
@@ -1917,10 +1921,31 @@ export function UserSettingsModal({
                 }
               />
             </label>
+
+            <label>
+              <span>Default invoice filename pattern</span>
+              <input
+                placeholder="{InvoiceNumber}"
+                type="text"
+                value={form.invoiceFilenamePattern}
+                onChange={(event) =>
+                  onUpdateField('invoiceFilenamePattern', event.target.value)
+                }
+              />
+            </label>
+          </div>
+
+          <div className="detail-grid client-settings-preview">
+            <article className="setting-card override">
+              <p className="detail-label">Preview</p>
+              <strong>{invoiceFilenamePreview}</strong>
+              <span>Using today's date and a sample invoice number.</span>
+            </article>
           </div>
 
           <div className="settings-note">
-            Leave a field blank if you do not want a default for that rate.
+            Leave a rate blank if you do not want a personal default. Filename tokens:
+            {` ${invoiceFilenameTokens.join(', ')}.`}
           </div>
 
           <div className="form-actions">
@@ -1938,6 +1963,8 @@ export function UserSettingsModal({
 type ClientSettingsModalProps = {
   authUser: AuthUser | null
   form: ClientSettingsForm
+  invoiceFilenamePreview: string
+  invoiceFilenameTokens: string[]
   isOpen: boolean
   isSaving: boolean
   onClose: () => void
@@ -1950,6 +1977,8 @@ type ClientSettingsModalProps = {
 export function ClientSettingsModal({
   authUser,
   form,
+  invoiceFilenamePreview,
+  invoiceFilenameTokens,
   isOpen,
   isSaving,
   onClose,
@@ -1983,7 +2012,7 @@ export function ClientSettingsModal({
 
         <p className="hero-text settings-intro">
           Leave a field blank to inherit the default from your own user settings.
-          Add a value here only when this client needs a special rate.
+          Add a value here only when this client needs special handling.
         </p>
 
         <div className="detail-grid client-settings-preview">
@@ -2025,6 +2054,23 @@ export function ClientSettingsModal({
                 : 'Overriding your default'}
             </span>
           </article>
+          <article
+            className={
+              selectedClient.invoiceFilenamePattern === null
+                ? 'setting-card inherited'
+                : 'setting-card override'
+            }
+          >
+            <p className="detail-label">Invoice PDF filename</p>
+            <strong>
+              {selectedClient.invoiceFilenamePattern ?? '{InvoiceNumber}'}
+            </strong>
+            <span>
+              {selectedClient.invoiceFilenamePattern === null
+                ? 'Using the default invoice number filename'
+                : 'Custom pattern for this client'}
+            </span>
+          </article>
         </div>
 
         <form className="settings-form" onSubmit={onSubmit}>
@@ -2061,10 +2107,30 @@ export function ClientSettingsModal({
                 }
               />
             </label>
+
+            <label>
+              <span>Invoice filename pattern</span>
+              <input
+                placeholder="{InvoiceNumber}"
+                type="text"
+                value={form.invoiceFilenamePattern}
+                onChange={(event) =>
+                  onUpdateField('invoiceFilenamePattern', event.target.value)
+                }
+              />
+            </label>
           </div>
 
           <div className="settings-note">
-            Blank means inherited. A filled value becomes a client-specific override.
+            Blank means inherited. Filename tokens: {invoiceFilenameTokens.join(', ')}.
+          </div>
+
+          <div className="detail-grid client-settings-preview">
+            <article className="setting-card override">
+              <p className="detail-label">Preview</p>
+              <strong>{invoiceFilenamePreview}</strong>
+              <span>Using today's date and the current effective pattern.</span>
+            </article>
           </div>
 
           <div className="form-actions">

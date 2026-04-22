@@ -29,6 +29,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasPrecision(18, 2);
             entity.Property(user => user.PassengerMileageRate)
                 .HasPrecision(18, 2);
+            entity.Property(user => user.InvoiceFilenamePattern)
+                .HasMaxLength(200);
             entity.Property(user => user.Role)
                 .HasConversion<string>()
                 .HasMaxLength(20);
@@ -51,6 +53,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasPrecision(18, 2);
             entity.Property(client => client.PassengerMileageRate)
                 .HasPrecision(18, 2);
+            entity.Property(client => client.InvoiceFilenamePattern)
+                .HasMaxLength(200);
             entity.HasOne(client => client.CreatedByUser)
                 .WithMany(user => user.ClientsCreated)
                 .HasForeignKey(client => client.CreatedByUserId)

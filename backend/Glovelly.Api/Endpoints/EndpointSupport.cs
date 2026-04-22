@@ -112,7 +112,28 @@ internal static class EndpointSupport
             });
         }
 
+        if (TryValidateInvoiceFilenamePattern(client.InvoiceFilenamePattern, out var patternErrors))
+        {
+            return Results.ValidationProblem(patternErrors);
+        }
+
         return null;
+    }
+
+    public static bool TryValidateInvoiceFilenamePattern(
+        string? pattern,
+        out Dictionary<string, string[]> errors,
+        string fieldName = "invoiceFilenamePattern")
+    {
+        errors = new Dictionary<string, string[]>();
+
+        if (pattern is not null && string.IsNullOrWhiteSpace(pattern))
+        {
+            errors[fieldName] = ["Invoice filename pattern cannot be empty or whitespace."];
+            return true;
+        }
+
+        return false;
     }
 
     public static void StampCreate(SellerProfile profile, Guid? userId)
