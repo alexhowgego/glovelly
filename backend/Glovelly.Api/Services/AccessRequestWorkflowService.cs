@@ -11,7 +11,8 @@ namespace Glovelly.Api.Services;
 public sealed class AccessRequestWorkflowService(
     AppDbContext dbContext,
     TimeProvider timeProvider,
-    IOptions<AccessRequestProtectionSettings> settings)
+    IOptions<AccessRequestProtectionSettings> settings,
+    AccessRequestRetentionService retentionService)
 {
     public const string DuplicateEmailSuppressionReason = "duplicate_email_window";
     public const string DailyIpSuppressionReason = "daily_ip_window";
@@ -48,6 +49,7 @@ public sealed class AccessRequestWorkflowService(
 
         dbContext.AccessRequests.Add(request);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await retentionService.CleanupIfDueAsync(cancellationToken);
 
         return new AccessRequestWorkflowResult(
             request,

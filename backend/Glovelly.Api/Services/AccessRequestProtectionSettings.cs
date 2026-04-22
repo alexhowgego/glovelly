@@ -11,4 +11,6 @@ public sealed class AccessRequestProtectionSettings
     public TimeSpan EmailNotificationSuppressionWindow { get; set; } = TimeSpan.FromHours(12);
     public int GlobalNotificationDailyCap { get; set; } = 50;
     public TimeSpan GlobalNotificationWindow { get; set; } = TimeSpan.FromHours(24);
+    public TimeSpan RetentionWindow { get; set; } = TimeSpan.FromDays(180);
+    public TimeSpan CleanupSlack { get; set; } = TimeSpan.FromDays(2);
 }
