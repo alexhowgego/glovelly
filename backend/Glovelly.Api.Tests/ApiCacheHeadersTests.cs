@@ -15,6 +15,7 @@ public sealed class ApiCacheHeadersTests : IClassFixture<GlovellyApiFactory>
     [Theory]
     [InlineData("/auth/me")]
     [InlineData("/clients")]
+    [InlineData("/seller-profile")]
     [InlineData("/admin/users")]
     public async Task ApiEndpoints_ReturnNoStoreCacheHeaders(string path)
     {
