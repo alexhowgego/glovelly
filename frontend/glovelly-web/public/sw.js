@@ -34,7 +34,8 @@ self.addEventListener('fetch', (event) => {
     requestUrl.pathname.startsWith('/gigs') ||
     requestUrl.pathname.startsWith('/invoices') ||
     requestUrl.pathname.startsWith('/invoice-lines') ||
-    requestUrl.pathname.startsWith('/seller-profile')
+    requestUrl.pathname.startsWith('/seller-profile') ||
+    requestUrl.pathname === '/app/metadata'
   ) {
     return
   }
