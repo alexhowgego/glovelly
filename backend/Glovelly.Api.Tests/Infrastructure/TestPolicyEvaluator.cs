@@ -12,15 +12,7 @@ internal sealed class TestPolicyEvaluator : IPolicyEvaluator
 {
     public Task<AuthenticateResult> AuthenticateAsync(AuthorizationPolicy policy, HttpContext context)
     {
-        var userId = ResolveUserId(context);
-        var claims = new[]
-        {
-            new Claim(GlovellyClaimTypes.UserId, userId.ToString()),
-            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-            new Claim(ClaimTypes.Name, "Test Admin"),
-            new Claim(ClaimTypes.Email, "test-admin@glovelly.local"),
-            new Claim(ClaimTypes.Role, UserRole.Admin.ToString()),
-        };
+        var claims = BuildClaims(context);
 
         var identity = new ClaimsIdentity(claims, TestAuthContext.SchemeName);
         var principal = new ClaimsPrincipal(identity);
@@ -40,14 +32,40 @@ internal sealed class TestPolicyEvaluator : IPolicyEvaluator
         return Task.FromResult(PolicyAuthorizationResult.Success());
     }
 
-    private static Guid ResolveUserId(HttpContext context)
+    private static Claim[] BuildClaims(HttpContext context)
     {
-        if (!context.Request.Headers.TryGetValue("X-Test-UserId", out var values))
+        var claims = new List<Claim>
         {
-            return TestAuthContext.UserId;
+            new(ClaimTypes.Name, ResolveHeader(context, "X-Test-Name") ?? TestAuthContext.DefaultName),
+            new(ClaimTypes.Email, ResolveHeader(context, "X-Test-Email") ?? TestAuthContext.DefaultEmail),
+            new Claim("email", ResolveHeader(context, "X-Test-Email") ?? TestAuthContext.DefaultEmail),
+            new Claim("sub", ResolveHeader(context, "X-Test-Subject") ?? TestAuthContext.DefaultSubject),
+        };
+
+        var role = ResolveHeader(context, "X-Test-Role") ?? UserRole.Admin.ToString();
+        claims.Add(new Claim(ClaimTypes.Role, role));
+        claims.Add(new Claim("role", role));
+
+        if (!string.Equals(ResolveHeader(context, "X-Test-Include-UserId"), "false", StringComparison.OrdinalIgnoreCase))
+        {
+            var userId = ResolveUserId(context);
+            claims.Add(new Claim(GlovellyClaimTypes.UserId, userId.ToString()));
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.ToString()));
         }
 
-        var value = values.FirstOrDefault();
+        return claims.ToArray();
+    }
+
+    private static Guid ResolveUserId(HttpContext context)
+    {
+        var value = ResolveHeader(context, "X-Test-UserId");
         return Guid.TryParse(value, out var parsed) ? parsed : TestAuthContext.UserId;
+    }
+
+    private static string? ResolveHeader(HttpContext context, string name)
+    {
+        return context.Request.Headers.TryGetValue(name, out var values)
+            ? values.FirstOrDefault()
+            : null;
     }
 }

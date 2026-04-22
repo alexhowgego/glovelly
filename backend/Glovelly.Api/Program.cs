@@ -14,6 +14,7 @@ await app.InitializeDatabaseAsync(builder.Configuration, startupSettings.ShouldS
 app.UseGlovellyHttpPipeline(startupSettings);
 app.MapAppMetadataEndpoints(startupSettings);
 app.MapAuthEndpoints(startupSettings);
+app.MapAccessEndpoints(startupSettings);
 app.MapCrudEndpoints();
 app.MapAdminEndpoints();
 app.MapFallbackToFile("index.html");
