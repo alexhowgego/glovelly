@@ -2,6 +2,7 @@ using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
@@ -18,21 +19,34 @@ internal static class AccessEndpoints
     public static IEndpointRouteBuilder MapAccessEndpoints(this IEndpointRouteBuilder app, StartupSettings settings)
     {
         var access = app.MapGroup("/access")
-            .WithTags("Access")
-            .RequireAuthorization();
+            .WithTags("Access");
         var environmentLabel = ResolveEnvironmentLabel(settings);
 
-        access.MapPost("/request", [Authorize] async (
+        access.MapPost("/request", async (
+            AccessRequestSubmission? request,
             ClaimsPrincipal user,
             AppDbContext dbContext,
             IEmailSender emailSender,
             AccessRequestWorkflowService workflowService,
             HttpContext httpContext,
+            IDataProtectionProvider dataProtectionProvider,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
             var logger = loggerFactory.CreateLogger("Glovelly.AccessRequests");
-            var requester = AccessRequestEmailRequest.FromClaims(user);
+            var requestedAtUtc = DateTimeOffset.UtcNow;
+            var requester =
+                AccessRequestEmailRequest.FromClaims(user, requestedAtUtc) ??
+                AccessRequestEmailRequest.FromToken(
+                    request?.AccessRequestToken,
+                    dataProtectionProvider,
+                    requestedAtUtc,
+                    logger);
+
+            if (requester is null)
+            {
+                return Results.Unauthorized();
+            }
 
             if (string.IsNullOrWhiteSpace(requester.Email))
             {
@@ -127,7 +141,8 @@ internal static class AccessEndpoints
 
             return Results.Ok(new { message = GenericSuccessMessage });
         })
-        .RequireRateLimiting("PublicAccessRequest");
+        .RequireRateLimiting("PublicAccessRequest")
+        .AllowAnonymous();
 
         return app;
     }
@@ -242,14 +257,39 @@ internal static class AccessEndpoints
         string? Subject,
         DateTimeOffset RequestedAtUtc)
     {
-        public static AccessRequestEmailRequest FromClaims(ClaimsPrincipal user)
+        public static AccessRequestEmailRequest? FromClaims(ClaimsPrincipal user, DateTimeOffset requestedAtUtc)
         {
+            if (user.Identity?.IsAuthenticated != true)
+            {
+                return null;
+            }
+
             var email = AuthFlowSupport.NormalizeEmail(
                 user.FindFirstValue("email") ?? user.FindFirstValue(ClaimTypes.Email)) ?? string.Empty;
             var displayName = Normalize(user.FindFirstValue("name") ?? user.FindFirstValue(ClaimTypes.Name));
             var subject = Normalize(user.FindFirstValue("sub") ?? user.FindFirstValue(ClaimTypes.NameIdentifier));
 
-            return new AccessRequestEmailRequest(email, displayName, subject, DateTimeOffset.MinValue);
+            return new AccessRequestEmailRequest(email, displayName, subject, requestedAtUtc);
+        }
+
+        public static AccessRequestEmailRequest? FromToken(
+            string? accessRequestToken,
+            IDataProtectionProvider dataProtectionProvider,
+            DateTimeOffset requestedAtUtc,
+            ILogger logger)
+        {
+            var tokenIdentity = AuthFlowSupport.ReadAccessRequestIdentity(
+                accessRequestToken,
+                dataProtectionProvider,
+                logger);
+
+            return tokenIdentity is null
+                ? null
+                : new AccessRequestEmailRequest(
+                    tokenIdentity.Email,
+                    tokenIdentity.DisplayName,
+                    tokenIdentity.Subject,
+                    requestedAtUtc);
         }
 
         private static string? Normalize(string? value)
@@ -257,4 +297,6 @@ internal static class AccessEndpoints
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
     }
+
+    internal sealed record AccessRequestSubmission(string? AccessRequestToken);
 }

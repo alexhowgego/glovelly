@@ -5,8 +5,9 @@ using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -27,7 +28,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     public async Task RequestAccess_SendsNotificationToEachAdministratorWithEmail()
     {
         using var scope = _factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<Glovelly.Api.Data.AppDbContext>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         dbContext.Users.Add(new User
         {
             Id = Guid.NewGuid(),
@@ -39,12 +40,13 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         });
         await dbContext.SaveChangesAsync();
 
-        var request = CreateAccessRequest("new-user@glovelly.local", "198.51.100.10");
-        request.Headers.Add("X-Test-Include-UserId", "false");
-        request.Headers.Add("X-Test-Name", "New User");
-        request.Headers.Add("X-Test-Subject", "google-sub-new-user");
-
-        var response = await _client.SendAsync(request);
+        var response = await _client.PostAsJsonAsync("/access/request", new
+        {
+            accessRequestToken = CreateAccessRequestToken(
+                "new-user@glovelly.local",
+                "New User",
+                "google-sub-new-user"),
+        });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
@@ -82,7 +84,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     public async Task RequestAccess_SkipsAdministratorsWithoutEmail()
     {
         using var scope = _factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<Glovelly.Api.Data.AppDbContext>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         dbContext.Users.Add(new User
         {
             Id = Guid.NewGuid(),
@@ -94,7 +96,13 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         });
         await dbContext.SaveChangesAsync();
 
-        var response = await _client.SendAsync(CreateAccessRequest(TestAuthContext.DefaultEmail, "198.51.100.11"));
+        var response = await _client.PostAsJsonAsync("/access/request", new
+        {
+            accessRequestToken = CreateAccessRequestToken(
+                "new-user@glovelly.local",
+                "New User",
+                "google-sub-new-user"),
+        });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
@@ -105,9 +113,13 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task RequestAccess_ReturnsBadRequest_WhenEmailClaimMissing()
     {
-        var request = CreateAccessRequest("   ", "198.51.100.12");
-
-        var response = await _client.SendAsync(request);
+        var response = await _client.PostAsJsonAsync("/access/request", new
+        {
+            accessRequestToken = CreateAccessRequestToken(
+                "   ",
+                "New User",
+                "google-sub-new-user"),
+        });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(_factory.Emails.SentEmails);
@@ -118,7 +130,13 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         _factory.Emails.ExceptionToThrow = new InvalidOperationException("SMTP unavailable");
 
-        var response = await _client.SendAsync(CreateAccessRequest(TestAuthContext.DefaultEmail, "198.51.100.13"));
+        var response = await _client.PostAsJsonAsync("/access/request", new
+        {
+            accessRequestToken = CreateAccessRequestToken(
+                "new-user@glovelly.local",
+                "New User",
+                "google-sub-new-user"),
+        });
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
 
@@ -132,8 +150,8 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task RequestAccess_SuppressesRepeatNotificationsForSameEmailWithinWindow()
     {
-        var firstRequest = CreateAccessRequest("repeat-user@glovelly.local", "198.51.100.14");
-        var secondRequest = CreateAccessRequest("REPEAT-USER@glovelly.local", "198.51.100.14");
+        var firstRequest = CreateAccessRequestWithToken("repeat-user@glovelly.local", "198.51.100.14");
+        var secondRequest = CreateAccessRequestWithToken("REPEAT-USER@glovelly.local", "198.51.100.14");
 
         var firstResponse = await _client.SendAsync(firstRequest);
         var secondResponse = await _client.SendAsync(secondRequest);
@@ -182,7 +200,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
             await dbContext.SaveChangesAsync();
         }
 
-        var request = CreateAccessRequest("quota-target@glovelly.local", "198.51.100.15");
+        var request = CreateAccessRequestWithToken("quota-target@glovelly.local", "198.51.100.15");
 
         var response = await _client.SendAsync(request);
 
@@ -209,7 +227,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         for (var index = 0; index < 6; index++)
         {
-            var request = CreateAccessRequest($"rate-limit-{index}@glovelly.local", "198.51.100.16");
+            var request = CreateAccessRequestWithToken($"rate-limit-{index}@glovelly.local", "198.51.100.16");
             responses.Add(await _client.SendAsync(request));
         }
 
@@ -227,17 +245,55 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(5, _factory.Emails.SentEmails.Count);
     }
 
+    [Fact]
+    public async Task RequestAccess_AllowsAnonymousSubmissionWithValidAccessRequestToken()
+    {
+        var token = CreateAccessRequestToken("new-user@glovelly.local", "New User", "google-sub-new-user");
+
+        var response = await _client.PostAsJsonAsync("/access/request", new
+        {
+            accessRequestToken = token,
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single(_factory.Emails.SentEmails);
+        Assert.Equal("test-admin@glovelly.local", _factory.Emails.SentEmails[0].To.Single().Address);
+        Assert.Contains("User email: new-user@glovelly.local", _factory.Emails.SentEmails[0].PlainTextBody);
+        Assert.Contains("User display name: New User", _factory.Emails.SentEmails[0].PlainTextBody);
+    }
+
     private static async Task<string?> ReadMessageAsync(HttpResponseMessage response)
     {
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         return payload.GetProperty("message").GetString();
     }
 
-    private static HttpRequestMessage CreateAccessRequest(string email, string remoteIp)
+    private HttpRequestMessage CreateAccessRequestWithToken(string email, string remoteIp)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/access/request");
-        request.Headers.Add("X-Test-Email", email);
         request.Headers.Add("X-Test-Remote-Ip", remoteIp);
+        request.Content = JsonContent.Create(new
+        {
+            accessRequestToken = CreateAccessRequestToken(email, "New User", "google-sub-new-user"),
+        });
         return request;
+    }
+
+    private string CreateAccessRequestToken(string email, string displayName, string subject)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dataProtectionProvider = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
+        var protector = dataProtectionProvider
+            .CreateProtector("Glovelly.AccessRequest")
+            .ToTimeLimitedDataProtector();
+
+        return protector.Protect(
+            JsonSerializer.Serialize(new
+            {
+                email,
+                displayName,
+                subject,
+            }),
+            lifetime: TimeSpan.FromMinutes(15));
     }
 }
