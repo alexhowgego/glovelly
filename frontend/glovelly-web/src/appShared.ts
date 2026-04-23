@@ -32,6 +32,7 @@ export type AuthUser = {
   mileageRate: number | null
   passengerMileageRate: number | null
   invoiceFilenamePattern: string | null
+  invoiceReplyToEmail: string | null
 }
 
 export type AdminUser = {
@@ -58,6 +59,7 @@ export type UserSettingsForm = {
   mileageRate: string
   passengerMileageRate: string
   invoiceFilenamePattern: string
+  invoiceReplyToEmail: string
 }
 
 export type ClientSettingsForm = {
@@ -221,6 +223,7 @@ export const emptyUserSettingsForm = (): UserSettingsForm => ({
   mileageRate: '',
   passengerMileageRate: '',
   invoiceFilenamePattern: '',
+  invoiceReplyToEmail: '',
 })
 
 export const emptyClientSettingsForm = (): ClientSettingsForm => ({

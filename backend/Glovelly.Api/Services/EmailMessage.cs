@@ -4,6 +4,7 @@ public sealed record EmailMessage(
     IReadOnlyList<EmailAddress> To,
     string Subject,
     string PlainTextBody,
+    EmailAddress? From = null,
     string? HtmlBody = null,
     IReadOnlyList<EmailAddress>? Cc = null,
     IReadOnlyList<EmailAddress>? Bcc = null,

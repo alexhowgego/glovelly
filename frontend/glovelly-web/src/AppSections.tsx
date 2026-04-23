@@ -1914,7 +1914,7 @@ export function UserSettingsModal({
 
         <p className="hero-text settings-intro">
           These defaults are used when a client does not provide its own pricing
-          or invoice filename pattern.
+          or invoice filename pattern, and invoice emails can reply back to your chosen address.
         </p>
 
         <form className="settings-form" onSubmit={onSubmit}>
@@ -1954,6 +1954,18 @@ export function UserSettingsModal({
                 }
               />
             </label>
+
+            <label>
+              <span>Invoice reply-to email</span>
+              <input
+                placeholder="you@example.com"
+                type="email"
+                value={form.invoiceReplyToEmail}
+                onChange={(event) =>
+                  onUpdateField('invoiceReplyToEmail', event.target.value)
+                }
+              />
+            </label>
           </div>
 
           <div className="detail-grid client-settings-preview">
@@ -1967,6 +1979,7 @@ export function UserSettingsModal({
           <div className="settings-note">
             Leave a rate blank if you do not want a personal default. Filename tokens:
             {` ${invoiceFilenameTokens.join(', ')}.`}
+            {' '}Leave reply-to blank if replies should not be directed to a personal mailbox.
           </div>
 
           <div className="form-actions">

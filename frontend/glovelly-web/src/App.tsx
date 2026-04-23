@@ -1204,6 +1204,7 @@ function App({ appMetadata }: AppProps) {
           ? ''
           : String(authUser.passengerMileageRate),
       invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? '',
+      invoiceReplyToEmail: authUser?.invoiceReplyToEmail ?? '',
     })
     setUserSettingsStatus(
       'Set the defaults used when a client does not provide its own overrides.'
@@ -1269,6 +1270,7 @@ function App({ appMetadata }: AppProps) {
       userSettingsForm.passengerMileageRate
     )
     const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
+    const invoiceReplyToEmail = userSettingsForm.invoiceReplyToEmail.trim()
 
     if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
       setUserSettingsStatus('Rates must be valid numbers, for example 0.45.')
@@ -1287,6 +1289,7 @@ function App({ appMetadata }: AppProps) {
           mileageRate,
           passengerMileageRate,
           invoiceFilenamePattern: invoiceFilenamePattern || null,
+          invoiceReplyToEmail: invoiceReplyToEmail || null,
         }),
       })
 
@@ -1312,6 +1315,7 @@ function App({ appMetadata }: AppProps) {
         mileageRate: number | null
         passengerMileageRate: number | null
         invoiceFilenamePattern: string | null
+        invoiceReplyToEmail: string | null
       }
 
       setAuthUser((current) =>
@@ -1321,6 +1325,7 @@ function App({ appMetadata }: AppProps) {
               mileageRate: savedSettings.mileageRate,
               passengerMileageRate: savedSettings.passengerMileageRate,
               invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
+              invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
             }
           : current
       )
@@ -1332,6 +1337,7 @@ function App({ appMetadata }: AppProps) {
             ? ''
             : String(savedSettings.passengerMileageRate),
         invoiceFilenamePattern: savedSettings.invoiceFilenamePattern ?? '',
+        invoiceReplyToEmail: savedSettings.invoiceReplyToEmail ?? '',
       })
       setUserSettingsStatus('Settings updated.')
     } catch (error) {

@@ -22,6 +22,15 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     [Fact]
     public async Task SendEmail_WhenInvoiceHasPdfAndClientEmail_SendsAttachmentAndLogsDelivery()
     {
+        var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            invoiceFilenamePattern = (string?)null,
+            invoiceReplyToEmail = "alex@example.com",
+        });
+        updateSettingsResponse.EnsureSuccessStatusCode();
+
         var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 invoice content");
         var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
         {
@@ -50,6 +59,10 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal("bookings@foxandfinch.co.uk", message.To.Single().Address);
         Assert.Equal("Fox & Finch Events", message.To.Single().DisplayName);
         Assert.Equal("Invoice GLV-SEND-001 from Glovelly", message.Subject);
+        Assert.Equal("invoices@glovelly.local", message.From?.Address);
+        Assert.Equal("Test Admin (via Glovelly)", message.From?.DisplayName);
+        Assert.Equal("alex@example.com", message.ReplyTo?.Address);
+        Assert.Equal("Test Admin", message.ReplyTo?.DisplayName);
         Assert.Contains("Please find invoice GLV-SEND-001 attached.", message.PlainTextBody);
         Assert.Contains("Please process this one this week.", message.PlainTextBody);
 
@@ -91,6 +104,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var message = Assert.Single(_factory.Emails.SentEmails);
         Assert.Contains("Please find invoice GLV-SEND-OPTIONAL-BODY attached.", message.PlainTextBody);
         Assert.DoesNotContain("Message:", message.PlainTextBody);
+        Assert.Null(message.ReplyTo);
     }
 
     [Fact]

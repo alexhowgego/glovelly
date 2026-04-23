@@ -9,7 +9,7 @@ public sealed class LoggingEmailSender(
     public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
         EmailSenderSupport.ValidateMessage(message);
-        var from = EmailSenderSupport.TryResolveFromAddress(settings);
+        var from = EmailSenderSupport.TryResolveFromAddress(message, settings);
 
         logger.LogInformation(
             "Outbound email queued for logging only. From: {From}; RecipientCount: {RecipientCount}; HasSubject: {HasSubject}; SubjectLength: {SubjectLength}; HasHtmlBody: {HasHtmlBody}; AttachmentCount: {AttachmentCount}",

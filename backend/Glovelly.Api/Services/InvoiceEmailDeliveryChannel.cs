@@ -1,9 +1,12 @@
 using Glovelly.Api.Models;
+using Microsoft.Extensions.Options;
 using System.Text;
 
 namespace Glovelly.Api.Services;
 
-public sealed class InvoiceEmailDeliveryChannel(IEmailSender emailSender) : IInvoiceDeliveryChannel
+public sealed class InvoiceEmailDeliveryChannel(
+    IEmailSender emailSender,
+    IOptions<EmailSettings> emailSettingsAccessor) : IInvoiceDeliveryChannel
 {
     public InvoiceDeliveryChannel Channel => InvoiceDeliveryChannel.Email;
 
@@ -25,11 +28,22 @@ public sealed class InvoiceEmailDeliveryChannel(IEmailSender emailSender) : IInv
             throw new InvalidOperationException("Invoice PDF is missing.");
         }
 
+        var configuredFrom = EmailSenderSupport.TryResolveConfiguredFromAddress(emailSettingsAccessor.Value)
+            ?? new EmailAddress("invoices@glovelly.local");
+
         await emailSender.SendAsync(
             new EmailMessage(
                 To: [new EmailAddress(client.Email.Trim(), client.Name.Trim())],
                 Subject: $"Invoice {invoice.InvoiceNumber} from Glovelly",
                 PlainTextBody: BuildPlainTextBody(invoice, request.Message),
+                From: new EmailAddress(
+                    configuredFrom.Address,
+                    request.SenderIdentity.FromDisplayName),
+                ReplyTo: string.IsNullOrWhiteSpace(request.SenderIdentity.ReplyToEmail)
+                    ? null
+                    : new EmailAddress(
+                        request.SenderIdentity.ReplyToEmail!,
+                        request.SenderIdentity.ReplyToDisplayName),
                 Attachments:
                 [
                     new EmailAttachment(

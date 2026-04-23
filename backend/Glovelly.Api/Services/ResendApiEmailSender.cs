@@ -14,7 +14,7 @@ public sealed class ResendApiEmailSender(IResend resend, EmailSettings settings)
                 "Resend email sending requires Email:Resend:ApiKey and Email:Resend:DefaultFromAddress to be configured.");
         }
 
-        var from = EmailSenderSupport.ResolveResendFromAddress(settings);
+        var from = EmailSenderSupport.ResolveFromAddress(message, settings);
         var resendMessage = new Resend.EmailMessage
         {
             From = EmailSenderSupport.FormatAddress(from),

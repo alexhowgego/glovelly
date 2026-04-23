@@ -300,6 +300,14 @@ public static class InvoiceEndpoints
                 invoice,
                 invoice.Client,
                 userDefaultPattern);
+            var sendingUser = userId.HasValue
+                ? await db.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        value => value.Id == userId.Value && value.IsActive,
+                        cancellationToken)
+                : null;
+            var senderIdentity = InvoiceEmailSenderIdentityBuilder.Build(sendingUser);
 
             try
             {
@@ -310,6 +318,7 @@ public static class InvoiceEndpoints
                     userId,
                     request?.Message,
                     attachmentFileName,
+                    senderIdentity,
                     cancellationToken);
             }
             catch (Exception exception)

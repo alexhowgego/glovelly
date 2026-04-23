@@ -13,13 +13,14 @@ public sealed class InvoiceDeliveryService(
         Guid? userId,
         string? message,
         string attachmentFileName,
+        InvoiceEmailSenderIdentity senderIdentity,
         CancellationToken cancellationToken = default)
     {
         var deliveryChannel = deliveryChannels.FirstOrDefault(value => value.Channel == channel)
             ?? throw new InvalidOperationException($"Invoice delivery channel {channel} is not registered.");
 
         await deliveryChannel.DeliverAsync(
-            new InvoiceDeliveryRequest(invoice, client, userId, message, attachmentFileName),
+            new InvoiceDeliveryRequest(invoice, client, userId, message, attachmentFileName, senderIdentity),
             cancellationToken);
 
         invoice.DeliveryCount += 1;

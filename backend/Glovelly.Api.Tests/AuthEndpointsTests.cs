@@ -39,6 +39,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "{MonthName} {Year} {InvoiceNumber}",
+            invoiceReplyToEmail = "billing@example.com",
         });
         updateResponse.EnsureSuccessStatusCode();
 
@@ -50,16 +51,20 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "{MonthName} {Year} {InvoiceNumber}",
             payload.GetProperty("invoiceFilenamePattern").GetString());
+        Assert.Equal(
+            "billing@example.com",
+            payload.GetProperty("invoiceReplyToEmail").GetString());
     }
 
     [Fact]
-    public async Task UpdateSettings_PersistsInvoiceFilenamePattern()
+    public async Task UpdateSettings_PersistsInvoiceFilenamePatternAndReplyToEmail()
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "  {ClientName} {InvoiceNumber}  ",
+            invoiceReplyToEmail = "  accounts@example.com  ",
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -68,6 +73,9 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "{ClientName} {InvoiceNumber}",
             payload.GetProperty("invoiceFilenamePattern").GetString());
+        Assert.Equal(
+            "accounts@example.com",
+            payload.GetProperty("invoiceReplyToEmail").GetString());
     }
 
     [Fact]
@@ -78,6 +86,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "   ",
+            invoiceReplyToEmail = (string?)null,
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -86,6 +95,25 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "Invoice filename pattern cannot be empty or whitespace.",
             problem.GetProperty("errors").GetProperty("invoiceFilenamePattern")[0].GetString());
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WithInvalidReplyToEmail_ReturnsValidationProblem()
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceReplyToEmail = "not-an-email",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Reply-to email must be a valid email address.",
+            problem.GetProperty("errors").GetProperty("invoiceReplyToEmail")[0].GetString());
     }
 
     [Fact]

@@ -22,7 +22,7 @@ internal static class EmailSenderSupport
         }
     }
 
-    public static EmailAddress ResolveResendFromAddress(EmailSettings settings)
+    public static EmailAddress ResolveConfiguredFromAddress(EmailSettings settings)
     {
         var address = settings.Resend.DefaultFromAddress
             ?? settings.DefaultFromAddress;
@@ -37,7 +37,12 @@ internal static class EmailSenderSupport
         return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
     }
 
-    public static EmailAddress? TryResolveFromAddress(EmailSettings settings)
+    public static EmailAddress ResolveFromAddress(EmailMessage message, EmailSettings settings)
+    {
+        return message.From ?? ResolveConfiguredFromAddress(settings);
+    }
+
+    public static EmailAddress? TryResolveDefaultFromAddress(EmailSettings settings)
     {
         var address = settings.DefaultFromAddress;
         if (string.IsNullOrWhiteSpace(address))
@@ -47,6 +52,25 @@ internal static class EmailSenderSupport
 
         var displayName = settings.DefaultFromDisplayName;
         return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
+    }
+
+    public static EmailAddress? TryResolveConfiguredFromAddress(EmailSettings settings)
+    {
+        var address = settings.Resend.DefaultFromAddress
+            ?? settings.DefaultFromAddress;
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            return null;
+        }
+
+        var displayName = settings.Resend.DefaultFromDisplayName
+            ?? settings.DefaultFromDisplayName;
+        return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
+    }
+
+    public static EmailAddress? TryResolveFromAddress(EmailMessage message, EmailSettings settings)
+    {
+        return message.From ?? TryResolveDefaultFromAddress(settings);
     }
 
     public static string FormatAddress(EmailAddress address)
