@@ -1512,6 +1512,7 @@ type InvoicesSectionProps = {
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<void>
   onOpenSellerProfile: () => void
   onReissue: (invoice: Invoice) => Promise<void>
+  onSendEmail: (invoice: Invoice) => Promise<void>
   onSearchQueryChange: (value: string) => void
   onSelectInvoice: (invoiceId: string) => void
   onStartEditing: () => void
@@ -1541,6 +1542,7 @@ export function InvoicesSection({
   onInvoiceStatusChange,
   onOpenSellerProfile,
   onReissue,
+  onSendEmail,
   onSearchQueryChange,
   onSelectInvoice,
   onStartEditing,
@@ -1644,6 +1646,14 @@ export function InvoicesSection({
                 Re-issue
               </button>
               <button
+                className="ghost-button"
+                onClick={() => selectedInvoice && void onSendEmail(selectedInvoice)}
+                type="button"
+                disabled={!selectedInvoice || isInvoiceLoading}
+              >
+                Send to client
+              </button>
+              <button
                 className="danger-button"
                 onClick={() => selectedInvoice && void onDeleteInvoice(selectedInvoice)}
                 type="button"
@@ -1739,6 +1749,17 @@ export function InvoicesSection({
                 <article>
                   <p className="detail-label">Last re-issue</p>
                   <strong>{formatDateTime(selectedInvoice.lastReissuedUtc)}</strong>
+                </article>
+                <article>
+                  <p className="detail-label">Deliveries</p>
+                  <strong>{selectedInvoice.deliveryCount}</strong>
+                </article>
+                <article>
+                  <p className="detail-label">Last delivery</p>
+                  <strong>{formatDateTime(selectedInvoice.lastDeliveredUtc)}</strong>
+                  {selectedInvoice.lastDeliveryRecipient ? (
+                    <span>{selectedInvoice.lastDeliveryRecipient}</span>
+                  ) : null}
                 </article>
               </div>
 
@@ -1893,7 +1914,7 @@ export function UserSettingsModal({
 
         <p className="hero-text settings-intro">
           These defaults are used when a client does not provide its own pricing
-          or invoice filename pattern.
+          or invoice filename pattern, and invoice emails can reply back to your chosen address.
         </p>
 
         <form className="settings-form" onSubmit={onSubmit}>
@@ -1933,6 +1954,18 @@ export function UserSettingsModal({
                 }
               />
             </label>
+
+            <label>
+              <span>Invoice reply-to email</span>
+              <input
+                placeholder="you@example.com"
+                type="email"
+                value={form.invoiceReplyToEmail}
+                onChange={(event) =>
+                  onUpdateField('invoiceReplyToEmail', event.target.value)
+                }
+              />
+            </label>
           </div>
 
           <div className="detail-grid client-settings-preview">
@@ -1946,6 +1979,7 @@ export function UserSettingsModal({
           <div className="settings-note">
             Leave a rate blank if you do not want a personal default. Filename tokens:
             {` ${invoiceFilenameTokens.join(', ')}.`}
+            {' '}Leave reply-to blank if replies should not be directed to a personal mailbox.
           </div>
 
           <div className="form-actions">

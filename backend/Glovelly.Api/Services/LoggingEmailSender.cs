@@ -3,17 +3,15 @@ using Microsoft.Extensions.Logging;
 namespace Glovelly.Api.Services;
 
 public sealed class LoggingEmailSender(
-    ILogger<LoggingEmailSender> logger,
-    EmailSettings settings) : IEmailSender
+    ILogger<LoggingEmailSender> logger) : IEmailSender
 {
     public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
         EmailSenderSupport.ValidateMessage(message);
-        var from = EmailSenderSupport.TryResolveFromAddress(settings);
 
         logger.LogInformation(
             "Outbound email queued for logging only. From: {From}; RecipientCount: {RecipientCount}; HasSubject: {HasSubject}; SubjectLength: {SubjectLength}; HasHtmlBody: {HasHtmlBody}; AttachmentCount: {AttachmentCount}",
-            from is null ? "(not configured)" : EmailSenderSupport.FormatAddress(from),
+            message.From is null ? "(not configured)" : EmailSenderSupport.FormatAddress(message.From),
             message.To.Count,
             !string.IsNullOrWhiteSpace(message.Subject),
             message.Subject?.Length ?? 0,

@@ -56,6 +56,8 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
             {
                 Assert.Equal("second-admin@glovelly.local", message.To.Single().Address);
                 Assert.Equal("Glovelly access request", message.Subject);
+                Assert.Equal("access@glovelly.test", message.From?.Address);
+                Assert.Equal("Glovelly Access", message.From?.DisplayName);
                 Assert.Contains("Environment: Testing", message.PlainTextBody);
                 Assert.Contains("User email: new-user@glovelly.local", message.PlainTextBody);
                 Assert.Contains("User display name: New User", message.PlainTextBody);
@@ -69,6 +71,8 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
             {
                 Assert.Equal("test-admin@glovelly.local", message.To.Single().Address);
                 Assert.Equal("Glovelly access request", message.Subject);
+                Assert.Equal("access@glovelly.test", message.From?.Address);
+                Assert.Equal("Glovelly Access", message.From?.DisplayName);
                 Assert.Contains("Environment: Testing", message.PlainTextBody);
                 Assert.Contains("User email: new-user@glovelly.local", message.PlainTextBody);
                 Assert.Contains("User display name: New User", message.PlainTextBody);
@@ -108,6 +112,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
         Assert.Single(_factory.Emails.SentEmails);
         Assert.Equal("test-admin@glovelly.local", _factory.Emails.SentEmails[0].To.Single().Address);
+        Assert.Equal("access@glovelly.test", _factory.Emails.SentEmails[0].From?.Address);
     }
 
     [Fact]
@@ -258,6 +263,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Single(_factory.Emails.SentEmails);
         Assert.Equal("test-admin@glovelly.local", _factory.Emails.SentEmails[0].To.Single().Address);
+        Assert.Equal("access@glovelly.test", _factory.Emails.SentEmails[0].From?.Address);
         Assert.Contains("User email: new-user@glovelly.local", _factory.Emails.SentEmails[0].PlainTextBody);
         Assert.Contains("User display name: New User", _factory.Emails.SentEmails[0].PlainTextBody);
     }

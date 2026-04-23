@@ -69,6 +69,7 @@ internal static class AuthEndpoints
                 mileageRate = localUser.MileageRate,
                 passengerMileageRate = localUser.PassengerMileageRate,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
+                invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
             });
         });
 
@@ -99,6 +100,7 @@ internal static class AuthEndpoints
             localUser.MileageRate = request.MileageRate;
             localUser.PassengerMileageRate = request.PassengerMileageRate;
             localUser.InvoiceFilenamePattern = request.InvoiceFilenamePattern?.Trim();
+            localUser.InvoiceReplyToEmail = request.InvoiceReplyToEmail?.Trim();
 
             await dbContext.SaveChangesAsync();
 
@@ -107,6 +109,7 @@ internal static class AuthEndpoints
                 mileageRate = localUser.MileageRate,
                 passengerMileageRate = localUser.PassengerMileageRate,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
+                invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
             });
         });
 
@@ -164,6 +167,14 @@ internal static class AuthEndpoints
             return patternErrors;
         }
 
+        if (request.InvoiceReplyToEmail is not null && string.IsNullOrWhiteSpace(request.InvoiceReplyToEmail))
+        {
+            return new Dictionary<string, string[]>
+            {
+                ["invoiceReplyToEmail"] = ["Reply-to email cannot be empty or whitespace."]
+            };
+        }
+
         var validationResults = new List<ValidationResult>();
         var validationContext = new ValidationContext(request);
         var isValid = Validator.TryValidateObject(request, validationContext, validationResults, validateAllProperties: true);
@@ -194,5 +205,7 @@ internal static class AuthEndpoints
         decimal? MileageRate,
         [Range(0, double.MaxValue, ErrorMessage = "Passenger mileage rate cannot be negative.")]
         decimal? PassengerMileageRate,
-        string? InvoiceFilenamePattern);
+        string? InvoiceFilenamePattern,
+        [property: EmailAddress(ErrorMessage = "Reply-to email must be a valid email address.")]
+        string? InvoiceReplyToEmail);
 }

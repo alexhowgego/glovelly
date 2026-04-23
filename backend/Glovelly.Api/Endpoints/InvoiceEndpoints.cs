@@ -242,6 +242,112 @@ public static class InvoiceEndpoints
             return Results.Ok(invoice);
         });
 
+        group.MapPost("/{id:guid}/send-email", async (
+            Guid id,
+            InvoiceEmailDeliveryRequest? request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceDeliveryService invoiceDeliveryService,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
+        {
+            var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
+                .Include(value => value.Client)
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id, cancellationToken);
+
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (invoice.Client is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["clientId"] = ["Client does not exist."]
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(invoice.Client.Email))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["recipient"] = ["Invoice recipient email is missing."]
+                });
+            }
+
+            if (invoice.PdfBlob is null || invoice.PdfBlob.Length == 0)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["pdf"] = ["Invoice PDF is missing."]
+                });
+            }
+
+            var userDefaultPattern = userId.HasValue
+                ? await db.Users
+                    .AsNoTracking()
+                    .Where(value => value.Id == userId.Value && value.IsActive)
+                    .Select(value => value.InvoiceFilenamePattern)
+                    .FirstOrDefaultAsync(cancellationToken)
+                : null;
+            var attachmentFileName = InvoicePdfFilenameBuilder.Build(
+                invoice,
+                invoice.Client,
+                userDefaultPattern);
+            var sendingUser = userId.HasValue
+                ? await db.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        value => value.Id == userId.Value && value.IsActive,
+                        cancellationToken)
+                : null;
+            var senderIdentity = InvoiceEmailSenderIdentityBuilder.Build(sendingUser);
+
+            try
+            {
+                await invoiceDeliveryService.DeliverAsync(
+                    InvoiceDeliveryChannel.Email,
+                    invoice,
+                    invoice.Client,
+                    userId,
+                    request?.Message,
+                    attachmentFileName,
+                    senderIdentity,
+                    cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(
+                    exception,
+                    "Failed to send invoice {InvoiceId} ({InvoiceNumber}) by email.",
+                    invoice.Id,
+                    invoice.InvoiceNumber);
+                return Results.Problem(
+                    title: "Unable to send invoice email",
+                    detail: "We couldn't send the invoice email right now. Please try again shortly.",
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            EndpointSupport.StampUpdate(invoice, userId);
+            await db.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Invoice {InvoiceId} ({InvoiceNumber}) delivered by {Channel} to {Recipient} by user {UserId}.",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.LastDeliveryChannel,
+                invoice.LastDeliveryRecipient,
+                userId);
+
+            return Results.Ok(invoice);
+        });
+
         group.MapPost("/{id:guid}/adjustments", async (
             Guid id,
             InvoiceAdjustmentCreateRequest request,
@@ -340,4 +446,5 @@ public static class InvoiceEndpoints
 
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
     private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);
+    private sealed record InvoiceEmailDeliveryRequest(string? Message);
 }

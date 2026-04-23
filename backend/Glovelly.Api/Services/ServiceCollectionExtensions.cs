@@ -12,6 +12,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AccessRequestWorkflowService>();
         services.AddScoped<AccessRequestRetentionService>();
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
+        services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
+        services.AddScoped<IInvoiceDeliveryChannel, InvoiceEmailDeliveryChannel>();
         services.AddOptions<ResendClientOptions>()
             .Configure<IOptions<EmailSettings>>((resendOptions, emailOptions) =>
             {
@@ -27,7 +29,7 @@ public static class ServiceCollectionExtensions
             {
                 EmailModes.Disabled => ActivatorUtilities.CreateInstance<NullEmailSender>(provider),
                 EmailModes.Resend => ActivatorUtilities.CreateInstance<ResendApiEmailSender>(provider, emailSettings),
-                _ => ActivatorUtilities.CreateInstance<LoggingEmailSender>(provider, emailSettings),
+                _ => ActivatorUtilities.CreateInstance<LoggingEmailSender>(provider),
             };
         });
 

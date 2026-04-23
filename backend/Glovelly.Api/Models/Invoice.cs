@@ -17,6 +17,11 @@ public sealed class Invoice
     public int ReissueCount { get; set; }
     public DateTimeOffset? LastReissuedUtc { get; set; }
     public Guid? LastReissuedByUserId { get; set; }
+    public int DeliveryCount { get; set; }
+    public string? LastDeliveryChannel { get; set; }
+    public string? LastDeliveryRecipient { get; set; }
+    public DateTimeOffset? LastDeliveredUtc { get; set; }
+    public Guid? LastDeliveredByUserId { get; set; }
     public string? Description { get; set; }
     public byte[]? PdfBlob { get; set; }
 
