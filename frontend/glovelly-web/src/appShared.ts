@@ -162,6 +162,11 @@ export type Invoice = {
   status: InvoiceStatus
   reissueCount: number
   lastReissuedUtc: string | null
+  deliveryCount: number
+  lastDeliveryChannel: string | null
+  lastDeliveryRecipient: string | null
+  lastDeliveredUtc: string | null
+  lastDeliveredByUserId: string | null
   description: string | null
   pdfBlob: string | null
   total: number

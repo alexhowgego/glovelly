@@ -1512,6 +1512,7 @@ type InvoicesSectionProps = {
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<void>
   onOpenSellerProfile: () => void
   onReissue: (invoice: Invoice) => Promise<void>
+  onSendEmail: (invoice: Invoice) => Promise<void>
   onSearchQueryChange: (value: string) => void
   onSelectInvoice: (invoiceId: string) => void
   onStartEditing: () => void
@@ -1541,6 +1542,7 @@ export function InvoicesSection({
   onInvoiceStatusChange,
   onOpenSellerProfile,
   onReissue,
+  onSendEmail,
   onSearchQueryChange,
   onSelectInvoice,
   onStartEditing,
@@ -1644,6 +1646,14 @@ export function InvoicesSection({
                 Re-issue
               </button>
               <button
+                className="ghost-button"
+                onClick={() => selectedInvoice && void onSendEmail(selectedInvoice)}
+                type="button"
+                disabled={!selectedInvoice || isInvoiceLoading}
+              >
+                Send to client
+              </button>
+              <button
                 className="danger-button"
                 onClick={() => selectedInvoice && void onDeleteInvoice(selectedInvoice)}
                 type="button"
@@ -1739,6 +1749,17 @@ export function InvoicesSection({
                 <article>
                   <p className="detail-label">Last re-issue</p>
                   <strong>{formatDateTime(selectedInvoice.lastReissuedUtc)}</strong>
+                </article>
+                <article>
+                  <p className="detail-label">Deliveries</p>
+                  <strong>{selectedInvoice.deliveryCount}</strong>
+                </article>
+                <article>
+                  <p className="detail-label">Last delivery</p>
+                  <strong>{formatDateTime(selectedInvoice.lastDeliveredUtc)}</strong>
+                  {selectedInvoice.lastDeliveryRecipient ? (
+                    <span>{selectedInvoice.lastDeliveryRecipient}</span>
+                  ) : null}
                 </article>
               </div>
 

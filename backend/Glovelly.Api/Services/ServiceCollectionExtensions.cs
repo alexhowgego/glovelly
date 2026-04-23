@@ -12,6 +12,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AccessRequestWorkflowService>();
         services.AddScoped<AccessRequestRetentionService>();
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
+        services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
+        services.AddScoped<IInvoiceDeliveryChannel, InvoiceEmailDeliveryChannel>();
         services.AddOptions<ResendClientOptions>()
             .Configure<IOptions<EmailSettings>>((resendOptions, emailOptions) =>
             {

@@ -158,6 +158,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasConversion<string>()
                 .HasMaxLength(50);
             entity.Property(invoice => invoice.ReissueCount);
+            entity.Property(invoice => invoice.DeliveryCount);
+            entity.Property(invoice => invoice.LastDeliveryChannel)
+                .HasMaxLength(50);
+            entity.Property(invoice => invoice.LastDeliveryRecipient)
+                .HasMaxLength(320);
             entity.Property(invoice => invoice.Description)
                 .HasMaxLength(4000);
             entity.Property(invoice => invoice.PdfBlob);

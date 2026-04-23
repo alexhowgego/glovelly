@@ -1,0 +1,158 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using Glovelly.Api.Tests.Infrastructure;
+using Xunit;
+
+namespace Glovelly.Api.Tests;
+
+public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFactory>
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly GlovellyApiFactory _factory;
+    private readonly HttpClient _client;
+
+    public InvoiceDeliveryEndpointsTests(GlovellyApiFactory factory)
+    {
+        _factory = factory;
+        _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task SendEmail_WhenInvoiceHasPdfAndClientEmail_SendsAttachmentAndLogsDelivery()
+    {
+        var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 invoice content");
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-SEND-001",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Email delivery test.",
+            pdfBlob = Convert.ToBase64String(pdfBytes),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
+        {
+            message = "Please process this one this week.",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var message = Assert.Single(_factory.Emails.SentEmails);
+        Assert.Equal("bookings@foxandfinch.co.uk", message.To.Single().Address);
+        Assert.Equal("Fox & Finch Events", message.To.Single().DisplayName);
+        Assert.Equal("Invoice GLV-SEND-001 from Glovelly", message.Subject);
+        Assert.Contains("Please find invoice GLV-SEND-001 attached.", message.PlainTextBody);
+        Assert.Contains("Please process this one this week.", message.PlainTextBody);
+
+        var attachment = Assert.Single(message.Attachments);
+        Assert.Equal("GLV-SEND-001.pdf", attachment.FileName);
+        Assert.Equal("application/pdf", attachment.ContentType);
+        Assert.Equal(pdfBytes, attachment.Content);
+
+        Assert.Equal(1, updatedInvoice.GetProperty("deliveryCount").GetInt32());
+        Assert.Equal("Email", updatedInvoice.GetProperty("lastDeliveryChannel").GetString());
+        Assert.Equal("bookings@foxandfinch.co.uk", updatedInvoice.GetProperty("lastDeliveryRecipient").GetString());
+        Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastDeliveredByUserId").GetGuid());
+        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("lastDeliveredUtc").ValueKind);
+    }
+
+    [Fact]
+    public async Task SendEmail_WhenBodyOmitted_SendsStandardMessage()
+    {
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-SEND-OPTIONAL-BODY",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-21",
+            dueDate = "2026-05-05",
+            status = "Issued",
+            description = "Optional body delivery test.",
+            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+
+        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsync(
+            $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var message = Assert.Single(_factory.Emails.SentEmails);
+        Assert.Contains("Please find invoice GLV-SEND-OPTIONAL-BODY attached.", message.PlainTextBody);
+        Assert.DoesNotContain("Message:", message.PlainTextBody);
+    }
+
+    [Fact]
+    public async Task SendEmail_WhenClientEmailMissing_ReturnsValidationProblemWithoutSending()
+    {
+        var createClientResponse = await _client.PostAsJsonAsync("/clients", new
+        {
+            name = "No Email Client",
+            email = "   ",
+            billingAddress = new
+            {
+                line1 = "1 Test Street",
+                city = "Leeds",
+                stateOrCounty = "West Yorkshire",
+                postalCode = "LS1 1AA",
+                country = "United Kingdom",
+            },
+        });
+        createClientResponse.EnsureSuccessStatusCode();
+        var client = await createClientResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-SEND-002",
+            clientId = client.GetProperty("id").GetGuid(),
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Missing email delivery test.",
+            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email", new
+        {
+            message = (string?)null,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_factory.Emails.SentEmails);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Invoice recipient email is missing.",
+            problem.GetProperty("errors").GetProperty("recipient")[0].GetString());
+    }
+
+    [Fact]
+    public async Task SendEmail_WhenInvoicePdfMissing_ReturnsValidationProblemWithoutSending()
+    {
+        var response = await _client.PostAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/send-email", new
+        {
+            message = "Please pay this invoice.",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_factory.Emails.SentEmails);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Invoice PDF is missing.",
+            problem.GetProperty("errors").GetProperty("pdf")[0].GetString());
+    }
+}

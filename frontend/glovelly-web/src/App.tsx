@@ -2188,6 +2188,55 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
+  const handleSendInvoiceEmail = async (invoice: Invoice) => {
+    const message = window.prompt(
+      `Add an optional message for ${invoice.invoiceNumber}, or leave blank to send the standard note.`
+    )
+    if (message === null) {
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Sending ${invoice.invoiceNumber} to client...`)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/send-email`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const recipientError = problem?.errors?.recipient?.[0]
+        const pdfError = problem?.errors?.pdf?.[0]
+        throw new Error(
+          recipientError ??
+            pdfError ??
+            problem?.detail ??
+            problem?.title ??
+            'Unable to send invoice email.'
+        )
+      }
+
+      const updatedInvoice = (await response.json()) as Invoice
+      setInvoices((current) =>
+        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
+      )
+      setInvoiceStatus(
+        `Invoice ${updatedInvoice.invoiceNumber} sent to ${updatedInvoice.lastDeliveryRecipient}.`
+      )
+    } catch (error) {
+      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to send invoice email.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
   const handleAddInvoiceAdjustment = async (invoice: Invoice) => {
     const amount = Number.parseFloat(adjustmentAmount)
     if (!Number.isFinite(amount) || amount === 0) {
@@ -2424,6 +2473,7 @@ function App({ appMetadata }: AppProps) {
         onInvoiceStatusChange={handleInvoiceStatusChange}
         onOpenSellerProfile={openSellerProfile}
         onReissue={handleInvoiceReissue}
+        onSendEmail={handleSendInvoiceEmail}
         onSearchQueryChange={setInvoiceSearchQuery}
         onSelectInvoice={setSelectedInvoiceId}
         onStartEditing={startInvoiceEdit}
