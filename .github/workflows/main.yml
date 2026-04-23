@@ -129,11 +129,14 @@ jobs:
           image: ${{ env.IMAGE_URI }}:sha-${{ github.sha }}
           env_vars: |-
             App__DeploymentName=Production
+            Email__Mode=Resend
+            Email__Resend__DefaultFromDisplayName=Glovelly
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest
             ConnectionStrings__Glovelly=glovelly-connection-string:latest
             Email__Resend__ApiKey=glovelly-resend-api-key:latest
+            Email__Resend__DefaultFromAddress=glovelly-resend-default-from-address:latest
           secrets_update_strategy: merge
           flags: >-
             --allow-unauthenticated
@@ -153,11 +156,14 @@ jobs:
           image: ${{ env.IMAGE_URI }}:sha-${{ github.sha }}
           env_vars: |-
             App__DeploymentName=Staging
+            Email__Mode=Resend
+            Email__Resend__DefaultFromDisplayName=Glovelly
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest
             ConnectionStrings__Glovelly=glovelly-connection-string-staging:latest
             Email__Resend__ApiKey=glovelly-resend-api-key:latest
+            Email__Resend__DefaultFromAddress=glovelly-resend-default-from-address:latest
           secrets_update_strategy: merge
           flags: >-
             --allow-unauthenticated
