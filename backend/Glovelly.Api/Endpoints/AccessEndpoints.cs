@@ -27,6 +27,7 @@ internal static class AccessEndpoints
             ClaimsPrincipal user,
             AppDbContext dbContext,
             IEmailSender emailSender,
+            Microsoft.Extensions.Options.IOptions<EmailSettings> emailSettingsAccessor,
             AccessRequestWorkflowService workflowService,
             HttpContext httpContext,
             IDataProtectionProvider dataProtectionProvider,
@@ -114,6 +115,9 @@ internal static class AccessEndpoints
                             To: [new EmailAddress(recipient)],
                             Subject: "Glovelly access request",
                             PlainTextBody: BuildPlainTextBody(notificationRequest, environmentLabel),
+                            From: EmailSenderSupport.ResolveConfiguredFromAddress(
+                                emailSettingsAccessor.Value,
+                                EmailUseCase.AccessRequests),
                             HtmlBody: BuildHtmlBody(notificationRequest, environmentLabel)),
                         cancellationToken);
                 }

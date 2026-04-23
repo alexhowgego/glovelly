@@ -42,7 +42,6 @@ public sealed class EmailInfrastructureTests
         {
             settings.Mode = "resend";
             settings.Resend.ApiKey = "re_test_key";
-            settings.Resend.DefaultFromAddress = "hello@glovelly.test";
         });
 
         var sender = services.GetRequiredService<IEmailSender>();
@@ -64,7 +63,8 @@ public sealed class EmailInfrastructureTests
             new EmailMessage(
                 To: [new EmailAddress("user@example.com")],
                 Subject: "Test subject",
-                PlainTextBody: "Hello from Glovelly.")));
+                PlainTextBody: "Hello from Glovelly.",
+                From: new EmailAddress("access@glovelly.test", "Glovelly Access"))));
 
         Assert.Contains("Email:Resend:ApiKey", error.Message);
     }

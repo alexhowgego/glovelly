@@ -1,5 +1,11 @@
 namespace Glovelly.Api.Services;
 
+internal enum EmailUseCase
+{
+    AccessRequests,
+    Invoices,
+}
+
 internal static class EmailSenderSupport
 {
     public static void ValidateMessage(EmailMessage message)
@@ -22,55 +28,28 @@ internal static class EmailSenderSupport
         }
     }
 
-    public static EmailAddress ResolveConfiguredFromAddress(EmailSettings settings)
+    public static EmailAddress ResolveConfiguredFromAddress(EmailSettings settings, EmailUseCase useCase)
     {
-        var address = settings.Resend.DefaultFromAddress
-            ?? settings.DefaultFromAddress;
-        var displayName = settings.Resend.DefaultFromDisplayName
-            ?? settings.DefaultFromDisplayName;
+        var useCaseSettings = ResolveUseCaseSettings(settings, useCase);
+        var address = useCaseSettings.FromAddress;
+        var displayName = useCaseSettings.FromDisplayName;
 
         if (string.IsNullOrWhiteSpace(address))
         {
-            throw new InvalidOperationException("Outbound email requires Email:DefaultFromAddress or Email:Resend:DefaultFromAddress to be configured.");
+            throw new InvalidOperationException($"Outbound email requires Email:{useCase}:FromAddress to be configured.");
         }
 
         return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
     }
 
-    public static EmailAddress ResolveFromAddress(EmailMessage message, EmailSettings settings)
+    public static EmailAddress ResolveFromAddress(EmailMessage message)
     {
-        return message.From ?? ResolveConfiguredFromAddress(settings);
-    }
-
-    public static EmailAddress? TryResolveDefaultFromAddress(EmailSettings settings)
-    {
-        var address = settings.DefaultFromAddress;
-        if (string.IsNullOrWhiteSpace(address))
+        if (message.From is null)
         {
-            return null;
+            throw new InvalidOperationException("Outbound email requires a sender identity.");
         }
 
-        var displayName = settings.DefaultFromDisplayName;
-        return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
-    }
-
-    public static EmailAddress? TryResolveConfiguredFromAddress(EmailSettings settings)
-    {
-        var address = settings.Resend.DefaultFromAddress
-            ?? settings.DefaultFromAddress;
-        if (string.IsNullOrWhiteSpace(address))
-        {
-            return null;
-        }
-
-        var displayName = settings.Resend.DefaultFromDisplayName
-            ?? settings.DefaultFromDisplayName;
-        return new EmailAddress(address.Trim(), string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
-    }
-
-    public static EmailAddress? TryResolveFromAddress(EmailMessage message, EmailSettings settings)
-    {
-        return message.From ?? TryResolveDefaultFromAddress(settings);
+        return message.From;
     }
 
     public static string FormatAddress(EmailAddress address)
@@ -78,5 +57,17 @@ internal static class EmailSenderSupport
         return string.IsNullOrWhiteSpace(address.DisplayName)
             ? address.Address
             : $"{address.DisplayName} <{address.Address}>";
+    }
+
+    private static EmailSenderIdentitySettings ResolveUseCaseSettings(
+        EmailSettings settings,
+        EmailUseCase useCase)
+    {
+        return useCase switch
+        {
+            EmailUseCase.AccessRequests => settings.AccessRequests,
+            EmailUseCase.Invoices => settings.Invoices,
+            _ => throw new ArgumentOutOfRangeException(nameof(useCase)),
+        };
     }
 }

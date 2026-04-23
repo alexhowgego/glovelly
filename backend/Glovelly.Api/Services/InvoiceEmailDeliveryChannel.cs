@@ -28,8 +28,9 @@ public sealed class InvoiceEmailDeliveryChannel(
             throw new InvalidOperationException("Invoice PDF is missing.");
         }
 
-        var configuredFrom = EmailSenderSupport.TryResolveConfiguredFromAddress(emailSettingsAccessor.Value)
-            ?? new EmailAddress("invoices@glovelly.local");
+        var configuredFrom = EmailSenderSupport.ResolveConfiguredFromAddress(
+            emailSettingsAccessor.Value,
+            EmailUseCase.Invoices);
 
         await emailSender.SendAsync(
             new EmailMessage(

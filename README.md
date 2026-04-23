@@ -43,8 +43,10 @@ export DevelopmentSeeding__AdminGoogleSubject="your-google-subject-claim"
 export DevelopmentSeeding__AdminEmail="you@example.com"
 export DevelopmentSeeding__AdminDisplayName="Your Name"
 export Email__Mode="Resend"
-export Email__Resend__DefaultFromAddress="your-verified-from@example.com"
-export Email__Resend__DefaultFromDisplayName="Glovelly"
+export Email__AccessRequests__FromAddress="access@example.com"
+export Email__AccessRequests__FromDisplayName="Glovelly Access"
+export Email__Invoices__FromAddress="invoices@example.com"
+export Email__Invoices__FromDisplayName="Glovelly Invoices"
 ```
 
 `run-dev.sh` sources this file automatically before starting the backend. The admin user is only seeded when no `ConnectionStrings:Glovelly` value is configured and Glovelly is using the in-memory development database.
@@ -86,8 +88,10 @@ dotnet user-secrets set "Email:Resend:ApiKey" "your-resend-api-key"
 
 ```bash
 export Email__Mode="Resend"
-export Email__Resend__DefaultFromAddress="your-verified-from@example.com"
-export Email__Resend__DefaultFromDisplayName="Glovelly"
+export Email__AccessRequests__FromAddress="access@example.com"
+export Email__AccessRequests__FromDisplayName="Glovelly Access"
+export Email__Invoices__FromAddress="invoices@example.com"
+export Email__Invoices__FromDisplayName="Glovelly Invoices"
 ```
 
 5. As an alternative, you can provide the same values via environment variables:
@@ -96,8 +100,10 @@ export Email__Resend__DefaultFromDisplayName="Glovelly"
    - `ConnectionStrings__Glovelly`
    - `Email__Resend__ApiKey`
    - `Email__Mode`
-   - `Email__Resend__DefaultFromAddress`
-   - `Email__Resend__DefaultFromDisplayName`
+   - `Email__AccessRequests__FromAddress`
+   - `Email__AccessRequests__FromDisplayName`
+   - `Email__Invoices__FromAddress`
+   - `Email__Invoices__FromDisplayName`
 
 The frontend signs users in through `/auth/login`, the backend completes the Google OpenID Connect flow, and the app stores the session in a secure cookie before allowing access to `/clients`, `/gigs`, `/invoices`, and `/invoice-lines`.
 

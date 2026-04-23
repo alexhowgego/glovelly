@@ -11,10 +11,10 @@ public sealed class ResendApiEmailSender(IResend resend, EmailSettings settings)
         if (!settings.Resend.IsConfigured)
         {
             throw new InvalidOperationException(
-                "Resend email sending requires Email:Resend:ApiKey and Email:Resend:DefaultFromAddress to be configured.");
+                "Resend email sending requires Email:Resend:ApiKey to be configured.");
         }
 
-        var from = EmailSenderSupport.ResolveFromAddress(message, settings);
+        var from = EmailSenderSupport.ResolveFromAddress(message);
         var resendMessage = new Resend.EmailMessage
         {
             From = EmailSenderSupport.FormatAddress(from),

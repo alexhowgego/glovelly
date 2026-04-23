@@ -59,7 +59,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal("bookings@foxandfinch.co.uk", message.To.Single().Address);
         Assert.Equal("Fox & Finch Events", message.To.Single().DisplayName);
         Assert.Equal("Invoice GLV-SEND-001 from Glovelly", message.Subject);
-        Assert.Equal("invoices@glovelly.local", message.From?.Address);
+        Assert.Equal("invoices@glovelly.test", message.From?.Address);
         Assert.Equal("Test Admin (via Glovelly)", message.From?.DisplayName);
         Assert.Equal("alex@example.com", message.ReplyTo?.Address);
         Assert.Equal("Test Admin", message.ReplyTo?.DisplayName);

@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.AspNetCore.Authorization.Policy;
+using Microsoft.Extensions.Options;
 
 namespace Glovelly.Api.Tests.Infrastructure;
 
@@ -31,6 +32,13 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
 
             services.AddSingleton<IPolicyEvaluator, TestPolicyEvaluator>();
             services.AddSingleton<IEmailSender>(_fakeEmailSender);
+            services.PostConfigure<EmailSettings>(settings =>
+            {
+                settings.AccessRequests.FromAddress = "access@glovelly.test";
+                settings.AccessRequests.FromDisplayName = "Glovelly Access";
+                settings.Invoices.FromAddress = "invoices@glovelly.test";
+                settings.Invoices.FromDisplayName = "Glovelly Invoices";
+            });
 
             services.AddDbContext<AppDbContext>(options =>
             {

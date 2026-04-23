@@ -29,7 +29,7 @@ public static class ServiceCollectionExtensions
             {
                 EmailModes.Disabled => ActivatorUtilities.CreateInstance<NullEmailSender>(provider),
                 EmailModes.Resend => ActivatorUtilities.CreateInstance<ResendApiEmailSender>(provider, emailSettings),
-                _ => ActivatorUtilities.CreateInstance<LoggingEmailSender>(provider, emailSettings),
+                _ => ActivatorUtilities.CreateInstance<LoggingEmailSender>(provider),
             };
         });
 
