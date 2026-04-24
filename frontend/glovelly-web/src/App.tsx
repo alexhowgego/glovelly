@@ -109,7 +109,7 @@ type AppProps = {
 }
 
 function App({ appMetadata }: AppProps) {
-  const [activeSection, setActiveSection] = useState<AppSection>('clients')
+  const [activeSection, setActiveSection] = useState<AppSection>('gigs')
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -194,7 +194,7 @@ function App({ appMetadata }: AppProps) {
 
   useEffect(() => {
     if (!isAdmin && activeSection === 'admin') {
-      setActiveSection('clients')
+      setActiveSection('gigs')
     }
   }, [activeSection, isAdmin])
 
