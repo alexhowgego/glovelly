@@ -69,8 +69,8 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             {
                 Id = Guid.NewGuid(),
                 UserId = TestAuthContext.UserId,
-                AccessToken = "access-token",
-                RefreshToken = "refresh-token",
+                EncryptedAccessToken = "encrypted-access-token",
+                EncryptedRefreshToken = "encrypted-refresh-token",
                 AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
                 RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
                 Scope = "https://www.googleapis.com/auth/drive.file",

@@ -78,6 +78,7 @@ internal static class GoogleDriveIntegrationEndpoints
             AppDbContext dbContext,
             IDataProtectionProvider dataProtectionProvider,
             IGoogleDriveOAuthTokenExchanger tokenExchanger,
+            IGoogleDriveTokenProtector tokenProtector,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
@@ -161,6 +162,7 @@ internal static class GoogleDriveIntegrationEndpoints
                 dbContext,
                 currentUserId.Value,
                 tokenResponse.TokenResponse,
+                tokenProtector,
                 cancellationToken);
 
             return Results.Redirect(BuildIntegrationStatusRedirectUri(settings));
@@ -213,6 +215,7 @@ internal static class GoogleDriveIntegrationEndpoints
         AppDbContext dbContext,
         Guid userId,
         GoogleDriveOAuthTokenResponse tokenResponse,
+        IGoogleDriveTokenProtector tokenProtector,
         CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
@@ -231,11 +234,11 @@ internal static class GoogleDriveIntegrationEndpoints
             dbContext.GoogleDriveConnections.Add(connection);
         }
 
-        connection.AccessToken = tokenResponse.AccessToken;
+        connection.EncryptedAccessToken = tokenProtector.Protect(tokenResponse.AccessToken);
 
         if (!string.IsNullOrWhiteSpace(tokenResponse.RefreshToken))
         {
-            connection.RefreshToken = tokenResponse.RefreshToken;
+            connection.EncryptedRefreshToken = tokenProtector.Protect(tokenResponse.RefreshToken);
             connection.RefreshTokenExpiresAtUtc = tokenResponse.RefreshTokenExpiresIn is { } refreshSeconds
                 ? now.AddSeconds(refreshSeconds)
                 : null;
