@@ -1213,6 +1213,10 @@ function App({ appMetadata }: AppProps) {
     setIsUserSettingsOpen(true)
   }
 
+  const connectGoogleDrive = () => {
+    window.location.assign(buildApiUrl('/integrations/google-drive/connect'))
+  }
+
   const openSellerProfile = () => {
     setSellerProfileForm(toSellerProfileForm(sellerProfile))
     setSellerProfileStatus(
@@ -2567,6 +2571,15 @@ function App({ appMetadata }: AppProps) {
                       disabled={isLoading || isAdminLoading || isSellerProfileSaving}
                     >
                       Seller profile
+                    </button>
+                    <button
+                      className="ghost-button profile-settings"
+                      onClick={connectGoogleDrive}
+                      role="menuitem"
+                      type="button"
+                      disabled={isLoading || isAdminLoading}
+                    >
+                      Connect Google Drive
                     </button>
                     <button
                       className="ghost-button profile-settings"
