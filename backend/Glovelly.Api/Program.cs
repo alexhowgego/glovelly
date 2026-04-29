@@ -15,6 +15,7 @@ app.UseGlovellyHttpPipeline(startupSettings);
 app.MapAppMetadataEndpoints(startupSettings);
 app.MapAuthEndpoints(startupSettings);
 app.MapAccessEndpoints(startupSettings);
+app.MapGoogleDriveIntegrationEndpoints();
 app.MapCrudEndpoints();
 app.MapAdminEndpoints();
 app.MapFallbackToFile("index.html");
