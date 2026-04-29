@@ -2549,6 +2549,13 @@ function App({ appMetadata }: AppProps) {
                             : 'Seller profile not set up'}
                       </span>
                     </div>
+                    <div className="profile-meta">
+                      <span>
+                        {authUser?.isGoogleDriveConnected
+                          ? 'Connected to Google Drive'
+                          : 'Google Drive not connected'}
+                      </span>
+                    </div>
                     <label className="theme-field" htmlFor="theme-preference-select">
                       <span>Theme</span>
                       <select
@@ -2579,7 +2586,9 @@ function App({ appMetadata }: AppProps) {
                       type="button"
                       disabled={isLoading || isAdminLoading}
                     >
-                      Connect Google Drive
+                      {authUser?.isGoogleDriveConnected
+                        ? 'Reconnect Google Drive'
+                        : 'Connect Google Drive'}
                     </button>
                     <button
                       className="ghost-button profile-settings"

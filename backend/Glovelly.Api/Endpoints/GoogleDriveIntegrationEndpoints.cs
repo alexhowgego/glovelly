@@ -3,6 +3,7 @@ using System.Text.Json;
 using Glovelly.Api.Auth;
 using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
+using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.WebUtilities;
@@ -147,6 +148,21 @@ internal static class GoogleDriveIntegrationEndpoints
                     statusCode: StatusCodes.Status502BadGateway);
             }
 
+            if (tokenResponse.TokenResponse is null ||
+                string.IsNullOrWhiteSpace(tokenResponse.TokenResponse.AccessToken))
+            {
+                return Results.Problem(
+                    title: "Google Drive token exchange failed.",
+                    detail: "Google token response did not include an access token.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+
+            await SaveGoogleDriveConnectionAsync(
+                dbContext,
+                currentUserId.Value,
+                tokenResponse.TokenResponse,
+                cancellationToken);
+
             return Results.Redirect(BuildIntegrationStatusRedirectUri(settings));
         });
 
@@ -191,6 +207,49 @@ internal static class GoogleDriveIntegrationEndpoints
             ?? settings.AllowedCorsOrigins[0];
 
         return $"{frontendOrigin.TrimEnd('/')}{integrationStatusPath}";
+    }
+
+    private static async Task SaveGoogleDriveConnectionAsync(
+        AppDbContext dbContext,
+        Guid userId,
+        GoogleDriveOAuthTokenResponse tokenResponse,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var connection = await dbContext.GoogleDriveConnections
+            .SingleOrDefaultAsync(value => value.UserId == userId, cancellationToken);
+
+        if (connection is null)
+        {
+            connection = new GoogleDriveConnection
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                ConnectedAtUtc = now,
+            };
+
+            dbContext.GoogleDriveConnections.Add(connection);
+        }
+
+        connection.AccessToken = tokenResponse.AccessToken;
+
+        if (!string.IsNullOrWhiteSpace(tokenResponse.RefreshToken))
+        {
+            connection.RefreshToken = tokenResponse.RefreshToken;
+            connection.RefreshTokenExpiresAtUtc = tokenResponse.RefreshTokenExpiresIn is { } refreshSeconds
+                ? now.AddSeconds(refreshSeconds)
+                : null;
+        }
+
+        connection.AccessTokenExpiresAtUtc = now.AddSeconds(tokenResponse.ExpiresIn);
+        connection.Scope = tokenResponse.Scope;
+        connection.TokenType = string.IsNullOrWhiteSpace(tokenResponse.TokenType)
+            ? "Bearer"
+            : tokenResponse.TokenType;
+        connection.UpdatedAtUtc = now;
+        connection.RevokedAtUtc = null;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static string CreateStateToken(
