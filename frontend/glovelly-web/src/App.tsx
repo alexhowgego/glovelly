@@ -60,6 +60,10 @@ function getCurrentMonthValue() {
   return new Date().toISOString().slice(0, 7)
 }
 
+function buildMonthlyInvoiceNumber(month: string, sequence: number) {
+  return `GLV-${month.replace('-', '')}-${String(sequence).padStart(3, '0')}`
+}
+
 
 function toSellerProfileForm(profile: SellerProfile): SellerProfileForm {
   return {
@@ -1952,37 +1956,89 @@ function App({ appMetadata }: AppProps) {
     )
 
     try {
-      const response = await fetchWithSession(buildApiUrl('/gigs/generate-invoice'), {
+      const createInvoiceResponse = await fetchWithSession(buildApiUrl('/invoices'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          gigIds: gigsToInvoice.map((gig) => gig.id),
+          invoiceNumber: buildMonthlyInvoiceNumber(monthlyInvoiceMonth, invoices.length + 1),
+          clientId: selectedClient.id,
+          status: 'Draft',
+          description: `Monthly invoice for ${monthlyInvoiceMonth}.`,
         }),
       })
 
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
+      if (!createInvoiceResponse.ok) {
+        const problem = await parseProblemDetails(createInvoiceResponse)
         const validationMessages = problem?.errors
           ? Object.values(problem.errors).flat().join(' ')
           : problem?.detail ?? problem?.title
-        throw new Error(validationMessages || 'Unable to generate monthly invoice.')
+        throw new Error(validationMessages || 'Unable to create monthly invoice.')
       }
 
-      const generatedInvoice = (await response.json()) as Invoice
+      const createdInvoice = (await createInvoiceResponse.json()) as Invoice
+
+      for (const gig of gigsToInvoice) {
+        const linkGigResponse = await fetchWithSession(buildApiUrl(`/gigs/${gig.id}`), {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            clientId: gig.clientId,
+            title: gig.title,
+            date: gig.date,
+            venue: gig.venue,
+            fee: gig.fee,
+            travelMiles: gig.travelMiles,
+            passengerCount: gig.passengerCount,
+            notes: gig.notes,
+            wasDriving: gig.wasDriving,
+            status: gig.status,
+            invoiceId: createdInvoice.id,
+            expenses: gig.expenses
+              .slice()
+              .sort((left, right) => left.sortOrder - right.sortOrder)
+              .map((expense, index) => ({
+                sortOrder: index + 1,
+                description: expense.description,
+                amount: expense.amount,
+              })),
+            invoicedAt: gig.invoicedAt,
+          }),
+        })
+
+        if (!linkGigResponse.ok) {
+          const problem = await parseProblemDetails(linkGigResponse)
+          const validationMessages = problem?.errors
+            ? Object.values(problem.errors).flat().join(' ')
+            : problem?.detail ?? problem?.title
+          throw new Error(
+            validationMessages || `Unable to link ${gig.title} to the monthly invoice.`
+          )
+        }
+      }
+
+      const hydratedInvoiceResponse = await fetchWithSession(
+        buildApiUrl(`/invoices/${createdInvoice.id}`)
+      )
+
+      const updatedInvoice = hydratedInvoiceResponse.ok
+        ? ((await hydratedInvoiceResponse.json()) as Invoice)
+        : createdInvoice
 
       setInvoices((current) => [
-        generatedInvoice,
-        ...current.filter((invoice) => invoice.id !== generatedInvoice.id),
+        updatedInvoice,
+        ...current.filter((invoice) => invoice.id !== updatedInvoice.id),
       ])
-      setSelectedInvoiceId(generatedInvoice.id)
+      setSelectedInvoiceId(updatedInvoice.id)
       setGigs((current) =>
         current.map((gig) =>
           gigsToInvoice.some((value) => value.id === gig.id)
             ? {
                 ...gig,
-                invoiceId: generatedInvoice.id,
+                invoiceId: updatedInvoice.id,
                 isInvoiced: true,
                 invoicedAt: gig.invoicedAt ?? new Date().toISOString(),
               }
@@ -1990,12 +2046,12 @@ function App({ appMetadata }: AppProps) {
         )
       )
       setGigStatus(
-        `Monthly invoice ${generatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
+        `Monthly invoice ${updatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
       )
       setMonthlyInvoiceStatus(
-        `Monthly invoice ${generatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
+        `Monthly invoice ${updatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
       )
-      setInvoiceStatus(`Monthly invoice ${generatedInvoice.invoiceNumber} is ready for review.`)
+      setInvoiceStatus(`Monthly invoice ${updatedInvoice.invoiceNumber} is ready for review.`)
       setActiveSection('invoices')
     } catch (error) {
       setMonthlyInvoiceStatus(
