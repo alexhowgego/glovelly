@@ -83,8 +83,12 @@ public static class InvoiceEndpoints
                 });
             }
 
+            var issuedOn = DateOnly.FromDateTime(DateTime.UtcNow);
+
             invoice.Id = Guid.NewGuid();
             invoice.InvoiceNumber = invoice.InvoiceNumber.Trim();
+            invoice.InvoiceDate = issuedOn;
+            invoice.DueDate = issuedOn.AddDays(14);
             invoice.Description = invoice.Description?.Trim();
             invoice.Client = null;
             invoice.Lines = new List<InvoiceLine>();

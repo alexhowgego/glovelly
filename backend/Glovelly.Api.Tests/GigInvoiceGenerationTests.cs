@@ -66,6 +66,12 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal("In respect of One-off corporate booking at King's House on 2026-06-20.", invoice.GetProperty("description").GetString());
         Assert.False(string.IsNullOrWhiteSpace(invoice.GetProperty("invoiceNumber").GetString()));
         Assert.False(string.IsNullOrWhiteSpace(invoice.GetProperty("pdfBlob").GetString()));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        Assert.Equal(today, invoice.GetProperty("invoiceDate").GetString());
+        Assert.Equal(
+            DateOnly.FromDateTime(DateTime.UtcNow).AddDays(14).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            invoice.GetProperty("dueDate").GetString());
+
         var initialPdfText = Encoding.ASCII.GetString(
             Convert.FromBase64String(invoice.GetProperty("pdfBlob").GetString()!));
         Assert.Contains("Glovelly Music Ltd", initialPdfText);
@@ -196,6 +202,12 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var invoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        Assert.Equal(today, invoice.GetProperty("invoiceDate").GetString());
+        Assert.Equal(
+            DateOnly.FromDateTime(DateTime.UtcNow).AddDays(14).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            invoice.GetProperty("dueDate").GetString());
 
         var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
         Assert.Equal(2, lines.Length);
