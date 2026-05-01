@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Glovelly.Api.Data;
+using Glovelly.Api.Models;
 using Glovelly.Api.Tests.Infrastructure;
 using Glovelly.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
@@ -80,6 +83,73 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
             response.Headers.Location?.OriginalString);
         Assert.Equal("auth-code", tokenExchanger.Code);
         Assert.Equal("http://localhost/integrations/google-drive/callback", tokenExchanger.RedirectUri);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var connection = await dbContext.GoogleDriveConnections.SingleAsync();
+        Assert.Equal(TestAuthContext.UserId, connection.UserId);
+        Assert.Equal("ya29.test", connection.AccessToken);
+        Assert.Equal("1//test", connection.RefreshToken);
+        Assert.Equal("https://www.googleapis.com/auth/drive.file", connection.Scope);
+        Assert.Equal("Bearer", connection.TokenType);
+        Assert.True(connection.AccessTokenExpiresAtUtc > DateTimeOffset.UtcNow);
+        Assert.True(connection.RefreshTokenExpiresAtUtc > DateTimeOffset.UtcNow);
+        Assert.Null(connection.RevokedAtUtc);
+    }
+
+    [Fact]
+    public async Task Callback_WithoutNewRefreshToken_PreservesExistingRefreshToken()
+    {
+        var tokenExchanger = new FakeGoogleDriveOAuthTokenExchanger
+        {
+            Response = new GoogleDriveOAuthTokenResponse
+            {
+                AccessToken = "ya29.new",
+                ExpiresIn = 1800,
+                RefreshToken = null,
+                Scope = "https://www.googleapis.com/auth/drive.file",
+                TokenType = "Bearer",
+            }
+        };
+        using var factory = CreateConfiguredFactory(tokenExchanger);
+        var previousRefreshExpiry = DateTimeOffset.UtcNow.AddDays(5);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.GoogleDriveConnections.Add(new GoogleDriveConnection
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                AccessToken = "ya29.old",
+                RefreshToken = "1//existing",
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(10),
+                RefreshTokenExpiresAtUtc = previousRefreshExpiry,
+                Scope = "https://www.googleapis.com/auth/drive.file",
+                TokenType = "Bearer",
+                ConnectedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+                UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var state = CreateGoogleDriveStateToken(factory.Services);
+        var client = factory.CreateClient(new()
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await client.GetAsync(
+            $"/integrations/google-drive/callback?code=auth-code&state={Uri.EscapeDataString(state)}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        using var assertionScope = factory.Services.CreateScope();
+        var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var connection = await assertionDbContext.GoogleDriveConnections.SingleAsync();
+        Assert.Equal("ya29.new", connection.AccessToken);
+        Assert.Equal("1//existing", connection.RefreshToken);
+        Assert.Equal(previousRefreshExpiry, connection.RefreshTokenExpiresAtUtc);
     }
 
     [Fact]
@@ -181,6 +251,15 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
     {
         public string? Code { get; private set; }
         public string? RedirectUri { get; private set; }
+        public GoogleDriveOAuthTokenResponse Response { get; set; } = new()
+        {
+            AccessToken = "ya29.test",
+            ExpiresIn = 3599,
+            RefreshToken = "1//test",
+            RefreshTokenExpiresIn = 604799,
+            Scope = "https://www.googleapis.com/auth/drive.file",
+            TokenType = "Bearer",
+        };
 
         public Task<GoogleDriveOAuthTokenExchangeResult> ExchangeCodeAsync(
             string code,
@@ -195,9 +274,8 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
             return Task.FromResult(new GoogleDriveOAuthTokenExchangeResult(
                 true,
                 StatusCodes.Status200OK,
-                """
-                {"access_token":"ya29.test","expires_in":3599,"refresh_token":"1//test","scope":"https://www.googleapis.com/auth/drive.file","token_type":"Bearer"}
-                """));
+                JsonSerializer.Serialize(Response, JsonOptions),
+                Response));
         }
     }
 }

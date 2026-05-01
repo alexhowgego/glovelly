@@ -39,4 +39,6 @@ public sealed class User
     public ICollection<SellerProfile> SellerProfilesUpdated { get; set; } = new List<SellerProfile>();
     [JsonIgnore]
     public SellerProfile? SellerProfile { get; set; }
+    [JsonIgnore]
+    public GoogleDriveConnection? GoogleDriveConnection { get; set; }
 }
