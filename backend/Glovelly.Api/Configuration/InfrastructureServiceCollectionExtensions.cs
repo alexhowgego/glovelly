@@ -27,6 +27,7 @@ internal static class InfrastructureServiceCollectionExtensions
         services.AddOptions<AccessRequestProtectionSettings>()
             .Bind(configuration.GetSection(AccessRequestProtectionSettings.SectionName));
         services.AddGlovellyApplicationServices();
+        services.AddHttpClient<IGoogleDriveOAuthTokenExchanger, GoogleDriveOAuthTokenExchanger>();
         services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
