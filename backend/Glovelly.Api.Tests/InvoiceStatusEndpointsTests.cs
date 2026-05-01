@@ -82,8 +82,31 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
+    public async Task UpdateStatus_WhenFirstIssued_StampsFirstIssueAndSlidesInvoiceDates()
+    {
+        var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var response = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
+        {
+            status = "Issued",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Issued", updatedInvoice.GetProperty("status").GetString());
+        Assert.Equal(expectedInvoiceDate.ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("invoiceDate").GetString());
+        Assert.Equal(expectedInvoiceDate.AddDays(14).ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("dueDate").GetString());
+        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("firstIssuedUtc").ValueKind);
+        Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("firstIssuedByUserId").GetGuid());
+        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("pdfBlob").ValueKind);
+    }
+
+    [Fact]
     public async Task Reissue_WhenInvoiceExists_RegeneratesPdfAndLogsActionWithoutChangingFinancials()
     {
+        var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
         var createLineResponse = await _client.PostAsJsonAsync("/invoice-lines", new
         {
             invoiceId = TestData.RiversideInvoiceId,
@@ -114,12 +137,69 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         Assert.Equal("Draft", updatedInvoice.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("statusUpdatedUtc").ValueKind);
+        Assert.Equal(expectedInvoiceDate.ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("invoiceDate").GetString());
+        Assert.Equal(expectedInvoiceDate.AddDays(14).ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("dueDate").GetString());
         Assert.Equal(300m, updatedInvoice.GetProperty("total").GetDecimal());
         Assert.Equal(1, updatedInvoice.GetProperty("reissueCount").GetInt32());
+        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("firstIssuedUtc").ValueKind);
+        Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("firstIssuedByUserId").GetGuid());
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastReissuedByUserId").GetGuid());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("lastReissuedUtc").ValueKind);
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("pdfBlob").ValueKind);
         Assert.Single(updatedInvoice.GetProperty("lines").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Reissue_WhenInvoiceIsDraft_ReturnsValidationProblem()
+    {
+        var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/reissue", null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Draft invoices can be redrafted, but cannot be re-issued until they have been issued.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
+    public async Task Reissue_WhenInvoiceIsCancelled_ReturnsValidationProblem()
+    {
+        var cancelResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
+        {
+            status = "Cancelled",
+        });
+        cancelResponse.EnsureSuccessStatusCode();
+
+        var response = await _client.PostAsync($"/invoices/{TestData.FoxInvoiceId}/reissue", null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Cancelled invoices must be moved back to Draft before they can be redrafted.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
+    public async Task Redraft_WhenInvoiceIsDraft_RegeneratesPdfWithoutIncrementingReissueAudit()
+    {
+        var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/redraft", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Draft", updatedInvoice.GetProperty("status").GetString());
+        Assert.Equal(expectedInvoiceDate.ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("invoiceDate").GetString());
+        Assert.Equal(expectedInvoiceDate.AddDays(14).ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("dueDate").GetString());
+        Assert.Equal(0, updatedInvoice.GetProperty("reissueCount").GetInt32());
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("firstIssuedUtc").ValueKind);
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("firstIssuedByUserId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("lastReissuedUtc").ValueKind);
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("lastReissuedByUserId").ValueKind);
+        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("pdfBlob").ValueKind);
     }
 
     [Fact]

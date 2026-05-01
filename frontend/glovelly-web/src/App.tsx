@@ -64,6 +64,7 @@ function buildMonthlyInvoiceNumber(month: string, sequence: number) {
   return `GLV-${month.replace('-', '')}-${String(sequence).padStart(3, '0')}`
 }
 
+
 function toSellerProfileForm(profile: SellerProfile): SellerProfileForm {
   return {
     sellerName: profile.sellerName ?? '',
@@ -1940,7 +1941,6 @@ function App({ appMetadata }: AppProps) {
       return
     }
 
-    const clientId = selectedClient.id
     const gigsToInvoice = monthlyInvoiceEligibleGigs
 
     if (gigsToInvoice.length === 0) {
@@ -1956,11 +1956,6 @@ function App({ appMetadata }: AppProps) {
     )
 
     try {
-      const issueDate = `${monthlyInvoiceMonth}-01`
-      const dueDateValue = new Date(`${issueDate}T00:00:00`)
-      dueDateValue.setDate(dueDateValue.getDate() + 14)
-      const dueDate = dueDateValue.toISOString().slice(0, 10)
-
       const createInvoiceResponse = await fetchWithSession(buildApiUrl('/invoices'), {
         method: 'POST',
         headers: {
@@ -1968,9 +1963,7 @@ function App({ appMetadata }: AppProps) {
         },
         body: JSON.stringify({
           invoiceNumber: buildMonthlyInvoiceNumber(monthlyInvoiceMonth, invoices.length + 1),
-          clientId,
-          invoiceDate: issueDate,
-          dueDate,
+          clientId: selectedClient.id,
           status: 'Draft',
           description: `Monthly invoice for ${monthlyInvoiceMonth}.`,
         }),
@@ -2027,13 +2020,29 @@ function App({ appMetadata }: AppProps) {
         }
       }
 
+      const redraftInvoiceResponse = await fetchWithSession(
+        buildApiUrl(`/invoices/${createdInvoice.id}/redraft`),
+        {
+          method: 'POST',
+        }
+      )
+
+      if (!redraftInvoiceResponse.ok) {
+        const problem = await parseProblemDetails(redraftInvoiceResponse)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+        throw new Error(validationMessages || 'Unable to prepare the monthly invoice PDF.')
+      }
+
+      const redraftedInvoice = (await redraftInvoiceResponse.json()) as Invoice
       const hydratedInvoiceResponse = await fetchWithSession(
         buildApiUrl(`/invoices/${createdInvoice.id}`)
       )
 
       const updatedInvoice = hydratedInvoiceResponse.ok
         ? ((await hydratedInvoiceResponse.json()) as Invoice)
-        : createdInvoice
+        : redraftedInvoice
 
       setInvoices((current) => [
         updatedInvoice,
@@ -2159,25 +2168,38 @@ function App({ appMetadata }: AppProps) {
   }
 
   const handleInvoiceReissue = async (invoice: Invoice) => {
+    const isRedraft = invoice.status === 'Draft'
+    const actionLabel = isRedraft ? 'Redraft' : 'Re-issue'
+    const actionVerb = isRedraft ? 'Redrafting' : 'Re-issuing'
     const shouldProceed = window.confirm(
-      `Re-issue ${invoice.invoiceNumber}? This will regenerate the document and log the action.`
+      isRedraft
+        ? `Redraft ${invoice.invoiceNumber}? This will regenerate the draft document without changing reissue history.`
+        : `Re-issue ${invoice.invoiceNumber}? This will regenerate the document and log the action.`
     )
     if (!shouldProceed) {
       return
     }
 
     setIsInvoiceLoading(true)
-    setInvoiceStatus(`Re-issuing ${invoice.invoiceNumber}...`)
+    setInvoiceStatus(`${actionVerb} ${invoice.invoiceNumber}...`)
 
     try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/reissue`), {
+      const actionPath = isRedraft ? 'redraft' : 'reissue'
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/${actionPath}`), {
         method: 'POST',
       })
 
       if (!response.ok) {
         const problem = await parseProblemDetails(response)
         const fieldError = problem?.errors?.recipient?.[0]
-        throw new Error(fieldError ?? problem?.detail ?? problem?.title ?? 'Unable to re-issue invoice.')
+        const statusError = problem?.errors?.status?.[0]
+        throw new Error(
+          fieldError ??
+            statusError ??
+            problem?.detail ??
+            problem?.title ??
+            `Unable to ${actionLabel.toLowerCase()} invoice.`
+        )
       }
 
       const updatedInvoice = (await response.json()) as Invoice
@@ -2185,10 +2207,16 @@ function App({ appMetadata }: AppProps) {
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
 
-      const reissuedAt = formatDateTime(updatedInvoice.lastReissuedUtc)
-      setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
+      if (isRedraft) {
+        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} draft regenerated.`)
+      } else {
+        const reissuedAt = formatDateTime(updatedInvoice.lastReissuedUtc)
+        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
+      }
     } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to re-issue invoice.')
+      setInvoiceStatus(
+        error instanceof Error ? error.message : `Unable to ${actionLabel.toLowerCase()} invoice.`
+      )
     } finally {
       setIsInvoiceLoading(false)
     }

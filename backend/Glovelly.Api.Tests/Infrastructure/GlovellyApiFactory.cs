@@ -134,6 +134,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
                 InvoiceDate = new DateOnly(2026, 4, 1),
                 DueDate = new DateOnly(2026, 4, 15),
                 Status = InvoiceStatus.Issued,
+                FirstIssuedUtc = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
+                FirstIssuedByUserId = TestAuthContext.UserId,
                 Description = "Fox & Finch April services.",
                 CreatedByUserId = TestAuthContext.UserId,
                 UpdatedByUserId = TestAuthContext.UserId,

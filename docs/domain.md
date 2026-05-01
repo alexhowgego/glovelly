@@ -25,9 +25,14 @@
 - id
 - invoiceNumber
 - clientId
-- issueDate
+- invoiceDate (last issue/re-issue date shown on the invoice)
 - dueDate
 - status
+- firstIssuedUtc?
+- firstIssuedByUserId?
+- reissueCount
+- lastReissuedUtc?
+- lastReissuedByUserId?
 - subtotal
 - notes
 

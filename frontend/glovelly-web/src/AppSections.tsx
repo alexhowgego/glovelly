@@ -1641,9 +1641,14 @@ export function InvoicesSection({
                 className="ghost-button"
                 onClick={() => selectedInvoice && void onReissue(selectedInvoice)}
                 type="button"
-                disabled={!selectedInvoice || isInvoiceLoading}
+                disabled={!selectedInvoice || isInvoiceLoading || selectedInvoice.status === 'Cancelled'}
+                title={
+                  selectedInvoice?.status === 'Cancelled'
+                    ? 'Move cancelled invoices back to Draft before redrafting.'
+                    : undefined
+                }
               >
-                Re-issue
+                {selectedInvoice?.status === 'Draft' ? 'Redraft' : 'Re-issue'}
               </button>
               <button
                 className="ghost-button"
@@ -1730,6 +1735,21 @@ export function InvoicesSection({
                   <p className="detail-label">Due date</p>
                   <strong>{formatDate(selectedInvoice.dueDate)}</strong>
                 </article>
+                <article>
+                  <p className="detail-label">First issued on</p>
+                  <strong>
+                    {selectedInvoice.firstIssuedUtc
+                      ? formatDateTime(selectedInvoice.firstIssuedUtc)
+                      : 'Not issued'}
+                  </strong>
+                </article>
+                <article>
+                  <p className="detail-label">Re-issued</p>
+                  <strong>
+                    {selectedInvoice.reissueCount}{' '}
+                    {selectedInvoice.reissueCount === 1 ? 'time' : 'times'}
+                  </strong>
+                </article>
                 <article className="full-width">
                   <p className="detail-label">In respect of</p>
                   <span>{selectedInvoice.description?.trim() || 'No description set.'}</span>
@@ -1741,14 +1761,6 @@ export function InvoicesSection({
                 <article>
                   <p className="detail-label">Line items</p>
                   <strong>{selectedInvoice.lines.length}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Re-issued</p>
-                  <strong>{selectedInvoice.reissueCount} times</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Last re-issue</p>
-                  <strong>{formatDateTime(selectedInvoice.lastReissuedUtc)}</strong>
                 </article>
                 <article>
                   <p className="detail-label">Deliveries</p>
