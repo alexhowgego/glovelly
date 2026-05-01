@@ -21,6 +21,7 @@ internal static class InfrastructureServiceCollectionExtensions
         var accessRequestSettings = configuration.GetSection(AccessRequestProtectionSettings.SectionName)
             .Get<AccessRequestProtectionSettings>() ?? new AccessRequestProtectionSettings();
 
+        services.AddSingleton(settings);
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddOptions<EmailSettings>()

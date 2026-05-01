@@ -1501,6 +1501,7 @@ type InvoicesSectionProps = {
   invoiceStatus: string
   invoices: Invoice[]
   issuedInvoiceCount: number
+  isGoogleDriveConnected: boolean
   isInvoiceLoading: boolean
   isSellerProfileConfigured: boolean
   onAdjustmentAmountChange: (value: string) => void
@@ -1511,6 +1512,7 @@ type InvoicesSectionProps = {
   onDownloadPdf: (invoice: Invoice) => Promise<void>
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<void>
   onOpenSellerProfile: () => void
+  onPublishGoogleDrive: (invoice: Invoice) => Promise<void>
   onReissue: (invoice: Invoice) => Promise<void>
   onSendEmail: (invoice: Invoice) => Promise<void>
   onSearchQueryChange: (value: string) => void
@@ -1531,6 +1533,7 @@ export function InvoicesSection({
   invoiceStatus,
   invoices,
   issuedInvoiceCount,
+  isGoogleDriveConnected,
   isInvoiceLoading,
   isSellerProfileConfigured,
   onAdjustmentAmountChange,
@@ -1541,6 +1544,7 @@ export function InvoicesSection({
   onDownloadPdf,
   onInvoiceStatusChange,
   onOpenSellerProfile,
+  onPublishGoogleDrive,
   onReissue,
   onSendEmail,
   onSearchQueryChange,
@@ -1649,6 +1653,19 @@ export function InvoicesSection({
                 }
               >
                 {selectedInvoice?.status === 'Draft' ? 'Redraft' : 'Re-issue'}
+              </button>
+              <button
+                className="ghost-button"
+                onClick={() => selectedInvoice && void onPublishGoogleDrive(selectedInvoice)}
+                type="button"
+                disabled={!selectedInvoice || isInvoiceLoading || !isGoogleDriveConnected}
+                title={
+                  isGoogleDriveConnected
+                    ? undefined
+                    : 'Connect Google Drive from your profile menu first.'
+                }
+              >
+                Publish to Drive
               </button>
               <button
                 className="ghost-button"

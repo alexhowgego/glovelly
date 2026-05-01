@@ -2,7 +2,16 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Glovelly.Api.Data;
+using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -168,5 +177,218 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal(
             "Invoice PDF is missing.",
             problem.GetProperty("errors").GetProperty("pdf")[0].GetString());
+    }
+
+    [Fact]
+    public async Task PublishGoogleDrive_WhenConnected_UploadsPdfAndLogsDelivery()
+    {
+        var driveClient = new FakeGoogleDriveApiClient();
+        using var factory = CreateFactoryWithGoogleDriveClient(driveClient);
+        var client = factory.CreateClient();
+        var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 drive invoice content");
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tokenProtector = scope.ServiceProvider.GetRequiredService<IGoogleDriveTokenProtector>();
+            dbContext.GoogleDriveConnections.Add(new GoogleDriveConnection
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                EncryptedAccessToken = tokenProtector.Protect("access-token"),
+                EncryptedRefreshToken = tokenProtector.Protect("refresh-token"),
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
+                RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+                Scope = "https://www.googleapis.com/auth/drive.file",
+                TokenType = "Bearer",
+                ConnectedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-DRIVE-001",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Drive delivery test.",
+            pdfBlob = Convert.ToBase64String(pdfBytes),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
+
+        var response = await client.PostAsync(
+            $"/invoices/{invoiceId}/publish/google-drive",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        Assert.Equal("access-token", driveClient.AccessToken);
+        Assert.Equal("GLV-DRIVE-001.pdf", driveClient.FileName);
+        Assert.Equal(pdfBytes, driveClient.Content);
+        Assert.Equal(1, updatedInvoice.GetProperty("deliveryCount").GetInt32());
+        Assert.Equal("GoogleDrive", updatedInvoice.GetProperty("lastDeliveryChannel").GetString());
+        Assert.Equal(
+            "https://drive.google.com/file/d/drive-file-id/view",
+            updatedInvoice.GetProperty("lastDeliveryRecipient").GetString());
+        Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastDeliveredByUserId").GetGuid());
+    }
+
+    [Fact]
+    public async Task PublishGoogleDrive_WhenNotConnected_ReturnsProblem()
+    {
+        var driveClient = new FakeGoogleDriveApiClient();
+        using var factory = CreateFactoryWithGoogleDriveClient(driveClient);
+        var client = factory.CreateClient();
+        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-DRIVE-MISSING-CONNECTION",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Drive missing connection test.",
+            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await client.PostAsync(
+            $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Null(driveClient.FileName);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Unable to publish invoice to Google Drive", problem.GetProperty("title").GetString());
+        Assert.Equal("Google Drive is not connected.", problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task PublishGoogleDrive_WhenAccessTokenExpired_RefreshesBeforeUpload()
+    {
+        var driveClient = new FakeGoogleDriveApiClient
+        {
+            RefreshedAccessToken = "new-access-token",
+        };
+        using var factory = CreateFactoryWithGoogleDriveClient(driveClient);
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tokenProtector = scope.ServiceProvider.GetRequiredService<IGoogleDriveTokenProtector>();
+            dbContext.GoogleDriveConnections.Add(new GoogleDriveConnection
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                EncryptedAccessToken = tokenProtector.Protect("expired-access-token"),
+                EncryptedRefreshToken = tokenProtector.Protect("refresh-token"),
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5),
+                RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+                Scope = "https://www.googleapis.com/auth/drive.file",
+                TokenType = "Bearer",
+                ConnectedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-DRIVE-REFRESH",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Drive refresh test.",
+            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await client.PostAsync(
+            $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("refresh-token", driveClient.RefreshToken);
+        Assert.Equal("new-access-token", driveClient.AccessToken);
+
+        using var assertionScope = factory.Services.CreateScope();
+        var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var assertionTokenProtector = assertionScope.ServiceProvider.GetRequiredService<IGoogleDriveTokenProtector>();
+        var connection = await assertionDbContext.GoogleDriveConnections.SingleAsync();
+        Assert.Equal("new-access-token", assertionTokenProtector.Unprotect(connection.EncryptedAccessToken));
+    }
+
+    private WebApplicationFactory<Program> CreateFactoryWithGoogleDriveClient(
+        FakeGoogleDriveApiClient driveClient)
+    {
+        return _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Authentication:Google:ClientId", "google-client-id");
+            builder.UseSetting("Authentication:Google:ClientSecret", "google-client-secret");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IGoogleDriveApiClient>();
+                services.AddSingleton<IGoogleDriveApiClient>(driveClient);
+            });
+        });
+    }
+
+    private sealed class FakeGoogleDriveApiClient : IGoogleDriveApiClient
+    {
+        public string? AccessToken { get; private set; }
+        public string? ContentText { get; private set; }
+        public byte[]? Content { get; private set; }
+        public string? FileName { get; private set; }
+        public string? RefreshToken { get; private set; }
+        public string RefreshedAccessToken { get; set; } = "refreshed-access-token";
+
+        public Task<GoogleDriveAccessTokenRefreshResult> RefreshAccessTokenAsync(
+            string refreshToken,
+            string clientId,
+            string clientSecret,
+            CancellationToken cancellationToken)
+        {
+            RefreshToken = refreshToken;
+            var tokenResponse = new GoogleDriveOAuthTokenResponse
+            {
+                AccessToken = RefreshedAccessToken,
+                ExpiresIn = 3599,
+                Scope = "https://www.googleapis.com/auth/drive.file",
+                TokenType = "Bearer",
+            };
+
+            return Task.FromResult(new GoogleDriveAccessTokenRefreshResult(
+                true,
+                StatusCodes.Status200OK,
+                "{}",
+                tokenResponse));
+        }
+
+        public Task<GoogleDriveUploadResult> UploadPdfAsync(
+            string accessToken,
+            string fileName,
+            byte[] content,
+            CancellationToken cancellationToken)
+        {
+            AccessToken = accessToken;
+            FileName = fileName;
+            Content = content;
+            ContentText = Encoding.ASCII.GetString(content);
+
+            return Task.FromResult(new GoogleDriveUploadResult(
+                "drive-file-id",
+                fileName,
+                "https://drive.google.com/file/d/drive-file-id/view"));
+        }
     }
 }
