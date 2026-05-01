@@ -86,10 +86,13 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tokenProtector = scope.ServiceProvider.GetRequiredService<IGoogleDriveTokenProtector>();
         var connection = await dbContext.GoogleDriveConnections.SingleAsync();
         Assert.Equal(TestAuthContext.UserId, connection.UserId);
-        Assert.Equal("ya29.test", connection.AccessToken);
-        Assert.Equal("1//test", connection.RefreshToken);
+        Assert.NotEqual("ya29.test", connection.EncryptedAccessToken);
+        Assert.NotEqual("1//test", connection.EncryptedRefreshToken);
+        Assert.Equal("ya29.test", tokenProtector.Unprotect(connection.EncryptedAccessToken));
+        Assert.Equal("1//test", tokenProtector.Unprotect(connection.EncryptedRefreshToken));
         Assert.Equal("https://www.googleapis.com/auth/drive.file", connection.Scope);
         Assert.Equal("Bearer", connection.TokenType);
         Assert.True(connection.AccessTokenExpiresAtUtc > DateTimeOffset.UtcNow);
@@ -113,16 +116,19 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         };
         using var factory = CreateConfiguredFactory(tokenExchanger);
         var previousRefreshExpiry = DateTimeOffset.UtcNow.AddDays(5);
+        string encryptedExistingRefreshToken;
 
         using (var scope = factory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tokenProtector = scope.ServiceProvider.GetRequiredService<IGoogleDriveTokenProtector>();
+            encryptedExistingRefreshToken = tokenProtector.Protect("1//existing");
             dbContext.GoogleDriveConnections.Add(new GoogleDriveConnection
             {
                 Id = Guid.NewGuid(),
                 UserId = TestAuthContext.UserId,
-                AccessToken = "ya29.old",
-                RefreshToken = "1//existing",
+                EncryptedAccessToken = tokenProtector.Protect("ya29.old"),
+                EncryptedRefreshToken = encryptedExistingRefreshToken,
                 AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(10),
                 RefreshTokenExpiresAtUtc = previousRefreshExpiry,
                 Scope = "https://www.googleapis.com/auth/drive.file",
@@ -146,9 +152,12 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
 
         using var assertionScope = factory.Services.CreateScope();
         var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var assertionTokenProtector = assertionScope.ServiceProvider.GetRequiredService<IGoogleDriveTokenProtector>();
         var connection = await assertionDbContext.GoogleDriveConnections.SingleAsync();
-        Assert.Equal("ya29.new", connection.AccessToken);
-        Assert.Equal("1//existing", connection.RefreshToken);
+        Assert.NotEqual("ya29.new", connection.EncryptedAccessToken);
+        Assert.Equal("ya29.new", assertionTokenProtector.Unprotect(connection.EncryptedAccessToken));
+        Assert.Equal(encryptedExistingRefreshToken, connection.EncryptedRefreshToken);
+        Assert.Equal("1//existing", assertionTokenProtector.Unprotect(connection.EncryptedRefreshToken));
         Assert.Equal(previousRefreshExpiry, connection.RefreshTokenExpiresAtUtc);
     }
 

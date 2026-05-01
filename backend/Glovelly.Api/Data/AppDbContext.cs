@@ -1,11 +1,13 @@
 using Glovelly.Api.Models;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Glovelly.Api.Data;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
     public DbSet<AccessRequest> AccessRequests => Set<AccessRequest>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Gig> Gigs => Set<Gig>();
@@ -73,9 +75,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<GoogleDriveConnection>(entity =>
         {
             entity.HasKey(connection => connection.Id);
-            entity.Property(connection => connection.AccessToken)
+            entity.Property(connection => connection.EncryptedAccessToken)
                 .IsRequired();
-            entity.Property(connection => connection.RefreshToken)
+            entity.Property(connection => connection.EncryptedRefreshToken)
                 .IsRequired();
             entity.Property(connection => connection.Scope)
                 .HasMaxLength(500);

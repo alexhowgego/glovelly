@@ -3,6 +3,7 @@ using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
@@ -27,7 +28,14 @@ internal static class InfrastructureServiceCollectionExtensions
         services.AddOptions<AccessRequestProtectionSettings>()
             .Bind(configuration.GetSection(AccessRequestProtectionSettings.SectionName));
         services.AddGlovellyApplicationServices();
+        services.AddScoped<IGoogleDriveTokenProtector, GoogleDriveTokenProtector>();
         services.AddHttpClient<IGoogleDriveOAuthTokenExchanger, GoogleDriveOAuthTokenExchanger>();
+        if (settings.UsePostgres)
+        {
+            services.AddDataProtection()
+                .SetApplicationName("Glovelly")
+                .PersistKeysToDbContext<AppDbContext>();
+        }
         services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
