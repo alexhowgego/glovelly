@@ -88,6 +88,8 @@ public static class AppDbSeeder
                 InvoiceDate = new DateOnly(2026, 4, 1),
                 DueDate = new DateOnly(2026, 4, 15),
                 Status = InvoiceStatus.Issued,
+                FirstIssuedUtc = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
+                FirstIssuedByUserId = seededAdminUserId,
                 Description = "In respect of services provided during April 2026."
             },
             new Invoice

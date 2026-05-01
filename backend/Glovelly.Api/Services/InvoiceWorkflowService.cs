@@ -81,19 +81,72 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         return ReissueInvoiceInternalAsync(invoice, client, userId, cancellationToken);
     }
 
+    public Task RedraftInvoiceAsync(
+        Invoice invoice,
+        Client client,
+        Guid? userId,
+        CancellationToken cancellationToken = default)
+    {
+        return RedraftInvoiceInternalAsync(invoice, client, userId, cancellationToken);
+    }
+
+    public async Task IssueInvoiceAsync(
+        Invoice invoice,
+        Client client,
+        Guid? userId,
+        CancellationToken cancellationToken = default)
+    {
+        var issuedUtc = DateTimeOffset.UtcNow;
+        var invoiceDate = DateOnly.FromDateTime(issuedUtc.UtcDateTime);
+        invoice.InvoiceDate = invoiceDate;
+        invoice.DueDate = invoiceDate.AddDays(14);
+        invoice.Status = InvoiceStatus.Issued;
+        invoice.StatusUpdatedUtc = issuedUtc;
+
+        if (!invoice.FirstIssuedUtc.HasValue)
+        {
+            invoice.FirstIssuedUtc = issuedUtc;
+            invoice.FirstIssuedByUserId = userId;
+        }
+
+        var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
+        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
+        StampUpdate(invoice, userId);
+    }
+
     private async Task ReissueInvoiceInternalAsync(
         Invoice invoice,
         Client client,
         Guid? userId,
         CancellationToken cancellationToken)
     {
+        var reissuedUtc = DateTimeOffset.UtcNow;
+        var invoiceDate = DateOnly.FromDateTime(reissuedUtc.UtcDateTime);
+        invoice.InvoiceDate = invoiceDate;
+        invoice.DueDate = invoiceDate.AddDays(14);
         var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
         invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
         invoice.Status = InvoiceStatus.Draft;
-        invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
+        invoice.StatusUpdatedUtc = reissuedUtc;
         invoice.ReissueCount += 1;
-        invoice.LastReissuedUtc = DateTimeOffset.UtcNow;
+        invoice.LastReissuedUtc = reissuedUtc;
         invoice.LastReissuedByUserId = userId;
+        StampUpdate(invoice, userId);
+    }
+
+    private async Task RedraftInvoiceInternalAsync(
+        Invoice invoice,
+        Client client,
+        Guid? userId,
+        CancellationToken cancellationToken)
+    {
+        var redraftedUtc = DateTimeOffset.UtcNow;
+        var invoiceDate = DateOnly.FromDateTime(redraftedUtc.UtcDateTime);
+        invoice.InvoiceDate = invoiceDate;
+        invoice.DueDate = invoiceDate.AddDays(14);
+        var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
+        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
+        invoice.Status = InvoiceStatus.Draft;
         StampUpdate(invoice, userId);
     }
 

@@ -100,11 +100,18 @@ public static class InvoiceEndpoints
             return Results.Created($"/invoices/{invoice.Id}", invoice);
         });
 
-        group.MapPut("/{id:guid}", async (Guid id, Invoice request, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
+        group.MapPut("/{id:guid}", async (
+            Guid id,
+            Invoice request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceWorkflowService invoiceWorkflowService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
                 .WhereVisibleTo(userId)
+                .Include(value => value.Client)
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
 
@@ -113,9 +120,10 @@ public static class InvoiceEndpoints
                 return Results.NotFound();
             }
 
-            if (!await db.Clients
+            var requestClient = await db.Clients
                     .WhereVisibleTo(userId)
-                    .AnyAsync(client => client.Id == request.ClientId))
+                    .FirstOrDefaultAsync(client => client.Id == request.ClientId);
+            if (requestClient is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -142,23 +150,32 @@ public static class InvoiceEndpoints
 
             invoice.InvoiceNumber = request.InvoiceNumber.Trim();
             invoice.ClientId = request.ClientId;
-            invoice.InvoiceDate = request.InvoiceDate;
-            invoice.DueDate = request.DueDate;
             var requestedStatus = request.Status;
+            if (requestedStatus is not InvoiceStatus.Issued)
+            {
+                invoice.InvoiceDate = request.InvoiceDate;
+                invoice.DueDate = request.DueDate;
+            }
+            invoice.Description = request.Description?.Trim();
             var statusValidation = EndpointSupport.ValidateInvoiceStatusTransition(invoice.Status, requestedStatus);
             if (statusValidation is not null)
             {
                 return statusValidation;
             }
 
-            if (invoice.Status != requestedStatus)
+            if (invoice.Status != requestedStatus && requestedStatus is InvoiceStatus.Issued)
+            {
+                await invoiceWorkflowService.IssueInvoiceAsync(invoice, requestClient, userId);
+            }
+            else if (invoice.Status != requestedStatus)
             {
                 invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
+                invoice.Status = request.Status;
             }
-
-            invoice.Status = request.Status;
-            invoice.Description = request.Description?.Trim();
-            invoice.PdfBlob = request.PdfBlob;
+            if (requestedStatus is not InvoiceStatus.Issued)
+            {
+                invoice.PdfBlob = request.PdfBlob;
+            }
             EndpointSupport.StampUpdate(invoice, userId);
 
             await db.SaveChangesAsync();
@@ -171,11 +188,13 @@ public static class InvoiceEndpoints
             InvoiceStatusUpdateRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor) =>
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceWorkflowService invoiceWorkflowService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
                 .WhereVisibleTo(userId)
+                .Include(value => value.Client)
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
             if (invoice is null)
@@ -194,9 +213,25 @@ public static class InvoiceEndpoints
                 return Results.Ok(invoice);
             }
 
+            if (request.Status is InvoiceStatus.Issued)
+            {
+                if (invoice.Client is null)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["clientId"] = ["Client does not exist."]
+                    });
+                }
+
+                await invoiceWorkflowService.IssueInvoiceAsync(invoice, invoice.Client, userId);
+                await db.SaveChangesAsync();
+
+                return Results.Ok(invoice);
+            }
+
             invoice.Status = request.Status;
             invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
-            EndpointSupport.StampUpdate(invoice, currentUserAccessor.TryGetUserId(user));
+            EndpointSupport.StampUpdate(invoice, userId);
             await db.SaveChangesAsync();
 
             return Results.Ok(invoice);
@@ -220,6 +255,22 @@ public static class InvoiceEndpoints
                 return Results.NotFound();
             }
 
+            if (invoice.Status is InvoiceStatus.Draft)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Draft invoices can be redrafted, but cannot be re-issued until they have been issued."]
+                });
+            }
+
+            if (invoice.Status is InvoiceStatus.Cancelled)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Cancelled invoices must be moved back to Draft before they can be redrafted."]
+                });
+            }
+
             var client = await db.Clients
                 .AsNoTracking()
                 .FirstOrDefaultAsync(value => value.Id == invoice.ClientId);
@@ -241,6 +292,50 @@ public static class InvoiceEndpoints
             }
 
             await invoiceWorkflowService.ReissueInvoiceAsync(invoice, client, userId);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(invoice);
+        });
+
+        group.MapPost("/{id:guid}/redraft", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceWorkflowService invoiceWorkflowService) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id);
+
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (invoice.Status is not InvoiceStatus.Draft)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["status"] = [$"{invoice.Status} invoices must be re-issued rather than redrafted."]
+                });
+            }
+
+            var client = await db.Clients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == invoice.ClientId);
+
+            if (client is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["clientId"] = ["Client does not exist."]
+                });
+            }
+
+            await invoiceWorkflowService.RedraftInvoiceAsync(invoice, client, userId);
             await db.SaveChangesAsync();
 
             return Results.Ok(invoice);

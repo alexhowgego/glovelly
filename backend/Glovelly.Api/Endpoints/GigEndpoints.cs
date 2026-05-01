@@ -97,7 +97,7 @@ public static class GigEndpoints
                 .Include(value => value.Lines)
                 .FirstAsync(value => value.Id == invoice.Id);
 
-            await invoiceWorkflowService.ReissueInvoiceAsync(refreshedInvoice, client, userId);
+            await invoiceWorkflowService.RedraftInvoiceAsync(refreshedInvoice, client, userId);
             await db.SaveChangesAsync();
 
             return Results.Created($"/invoices/{refreshedInvoice.Id}", refreshedInvoice);

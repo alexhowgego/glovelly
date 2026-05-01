@@ -162,8 +162,11 @@ export type Invoice = {
   invoiceDate: string
   dueDate: string
   status: InvoiceStatus
+  firstIssuedUtc: string | null
+  firstIssuedByUserId: string | null
   reissueCount: number
   lastReissuedUtc: string | null
+  lastReissuedByUserId: string | null
   deliveryCount: number
   lastDeliveryChannel: string | null
   lastDeliveryRecipient: string | null

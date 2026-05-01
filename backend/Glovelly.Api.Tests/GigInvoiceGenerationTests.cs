@@ -236,6 +236,88 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
     }
 
     [Fact]
+    public async Task Redraft_AfterLinkingGigsToDraftInvoice_RegeneratesDownloadablePdf()
+    {
+        var firstGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Monthly draft first gig",
+            date = "2026-05-12",
+            venue = "Park Room",
+            fee = 300.00m,
+            travelMiles = 0m,
+            notes = "First monthly draft line",
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        firstGigResponse.EnsureSuccessStatusCode();
+        var firstGig = await firstGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var secondGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Monthly draft second gig",
+            date = "2026-05-18",
+            venue = "Bridge Hall",
+            fee = 200.00m,
+            travelMiles = 0m,
+            notes = "Second monthly draft line",
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        secondGigResponse.EnsureSuccessStatusCode();
+        var secondGig = await secondGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-MONTHLY-TEST",
+            clientId = TestData.FoxAndFinchId,
+            status = "Draft",
+            description = "Monthly invoice for 2026-05.",
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
+
+        foreach (var gig in new[] { firstGig, secondGig })
+        {
+            var linkResponse = await _client.PutAsJsonAsync($"/gigs/{gig.GetProperty("id").GetGuid()}", new
+            {
+                clientId = TestData.FoxAndFinchId,
+                title = gig.GetProperty("title").GetString(),
+                date = gig.GetProperty("date").GetString(),
+                venue = gig.GetProperty("venue").GetString(),
+                fee = gig.GetProperty("fee").GetDecimal(),
+                travelMiles = gig.GetProperty("travelMiles").GetDecimal(),
+                passengerCount = 0,
+                notes = gig.GetProperty("notes").GetString(),
+                wasDriving = gig.GetProperty("wasDriving").GetBoolean(),
+                status = gig.GetProperty("status").GetString(),
+                invoiceId,
+                expenses = Array.Empty<object>(),
+                invoicedAt = (string?)null,
+            });
+            linkResponse.EnsureSuccessStatusCode();
+        }
+
+        var redraftResponse = await _client.PostAsync($"/invoices/{invoiceId}/redraft", null);
+
+        Assert.Equal(HttpStatusCode.OK, redraftResponse.StatusCode);
+        var redraftedInvoice = await redraftResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(JsonValueKind.String, redraftedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal(2, redraftedInvoice.GetProperty("lines").GetArrayLength());
+        var lines = redraftedInvoice.GetProperty("lines").EnumerateArray().ToArray();
+        Assert.Contains(lines, line => line.GetProperty("description").GetString()!.Contains("Monthly draft first gig"));
+        Assert.Contains(lines, line => line.GetProperty("description").GetString()!.Contains("Monthly draft second gig"));
+
+        var pdfResponse = await _client.GetAsync($"/invoices/{invoiceId}/pdf");
+        Assert.Equal(HttpStatusCode.OK, pdfResponse.StatusCode);
+        Assert.True((await pdfResponse.Content.ReadAsByteArrayAsync()).Length > 0);
+    }
+
+    [Fact]
     public async Task GenerateInvoice_FromSelectedGigs_WhenDifferentClients_ReturnsValidationError()
     {
         var foxGigResponse = await _client.PostAsJsonAsync("/gigs", new
@@ -344,8 +426,9 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         var response = await _client.GetAsync($"/invoices/{generatedInvoice.GetProperty("id").GetGuid()}/pdf");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var invoiceDate = DateOnly.Parse(generatedInvoice.GetProperty("invoiceDate").GetString()!, CultureInfo.InvariantCulture);
         Assert.Equal(
-            $"Fox & Finch Events- April 2026 {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
+            $"Fox & Finch Events- {invoiceDate.ToString("MMMM yyyy", CultureInfo.InvariantCulture)} {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
             response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
     }
 
@@ -397,8 +480,9 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         var response = await _client.GetAsync($"/invoices/{generatedInvoice.GetProperty("id").GetGuid()}/pdf");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var invoiceDate = DateOnly.Parse(generatedInvoice.GetProperty("invoiceDate").GetString()!, CultureInfo.InvariantCulture);
         Assert.Equal(
-            $"April 2026 {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
+            $"{invoiceDate.ToString("MMMM yyyy", CultureInfo.InvariantCulture)} {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
             response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
     }
 }
