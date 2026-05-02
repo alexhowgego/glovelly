@@ -2013,6 +2013,18 @@ export function UserSettingsModal({
                 }
               />
             </label>
+
+            <label>
+              <span>Google Drive invoice folder ID</span>
+              <input
+                placeholder="Drive folder ID"
+                type="text"
+                value={form.invoiceUploadFolderId}
+                onChange={(event) =>
+                  onUpdateField('invoiceUploadFolderId', event.target.value)
+                }
+              />
+            </label>
           </div>
 
           <div className="detail-grid client-settings-preview">
@@ -2027,6 +2039,7 @@ export function UserSettingsModal({
             Leave a rate blank if you do not want a personal default. Filename tokens:
             {` ${invoiceFilenameTokens.join(', ')}.`}
             {' '}Leave reply-to blank if replies should not be directed to a personal mailbox.
+            {' '}Leave the Drive folder ID blank to use Google Drive's default upload destination.
           </div>
 
           <div className="form-actions">

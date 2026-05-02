@@ -60,13 +60,14 @@ internal static class AuthEndpoints
             }
 
             var now = DateTimeOffset.UtcNow;
-            var isGoogleDriveConnected = await dbContext.GoogleDriveConnections
+            var googleDriveConnection = await dbContext.GoogleDriveConnections
                 .AsNoTracking()
-                .AnyAsync(connection =>
+                .FirstOrDefaultAsync(connection =>
                     connection.UserId == userId.Value &&
                     connection.RevokedAtUtc == null &&
                     (connection.RefreshTokenExpiresAtUtc == null ||
                      connection.RefreshTokenExpiresAtUtc > now));
+            var isGoogleDriveConnected = googleDriveConnection is not null;
 
             return Results.Ok(new
             {
@@ -79,6 +80,7 @@ internal static class AuthEndpoints
                 passengerMileageRate = localUser.PassengerMileageRate,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
+                invoiceUploadFolderId = googleDriveConnection?.InvoiceUploadFolderId,
                 isGoogleDriveConnected,
             });
         });
@@ -112,6 +114,33 @@ internal static class AuthEndpoints
             localUser.InvoiceFilenamePattern = request.InvoiceFilenamePattern?.Trim();
             localUser.InvoiceReplyToEmail = request.InvoiceReplyToEmail?.Trim();
 
+            var invoiceUploadFolderId = request.InvoiceUploadFolderId?.Trim();
+            if (string.IsNullOrEmpty(invoiceUploadFolderId))
+            {
+                invoiceUploadFolderId = null;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var googleDriveConnection = await dbContext.GoogleDriveConnections
+                .FirstOrDefaultAsync(connection =>
+                    connection.UserId == userId.Value &&
+                    connection.RevokedAtUtc == null &&
+                    (connection.RefreshTokenExpiresAtUtc == null ||
+                     connection.RefreshTokenExpiresAtUtc > now));
+            if (invoiceUploadFolderId is not null && googleDriveConnection is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["invoiceUploadFolderId"] = ["Connect Google Drive before setting an invoice upload folder."]
+                });
+            }
+
+            if (googleDriveConnection is not null)
+            {
+                googleDriveConnection.InvoiceUploadFolderId = invoiceUploadFolderId;
+                googleDriveConnection.UpdatedAtUtc = now;
+            }
+
             await dbContext.SaveChangesAsync();
 
             return Results.Ok(new
@@ -120,6 +149,7 @@ internal static class AuthEndpoints
                 passengerMileageRate = localUser.PassengerMileageRate,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
+                invoiceUploadFolderId = googleDriveConnection?.InvoiceUploadFolderId,
             });
         });
 
@@ -185,6 +215,14 @@ internal static class AuthEndpoints
             };
         }
 
+        if (request.InvoiceUploadFolderId is not null && string.IsNullOrWhiteSpace(request.InvoiceUploadFolderId))
+        {
+            return new Dictionary<string, string[]>
+            {
+                ["invoiceUploadFolderId"] = ["Google Drive folder ID cannot be empty or whitespace."]
+            };
+        }
+
         var validationResults = new List<ValidationResult>();
         var validationContext = new ValidationContext(request);
         var isValid = Validator.TryValidateObject(request, validationContext, validationResults, validateAllProperties: true);
@@ -217,5 +255,7 @@ internal static class AuthEndpoints
         decimal? PassengerMileageRate,
         string? InvoiceFilenamePattern,
         [property: EmailAddress(ErrorMessage = "Reply-to email must be a valid email address.")]
-        string? InvoiceReplyToEmail);
+        string? InvoiceReplyToEmail,
+        [property: StringLength(200, ErrorMessage = "Google Drive folder ID must be 200 characters or fewer.")]
+        string? InvoiceUploadFolderId);
 }

@@ -1220,6 +1220,7 @@ function App({ appMetadata }: AppProps) {
           : String(authUser.passengerMileageRate),
       invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? '',
       invoiceReplyToEmail: authUser?.invoiceReplyToEmail ?? '',
+      invoiceUploadFolderId: authUser?.invoiceUploadFolderId ?? '',
     })
     setUserSettingsStatus(
       'Set the defaults used when a client does not provide its own overrides.'
@@ -1290,6 +1291,7 @@ function App({ appMetadata }: AppProps) {
     )
     const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
     const invoiceReplyToEmail = userSettingsForm.invoiceReplyToEmail.trim()
+    const invoiceUploadFolderId = userSettingsForm.invoiceUploadFolderId.trim()
 
     if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
       setUserSettingsStatus('Rates must be valid numbers, for example 0.45.')
@@ -1309,6 +1311,7 @@ function App({ appMetadata }: AppProps) {
           passengerMileageRate,
           invoiceFilenamePattern: invoiceFilenamePattern || null,
           invoiceReplyToEmail: invoiceReplyToEmail || null,
+          invoiceUploadFolderId: invoiceUploadFolderId || null,
         }),
       })
 
@@ -1335,6 +1338,7 @@ function App({ appMetadata }: AppProps) {
         passengerMileageRate: number | null
         invoiceFilenamePattern: string | null
         invoiceReplyToEmail: string | null
+        invoiceUploadFolderId: string | null
       }
 
       setAuthUser((current) =>
@@ -1345,6 +1349,7 @@ function App({ appMetadata }: AppProps) {
               passengerMileageRate: savedSettings.passengerMileageRate,
               invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
               invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
+              invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
             }
           : current
       )
@@ -1357,6 +1362,7 @@ function App({ appMetadata }: AppProps) {
             : String(savedSettings.passengerMileageRate),
         invoiceFilenamePattern: savedSettings.invoiceFilenamePattern ?? '',
         invoiceReplyToEmail: savedSettings.invoiceReplyToEmail ?? '',
+        invoiceUploadFolderId: savedSettings.invoiceUploadFolderId ?? '',
       })
       setUserSettingsStatus('Settings updated.')
     } catch (error) {

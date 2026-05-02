@@ -33,6 +33,7 @@ export type AuthUser = {
   passengerMileageRate: number | null
   invoiceFilenamePattern: string | null
   invoiceReplyToEmail: string | null
+  invoiceUploadFolderId: string | null
   isGoogleDriveConnected: boolean
 }
 
@@ -61,6 +62,7 @@ export type UserSettingsForm = {
   passengerMileageRate: string
   invoiceFilenamePattern: string
   invoiceReplyToEmail: string
+  invoiceUploadFolderId: string
 }
 
 export type ClientSettingsForm = {
@@ -228,6 +230,7 @@ export const emptyUserSettingsForm = (): UserSettingsForm => ({
   passengerMileageRate: '',
   invoiceFilenamePattern: '',
   invoiceReplyToEmail: '',
+  invoiceUploadFolderId: '',
 })
 
 export const emptyClientSettingsForm = (): ClientSettingsForm => ({
