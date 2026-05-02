@@ -40,6 +40,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 30,
             invoiceFilenamePattern = "{MonthName} {Year} {InvoiceNumber}",
             invoiceReplyToEmail = "billing@example.com",
         });
@@ -56,6 +57,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "billing@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
+        Assert.Equal(30, payload.GetProperty("defaultPaymentWindowDays").GetInt32());
         Assert.False(payload.GetProperty("isGoogleDriveConnected").GetBoolean());
     }
 
@@ -90,12 +92,76 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task UpdateSettings_WhenGoogleDriveConnected_PersistsInvoiceUploadFolderId()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.GoogleDriveConnections.Add(new GoogleDriveConnection
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                EncryptedAccessToken = "encrypted-access-token",
+                EncryptedRefreshToken = "encrypted-refresh-token",
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
+                RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+                Scope = "https://www.googleapis.com/auth/drive.file",
+                TokenType = "Bearer",
+                ConnectedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 14,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+            invoiceUploadFolderId = "  drive-folder-id  ",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("drive-folder-id", payload.GetProperty("invoiceUploadFolderId").GetString());
+
+        var meResponse = await _client.GetAsync("/auth/me");
+        var mePayload = await meResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("drive-folder-id", mePayload.GetProperty("invoiceUploadFolderId").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WithInvoiceUploadFolderIdWhenGoogleDriveDisconnected_ReturnsValidationProblem()
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 14,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+            invoiceUploadFolderId = "drive-folder-id",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Connect Google Drive before setting an invoice upload folder.",
+            problem.GetProperty("errors").GetProperty("invoiceUploadFolderId")[0].GetString());
+    }
+
+    [Fact]
     public async Task UpdateSettings_PersistsInvoiceFilenamePatternAndReplyToEmail()
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 21,
             invoiceFilenamePattern = "  {ClientName} {InvoiceNumber}  ",
             invoiceReplyToEmail = "  accounts@example.com  ",
         });
@@ -109,6 +175,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "accounts@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
+        Assert.Equal(21, payload.GetProperty("defaultPaymentWindowDays").GetInt32());
     }
 
     [Fact]

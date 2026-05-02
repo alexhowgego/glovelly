@@ -51,6 +51,7 @@ internal sealed class InvoiceGoogleDriveDeliveryChannel(
             accessToken,
             request.AttachmentFileName,
             invoice.PdfBlob,
+            connection.InvoiceUploadFolderId,
             cancellationToken);
 
         var webViewLink = string.IsNullOrWhiteSpace(upload.WebViewLink)

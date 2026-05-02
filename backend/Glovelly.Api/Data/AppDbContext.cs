@@ -57,6 +57,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasPrecision(18, 2);
             entity.Property(user => user.PassengerMileageRate)
                 .HasPrecision(18, 2);
+            entity.Property(user => user.DefaultPaymentWindowDays);
             entity.Property(user => user.InvoiceFilenamePattern)
                 .HasMaxLength(200);
             entity.Property(user => user.InvoiceReplyToEmail)
@@ -83,6 +84,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasMaxLength(500);
             entity.Property(connection => connection.TokenType)
                 .HasMaxLength(50);
+            entity.Property(connection => connection.InvoiceUploadFolderId)
+                .HasMaxLength(200);
             entity.Property(connection => connection.ConnectedAtUtc)
                 .IsRequired();
             entity.Property(connection => connection.UpdatedAtUtc)

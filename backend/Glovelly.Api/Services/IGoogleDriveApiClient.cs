@@ -12,5 +12,6 @@ public interface IGoogleDriveApiClient
         string accessToken,
         string fileName,
         byte[] content,
+        string? parentFolderId,
         CancellationToken cancellationToken);
 }

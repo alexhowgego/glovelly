@@ -232,6 +232,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal("access-token", driveClient.AccessToken);
         Assert.Equal("GLV-DRIVE-001.pdf", driveClient.FileName);
         Assert.Equal(pdfBytes, driveClient.Content);
+        Assert.Null(driveClient.ParentFolderId);
         Assert.Equal("drive-file-id", publishResult.GetProperty("fileId").GetString());
         Assert.Equal("GLV-DRIVE-001.pdf", publishResult.GetProperty("fileName").GetString());
         Assert.Equal(
@@ -243,6 +244,55 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             "https://drive.google.com/file/d/drive-file-id/view",
             updatedInvoice.GetProperty("lastDeliveryRecipient").GetString());
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastDeliveredByUserId").GetGuid());
+    }
+
+    [Fact]
+    public async Task PublishGoogleDrive_WhenConnectionHasUploadFolder_UsesFolder()
+    {
+        var driveClient = new FakeGoogleDriveApiClient();
+        using var factory = CreateFactoryWithGoogleDriveClient(driveClient);
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tokenProtector = scope.ServiceProvider.GetRequiredService<IGoogleDriveTokenProtector>();
+            dbContext.GoogleDriveConnections.Add(new GoogleDriveConnection
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                EncryptedAccessToken = tokenProtector.Protect("access-token"),
+                EncryptedRefreshToken = tokenProtector.Protect("refresh-token"),
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
+                RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+                Scope = "https://www.googleapis.com/auth/drive.file",
+                TokenType = "Bearer",
+                InvoiceUploadFolderId = "drive-folder-id",
+                ConnectedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-DRIVE-FOLDER",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Drive folder delivery test.",
+            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await client.PostAsync(
+            $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("drive-folder-id", driveClient.ParentFolderId);
     }
 
     [Fact]
@@ -355,6 +405,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         public string? ContentText { get; private set; }
         public byte[]? Content { get; private set; }
         public string? FileName { get; private set; }
+        public string? ParentFolderId { get; private set; }
         public string? RefreshToken { get; private set; }
         public string RefreshedAccessToken { get; set; } = "refreshed-access-token";
 
@@ -384,12 +435,14 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             string accessToken,
             string fileName,
             byte[] content,
+            string? parentFolderId,
             CancellationToken cancellationToken)
         {
             AccessToken = accessToken;
             FileName = fileName;
             Content = content;
             ContentText = Encoding.ASCII.GetString(content);
+            ParentFolderId = parentFolderId;
 
             return Task.FromResult(new GoogleDriveUploadResult(
                 "drive-file-id",

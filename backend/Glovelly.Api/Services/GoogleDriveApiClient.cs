@@ -57,18 +57,22 @@ public sealed class GoogleDriveApiClient(HttpClient httpClient) : IGoogleDriveAp
         string accessToken,
         string fileName,
         byte[] content,
+        string? parentFolderId,
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, GoogleDriveUploadEndpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Content = BuildMultipartContent(fileName, content);
+        request.Content = BuildMultipartContent(fileName, content, parentFolderId);
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
+            var folderHint = string.IsNullOrWhiteSpace(parentFolderId)
+                ? string.Empty
+                : " Check that the configured Google Drive folder ID exists and is accessible.";
             throw new InvalidOperationException(
-                $"Google Drive upload failed with HTTP {(int)response.StatusCode}: {responseBody}");
+                $"Google Drive upload failed with HTTP {(int)response.StatusCode}.{folderHint} {responseBody}".Trim());
         }
 
         var uploadResponse = JsonSerializer.Deserialize<GoogleDriveUploadResponse>(
@@ -85,15 +89,27 @@ public sealed class GoogleDriveApiClient(HttpClient httpClient) : IGoogleDriveAp
             uploadResponse.WebViewLink);
     }
 
-    private static MultipartContent BuildMultipartContent(string fileName, byte[] content)
+    private static MultipartContent BuildMultipartContent(
+        string fileName,
+        byte[] content,
+        string? parentFolderId)
     {
         var multipart = new MultipartContent("related");
-        var metadata = JsonSerializer.Serialize(
-            new
+        object metadataValue = string.IsNullOrWhiteSpace(parentFolderId)
+            ? new
             {
                 name = fileName,
                 mimeType = "application/pdf",
-            },
+            }
+            : new
+            {
+                name = fileName,
+                mimeType = "application/pdf",
+                parents = new[] { parentFolderId.Trim() },
+            };
+
+        var metadata = JsonSerializer.Serialize(
+            metadataValue,
             JsonOptions);
 
         multipart.Add(new StringContent(metadata, Encoding.UTF8, "application/json"));

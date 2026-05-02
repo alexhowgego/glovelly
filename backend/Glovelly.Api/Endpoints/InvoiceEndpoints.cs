@@ -9,6 +9,8 @@ namespace Glovelly.Api.Endpoints;
 
 public static class InvoiceEndpoints
 {
+    private const int DefaultPaymentWindowDays = 14;
+
     public static RouteGroupBuilder MapInvoiceEndpoints(this RouteGroupBuilder group)
     {
         group.MapGet("/", async (AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
@@ -84,11 +86,18 @@ public static class InvoiceEndpoints
             }
 
             var issuedOn = DateOnly.FromDateTime(DateTime.UtcNow);
+            var paymentWindowDays = userId.HasValue
+                ? await db.Users
+                    .AsNoTracking()
+                    .Where(value => value.Id == userId.Value && value.IsActive)
+                    .Select(value => value.DefaultPaymentWindowDays)
+                    .FirstOrDefaultAsync() ?? DefaultPaymentWindowDays
+                : DefaultPaymentWindowDays;
 
             invoice.Id = Guid.NewGuid();
             invoice.InvoiceNumber = invoice.InvoiceNumber.Trim();
             invoice.InvoiceDate = issuedOn;
-            invoice.DueDate = issuedOn.AddDays(14);
+            invoice.DueDate = issuedOn.AddDays(paymentWindowDays);
             invoice.Description = invoice.Description?.Trim();
             invoice.Client = null;
             invoice.Lines = new List<InvoiceLine>();

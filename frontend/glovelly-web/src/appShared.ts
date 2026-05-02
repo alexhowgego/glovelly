@@ -14,6 +14,7 @@ export type Client = {
   billingAddress: Address
   mileageRate: number | null
   passengerMileageRate: number | null
+  defaultPaymentWindowDays: number | null
   invoiceFilenamePattern: string | null
 }
 
@@ -31,8 +32,10 @@ export type AuthUser = {
   profileImageUrl: string
   mileageRate: number | null
   passengerMileageRate: number | null
+  defaultPaymentWindowDays: number | null
   invoiceFilenamePattern: string | null
   invoiceReplyToEmail: string | null
+  invoiceUploadFolderId: string | null
   isGoogleDriveConnected: boolean
 }
 
@@ -59,8 +62,10 @@ export type AdminUserForm = {
 export type UserSettingsForm = {
   mileageRate: string
   passengerMileageRate: string
+  defaultPaymentWindowDays: string
   invoiceFilenamePattern: string
   invoiceReplyToEmail: string
+  invoiceUploadFolderId: string
 }
 
 export type ClientSettingsForm = {
@@ -226,8 +231,10 @@ export const emptyAdminForm = (): AdminUserForm => ({
 export const emptyUserSettingsForm = (): UserSettingsForm => ({
   mileageRate: '',
   passengerMileageRate: '',
+  defaultPaymentWindowDays: '',
   invoiceFilenamePattern: '',
   invoiceReplyToEmail: '',
+  invoiceUploadFolderId: '',
 })
 
 export const emptyClientSettingsForm = (): ClientSettingsForm => ({

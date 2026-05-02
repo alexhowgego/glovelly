@@ -12,6 +12,7 @@ public sealed class GoogleDriveConnection
     public DateTimeOffset? RefreshTokenExpiresAtUtc { get; set; }
     public string Scope { get; set; } = string.Empty;
     public string TokenType { get; set; } = "Bearer";
+    public string? InvoiceUploadFolderId { get; set; }
     public DateTimeOffset ConnectedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
     public DateTimeOffset? RevokedAtUtc { get; set; }
