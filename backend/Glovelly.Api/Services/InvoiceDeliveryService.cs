@@ -6,7 +6,7 @@ public sealed class InvoiceDeliveryService(
     IEnumerable<IInvoiceDeliveryChannel> deliveryChannels,
     TimeProvider timeProvider) : IInvoiceDeliveryService
 {
-    public async Task DeliverAsync(
+    public async Task<InvoiceDeliveryResult> DeliverAsync(
         InvoiceDeliveryChannel channel,
         Invoice invoice,
         Client client,
@@ -28,5 +28,7 @@ public sealed class InvoiceDeliveryService(
         invoice.LastDeliveryRecipient = result.Recipient;
         invoice.LastDeliveredUtc = timeProvider.GetUtcNow();
         invoice.LastDeliveredByUserId = userId;
+
+        return result;
     }
 }

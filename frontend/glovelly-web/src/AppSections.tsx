@@ -1496,6 +1496,7 @@ type InvoicesSectionProps = {
   clientNamesById: ReadonlyMap<string, string>
   draftInvoiceCount: number
   filteredInvoices: Invoice[]
+  googleDrivePublishLink: { href: string; fileName: string | null } | null
   isEditorOpen: boolean
   invoiceSearchQuery: string
   invoiceStatus: string
@@ -1528,6 +1529,7 @@ export function InvoicesSection({
   clientNamesById,
   draftInvoiceCount,
   filteredInvoices,
+  googleDrivePublishLink,
   isEditorOpen,
   invoiceSearchQuery,
   invoiceStatus,
@@ -1566,7 +1568,23 @@ export function InvoicesSection({
               <p className="section-label">Billing</p>
               <h2>Invoices</h2>
             </div>
-            <span className="status-pill">{invoiceStatus}</span>
+            <span className="status-pill">
+              <span>{invoiceStatus}</span>
+              {googleDrivePublishLink ? (
+                <a
+                  href={googleDrivePublishLink.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={
+                    googleDrivePublishLink.fileName
+                      ? `Open ${googleDrivePublishLink.fileName} in Google Drive`
+                      : 'Open file in Google Drive'
+                  }
+                >
+                  Open file
+                </a>
+              ) : null}
+            </span>
           </div>
 
           <label className="search-field">

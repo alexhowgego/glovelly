@@ -4,7 +4,7 @@ namespace Glovelly.Api.Services;
 
 public interface IInvoiceDeliveryService
 {
-    Task DeliverAsync(
+    Task<InvoiceDeliveryResult> DeliverAsync(
         InvoiceDeliveryChannel channel,
         Invoice invoice,
         Client client,

@@ -53,10 +53,15 @@ internal sealed class InvoiceGoogleDriveDeliveryChannel(
             invoice.PdfBlob,
             cancellationToken);
 
+        var webViewLink = string.IsNullOrWhiteSpace(upload.WebViewLink)
+            ? null
+            : upload.WebViewLink;
+
         return new InvoiceDeliveryResult(
-            string.IsNullOrWhiteSpace(upload.WebViewLink)
-                ? $"Google Drive file {upload.Id}"
-                : upload.WebViewLink);
+            webViewLink ?? $"Google Drive file {upload.Id}",
+            upload.Id,
+            upload.Name,
+            webViewLink);
     }
 
     private async Task<string> RefreshAccessTokenAsync(
