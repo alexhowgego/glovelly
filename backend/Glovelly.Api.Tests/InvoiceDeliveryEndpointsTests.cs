@@ -226,11 +226,17 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             content: null);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var publishResult = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = publishResult.GetProperty("invoice");
 
         Assert.Equal("access-token", driveClient.AccessToken);
         Assert.Equal("GLV-DRIVE-001.pdf", driveClient.FileName);
         Assert.Equal(pdfBytes, driveClient.Content);
+        Assert.Equal("drive-file-id", publishResult.GetProperty("fileId").GetString());
+        Assert.Equal("GLV-DRIVE-001.pdf", publishResult.GetProperty("fileName").GetString());
+        Assert.Equal(
+            "https://drive.google.com/file/d/drive-file-id/view",
+            publishResult.GetProperty("webViewLink").GetString());
         Assert.Equal(1, updatedInvoice.GetProperty("deliveryCount").GetInt32());
         Assert.Equal("GoogleDrive", updatedInvoice.GetProperty("lastDeliveryChannel").GetString());
         Assert.Equal(

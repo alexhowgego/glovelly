@@ -497,9 +497,10 @@ public static class InvoiceEndpoints
                 invoice.Client,
                 userDefaultPattern);
 
+            InvoiceDeliveryResult deliveryResult;
             try
             {
-                await invoiceDeliveryService.DeliverAsync(
+                deliveryResult = await invoiceDeliveryService.DeliverAsync(
                     InvoiceDeliveryChannel.GoogleDrive,
                     invoice,
                     invoice.Client,
@@ -533,7 +534,11 @@ public static class InvoiceEndpoints
                 invoice.LastDeliveryRecipient,
                 userId);
 
-            return Results.Ok(invoice);
+            return Results.Ok(new InvoiceGoogleDrivePublishResponse(
+                invoice,
+                deliveryResult.FileId,
+                deliveryResult.FileName,
+                deliveryResult.WebViewLink));
         });
 
         group.MapPost("/{id:guid}/adjustments", async (
@@ -635,4 +640,9 @@ public static class InvoiceEndpoints
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
     private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);
     private sealed record InvoiceEmailDeliveryRequest(string? Message);
+    private sealed record InvoiceGoogleDrivePublishResponse(
+        Invoice Invoice,
+        string? FileId,
+        string? FileName,
+        string? WebViewLink);
 }

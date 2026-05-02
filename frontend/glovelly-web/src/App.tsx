@@ -56,6 +56,18 @@ import type {
 } from './appShared'
 import './App.css'
 
+type GoogleDrivePublishLink = {
+  href: string
+  fileName: string | null
+}
+
+type GoogleDrivePublishResponse = {
+  invoice: Invoice
+  fileId: string | null
+  fileName: string | null
+  webViewLink: string | null
+}
+
 function getCurrentMonthValue() {
   return new Date().toISOString().slice(0, 7)
 }
@@ -175,6 +187,8 @@ function App({ appMetadata }: AppProps) {
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
   const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
+  const [googleDrivePublishLink, setGoogleDrivePublishLink] =
+    useState<GoogleDrivePublishLink | null>(null)
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
   const [adjustmentAmount, setAdjustmentAmount] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
@@ -2284,6 +2298,7 @@ function App({ appMetadata }: AppProps) {
     }
 
     setIsInvoiceLoading(true)
+    setGoogleDrivePublishLink(null)
     setInvoiceStatus(`Publishing ${invoice.invoiceNumber} to Google Drive...`)
 
     try {
@@ -2305,12 +2320,23 @@ function App({ appMetadata }: AppProps) {
         )
       }
 
-      const updatedInvoice = (await response.json()) as Invoice
+      const publishResult = (await response.json()) as GoogleDrivePublishResponse
+      const updatedInvoice = publishResult.invoice
       setInvoices((current) =>
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
-      setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} published to Google Drive.`)
+      const driveLink = publishResult.webViewLink?.trim()
+      if (driveLink) {
+        setGoogleDrivePublishLink({
+          href: driveLink,
+          fileName: publishResult.fileName,
+        })
+        setInvoiceStatus(`Uploaded ${updatedInvoice.invoiceNumber} to Google Drive.`)
+      } else {
+        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} published to Google Drive.`)
+      }
     } catch (error) {
+      setGoogleDrivePublishLink(null)
       setInvoiceStatus(
         error instanceof Error
           ? error.message
@@ -2544,6 +2570,9 @@ function App({ appMetadata }: AppProps) {
         isEditorOpen={isInvoiceEditorOpen}
         invoiceSearchQuery={invoiceSearchQuery}
         invoiceStatus={invoiceStatus}
+        googleDrivePublishLink={
+          invoiceStatus.startsWith('Uploaded ') ? googleDrivePublishLink : null
+        }
         invoices={invoices}
         issuedInvoiceCount={issuedInvoiceCount}
         isGoogleDriveConnected={authUser?.isGoogleDriveConnected ?? false}

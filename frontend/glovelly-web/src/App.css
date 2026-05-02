@@ -852,12 +852,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
   padding: 10px 14px;
   border-radius: 999px;
   background: color-mix(in srgb, #f47d2a 20%, transparent);
   color: var(--heading);
   font-size: 0.86rem;
   line-height: 1.2;
+}
+
+.status-pill a {
+  color: var(--heading);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .form-grid {
