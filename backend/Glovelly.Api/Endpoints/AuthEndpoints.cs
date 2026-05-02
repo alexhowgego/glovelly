@@ -59,6 +59,15 @@ internal static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
+            var now = DateTimeOffset.UtcNow;
+            var isGoogleDriveConnected = await dbContext.GoogleDriveConnections
+                .AsNoTracking()
+                .AnyAsync(connection =>
+                    connection.UserId == userId.Value &&
+                    connection.RevokedAtUtc == null &&
+                    (connection.RefreshTokenExpiresAtUtc == null ||
+                     connection.RefreshTokenExpiresAtUtc > now));
+
             return Results.Ok(new
             {
                 userId,
@@ -70,6 +79,7 @@ internal static class AuthEndpoints
                 passengerMileageRate = localUser.PassengerMileageRate,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
+                isGoogleDriveConnected,
             });
         });
 

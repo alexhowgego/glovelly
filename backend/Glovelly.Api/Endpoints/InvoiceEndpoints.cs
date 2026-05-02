@@ -447,6 +447,95 @@ public static class InvoiceEndpoints
             return Results.Ok(invoice);
         });
 
+        group.MapPost("/{id:guid}/publish/google-drive", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceDeliveryService invoiceDeliveryService,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
+        {
+            var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
+                .Include(value => value.Client)
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id, cancellationToken);
+
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (invoice.Client is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["clientId"] = ["Client does not exist."]
+                });
+            }
+
+            if (invoice.PdfBlob is null || invoice.PdfBlob.Length == 0)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["pdf"] = ["Invoice PDF is missing."]
+                });
+            }
+
+            var userDefaultPattern = userId.HasValue
+                ? await db.Users
+                    .AsNoTracking()
+                    .Where(value => value.Id == userId.Value && value.IsActive)
+                    .Select(value => value.InvoiceFilenamePattern)
+                    .FirstOrDefaultAsync(cancellationToken)
+                : null;
+            var attachmentFileName = InvoicePdfFilenameBuilder.Build(
+                invoice,
+                invoice.Client,
+                userDefaultPattern);
+
+            try
+            {
+                await invoiceDeliveryService.DeliverAsync(
+                    InvoiceDeliveryChannel.GoogleDrive,
+                    invoice,
+                    invoice.Client,
+                    userId,
+                    message: null,
+                    attachmentFileName,
+                    InvoiceEmailSenderIdentityBuilder.Build(null),
+                    cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(
+                    exception,
+                    "Failed to publish invoice {InvoiceId} ({InvoiceNumber}) to Google Drive.",
+                    invoice.Id,
+                    invoice.InvoiceNumber);
+                return Results.Problem(
+                    title: "Unable to publish invoice to Google Drive",
+                    detail: exception.Message,
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            EndpointSupport.StampUpdate(invoice, userId);
+            await db.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Invoice {InvoiceId} ({InvoiceNumber}) delivered by {Channel} to {Recipient} by user {UserId}.",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.LastDeliveryChannel,
+                invoice.LastDeliveryRecipient,
+                userId);
+
+            return Results.Ok(invoice);
+        });
+
         group.MapPost("/{id:guid}/adjustments", async (
             Guid id,
             InvoiceAdjustmentCreateRequest request,

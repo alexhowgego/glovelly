@@ -51,6 +51,7 @@ internal static class AuthFlowSupport
                path.StartsWithSegments("/admin") ||
                path.StartsWithSegments("/clients") ||
                path.StartsWithSegments("/gigs") ||
+               path.StartsWithSegments("/integrations") ||
                path.StartsWithSegments("/invoices") ||
                path.StartsWithSegments("/invoice-lines") ||
                path.StartsWithSegments("/seller-profile");

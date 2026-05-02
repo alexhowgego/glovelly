@@ -10,7 +10,7 @@ public sealed class InvoiceEmailDeliveryChannel(
 {
     public InvoiceDeliveryChannel Channel => InvoiceDeliveryChannel.Email;
 
-    public async Task DeliverAsync(
+    public async Task<InvoiceDeliveryResult> DeliverAsync(
         InvoiceDeliveryRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -53,6 +53,8 @@ public sealed class InvoiceEmailDeliveryChannel(
                         invoice.PdfBlob)
                 ]),
             cancellationToken);
+
+        return new InvoiceDeliveryResult(client.Email.Trim());
     }
 
     private static string BuildPlainTextBody(Invoice invoice, string? message)

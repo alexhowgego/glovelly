@@ -4,5 +4,7 @@ public interface IInvoiceDeliveryChannel
 {
     InvoiceDeliveryChannel Channel { get; }
 
-    Task DeliverAsync(InvoiceDeliveryRequest request, CancellationToken cancellationToken = default);
+    Task<InvoiceDeliveryResult> DeliverAsync(
+        InvoiceDeliveryRequest request,
+        CancellationToken cancellationToken = default);
 }

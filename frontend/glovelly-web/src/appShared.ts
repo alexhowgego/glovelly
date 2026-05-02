@@ -33,6 +33,7 @@ export type AuthUser = {
   passengerMileageRate: number | null
   invoiceFilenamePattern: string | null
   invoiceReplyToEmail: string | null
+  isGoogleDriveConnected: boolean
 }
 
 export type AdminUser = {

@@ -1214,6 +1214,10 @@ function App({ appMetadata }: AppProps) {
     setIsUserSettingsOpen(true)
   }
 
+  const connectGoogleDrive = () => {
+    window.location.assign(buildApiUrl('/integrations/google-drive/connect'))
+  }
+
   const openSellerProfile = () => {
     setSellerProfileForm(toSellerProfileForm(sellerProfile))
     setSellerProfileStatus(
@@ -2271,6 +2275,52 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
+  const handlePublishInvoiceGoogleDrive = async (invoice: Invoice) => {
+    const shouldProceed = window.confirm(
+      `Publish ${invoice.invoiceNumber} to your connected Google Drive?`
+    )
+    if (!shouldProceed) {
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Publishing ${invoice.invoiceNumber} to Google Drive...`)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/publish/google-drive`),
+        {
+          method: 'POST',
+        }
+      )
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const pdfError = problem?.errors?.pdf?.[0]
+        throw new Error(
+          pdfError ??
+            problem?.detail ??
+            problem?.title ??
+            'Unable to publish invoice to Google Drive.'
+        )
+      }
+
+      const updatedInvoice = (await response.json()) as Invoice
+      setInvoices((current) =>
+        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
+      )
+      setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} published to Google Drive.`)
+    } catch (error) {
+      setInvoiceStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to publish invoice to Google Drive.'
+      )
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
   const handleAddInvoiceAdjustment = async (invoice: Invoice) => {
     const amount = Number.parseFloat(adjustmentAmount)
     if (!Number.isFinite(amount) || amount === 0) {
@@ -2496,6 +2546,7 @@ function App({ appMetadata }: AppProps) {
         invoiceStatus={invoiceStatus}
         invoices={invoices}
         issuedInvoiceCount={issuedInvoiceCount}
+        isGoogleDriveConnected={authUser?.isGoogleDriveConnected ?? false}
         isInvoiceLoading={isInvoiceLoading}
         isSellerProfileConfigured={sellerProfile.isConfigured}
         onAdjustmentAmountChange={setAdjustmentAmount}
@@ -2506,6 +2557,7 @@ function App({ appMetadata }: AppProps) {
         onDownloadPdf={handleDownloadInvoicePdf}
         onInvoiceStatusChange={handleInvoiceStatusChange}
         onOpenSellerProfile={openSellerProfile}
+        onPublishGoogleDrive={handlePublishInvoiceGoogleDrive}
         onReissue={handleInvoiceReissue}
         onSendEmail={handleSendInvoiceEmail}
         onSearchQueryChange={setInvoiceSearchQuery}
@@ -2573,6 +2625,13 @@ function App({ appMetadata }: AppProps) {
                             : 'Seller profile not set up'}
                       </span>
                     </div>
+                    <div className="profile-meta">
+                      <span>
+                        {authUser?.isGoogleDriveConnected
+                          ? 'Connected to Google Drive'
+                          : 'Google Drive not connected'}
+                      </span>
+                    </div>
                     <label className="theme-field" htmlFor="theme-preference-select">
                       <span>Theme</span>
                       <select
@@ -2595,6 +2654,17 @@ function App({ appMetadata }: AppProps) {
                       disabled={isLoading || isAdminLoading || isSellerProfileSaving}
                     >
                       Seller profile
+                    </button>
+                    <button
+                      className="ghost-button profile-settings"
+                      onClick={connectGoogleDrive}
+                      role="menuitem"
+                      type="button"
+                      disabled={isLoading || isAdminLoading}
+                    >
+                      {authUser?.isGoogleDriveConnected
+                        ? 'Reconnect Google Drive'
+                        : 'Connect Google Drive'}
                     </button>
                     <button
                       className="ghost-button profile-settings"

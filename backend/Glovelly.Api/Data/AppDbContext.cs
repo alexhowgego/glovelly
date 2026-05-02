@@ -1,11 +1,13 @@
 using Glovelly.Api.Models;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Glovelly.Api.Data;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
     public DbSet<AccessRequest> AccessRequests => Set<AccessRequest>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Gig> Gigs => Set<Gig>();
@@ -13,6 +15,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<SellerProfile> SellerProfiles => Set<SellerProfile>();
+    public DbSet<GoogleDriveConnection> GoogleDriveConnections => Set<GoogleDriveConnection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,6 +70,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .IsUnique();
             entity.HasIndex(user => user.Email)
                 .IsUnique();
+        });
+
+        modelBuilder.Entity<GoogleDriveConnection>(entity =>
+        {
+            entity.HasKey(connection => connection.Id);
+            entity.Property(connection => connection.EncryptedAccessToken)
+                .IsRequired();
+            entity.Property(connection => connection.EncryptedRefreshToken)
+                .IsRequired();
+            entity.Property(connection => connection.Scope)
+                .HasMaxLength(500);
+            entity.Property(connection => connection.TokenType)
+                .HasMaxLength(50);
+            entity.Property(connection => connection.ConnectedAtUtc)
+                .IsRequired();
+            entity.Property(connection => connection.UpdatedAtUtc)
+                .IsRequired();
+            entity.HasIndex(connection => connection.UserId)
+                .IsUnique();
+            entity.HasOne(connection => connection.User)
+                .WithOne(user => user.GoogleDriveConnection)
+                .HasForeignKey<GoogleDriveConnection>(connection => connection.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Client>(entity =>

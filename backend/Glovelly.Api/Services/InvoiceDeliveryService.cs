@@ -19,13 +19,13 @@ public sealed class InvoiceDeliveryService(
         var deliveryChannel = deliveryChannels.FirstOrDefault(value => value.Channel == channel)
             ?? throw new InvalidOperationException($"Invoice delivery channel {channel} is not registered.");
 
-        await deliveryChannel.DeliverAsync(
+        var result = await deliveryChannel.DeliverAsync(
             new InvoiceDeliveryRequest(invoice, client, userId, message, attachmentFileName, senderIdentity),
             cancellationToken);
 
         invoice.DeliveryCount += 1;
         invoice.LastDeliveryChannel = channel.ToString();
-        invoice.LastDeliveryRecipient = client.Email.Trim();
+        invoice.LastDeliveryRecipient = result.Recipient;
         invoice.LastDeliveredUtc = timeProvider.GetUtcNow();
         invoice.LastDeliveredByUserId = userId;
     }

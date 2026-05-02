@@ -14,12 +14,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceEmailDeliveryChannel>();
+        services.AddScoped<IInvoiceDeliveryChannel, InvoiceGoogleDriveDeliveryChannel>();
         services.AddOptions<ResendClientOptions>()
             .Configure<IOptions<EmailSettings>>((resendOptions, emailOptions) =>
             {
                 resendOptions.ApiToken = emailOptions.Value.Resend.ApiKey ?? string.Empty;
             });
         services.AddHttpClient<ResendClient>();
+        services.AddHttpClient<IGoogleDriveApiClient, GoogleDriveApiClient>();
         services.AddScoped<IResend, ResendClient>();
         services.AddScoped<IEmailSender>(provider =>
         {
