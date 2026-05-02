@@ -40,6 +40,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 30,
             invoiceFilenamePattern = "{MonthName} {Year} {InvoiceNumber}",
             invoiceReplyToEmail = "billing@example.com",
         });
@@ -56,6 +57,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "billing@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
+        Assert.Equal(30, payload.GetProperty("defaultPaymentWindowDays").GetInt32());
         Assert.False(payload.GetProperty("isGoogleDriveConnected").GetBoolean());
     }
 
@@ -115,6 +117,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 14,
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
             invoiceUploadFolderId = "  drive-folder-id  ",
@@ -137,6 +140,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 14,
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
             invoiceUploadFolderId = "drive-folder-id",
@@ -157,6 +161,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 21,
             invoiceFilenamePattern = "  {ClientName} {InvoiceNumber}  ",
             invoiceReplyToEmail = "  accounts@example.com  ",
         });
@@ -170,6 +175,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "accounts@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
+        Assert.Equal(21, payload.GetProperty("defaultPaymentWindowDays").GetInt32());
     }
 
     [Fact]

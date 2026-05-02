@@ -78,6 +78,7 @@ internal static class AuthEndpoints
                 profileImageUrl = user.FindFirstValue("picture") ?? user.FindFirstValue("profile") ?? string.Empty,
                 mileageRate = localUser.MileageRate,
                 passengerMileageRate = localUser.PassengerMileageRate,
+                defaultPaymentWindowDays = localUser.DefaultPaymentWindowDays,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
                 invoiceUploadFolderId = googleDriveConnection?.InvoiceUploadFolderId,
@@ -111,6 +112,7 @@ internal static class AuthEndpoints
 
             localUser.MileageRate = request.MileageRate;
             localUser.PassengerMileageRate = request.PassengerMileageRate;
+            localUser.DefaultPaymentWindowDays = request.DefaultPaymentWindowDays;
             localUser.InvoiceFilenamePattern = request.InvoiceFilenamePattern?.Trim();
             localUser.InvoiceReplyToEmail = request.InvoiceReplyToEmail?.Trim();
 
@@ -147,6 +149,7 @@ internal static class AuthEndpoints
             {
                 mileageRate = localUser.MileageRate,
                 passengerMileageRate = localUser.PassengerMileageRate,
+                defaultPaymentWindowDays = localUser.DefaultPaymentWindowDays,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
                 invoiceUploadFolderId = googleDriveConnection?.InvoiceUploadFolderId,
@@ -253,6 +256,8 @@ internal static class AuthEndpoints
         decimal? MileageRate,
         [Range(0, double.MaxValue, ErrorMessage = "Passenger mileage rate cannot be negative.")]
         decimal? PassengerMileageRate,
+        [property: Range(0, 3650, ErrorMessage = "Default payment window must be between 0 and 3650 days.")]
+        int? DefaultPaymentWindowDays,
         string? InvoiceFilenamePattern,
         [property: EmailAddress(ErrorMessage = "Reply-to email must be a valid email address.")]
         string? InvoiceReplyToEmail,

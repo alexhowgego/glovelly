@@ -157,6 +157,49 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
     }
 
     [Fact]
+    public async Task GenerateInvoice_FromGig_UsesUserDefaultPaymentWindow()
+    {
+        var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 30,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+        });
+        updateSettingsResponse.EnsureSuccessStatusCode();
+
+        var createGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Payment window booking",
+            date = "2026-06-21",
+            venue = "The Hall",
+            fee = 300.00m,
+            travelMiles = 0m,
+            passengerCount = 0,
+            notes = "",
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createGigResponse.EnsureSuccessStatusCode();
+
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var generateResponse = await _client.PostAsync(
+            $"/gigs/{createdGig.GetProperty("id").GetGuid()}/generate-invoice",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.Created, generateResponse.StatusCode);
+
+        var invoice = await generateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        Assert.Equal(
+            expectedInvoiceDate.AddDays(30).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            invoice.GetProperty("dueDate").GetString());
+    }
+
+    [Fact]
     public async Task GenerateInvoice_FromSelectedGigs_CreatesCombinedInvoiceOrderedByDate()
     {
         var firstGigResponse = await _client.PostAsJsonAsync("/gigs", new

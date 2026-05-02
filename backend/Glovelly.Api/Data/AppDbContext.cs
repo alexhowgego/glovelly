@@ -57,6 +57,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasPrecision(18, 2);
             entity.Property(user => user.PassengerMileageRate)
                 .HasPrecision(18, 2);
+            entity.Property(user => user.DefaultPaymentWindowDays);
             entity.Property(user => user.InvoiceFilenamePattern)
                 .HasMaxLength(200);
             entity.Property(user => user.InvoiceReplyToEmail)

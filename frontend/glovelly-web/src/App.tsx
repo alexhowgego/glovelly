@@ -1218,6 +1218,11 @@ function App({ appMetadata }: AppProps) {
         authUser?.passengerMileageRate === undefined
           ? ''
           : String(authUser.passengerMileageRate),
+      defaultPaymentWindowDays:
+        authUser?.defaultPaymentWindowDays === null ||
+        authUser?.defaultPaymentWindowDays === undefined
+          ? ''
+          : String(authUser.defaultPaymentWindowDays),
       invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? '',
       invoiceReplyToEmail: authUser?.invoiceReplyToEmail ?? '',
       invoiceUploadFolderId: authUser?.invoiceUploadFolderId ?? '',
@@ -1289,12 +1294,24 @@ function App({ appMetadata }: AppProps) {
     const passengerMileageRate = parseOptionalDecimal(
       userSettingsForm.passengerMileageRate
     )
+    const defaultPaymentWindowDaysText = userSettingsForm.defaultPaymentWindowDays.trim()
     const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
     const invoiceReplyToEmail = userSettingsForm.invoiceReplyToEmail.trim()
     const invoiceUploadFolderId = userSettingsForm.invoiceUploadFolderId.trim()
 
     if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
       setUserSettingsStatus('Rates must be valid numbers, for example 0.45.')
+      return
+    }
+
+    const defaultPaymentWindowDays = defaultPaymentWindowDaysText
+      ? Number(defaultPaymentWindowDaysText)
+      : null
+    if (
+      defaultPaymentWindowDays !== null &&
+      (!Number.isInteger(defaultPaymentWindowDays) || defaultPaymentWindowDays < 0)
+    ) {
+      setUserSettingsStatus('Payment window must be a whole number of days.')
       return
     }
 
@@ -1309,6 +1326,7 @@ function App({ appMetadata }: AppProps) {
         body: JSON.stringify({
           mileageRate,
           passengerMileageRate,
+          defaultPaymentWindowDays,
           invoiceFilenamePattern: invoiceFilenamePattern || null,
           invoiceReplyToEmail: invoiceReplyToEmail || null,
           invoiceUploadFolderId: invoiceUploadFolderId || null,
@@ -1336,6 +1354,7 @@ function App({ appMetadata }: AppProps) {
       const savedSettings = (await response.json()) as {
         mileageRate: number | null
         passengerMileageRate: number | null
+        defaultPaymentWindowDays: number | null
         invoiceFilenamePattern: string | null
         invoiceReplyToEmail: string | null
         invoiceUploadFolderId: string | null
@@ -1347,6 +1366,7 @@ function App({ appMetadata }: AppProps) {
               ...current,
               mileageRate: savedSettings.mileageRate,
               passengerMileageRate: savedSettings.passengerMileageRate,
+              defaultPaymentWindowDays: savedSettings.defaultPaymentWindowDays,
               invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
               invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
               invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
@@ -1360,6 +1380,10 @@ function App({ appMetadata }: AppProps) {
           savedSettings.passengerMileageRate === null
             ? ''
             : String(savedSettings.passengerMileageRate),
+        defaultPaymentWindowDays:
+          savedSettings.defaultPaymentWindowDays === null
+            ? ''
+            : String(savedSettings.defaultPaymentWindowDays),
         invoiceFilenamePattern: savedSettings.invoiceFilenamePattern ?? '',
         invoiceReplyToEmail: savedSettings.invoiceReplyToEmail ?? '',
         invoiceUploadFolderId: savedSettings.invoiceUploadFolderId ?? '',
@@ -2660,13 +2684,6 @@ function App({ appMetadata }: AppProps) {
                             : 'Seller profile not set up'}
                       </span>
                     </div>
-                    <div className="profile-meta">
-                      <span>
-                        {authUser?.isGoogleDriveConnected
-                          ? 'Connected to Google Drive'
-                          : 'Google Drive not connected'}
-                      </span>
-                    </div>
                     <label className="theme-field" htmlFor="theme-preference-select">
                       <span>Theme</span>
                       <select
@@ -2689,17 +2706,6 @@ function App({ appMetadata }: AppProps) {
                       disabled={isLoading || isAdminLoading || isSellerProfileSaving}
                     >
                       Seller profile
-                    </button>
-                    <button
-                      className="ghost-button profile-settings"
-                      onClick={connectGoogleDrive}
-                      role="menuitem"
-                      type="button"
-                      disabled={isLoading || isAdminLoading}
-                    >
-                      {authUser?.isGoogleDriveConnected
-                        ? 'Reconnect Google Drive'
-                        : 'Connect Google Drive'}
                     </button>
                     <button
                       className="ghost-button profile-settings"
@@ -2789,9 +2795,12 @@ function App({ appMetadata }: AppProps) {
           null
         )}
         invoiceFilenameTokens={invoiceFilenameTokens}
+        isGoogleDriveConnected={authUser?.isGoogleDriveConnected ?? false}
         isOpen={isUserSettingsOpen}
         isSaving={isUserSettingsSaving}
+        isGoogleDriveConnectDisabled={isLoading || isAdminLoading}
         onClose={closeUserSettings}
+        onConnectGoogleDrive={connectGoogleDrive}
         onSubmit={handleUserSettingsSubmit}
         onUpdateField={updateUserSettingsField}
         status={userSettingsStatus}

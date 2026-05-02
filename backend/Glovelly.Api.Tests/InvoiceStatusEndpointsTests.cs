@@ -103,6 +103,34 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
+    public async Task UpdateStatus_WhenFirstIssued_UsesUserDefaultPaymentWindow()
+    {
+        var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            defaultPaymentWindowDays = 30,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+        });
+        updateSettingsResponse.EnsureSuccessStatusCode();
+
+        var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var response = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
+        {
+            status = "Issued",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            expectedInvoiceDate.AddDays(30).ToString("yyyy-MM-dd"),
+            updatedInvoice.GetProperty("dueDate").GetString());
+    }
+
+    [Fact]
     public async Task Reissue_WhenInvoiceExists_RegeneratesPdfAndLogsActionWithoutChangingFinancials()
     {
         var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);

@@ -8,6 +8,8 @@ namespace Glovelly.Api.Services;
 
 public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWorkflowService
 {
+    private const int DefaultPaymentWindowDays = 14;
+
     public async Task<Invoice> GenerateInvoiceForGigAsync(
         Gig gig,
         Client client,
@@ -15,13 +17,14 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         CancellationToken cancellationToken = default)
     {
         var invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var paymentWindowDays = await ResolvePaymentWindowDaysAsync(userId, cancellationToken);
         var invoice = new Invoice
         {
             Id = Guid.NewGuid(),
             InvoiceNumber = await GenerateInvoiceNumberAsync(invoiceDate, cancellationToken),
             ClientId = gig.ClientId,
             InvoiceDate = invoiceDate,
-            DueDate = invoiceDate.AddDays(14),
+            DueDate = invoiceDate.AddDays(paymentWindowDays),
             Status = InvoiceStatus.Draft,
             Description = BuildInvoiceDescription(gig),
             Client = null,
@@ -98,8 +101,9 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
     {
         var issuedUtc = DateTimeOffset.UtcNow;
         var invoiceDate = DateOnly.FromDateTime(issuedUtc.UtcDateTime);
+        var paymentWindowDays = await ResolvePaymentWindowDaysAsync(userId, cancellationToken);
         invoice.InvoiceDate = invoiceDate;
-        invoice.DueDate = invoiceDate.AddDays(14);
+        invoice.DueDate = invoiceDate.AddDays(paymentWindowDays);
         invoice.Status = InvoiceStatus.Issued;
         invoice.StatusUpdatedUtc = issuedUtc;
 
@@ -122,8 +126,9 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
     {
         var reissuedUtc = DateTimeOffset.UtcNow;
         var invoiceDate = DateOnly.FromDateTime(reissuedUtc.UtcDateTime);
+        var paymentWindowDays = await ResolvePaymentWindowDaysAsync(userId, cancellationToken);
         invoice.InvoiceDate = invoiceDate;
-        invoice.DueDate = invoiceDate.AddDays(14);
+        invoice.DueDate = invoiceDate.AddDays(paymentWindowDays);
         var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
         invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
         invoice.Status = InvoiceStatus.Draft;
@@ -142,12 +147,29 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
     {
         var redraftedUtc = DateTimeOffset.UtcNow;
         var invoiceDate = DateOnly.FromDateTime(redraftedUtc.UtcDateTime);
+        var paymentWindowDays = await ResolvePaymentWindowDaysAsync(userId, cancellationToken);
         invoice.InvoiceDate = invoiceDate;
-        invoice.DueDate = invoiceDate.AddDays(14);
+        invoice.DueDate = invoiceDate.AddDays(paymentWindowDays);
         var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
         invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
         invoice.Status = InvoiceStatus.Draft;
         StampUpdate(invoice, userId);
+    }
+
+    private async Task<int> ResolvePaymentWindowDaysAsync(
+        Guid? userId,
+        CancellationToken cancellationToken)
+    {
+        if (!userId.HasValue)
+        {
+            return DefaultPaymentWindowDays;
+        }
+
+        return await dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId.Value && user.IsActive)
+            .Select(user => user.DefaultPaymentWindowDays)
+            .FirstOrDefaultAsync(cancellationToken) ?? DefaultPaymentWindowDays;
     }
 
     public async Task<InvoiceLine> CreateManualAdjustmentAsync(

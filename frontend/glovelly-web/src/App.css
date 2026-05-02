@@ -333,6 +333,40 @@
   margin: 0;
 }
 
+.settings-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.drive-connection-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 85%, transparent);
+  color: var(--muted-strong);
+  font-size: 0.86rem;
+}
+
+.drive-connection-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #a65f27;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #a65f27 18%, transparent);
+}
+
+.drive-connection-indicator.connected {
+  background: #2b8c67;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #2b8c67 18%, transparent);
+}
+
 .settings-form {
   display: grid;
   gap: 18px;
@@ -407,6 +441,15 @@
   background: var(--surface-subtle);
   border: 1px solid color-mix(in srgb, var(--surface-border) 85%, transparent);
   color: var(--muted);
+}
+
+.invoice-filename-preview {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, #f47d2a 34%, var(--surface-border));
 }
 
 .hero-mascot {
@@ -1077,6 +1120,10 @@ button:disabled {
 
   .panel-heading {
     flex-direction: column;
+  }
+
+  .settings-header-actions {
+    justify-content: flex-start;
   }
 
   .status-pill {
