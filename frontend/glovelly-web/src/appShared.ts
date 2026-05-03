@@ -312,6 +312,7 @@ export function buildInvoiceFilenamePreview(
   )
 
   const sanitized = resolved
+    // eslint-disable-next-line no-control-regex
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
     .replace(/\s+/g, ' ')
     .trim()

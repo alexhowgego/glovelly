@@ -2184,7 +2184,7 @@ function App({ appMetadata }: AppProps) {
       }
     }
 
-    const quotedMatch = contentDisposition.match(/filename=\"([^\"]+)\"/i)
+    const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
     if (quotedMatch?.[1]) {
       return quotedMatch[1]
     }
