@@ -13,6 +13,7 @@ import {
 } from './AppSections'
 import {
   buildApiUrl,
+  buildInvoiceEmailSubjectPreview,
   buildInvoiceFilenamePreview,
   buildReturnUrl,
   defaultAdminStatus,
@@ -1091,6 +1092,7 @@ function App({ appMetadata }: AppProps) {
           ? ''
           : String(selectedClient.passengerMileageRate),
       invoiceFilenamePattern: selectedClient.invoiceFilenamePattern ?? '',
+      invoiceEmailSubjectPattern: selectedClient.invoiceEmailSubjectPattern ?? '',
     })
     setClientSettingsStatus(
       'Client-specific rates override your personal defaults when set.'
@@ -1136,6 +1138,8 @@ function App({ appMetadata }: AppProps) {
       clientSettingsForm.passengerMileageRate
     )
     const invoiceFilenamePattern = clientSettingsForm.invoiceFilenamePattern.trim()
+    const invoiceEmailSubjectPattern =
+      clientSettingsForm.invoiceEmailSubjectPattern.trim()
 
     if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
       setClientSettingsStatus('Rates must be valid numbers, for example 0.45.')
@@ -1160,6 +1164,7 @@ function App({ appMetadata }: AppProps) {
             mileageRate,
             passengerMileageRate,
             invoiceFilenamePattern: invoiceFilenamePattern || null,
+            invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
           }),
         }
       )
@@ -1194,6 +1199,7 @@ function App({ appMetadata }: AppProps) {
             ? ''
             : String(savedClient.passengerMileageRate),
         invoiceFilenamePattern: savedClient.invoiceFilenamePattern ?? '',
+        invoiceEmailSubjectPattern: savedClient.invoiceEmailSubjectPattern ?? '',
       })
       setClientSettingsStatus('Client settings updated.')
     } catch (error) {
@@ -1224,6 +1230,7 @@ function App({ appMetadata }: AppProps) {
           ? ''
           : String(authUser.defaultPaymentWindowDays),
       invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? '',
+      invoiceEmailSubjectPattern: authUser?.invoiceEmailSubjectPattern ?? '',
       invoiceReplyToEmail: authUser?.invoiceReplyToEmail ?? '',
       invoiceUploadFolderId: authUser?.invoiceUploadFolderId ?? '',
     })
@@ -1296,6 +1303,8 @@ function App({ appMetadata }: AppProps) {
     )
     const defaultPaymentWindowDaysText = userSettingsForm.defaultPaymentWindowDays.trim()
     const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
+    const invoiceEmailSubjectPattern =
+      userSettingsForm.invoiceEmailSubjectPattern.trim()
     const invoiceReplyToEmail = userSettingsForm.invoiceReplyToEmail.trim()
     const invoiceUploadFolderId = userSettingsForm.invoiceUploadFolderId.trim()
 
@@ -1328,6 +1337,7 @@ function App({ appMetadata }: AppProps) {
           passengerMileageRate,
           defaultPaymentWindowDays,
           invoiceFilenamePattern: invoiceFilenamePattern || null,
+          invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
           invoiceReplyToEmail: invoiceReplyToEmail || null,
           invoiceUploadFolderId: invoiceUploadFolderId || null,
         }),
@@ -1356,6 +1366,7 @@ function App({ appMetadata }: AppProps) {
         passengerMileageRate: number | null
         defaultPaymentWindowDays: number | null
         invoiceFilenamePattern: string | null
+        invoiceEmailSubjectPattern: string | null
         invoiceReplyToEmail: string | null
         invoiceUploadFolderId: string | null
       }
@@ -1368,6 +1379,7 @@ function App({ appMetadata }: AppProps) {
               passengerMileageRate: savedSettings.passengerMileageRate,
               defaultPaymentWindowDays: savedSettings.defaultPaymentWindowDays,
               invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
+              invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern,
               invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
               invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
             }
@@ -1385,6 +1397,7 @@ function App({ appMetadata }: AppProps) {
             ? ''
             : String(savedSettings.defaultPaymentWindowDays),
         invoiceFilenamePattern: savedSettings.invoiceFilenamePattern ?? '',
+        invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern ?? '',
         invoiceReplyToEmail: savedSettings.invoiceReplyToEmail ?? '',
         invoiceUploadFolderId: savedSettings.invoiceUploadFolderId ?? '',
       })
@@ -2171,7 +2184,7 @@ function App({ appMetadata }: AppProps) {
       }
     }
 
-    const quotedMatch = contentDisposition.match(/filename=\"([^\"]+)\"/i)
+    const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
     if (quotedMatch?.[1]) {
       return quotedMatch[1]
     }
@@ -2790,6 +2803,10 @@ function App({ appMetadata }: AppProps) {
 
       <UserSettingsModal
         form={userSettingsForm}
+        invoiceEmailSubjectPreview={buildInvoiceEmailSubjectPreview(
+          userSettingsForm.invoiceEmailSubjectPattern,
+          null
+        )}
         invoiceFilenamePreview={buildInvoiceFilenamePreview(
           userSettingsForm.invoiceFilenamePattern,
           null
@@ -2820,6 +2837,11 @@ function App({ appMetadata }: AppProps) {
       <ClientSettingsModal
         authUser={authUser}
         form={clientSettingsForm}
+        invoiceEmailSubjectPreview={buildInvoiceEmailSubjectPreview(
+          clientSettingsForm.invoiceEmailSubjectPattern ||
+            authUser?.invoiceEmailSubjectPattern,
+          selectedClient?.name
+        )}
         invoiceFilenamePreview={buildInvoiceFilenamePreview(
           clientSettingsForm.invoiceFilenamePattern || authUser?.invoiceFilenamePattern,
           selectedClient?.name

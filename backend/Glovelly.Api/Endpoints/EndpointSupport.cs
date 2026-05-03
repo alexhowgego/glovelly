@@ -117,6 +117,11 @@ internal static class EndpointSupport
             return Results.ValidationProblem(patternErrors);
         }
 
+        if (TryValidateInvoiceEmailSubjectPattern(client.InvoiceEmailSubjectPattern, out var subjectErrors))
+        {
+            return Results.ValidationProblem(subjectErrors);
+        }
+
         return null;
     }
 
@@ -130,6 +135,22 @@ internal static class EndpointSupport
         if (pattern is not null && string.IsNullOrWhiteSpace(pattern))
         {
             errors[fieldName] = ["Invoice filename pattern cannot be empty or whitespace."];
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool TryValidateInvoiceEmailSubjectPattern(
+        string? pattern,
+        out Dictionary<string, string[]> errors,
+        string fieldName = "invoiceEmailSubjectPattern")
+    {
+        errors = new Dictionary<string, string[]>();
+
+        if (pattern is not null && string.IsNullOrWhiteSpace(pattern))
+        {
+            errors[fieldName] = ["Invoice email subject pattern cannot be empty or whitespace."];
             return true;
         }
 

@@ -9,9 +9,8 @@ public sealed class NullEmailSender(ILogger<NullEmailSender> logger) : IEmailSen
         EmailSenderSupport.ValidateMessage(message);
 
         logger.LogInformation(
-            "Email sending is disabled. Discarding message for {RecipientCount} recipient(s) with subject {Subject}.",
-            message.To.Count,
-            message.Subject);
+            "Email sending is disabled. Discarding message for {RecipientCount} recipient(s).",
+            message.To.Count);
 
         return Task.CompletedTask;
     }

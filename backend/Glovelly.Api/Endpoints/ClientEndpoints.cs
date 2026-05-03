@@ -46,6 +46,7 @@ public static class ClientEndpoints
             client.Email = client.Email.Trim();
             client.BillingAddress ??= new Address();
             client.InvoiceFilenamePattern = client.InvoiceFilenamePattern?.Trim();
+            client.InvoiceEmailSubjectPattern = client.InvoiceEmailSubjectPattern?.Trim();
             EndpointSupport.StampCreate(client, currentUserAccessor.TryGetUserId(user));
 
             db.Clients.Add(client);
@@ -77,6 +78,7 @@ public static class ClientEndpoints
             client.MileageRate = request.MileageRate;
             client.PassengerMileageRate = request.PassengerMileageRate;
             client.InvoiceFilenamePattern = request.InvoiceFilenamePattern?.Trim();
+            client.InvoiceEmailSubjectPattern = request.InvoiceEmailSubjectPattern?.Trim();
             EndpointSupport.StampUpdate(client, userId);
 
             await db.SaveChangesAsync();

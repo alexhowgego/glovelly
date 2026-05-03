@@ -19,7 +19,11 @@ internal static partial class InvoicePdfFilenameBuilder
 
     public const string DefaultInvoiceNumber = "INV-2026-001";
 
-    public static string Build(Invoice invoice, Client? client, string? defaultPattern = null)
+    public static string Build(
+        Invoice invoice,
+        Client? client,
+        string? defaultPattern = null,
+        DateOnly? periodDate = null)
     {
         var pattern = client?.InvoiceFilenamePattern ?? defaultPattern;
         if (string.IsNullOrWhiteSpace(pattern))
@@ -32,7 +36,7 @@ internal static partial class InvoicePdfFilenameBuilder
             return AppendPdfExtension(Sanitize(invoice.InvoiceNumber));
         }
 
-        var resolved = ResolveTokens(pattern, invoice, client);
+        var resolved = ResolveTokens(pattern, invoice, client, periodDate);
         var sanitized = Sanitize(resolved);
 
         if (string.IsNullOrWhiteSpace(sanitized))
@@ -47,7 +51,8 @@ internal static partial class InvoicePdfFilenameBuilder
         string? pattern,
         string? clientName,
         DateOnly? invoiceDate = null,
-        string? defaultPattern = null)
+        string? defaultPattern = null,
+        DateOnly? periodDate = null)
     {
         var previewInvoice = new Invoice
         {
@@ -62,7 +67,7 @@ internal static partial class InvoicePdfFilenameBuilder
             InvoiceFilenamePattern = pattern,
         };
 
-        return Build(previewInvoice, previewClient, defaultPattern);
+        return Build(previewInvoice, previewClient, defaultPattern, periodDate);
     }
 
     private static bool ContainsUnsupportedTokens(string pattern)
@@ -79,17 +84,22 @@ internal static partial class InvoicePdfFilenameBuilder
         return false;
     }
 
-    private static string ResolveTokens(string pattern, Invoice invoice, Client? client)
+    private static string ResolveTokens(
+        string pattern,
+        Invoice invoice,
+        Client? client,
+        DateOnly? periodDate)
     {
         var invoiceDate = invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue);
+        var effectivePeriodDate = (periodDate ?? invoice.InvoiceDate).ToDateTime(TimeOnly.MinValue);
         var replacements = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["{InvoiceNumber}"] = invoice.InvoiceNumber,
             ["{InvoiceId}"] = invoice.Id.ToString(),
             ["{ClientName}"] = client?.Name ?? string.Empty,
-            ["{Month}"] = invoiceDate.ToString("MM", CultureInfo.InvariantCulture),
-            ["{MonthName}"] = invoiceDate.ToString("MMMM", CultureInfo.InvariantCulture),
-            ["{Year}"] = invoiceDate.ToString("yyyy", CultureInfo.InvariantCulture),
+            ["{Month}"] = effectivePeriodDate.ToString("MM", CultureInfo.InvariantCulture),
+            ["{MonthName}"] = effectivePeriodDate.ToString("MMMM", CultureInfo.InvariantCulture),
+            ["{Year}"] = effectivePeriodDate.ToString("yyyy", CultureInfo.InvariantCulture),
             ["{InvoiceDate}"] = invoiceDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         };
 

@@ -10,6 +10,7 @@ public interface IInvoiceDeliveryService
         Client client,
         Guid? userId,
         string? message,
+        string emailSubject,
         string attachmentFileName,
         InvoiceEmailSenderIdentity senderIdentity,
         CancellationToken cancellationToken = default);

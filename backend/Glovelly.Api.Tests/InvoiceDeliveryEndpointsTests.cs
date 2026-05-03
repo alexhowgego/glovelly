@@ -36,6 +36,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = (string?)null,
+            invoiceEmailSubjectPattern = (string?)null,
             invoiceReplyToEmail = "alex@example.com",
         });
         updateSettingsResponse.EnsureSuccessStatusCode();
@@ -85,6 +86,98 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal("bookings@foxandfinch.co.uk", updatedInvoice.GetProperty("lastDeliveryRecipient").GetString());
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastDeliveredByUserId").GetGuid());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("lastDeliveredUtc").ValueKind);
+    }
+
+    [Fact]
+    public async Task SendEmail_WithUserSubjectPattern_UsesResolvedSubject()
+    {
+        var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            invoiceFilenamePattern = (string?)null,
+            invoiceEmailSubjectPattern = "{ClientName} invoice {InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+        });
+        updateSettingsResponse.EnsureSuccessStatusCode();
+
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-SUBJECT-001",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Subject pattern test.",
+            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsync(
+            $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var message = Assert.Single(_factory.Emails.SentEmails);
+        Assert.Equal("Fox & Finch Events invoice GLV-SUBJECT-001", message.Subject);
+    }
+
+    [Fact]
+    public async Task SendEmail_WithClientSubjectPattern_OverridesUserSubjectPattern()
+    {
+        var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            invoiceFilenamePattern = (string?)null,
+            invoiceEmailSubjectPattern = "User invoice {InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+        });
+        updateSettingsResponse.EnsureSuccessStatusCode();
+
+        var updateClientResponse = await _client.PutAsJsonAsync($"/clients/{TestData.FoxAndFinchId}", new
+        {
+            id = TestData.FoxAndFinchId,
+            name = "Fox & Finch Events",
+            email = "bookings@foxandfinch.co.uk",
+            billingAddress = new
+            {
+                line1 = "12 Chapel Street",
+                city = "Manchester",
+                stateOrCounty = "Greater Manchester",
+                postalCode = "M3 5JZ",
+                country = "United Kingdom",
+            },
+            mileageRate = 0.52m,
+            passengerMileageRate = 0.15m,
+            invoiceFilenamePattern = (string?)null,
+            invoiceEmailSubjectPattern = "Client invoice {InvoiceNumber} for {ClientName}",
+        });
+        updateClientResponse.EnsureSuccessStatusCode();
+
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-SUBJECT-002",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Client subject pattern test.",
+            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsync(
+            $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var message = Assert.Single(_factory.Emails.SentEmails);
+        Assert.Equal("Client invoice GLV-SUBJECT-002 for Fox & Finch Events", message.Subject);
     }
 
     [Fact]
