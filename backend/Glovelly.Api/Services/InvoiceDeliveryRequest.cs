@@ -7,5 +7,6 @@ public sealed record InvoiceDeliveryRequest(
     Client Client,
     Guid? UserId,
     string? Message,
+    string EmailSubject,
     string AttachmentFileName,
     InvoiceEmailSenderIdentity SenderIdentity);

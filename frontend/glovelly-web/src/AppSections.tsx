@@ -1916,6 +1916,7 @@ export function InvoicesSection({
 
 type UserSettingsModalProps = {
   form: UserSettingsForm
+  invoiceEmailSubjectPreview: string
   invoiceFilenamePreview: string
   invoiceFilenameTokens: string[]
   isGoogleDriveConnected: boolean
@@ -1931,6 +1932,7 @@ type UserSettingsModalProps = {
 
 export function UserSettingsModal({
   form,
+  invoiceEmailSubjectPreview,
   invoiceFilenamePreview,
   invoiceFilenameTokens,
   isGoogleDriveConnected,
@@ -1953,11 +1955,13 @@ export function UserSettingsModal({
           ? 'Leave blank to keep the standard 14 day payment window.'
           : focusedField === 'invoiceFilenamePattern'
             ? `Available filename tokens: ${invoiceFilenameTokens.join(', ')}.`
-            : focusedField === 'invoiceReplyToEmail'
-              ? 'Leave blank if replies should not be directed to a personal mailbox.'
-              : focusedField === 'invoiceUploadFolderId'
-                ? "Leave blank to use Google Drive's default upload destination."
-                : 'Choose a setting to see a short note here.'
+            : focusedField === 'invoiceEmailSubjectPattern'
+              ? `Available subject tokens: ${invoiceFilenameTokens.join(', ')}.`
+              : focusedField === 'invoiceReplyToEmail'
+                ? 'Leave blank if replies should not be directed to a personal mailbox.'
+                : focusedField === 'invoiceUploadFolderId'
+                  ? "Leave blank to use Google Drive's default upload destination."
+                  : 'Choose a setting to see a short note here.'
   const handleFocus = (field: keyof UserSettingsForm) => {
     setFocusedField(field)
   }
@@ -2080,6 +2084,19 @@ export function UserSettingsModal({
             </label>
 
             <label>
+              <span>Default invoice email subject</span>
+              <input
+                placeholder="Invoice {InvoiceNumber} from Glovelly"
+                type="text"
+                value={form.invoiceEmailSubjectPattern}
+                onFocus={() => handleFocus('invoiceEmailSubjectPattern')}
+                onChange={(event) =>
+                  onUpdateField('invoiceEmailSubjectPattern', event.target.value)
+                }
+              />
+            </label>
+
+            <label>
               <span>Google Drive invoice folder ID</span>
               <input
                 placeholder="Drive folder ID"
@@ -2096,6 +2113,14 @@ export function UserSettingsModal({
               <article className="setting-card override invoice-filename-preview">
                 <p className="detail-label">Preview</p>
                 <strong>{invoiceFilenamePreview}</strong>
+                <span>Using today's date and a sample invoice number.</span>
+              </article>
+            ) : null}
+
+            {focusedField === 'invoiceEmailSubjectPattern' ? (
+              <article className="setting-card override invoice-filename-preview">
+                <p className="detail-label">Preview</p>
+                <strong>{invoiceEmailSubjectPreview}</strong>
                 <span>Using today's date and a sample invoice number.</span>
               </article>
             ) : null}
@@ -2118,6 +2143,7 @@ export function UserSettingsModal({
 type ClientSettingsModalProps = {
   authUser: AuthUser | null
   form: ClientSettingsForm
+  invoiceEmailSubjectPreview: string
   invoiceFilenamePreview: string
   invoiceFilenameTokens: string[]
   isOpen: boolean
@@ -2132,6 +2158,7 @@ type ClientSettingsModalProps = {
 export function ClientSettingsModal({
   authUser,
   form,
+  invoiceEmailSubjectPreview,
   invoiceFilenamePreview,
   invoiceFilenameTokens,
   isOpen,
@@ -2142,8 +2169,39 @@ export function ClientSettingsModal({
   selectedClient,
   status,
 }: ClientSettingsModalProps) {
+  const [focusedField, setFocusedField] = useState<keyof ClientSettingsForm | null>(null)
+
   if (!isOpen || !selectedClient) {
     return null
+  }
+
+  const isOverriding = (value: string) => value.trim().length > 0
+  const fieldClassName = (value: string) =>
+    `override-field ${isOverriding(value) ? 'is-overriding' : 'is-inherited'}`
+  const mileageOverride = isOverriding(form.mileageRate)
+  const passengerOverride = isOverriding(form.passengerMileageRate)
+  const filenameOverride = isOverriding(form.invoiceFilenamePattern)
+  const subjectOverride = isOverriding(form.invoiceEmailSubjectPattern)
+  const formatFormRate = (value: string, fallback: number | null | undefined) => {
+    if (!isOverriding(value)) {
+      return formatRate(fallback ?? null)
+    }
+
+    const parsed = Number(value.trim())
+    return Number.isFinite(parsed) ? formatRate(parsed) : value.trim()
+  }
+  const settingsNote =
+    focusedField === 'mileageRate'
+      ? 'Leave blank to inherit your personal mileage default.'
+      : focusedField === 'passengerMileageRate'
+        ? 'Leave blank to inherit your personal passenger mileage default.'
+        : focusedField === 'invoiceFilenamePattern'
+          ? `Leave blank to inherit the default filename pattern. Filename tokens: ${invoiceFilenameTokens.join(', ')}.`
+          : focusedField === 'invoiceEmailSubjectPattern'
+            ? `Leave blank to inherit the default email subject. Subject tokens: ${invoiceFilenameTokens.join(', ')}.`
+            : 'Choose a setting to see override details here.'
+  const handleFocus = (field: keyof ClientSettingsForm) => {
+    setFocusedField(field)
   }
 
   return (
@@ -2170,67 +2228,9 @@ export function ClientSettingsModal({
           Add a value here only when this client needs special handling.
         </p>
 
-        <div className="detail-grid client-settings-preview">
-          <article
-            className={
-              selectedClient.mileageRate === null
-                ? 'setting-card inherited'
-                : 'setting-card override'
-            }
-          >
-            <p className="detail-label">Current mileage rule</p>
-            <strong>
-              {formatRate(selectedClient.mileageRate ?? authUser?.mileageRate ?? null)}
-            </strong>
-            <span>
-              {selectedClient.mileageRate === null
-                ? 'Inherited from your user settings'
-                : 'Overriding your default'}
-            </span>
-          </article>
-          <article
-            className={
-              selectedClient.passengerMileageRate === null
-                ? 'setting-card inherited'
-                : 'setting-card override'
-            }
-          >
-            <p className="detail-label">Current passenger rule</p>
-            <strong>
-              {formatRate(
-                selectedClient.passengerMileageRate ??
-                  authUser?.passengerMileageRate ??
-                  null
-              )}
-            </strong>
-            <span>
-              {selectedClient.passengerMileageRate === null
-                ? 'Inherited from your user settings'
-                : 'Overriding your default'}
-            </span>
-          </article>
-          <article
-            className={
-              selectedClient.invoiceFilenamePattern === null
-                ? 'setting-card inherited'
-                : 'setting-card override'
-            }
-          >
-            <p className="detail-label">Invoice PDF filename</p>
-            <strong>
-              {selectedClient.invoiceFilenamePattern ?? '{InvoiceNumber}'}
-            </strong>
-            <span>
-              {selectedClient.invoiceFilenamePattern === null
-                ? 'Using the default invoice number filename'
-                : 'Custom pattern for this client'}
-            </span>
-          </article>
-        </div>
-
         <form className="settings-form" onSubmit={onSubmit}>
           <div className="form-grid">
-            <label>
+            <label className={fieldClassName(form.mileageRate)}>
               <span>Mileage rate override</span>
               <input
                 inputMode="decimal"
@@ -2241,11 +2241,12 @@ export function ClientSettingsModal({
                 }
                 type="text"
                 value={form.mileageRate}
+                onFocus={() => handleFocus('mileageRate')}
                 onChange={(event) => onUpdateField('mileageRate', event.target.value)}
               />
             </label>
 
-            <label>
+            <label className={fieldClassName(form.passengerMileageRate)}>
               <span>Passenger rate override</span>
               <input
                 inputMode="decimal"
@@ -2257,36 +2258,113 @@ export function ClientSettingsModal({
                 }
                 type="text"
                 value={form.passengerMileageRate}
+                onFocus={() => handleFocus('passengerMileageRate')}
                 onChange={(event) =>
                   onUpdateField('passengerMileageRate', event.target.value)
                 }
               />
             </label>
 
-            <label>
+            <label className={fieldClassName(form.invoiceFilenamePattern)}>
               <span>Invoice filename pattern</span>
               <input
                 placeholder="{InvoiceNumber}"
                 type="text"
                 value={form.invoiceFilenamePattern}
+                onFocus={() => handleFocus('invoiceFilenamePattern')}
                 onChange={(event) =>
                   onUpdateField('invoiceFilenamePattern', event.target.value)
                 }
               />
             </label>
+
+            <label className={fieldClassName(form.invoiceEmailSubjectPattern)}>
+              <span>Invoice email subject</span>
+              <input
+                placeholder={
+                  authUser?.invoiceEmailSubjectPattern ??
+                  'Invoice {InvoiceNumber} from Glovelly'
+                }
+                type="text"
+                value={form.invoiceEmailSubjectPattern}
+                onFocus={() => handleFocus('invoiceEmailSubjectPattern')}
+                onChange={(event) =>
+                  onUpdateField('invoiceEmailSubjectPattern', event.target.value)
+                }
+              />
+            </label>
+
+            {focusedField === 'mileageRate' ? (
+              <article
+                className={`setting-card ${
+                  mileageOverride ? 'override' : 'inherited'
+                } invoice-filename-preview`}
+              >
+                <p className="detail-label">Mileage rule</p>
+                <strong>{formatFormRate(form.mileageRate, authUser?.mileageRate)}</strong>
+                <span>
+                  {mileageOverride
+                    ? 'Custom rate for this client'
+                    : 'Inherited from your user settings'}
+                </span>
+              </article>
+            ) : null}
+
+            {focusedField === 'passengerMileageRate' ? (
+              <article
+                className={`setting-card ${
+                  passengerOverride ? 'override' : 'inherited'
+                } invoice-filename-preview`}
+              >
+                <p className="detail-label">Passenger mileage rule</p>
+                <strong>
+                  {formatFormRate(
+                    form.passengerMileageRate,
+                    authUser?.passengerMileageRate
+                  )}
+                </strong>
+                <span>
+                  {passengerOverride
+                    ? 'Custom passenger rate for this client'
+                    : 'Inherited from your user settings'}
+                </span>
+              </article>
+            ) : null}
+
+            {focusedField === 'invoiceFilenamePattern' ? (
+              <article
+                className={`setting-card ${
+                  filenameOverride ? 'override' : 'inherited'
+                } invoice-filename-preview`}
+              >
+                <p className="detail-label">Filename preview</p>
+                <strong>{invoiceFilenamePreview}</strong>
+                <span>
+                  {filenameOverride
+                    ? 'Custom pattern for this client'
+                    : 'Inherited from your user settings'}
+                </span>
+              </article>
+            ) : null}
+
+            {focusedField === 'invoiceEmailSubjectPattern' ? (
+              <article
+                className={`setting-card ${
+                  subjectOverride ? 'override' : 'inherited'
+                } invoice-filename-preview`}
+              >
+                <p className="detail-label">Email subject preview</p>
+                <strong>{invoiceEmailSubjectPreview}</strong>
+                <span>
+                  {subjectOverride
+                    ? 'Custom subject for this client'
+                    : 'Inherited from your user settings'}
+                </span>
+              </article>
+            ) : null}
           </div>
 
-          <div className="settings-note">
-            Blank means inherited. Filename tokens: {invoiceFilenameTokens.join(', ')}.
-          </div>
-
-          <div className="detail-grid client-settings-preview">
-            <article className="setting-card override">
-              <p className="detail-label">Preview</p>
-              <strong>{invoiceFilenamePreview}</strong>
-              <span>Using today's date and the current effective pattern.</span>
-            </article>
-          </div>
+          <div className="settings-note">{settingsNote}</div>
 
           <div className="form-actions">
             <button className="primary-button" type="submit" disabled={isSaving}>

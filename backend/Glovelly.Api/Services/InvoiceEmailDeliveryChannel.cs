@@ -35,7 +35,7 @@ public sealed class InvoiceEmailDeliveryChannel(
         await emailSender.SendAsync(
             new EmailMessage(
                 To: [new EmailAddress(client.Email.Trim(), client.Name.Trim())],
-                Subject: $"Invoice {invoice.InvoiceNumber} from Glovelly",
+                Subject: request.EmailSubject,
                 PlainTextBody: BuildPlainTextBody(invoice, request.Message),
                 From: new EmailAddress(
                     configuredFrom.Address,

@@ -17,7 +17,7 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
-    public async Task UpdateClientSettings_WithInvoiceFilenamePattern_PersistsTrimmedPattern()
+    public async Task UpdateClientSettings_WithInvoicePatterns_PersistsTrimmedPatterns()
     {
         var response = await _client.PutAsJsonAsync($"/clients/{TestData.FoxAndFinchId}", new
         {
@@ -35,6 +35,7 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
             mileageRate = 0.52m,
             passengerMileageRate = 0.15m,
             invoiceFilenamePattern = "  {ClientName} Invoice {InvoiceNumber}  ",
+            invoiceEmailSubjectPattern = "  {ClientName}: invoice {InvoiceNumber}  ",
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -43,6 +44,9 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "{ClientName} Invoice {InvoiceNumber}",
             client.GetProperty("invoiceFilenamePattern").GetString());
+        Assert.Equal(
+            "{ClientName}: invoice {InvoiceNumber}",
+            client.GetProperty("invoiceEmailSubjectPattern").GetString());
     }
 
     [Fact]
@@ -72,5 +76,35 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "Invoice filename pattern cannot be empty or whitespace.",
             problem.GetProperty("errors").GetProperty("invoiceFilenamePattern")[0].GetString());
+    }
+
+    [Fact]
+    public async Task UpdateClientSettings_WithWhitespaceOnlyInvoiceEmailSubjectPattern_ReturnsValidationProblem()
+    {
+        var response = await _client.PutAsJsonAsync($"/clients/{TestData.FoxAndFinchId}", new
+        {
+            id = TestData.FoxAndFinchId,
+            name = "Fox & Finch Events",
+            email = "bookings@foxandfinch.co.uk",
+            billingAddress = new
+            {
+                line1 = "12 Chapel Street",
+                city = "Manchester",
+                stateOrCounty = "Greater Manchester",
+                postalCode = "M3 5JZ",
+                country = "United Kingdom",
+            },
+            mileageRate = 0.52m,
+            passengerMileageRate = 0.15m,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceEmailSubjectPattern = "   ",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Invoice email subject pattern cannot be empty or whitespace.",
+            problem.GetProperty("errors").GetProperty("invoiceEmailSubjectPattern")[0].GetString());
     }
 }

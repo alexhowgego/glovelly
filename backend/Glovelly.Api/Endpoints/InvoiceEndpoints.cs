@@ -402,7 +402,7 @@ public static class InvoiceEndpoints
                 });
             }
 
-            var userDefaultPattern = userId.HasValue
+            var userDefaultFilenamePattern = userId.HasValue
                 ? await db.Users
                     .AsNoTracking()
                     .Where(value => value.Id == userId.Value && value.IsActive)
@@ -413,7 +413,7 @@ public static class InvoiceEndpoints
             var attachmentFileName = InvoicePdfFilenameBuilder.Build(
                 invoice,
                 invoice.Client,
-                userDefaultPattern,
+                userDefaultFilenamePattern,
                 periodDate);
             var sendingUser = userId.HasValue
                 ? await db.Users
@@ -422,6 +422,11 @@ public static class InvoiceEndpoints
                         value => value.Id == userId.Value && value.IsActive,
                         cancellationToken)
                 : null;
+            var emailSubject = InvoiceEmailSubjectBuilder.Build(
+                invoice,
+                invoice.Client,
+                sendingUser?.InvoiceEmailSubjectPattern,
+                periodDate);
             var senderIdentity = InvoiceEmailSenderIdentityBuilder.Build(sendingUser);
 
             try
@@ -432,6 +437,7 @@ public static class InvoiceEndpoints
                     invoice.Client,
                     userId,
                     request?.Message,
+                    emailSubject,
                     attachmentFileName,
                     senderIdentity,
                     cancellationToken);
@@ -501,7 +507,7 @@ public static class InvoiceEndpoints
                 });
             }
 
-            var userDefaultPattern = userId.HasValue
+            var userDefaultFilenamePattern = userId.HasValue
                 ? await db.Users
                     .AsNoTracking()
                     .Where(value => value.Id == userId.Value && value.IsActive)
@@ -512,7 +518,12 @@ public static class InvoiceEndpoints
             var attachmentFileName = InvoicePdfFilenameBuilder.Build(
                 invoice,
                 invoice.Client,
-                userDefaultPattern,
+                userDefaultFilenamePattern,
+                periodDate);
+            var emailSubject = InvoiceEmailSubjectBuilder.Build(
+                invoice,
+                invoice.Client,
+                defaultPattern: null,
                 periodDate);
 
             InvoiceDeliveryResult deliveryResult;
@@ -523,7 +534,8 @@ public static class InvoiceEndpoints
                     invoice,
                     invoice.Client,
                     userId,
-                    message: null,
+                    null,
+                    emailSubject,
                     attachmentFileName,
                     InvoiceEmailSenderIdentityBuilder.Build(null),
                     cancellationToken);

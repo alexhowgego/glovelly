@@ -60,6 +60,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(user => user.DefaultPaymentWindowDays);
             entity.Property(user => user.InvoiceFilenamePattern)
                 .HasMaxLength(200);
+            entity.Property(user => user.InvoiceEmailSubjectPattern)
+                .HasMaxLength(200);
             entity.Property(user => user.InvoiceReplyToEmail)
                 .HasMaxLength(320);
             entity.Property(user => user.Role)
@@ -110,6 +112,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(client => client.PassengerMileageRate)
                 .HasPrecision(18, 2);
             entity.Property(client => client.InvoiceFilenamePattern)
+                .HasMaxLength(200);
+            entity.Property(client => client.InvoiceEmailSubjectPattern)
                 .HasMaxLength(200);
             entity.HasOne(client => client.CreatedByUser)
                 .WithMany(user => user.ClientsCreated)

@@ -16,6 +16,7 @@ export type Client = {
   passengerMileageRate: number | null
   defaultPaymentWindowDays: number | null
   invoiceFilenamePattern: string | null
+  invoiceEmailSubjectPattern: string | null
 }
 
 export type ClientForm = {
@@ -34,6 +35,7 @@ export type AuthUser = {
   passengerMileageRate: number | null
   defaultPaymentWindowDays: number | null
   invoiceFilenamePattern: string | null
+  invoiceEmailSubjectPattern: string | null
   invoiceReplyToEmail: string | null
   invoiceUploadFolderId: string | null
   isGoogleDriveConnected: boolean
@@ -64,6 +66,7 @@ export type UserSettingsForm = {
   passengerMileageRate: string
   defaultPaymentWindowDays: string
   invoiceFilenamePattern: string
+  invoiceEmailSubjectPattern: string
   invoiceReplyToEmail: string
   invoiceUploadFolderId: string
 }
@@ -72,6 +75,7 @@ export type ClientSettingsForm = {
   mileageRate: string
   passengerMileageRate: string
   invoiceFilenamePattern: string
+  invoiceEmailSubjectPattern: string
 }
 
 export type SellerProfile = {
@@ -233,6 +237,7 @@ export const emptyUserSettingsForm = (): UserSettingsForm => ({
   passengerMileageRate: '',
   defaultPaymentWindowDays: '',
   invoiceFilenamePattern: '',
+  invoiceEmailSubjectPattern: '',
   invoiceReplyToEmail: '',
   invoiceUploadFolderId: '',
 })
@@ -241,6 +246,7 @@ export const emptyClientSettingsForm = (): ClientSettingsForm => ({
   mileageRate: '',
   passengerMileageRate: '',
   invoiceFilenamePattern: '',
+  invoiceEmailSubjectPattern: '',
 })
 
 export const invoiceFilenameTokens = [
@@ -256,18 +262,14 @@ export const invoiceFilenameTokens = [
 const previewInvoiceNumber = 'INV-2026-001'
 const previewInvoiceId = '11111111-1111-1111-1111-111111111111'
 
-export function buildInvoiceFilenamePreview(
-  pattern: string | null | undefined,
+function buildInvoiceTokenReplacements(
   clientName: string | null | undefined,
-  invoiceDate = new Date()
+  invoiceDate: Date
 ) {
-  const trimmedPattern = pattern?.trim() ?? ''
-  const effectivePattern = trimmedPattern || '{InvoiceNumber}'
-
-  const replacements = new Map<string, string>([
+  return new Map<string, string>([
     ['{InvoiceNumber}', previewInvoiceNumber],
     ['{InvoiceId}', previewInvoiceId],
-    ['{ClientName}', (clientName?.trim() || 'Client Name')],
+    ['{ClientName}', clientName?.trim() || 'Client Name'],
     ['{Month}', String(invoiceDate.getMonth() + 1).padStart(2, '0')],
     [
       '{MonthName}',
@@ -276,19 +278,38 @@ export function buildInvoiceFilenamePreview(
     ['{Year}', String(invoiceDate.getFullYear())],
     ['{InvoiceDate}', invoiceDate.toISOString().slice(0, 10)],
   ])
+}
 
+function resolveInvoicePatternPreview(
+  pattern: string,
+  clientName: string | null | undefined,
+  invoiceDate = new Date()
+) {
+  const replacements = buildInvoiceTokenReplacements(clientName, invoiceDate)
   const containsUnsupportedToken = Array.from(
-    effectivePattern.matchAll(/\{[^{}]+\}/g)
+    pattern.matchAll(/\{[^{}]+\}/g)
   ).some(([token]) => !replacements.has(token))
 
-  if (containsUnsupportedToken) {
-    return `${previewInvoiceNumber}.pdf`
-  }
-
-  let resolved = effectivePattern
+  let resolved = containsUnsupportedToken ? '{InvoiceNumber}' : pattern
   for (const [token, replacement] of replacements) {
     resolved = resolved.replaceAll(token, replacement)
   }
+
+  return resolved
+}
+
+export function buildInvoiceFilenamePreview(
+  pattern: string | null | undefined,
+  clientName: string | null | undefined,
+  invoiceDate = new Date()
+) {
+  const trimmedPattern = pattern?.trim() ?? ''
+  const effectivePattern = trimmedPattern || '{InvoiceNumber}'
+  const resolved = resolveInvoicePatternPreview(
+    effectivePattern,
+    clientName,
+    invoiceDate
+  )
 
   const sanitized = resolved
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
@@ -297,6 +318,25 @@ export function buildInvoiceFilenamePreview(
     .replace(/^[. ]+|[. ]+$/g, '')
 
   return `${sanitized || previewInvoiceNumber}.pdf`
+}
+
+export function buildInvoiceEmailSubjectPreview(
+  pattern: string | null | undefined,
+  clientName: string | null | undefined,
+  invoiceDate = new Date()
+) {
+  const trimmedPattern = pattern?.trim() ?? ''
+  const effectivePattern =
+    trimmedPattern || 'Invoice {InvoiceNumber} from Glovelly'
+  const resolved = resolveInvoicePatternPreview(
+    effectivePattern,
+    clientName,
+    invoiceDate
+  )
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return resolved || 'Invoice INV-2026-001 from Glovelly'
 }
 
 export const emptySellerProfileForm = (): SellerProfileForm => ({

@@ -13,6 +13,7 @@ public sealed class User
     public decimal? PassengerMileageRate { get; set; }
     public int? DefaultPaymentWindowDays { get; set; }
     public string? InvoiceFilenamePattern { get; set; }
+    public string? InvoiceEmailSubjectPattern { get; set; }
     public string? InvoiceReplyToEmail { get; set; }
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public UserRole Role { get; set; } = UserRole.User;

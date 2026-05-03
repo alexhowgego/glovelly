@@ -11,6 +11,7 @@ public sealed class Client
     public decimal? MileageRate { get; set; }
     public decimal? PassengerMileageRate { get; set; }
     public string? InvoiceFilenamePattern { get; set; }
+    public string? InvoiceEmailSubjectPattern { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public Guid? UpdatedByUserId { get; set; }
 

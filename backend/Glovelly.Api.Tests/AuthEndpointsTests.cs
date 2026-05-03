@@ -42,6 +42,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             passengerMileageRate = 0.10m,
             defaultPaymentWindowDays = 30,
             invoiceFilenamePattern = "{MonthName} {Year} {InvoiceNumber}",
+            invoiceEmailSubjectPattern = "{ClientName} invoice {InvoiceNumber}",
             invoiceReplyToEmail = "billing@example.com",
         });
         updateResponse.EnsureSuccessStatusCode();
@@ -54,6 +55,9 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "{MonthName} {Year} {InvoiceNumber}",
             payload.GetProperty("invoiceFilenamePattern").GetString());
+        Assert.Equal(
+            "{ClientName} invoice {InvoiceNumber}",
+            payload.GetProperty("invoiceEmailSubjectPattern").GetString());
         Assert.Equal(
             "billing@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
@@ -163,6 +167,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             passengerMileageRate = 0.10m,
             defaultPaymentWindowDays = 21,
             invoiceFilenamePattern = "  {ClientName} {InvoiceNumber}  ",
+            invoiceEmailSubjectPattern = "  Invoice {InvoiceNumber} for {ClientName}  ",
             invoiceReplyToEmail = "  accounts@example.com  ",
         });
 
@@ -172,6 +177,9 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "{ClientName} {InvoiceNumber}",
             payload.GetProperty("invoiceFilenamePattern").GetString());
+        Assert.Equal(
+            "Invoice {InvoiceNumber} for {ClientName}",
+            payload.GetProperty("invoiceEmailSubjectPattern").GetString());
         Assert.Equal(
             "accounts@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
@@ -183,8 +191,29 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         Assert.NotNull(savedUser);
         Assert.Equal("{ClientName} {InvoiceNumber}", savedUser.InvoiceFilenamePattern);
+        Assert.Equal("Invoice {InvoiceNumber} for {ClientName}", savedUser.InvoiceEmailSubjectPattern);
         Assert.Equal("accounts@example.com", savedUser.InvoiceReplyToEmail);
         Assert.Equal(21, savedUser.DefaultPaymentWindowDays);
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WithWhitespaceOnlyInvoiceEmailSubjectPattern_ReturnsValidationProblem()
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceEmailSubjectPattern = "   ",
+            invoiceReplyToEmail = (string?)null,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Invoice email subject pattern cannot be empty or whitespace.",
+            problem.GetProperty("errors").GetProperty("invoiceEmailSubjectPattern")[0].GetString());
     }
 
     [Fact]
