@@ -176,6 +176,15 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             "accounts@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
         Assert.Equal(21, payload.GetProperty("defaultPaymentWindowDays").GetInt32());
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var savedUser = await dbContext.Users.FindAsync(TestAuthContext.UserId);
+
+        Assert.NotNull(savedUser);
+        Assert.Equal("{ClientName} {InvoiceNumber}", savedUser.InvoiceFilenamePattern);
+        Assert.Equal("accounts@example.com", savedUser.InvoiceReplyToEmail);
+        Assert.Equal(21, savedUser.DefaultPaymentWindowDays);
     }
 
     [Fact]

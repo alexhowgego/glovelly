@@ -1961,9 +1961,6 @@ export function UserSettingsModal({
   const handleFocus = (field: keyof UserSettingsForm) => {
     setFocusedField(field)
   }
-  const handleBlur = () => {
-    setFocusedField(null)
-  }
 
   if (!isOpen) {
     return null
@@ -2023,7 +2020,6 @@ export function UserSettingsModal({
                 type="text"
                 value={form.mileageRate}
                 onFocus={() => handleFocus('mileageRate')}
-                onBlur={handleBlur}
                 onChange={(event) => onUpdateField('mileageRate', event.target.value)}
               />
             </label>
@@ -2036,7 +2032,6 @@ export function UserSettingsModal({
                 type="text"
                 value={form.passengerMileageRate}
                 onFocus={() => handleFocus('passengerMileageRate')}
-                onBlur={handleBlur}
                 onChange={(event) =>
                   onUpdateField('passengerMileageRate', event.target.value)
                 }
@@ -2052,7 +2047,6 @@ export function UserSettingsModal({
                 type="number"
                 value={form.defaultPaymentWindowDays}
                 onFocus={() => handleFocus('defaultPaymentWindowDays')}
-                onBlur={handleBlur}
                 onChange={(event) =>
                   onUpdateField('defaultPaymentWindowDays', event.target.value)
                 }
@@ -2066,7 +2060,6 @@ export function UserSettingsModal({
                 type="email"
                 value={form.invoiceReplyToEmail}
                 onFocus={() => handleFocus('invoiceReplyToEmail')}
-                onBlur={handleBlur}
                 onChange={(event) =>
                   onUpdateField('invoiceReplyToEmail', event.target.value)
                 }
@@ -2080,7 +2073,6 @@ export function UserSettingsModal({
                 type="text"
                 value={form.invoiceFilenamePattern}
                 onFocus={() => handleFocus('invoiceFilenamePattern')}
-                onBlur={handleBlur}
                 onChange={(event) =>
                   onUpdateField('invoiceFilenamePattern', event.target.value)
                 }
@@ -2094,7 +2086,6 @@ export function UserSettingsModal({
                 type="text"
                 value={form.invoiceUploadFolderId}
                 onFocus={() => handleFocus('invoiceUploadFolderId')}
-                onBlur={handleBlur}
                 onChange={(event) =>
                   onUpdateField('invoiceUploadFolderId', event.target.value)
                 }
