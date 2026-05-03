@@ -410,6 +410,85 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
     }
 
     [Fact]
+    public async Task DownloadMonthlyInvoicePdf_WithMonthTokens_UsesInvoicedMonth()
+    {
+        var updateClientResponse = await _client.PutAsJsonAsync($"/clients/{TestData.FoxAndFinchId}", new
+        {
+            id = TestData.FoxAndFinchId,
+            name = "Fox & Finch Events",
+            email = "bookings@foxandfinch.co.uk",
+            billingAddress = new
+            {
+                line1 = "12 Chapel Street",
+                city = "Manchester",
+                stateOrCounty = "Greater Manchester",
+                postalCode = "M3 5JZ",
+                country = "United Kingdom",
+            },
+            mileageRate = 0.52m,
+            passengerMileageRate = 0.15m,
+            invoiceFilenamePattern = "{ClientName} {MonthName} {Year} {InvoiceNumber}",
+        });
+        updateClientResponse.EnsureSuccessStatusCode();
+
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-MONTHLY-PERIOD",
+            clientId = TestData.FoxAndFinchId,
+            status = "Draft",
+            description = "Monthly invoice for 2026-02.",
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
+
+        var createGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "February monthly booking",
+            date = "2026-02-14",
+            venue = "Winter Hall",
+            fee = 250.00m,
+            travelMiles = 0m,
+            notes = "February monthly period",
+            wasDriving = false,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createGigResponse.EnsureSuccessStatusCode();
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var linkGigResponse = await _client.PutAsJsonAsync($"/gigs/{createdGig.GetProperty("id").GetGuid()}", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = createdGig.GetProperty("title").GetString(),
+            date = createdGig.GetProperty("date").GetString(),
+            venue = createdGig.GetProperty("venue").GetString(),
+            fee = createdGig.GetProperty("fee").GetDecimal(),
+            travelMiles = createdGig.GetProperty("travelMiles").GetDecimal(),
+            passengerCount = 0,
+            notes = createdGig.GetProperty("notes").GetString(),
+            wasDriving = createdGig.GetProperty("wasDriving").GetBoolean(),
+            status = createdGig.GetProperty("status").GetString(),
+            invoiceId,
+            expenses = Array.Empty<object>(),
+            invoicedAt = (string?)null,
+        });
+        linkGigResponse.EnsureSuccessStatusCode();
+
+        var redraftResponse = await _client.PostAsync($"/invoices/{invoiceId}/redraft", null);
+        redraftResponse.EnsureSuccessStatusCode();
+
+        var pdfResponse = await _client.GetAsync($"/invoices/{invoiceId}/pdf");
+
+        Assert.Equal(HttpStatusCode.OK, pdfResponse.StatusCode);
+        Assert.Equal(
+            "Fox & Finch Events February 2026 GLV-MONTHLY-PERIOD.pdf",
+            pdfResponse.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+    }
+
+    [Fact]
     public async Task DownloadInvoicePdf_WithClientFilenamePattern_UsesResolvedSanitizedFilename()
     {
         var sellerProfileResponse = await _client.PutAsJsonAsync("/seller-profile", new
@@ -469,9 +548,8 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         var response = await _client.GetAsync($"/invoices/{generatedInvoice.GetProperty("id").GetGuid()}/pdf");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var invoiceDate = DateOnly.Parse(generatedInvoice.GetProperty("invoiceDate").GetString()!, CultureInfo.InvariantCulture);
         Assert.Equal(
-            $"Fox & Finch Events- {invoiceDate.ToString("MMMM yyyy", CultureInfo.InvariantCulture)} {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
+            $"Fox & Finch Events- April 2026 {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
             response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
     }
 
@@ -523,9 +601,8 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         var response = await _client.GetAsync($"/invoices/{generatedInvoice.GetProperty("id").GetGuid()}/pdf");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var invoiceDate = DateOnly.Parse(generatedInvoice.GetProperty("invoiceDate").GetString()!, CultureInfo.InvariantCulture);
         Assert.Equal(
-            $"{invoiceDate.ToString("MMMM yyyy", CultureInfo.InvariantCulture)} {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
+            $"April 2026 {generatedInvoice.GetProperty("invoiceNumber").GetString()}.pdf",
             response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
     }
 }

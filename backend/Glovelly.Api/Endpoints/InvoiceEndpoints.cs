@@ -53,11 +53,16 @@ public static class InvoiceEndpoints
                     .Select(value => value.InvoiceFilenamePattern)
                     .FirstOrDefaultAsync()
                 : null;
+            var periodDate = await ResolveInvoicePeriodDateAsync(db, invoice.Id);
 
             return Results.File(
                 invoice.PdfBlob,
                 "application/pdf",
-                InvoicePdfFilenameBuilder.Build(invoice, invoice.Client, userDefaultPattern));
+                InvoicePdfFilenameBuilder.Build(
+                    invoice,
+                    invoice.Client,
+                    userDefaultPattern,
+                    periodDate));
         });
 
         group.MapGet("/{id:guid}", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
@@ -404,10 +409,12 @@ public static class InvoiceEndpoints
                     .Select(value => value.InvoiceFilenamePattern)
                     .FirstOrDefaultAsync(cancellationToken)
                 : null;
+            var periodDate = await ResolveInvoicePeriodDateAsync(db, invoice.Id, cancellationToken);
             var attachmentFileName = InvoicePdfFilenameBuilder.Build(
                 invoice,
                 invoice.Client,
-                userDefaultPattern);
+                userDefaultPattern,
+                periodDate);
             var sendingUser = userId.HasValue
                 ? await db.Users
                     .AsNoTracking()
@@ -501,10 +508,12 @@ public static class InvoiceEndpoints
                     .Select(value => value.InvoiceFilenamePattern)
                     .FirstOrDefaultAsync(cancellationToken)
                 : null;
+            var periodDate = await ResolveInvoicePeriodDateAsync(db, invoice.Id, cancellationToken);
             var attachmentFileName = InvoicePdfFilenameBuilder.Build(
                 invoice,
                 invoice.Client,
-                userDefaultPattern);
+                userDefaultPattern,
+                periodDate);
 
             InvoiceDeliveryResult deliveryResult;
             try
@@ -644,6 +653,27 @@ public static class InvoiceEndpoints
         });
 
         return group;
+    }
+
+    private static async Task<DateOnly?> ResolveInvoicePeriodDateAsync(
+        AppDbContext db,
+        Guid invoiceId,
+        CancellationToken cancellationToken = default)
+    {
+        var firstGigDate = await db.InvoiceLines
+            .AsNoTracking()
+            .Where(line => line.InvoiceId == invoiceId && line.GigId.HasValue)
+            .Join(
+                db.Gigs.AsNoTracking(),
+                line => line.GigId!.Value,
+                gig => gig.Id,
+                (_, gig) => gig.Date)
+            .OrderBy(date => date)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return firstGigDate == default
+            ? null
+            : new DateOnly(firstGigDate.Year, firstGigDate.Month, 1);
     }
 
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
