@@ -981,6 +981,7 @@ function App({ appMetadata }: AppProps) {
           sortOrder: current.expenses.length + 1,
           description,
           amount: gigExpenseAmount,
+          attachments: [],
         },
       ],
     }))
@@ -1017,6 +1018,134 @@ function App({ appMetadata }: AppProps) {
           sortOrder: expenseIndex + 1,
         })),
     }))
+  }
+
+  const mergeSavedGig = (savedGig: Gig) => {
+    setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
+    setGigForm((current) => ({
+      ...current,
+      expenses: savedGig.expenses
+        .slice()
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map(toGigExpenseForm),
+    }))
+  }
+
+  const refreshGig = async (gigId: string) => {
+    const response = await fetchWithSession(buildApiUrl(`/gigs/${gigId}`))
+
+    if (response.status === 401) {
+      setIsAuthenticated(false)
+      setAuthUser(null)
+      setIsApiConnected(false)
+      setStatus('Your session expired. Sign in again to keep managing gigs.')
+      return null
+    }
+
+    if (!response.ok) {
+      throw new Error('Unable to refresh gig receipts.')
+    }
+
+    const savedGig = (await response.json()) as Gig
+    mergeSavedGig(savedGig)
+    return savedGig
+  }
+
+  const uploadExpenseAttachment = async (index: number, file: File) => {
+    const expense = gigForm.expenses[index]
+    if (!selectedGig || !expense?.id) {
+      setGigStatus('Save the gig before adding receipts.')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+    setIsGigLoading(true)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments`),
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setStatus('Your session expired. Sign in again to keep managing gigs.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to upload receipt.')
+      }
+
+      await refreshGig(selectedGig.id)
+      setGigStatus('Receipt uploaded.')
+    } catch (error) {
+      setGigStatus(error instanceof Error ? error.message : 'Unable to upload receipt.')
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const downloadExpenseAttachment = (expense: GigExpenseForm, attachmentId: string) => {
+    if (!selectedGig || !expense.id) {
+      return
+    }
+
+    window.open(
+      buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments/${attachmentId}`),
+      '_blank',
+      'noopener,noreferrer'
+    )
+  }
+
+  const deleteExpenseAttachment = async (
+    expense: GigExpenseForm,
+    attachmentId: string
+  ) => {
+    if (!selectedGig || !expense.id) {
+      return
+    }
+
+    setIsGigLoading(true)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments/${attachmentId}`),
+        {
+          method: 'DELETE',
+        }
+      )
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setStatus('Your session expired. Sign in again to keep managing gigs.')
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error('Unable to delete receipt.')
+      }
+
+      await refreshGig(selectedGig.id)
+      setGigStatus('Receipt deleted.')
+    } catch (error) {
+      setGigStatus(error instanceof Error ? error.message : 'Unable to delete receipt.')
+    } finally {
+      setIsGigLoading(false)
+    }
   }
 
   const signIn = () => {
@@ -2585,8 +2714,11 @@ function App({ appMetadata }: AppProps) {
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateInvoice={handleGenerateInvoice}
+        onDownloadExpenseAttachment={downloadExpenseAttachment}
         onOpenLinkedInvoice={openSelectedGigInvoice}
         onOpenSellerProfile={openSellerProfile}
+        onUploadExpenseAttachment={uploadExpenseAttachment}
+        onDeleteExpenseAttachment={deleteExpenseAttachment}
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
         onSearchQueryChange={setGigSearchQuery}

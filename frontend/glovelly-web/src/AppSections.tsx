@@ -701,8 +701,11 @@ type GigsSectionProps = {
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
   onGenerateInvoice: () => void
+  onDownloadExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onOpenLinkedInvoice: () => void
   onOpenSellerProfile: () => void
+  onUploadExpenseAttachment: (index: number, file: File) => void
+  onDeleteExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
@@ -747,8 +750,11 @@ export function GigsSection({
   onExpenseAmountChange,
   onExpenseDescriptionChange,
   onGenerateInvoice,
+  onDownloadExpenseAttachment,
   onOpenLinkedInvoice,
   onOpenSellerProfile,
+  onUploadExpenseAttachment,
+  onDeleteExpenseAttachment,
   onRemoveGigExpense,
   onResetForm,
   onSearchQueryChange,
@@ -1141,6 +1147,58 @@ export function GigsSection({
                     >
                       Remove
                     </button>
+                    <div className="expense-attachments">
+                      <div className="expense-attachment-header">
+                        <span>
+                          {expense.attachments.length === 1
+                            ? '1 receipt'
+                            : `${expense.attachments.length} receipts`}
+                        </span>
+                        <label className="ghost-button file-button">
+                          Add receipt
+                          <input
+                            type="file"
+                            accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+                            disabled={isGigLoading || !expense.id}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0]
+                              event.target.value = ''
+                              if (file) {
+                                onUploadExpenseAttachment(index, file)
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {expense.id ? (
+                        expense.attachments.length > 0 ? (
+                          <div className="expense-attachment-list">
+                            {expense.attachments.map((attachment) => (
+                              <div className="expense-attachment-item" key={attachment.id}>
+                                <button
+                                  className="link-button"
+                                  type="button"
+                                  onClick={() => onDownloadExpenseAttachment(expense, attachment.id)}
+                                  disabled={isGigLoading}
+                                >
+                                  {attachment.fileName}
+                                </button>
+                                <button
+                                  className="ghost-button"
+                                  type="button"
+                                  onClick={() => onDeleteExpenseAttachment(expense, attachment.id)}
+                                  disabled={isGigLoading}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null
+                      ) : (
+                        <p className="attachment-helper">Save the gig before adding receipts.</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

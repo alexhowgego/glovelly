@@ -12,6 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Gig> Gigs => Set<Gig>();
     public DbSet<GigExpense> GigExpenses => Set<GigExpense>();
+    public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<SellerProfile> SellerProfiles => Set<SellerProfile>();
@@ -182,6 +183,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasMaxLength(500);
             entity.Property(expense => expense.Amount)
                 .HasPrecision(18, 2);
+            entity.HasMany(expense => expense.Attachments)
+                .WithOne(attachment => attachment.Expense)
+                .HasForeignKey(attachment => attachment.GigExpenseId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ExpenseAttachment>(entity =>
+        {
+            entity.HasKey(attachment => attachment.Id);
+            entity.Property(attachment => attachment.FileName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(attachment => attachment.ContentType)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(attachment => attachment.StorageKey)
+                .IsRequired()
+                .HasMaxLength(600);
+            entity.Property(attachment => attachment.CreatedAt)
+                .IsRequired();
+            entity.HasIndex(attachment => attachment.GigExpenseId);
+            entity.HasIndex(attachment => attachment.StorageKey)
+                .IsUnique();
         });
 
         modelBuilder.Entity<Invoice>(entity =>

@@ -132,6 +132,7 @@ jobs:
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly
             Email__Invoices__FromDisplayName=Glovelly
+            ExpenseAttachments__BucketName=glovelly-storage-production
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest
@@ -161,6 +162,7 @@ jobs:
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly
             Email__Invoices__FromDisplayName=Glovelly
+            ExpenseAttachments__BucketName=glovelly-storage-staging
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest

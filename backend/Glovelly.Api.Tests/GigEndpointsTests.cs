@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using Glovelly.Api.Tests.Infrastructure;
 using Xunit;
@@ -255,6 +256,119 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Performance fee for Expense refresh test (2026-06-08)");
         Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Tolls");
         Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Parking");
+    }
+
+    [Fact]
+    public async Task ExpenseAttachmentFlow_UploadsListsDownloadsAndDeletesReceipt()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Receipt test",
+            date = "2026-06-09",
+            venue = "Station",
+            fee = 120.00m,
+            travelMiles = 0.00m,
+            notes = "Receipt test",
+            wasDriving = true,
+            status = 1,
+            expenses = new[]
+            {
+                new
+                {
+                    description = "Taxi",
+                    amount = 38.42m,
+                },
+            },
+            invoicedAt = (string?)null,
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+        var expenseId = createdGig.GetProperty("expenses")[0].GetProperty("id").GetGuid();
+
+        using var form = new MultipartFormDataContent();
+        using var file = new ByteArrayContent("receipt evidence"u8.ToArray());
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        form.Add(file, "file", "uber-receipt.pdf");
+
+        var uploadResponse = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form);
+
+        Assert.Equal(HttpStatusCode.Created, uploadResponse.StatusCode);
+
+        var attachment = await uploadResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var attachmentId = attachment.GetProperty("id").GetGuid();
+        Assert.Equal("uber-receipt.pdf", attachment.GetProperty("fileName").GetString());
+        Assert.Equal("application/pdf", attachment.GetProperty("contentType").GetString());
+        Assert.Equal("receipt evidence"u8.Length, attachment.GetProperty("sizeBytes").GetInt64());
+        Assert.False(attachment.TryGetProperty("storageKey", out _));
+
+        var gigResponse = await _client.GetAsync($"/gigs/{gigId}");
+        gigResponse.EnsureSuccessStatusCode();
+
+        var gig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var attachments = gig.GetProperty("expenses")[0].GetProperty("attachments").EnumerateArray().ToArray();
+        Assert.Single(attachments);
+        Assert.Equal(attachmentId, attachments[0].GetProperty("id").GetGuid());
+
+        var downloadResponse = await _client.GetAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}");
+
+        Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
+        Assert.Equal("application/pdf", downloadResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("receipt evidence", await downloadResponse.Content.ReadAsStringAsync());
+
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var missingDownloadResponse = await _client.GetAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}");
+        Assert.Equal(HttpStatusCode.NotFound, missingDownloadResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadExpenseAttachment_WithUnsupportedType_ReturnsValidationProblem()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Receipt validation test",
+            date = "2026-06-10",
+            venue = "Station",
+            fee = 120.00m,
+            travelMiles = 0.00m,
+            notes = "Receipt test",
+            wasDriving = true,
+            status = 1,
+            expenses = new[]
+            {
+                new
+                {
+                    description = "Taxi",
+                    amount = 38.42m,
+                },
+            },
+            invoicedAt = (string?)null,
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+        var expenseId = createdGig.GetProperty("expenses")[0].GetProperty("id").GetGuid();
+
+        using var form = new MultipartFormDataContent();
+        using var file = new ByteArrayContent("bad"u8.ToArray());
+        file.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
+        form.Add(file, "file", "receipt.txt");
+
+        var response = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Receipt files must be PDF, JPG, PNG, WebP or HEIC.", problem.GetProperty("errors").GetProperty("file")[0].GetString());
     }
 
     [Fact]
