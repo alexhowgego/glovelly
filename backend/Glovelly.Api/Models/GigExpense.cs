@@ -9,6 +9,7 @@ public sealed class GigExpense
     public int SortOrder { get; set; }
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
+    public ICollection<ExpenseAttachment> Attachments { get; set; } = new List<ExpenseAttachment>();
 
     [JsonIgnore]
     public Gig? Gig { get; set; }

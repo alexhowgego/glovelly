@@ -116,11 +116,21 @@ export type SellerProfileForm = {
 
 export type GigStatus = 'Draft' | 'Confirmed' | 'Completed' | 'Cancelled'
 
+export type ExpenseAttachment = {
+  id: string
+  gigExpenseId: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+  createdAt: string
+}
+
 export type GigExpense = {
   id: string
   sortOrder: number
   description: string
   amount: number
+  attachments: ExpenseAttachment[]
 }
 
 export type GigExpenseForm = {
@@ -128,6 +138,7 @@ export type GigExpenseForm = {
   sortOrder: number
   description: string
   amount: string
+  attachments: ExpenseAttachment[]
 }
 
 export type Gig = {
@@ -507,6 +518,7 @@ export function toGigExpenseForm(expense: GigExpense): GigExpenseForm {
     sortOrder: expense.sortOrder,
     description: expense.description,
     amount: formatEditableAmount(expense.amount),
+    attachments: expense.attachments ?? [],
   }
 }
 

@@ -806,6 +806,64 @@
   justify-self: start;
 }
 
+.expense-attachments {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.expense-attachment-header,
+.expense-attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.expense-attachment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.expense-attachment-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.expense-attachment-item button {
+  grid-column: auto;
+}
+
+.file-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.attachment-helper {
+  margin: 0;
+  color: var(--muted);
+}
+
+.link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--link);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .invoice-adjustment-form {
   display: grid;
   gap: 10px;

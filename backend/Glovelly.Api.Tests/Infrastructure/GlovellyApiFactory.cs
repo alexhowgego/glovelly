@@ -29,9 +29,11 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IPolicyEvaluator>();
             services.RemoveAll<IEmailSender>();
+            services.RemoveAll<IExpenseAttachmentStore>();
 
             services.AddSingleton<IPolicyEvaluator, TestPolicyEvaluator>();
             services.AddSingleton<IEmailSender>(_fakeEmailSender);
+            services.AddSingleton<IExpenseAttachmentStore, InMemoryExpenseAttachmentStore>();
             services.PostConfigure<EmailSettings>(settings =>
             {
                 settings.AccessRequests.FromAddress = "access@glovelly.test";

@@ -1,4 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
+using Google.Cloud.Storage.V1;
+using Glovelly.Api.Configuration;
 using Microsoft.Extensions.Options;
 using Resend;
 
@@ -15,6 +16,25 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceEmailDeliveryChannel>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceGoogleDriveDeliveryChannel>();
+        services.AddOptions<ExpenseAttachmentSettings>()
+            .BindConfiguration(ExpenseAttachmentSettings.SectionName);
+        services.AddSingleton<IExpenseAttachmentStore>(provider =>
+        {
+            var settings = provider.GetRequiredService<IOptions<ExpenseAttachmentSettings>>().Value;
+            if (string.IsNullOrWhiteSpace(settings.BucketName))
+            {
+                var startupSettings = provider.GetRequiredService<StartupSettings>();
+                if (!startupSettings.IsDevelopment)
+                {
+                    throw new InvalidOperationException(
+                        "Expense attachment storage requires ExpenseAttachments:BucketName outside local development.");
+                }
+
+                return new InMemoryExpenseAttachmentStore();
+            }
+
+            return ActivatorUtilities.CreateInstance<GcsExpenseAttachmentStore>(provider, StorageClient.Create());
+        });
         services.AddOptions<ResendClientOptions>()
             .Configure<IOptions<EmailSettings>>((resendOptions, emailOptions) =>
             {
