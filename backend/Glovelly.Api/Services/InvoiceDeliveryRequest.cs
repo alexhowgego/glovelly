@@ -9,4 +9,12 @@ public sealed record InvoiceDeliveryRequest(
     string? Message,
     string EmailSubject,
     string AttachmentFileName,
-    InvoiceEmailSenderIdentity SenderIdentity);
+    InvoiceEmailSenderIdentity SenderIdentity,
+    IReadOnlyList<InvoiceExpenseReceiptAttachment> ExpenseReceiptAttachments);
+
+public sealed record InvoiceExpenseReceiptAttachment(
+    string ExpenseDescription,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    string StorageKey);

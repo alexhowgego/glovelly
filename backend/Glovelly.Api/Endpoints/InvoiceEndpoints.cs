@@ -428,6 +428,9 @@ public static class InvoiceEndpoints
                 sendingUser?.InvoiceEmailSubjectPattern,
                 periodDate);
             var senderIdentity = InvoiceEmailSenderIdentityBuilder.Build(sendingUser);
+            IReadOnlyList<InvoiceExpenseReceiptAttachment> receiptAttachments = request?.IncludeReceipts is true
+                ? await BuildInvoiceReceiptAttachmentsAsync(db, invoice, cancellationToken)
+                : [];
 
             try
             {
@@ -440,7 +443,18 @@ public static class InvoiceEndpoints
                     emailSubject,
                     attachmentFileName,
                     senderIdentity,
-                    cancellationToken);
+                    cancellationToken,
+                    receiptAttachments);
+            }
+            catch (InvoiceEmailAttachmentLimitExceededException exception)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["attachments"] =
+                    [
+                        $"Invoice email attachments total {FormatBytes(exception.TotalAttachmentBytes)}, exceeding the configured {FormatBytes(exception.MaxTotalAttachmentBytes)} limit."
+                    ]
+                });
             }
             catch (Exception exception)
             {
@@ -688,9 +702,66 @@ public static class InvoiceEndpoints
             : new DateOnly(firstGigDate.Year, firstGigDate.Month, 1);
     }
 
+    private static async Task<IReadOnlyList<InvoiceExpenseReceiptAttachment>> BuildInvoiceReceiptAttachmentsAsync(
+        AppDbContext db,
+        Invoice invoice,
+        CancellationToken cancellationToken)
+    {
+        var expenseLineKeys = invoice.Lines
+            .Where(line => line.Type is InvoiceLineType.MiscExpense && line.GigId.HasValue)
+            .Select(line => new
+            {
+                GigId = line.GigId!.Value,
+                Description = line.Description.Trim(),
+                Amount = line.UnitPrice,
+            })
+            .ToList();
+
+        if (expenseLineKeys.Count == 0)
+        {
+            return [];
+        }
+
+        var gigIds = expenseLineKeys
+            .Select(line => line.GigId)
+            .Distinct()
+            .ToList();
+        var expenses = await db.GigExpenses
+            .AsNoTracking()
+            .Include(expense => expense.Attachments)
+            .Where(expense => gigIds.Contains(expense.GigId))
+            .OrderBy(expense => expense.SortOrder)
+            .ThenBy(expense => expense.Description)
+            .ToListAsync(cancellationToken);
+
+        return expenses
+            .Where(expense => expense.Attachments.Count > 0)
+            .Where(expense => expenseLineKeys.Any(line =>
+                line.GigId == expense.GigId &&
+                string.Equals(line.Description, expense.Description.Trim(), StringComparison.Ordinal) &&
+                line.Amount == expense.Amount))
+            .SelectMany(expense => expense.Attachments
+                .OrderBy(attachment => attachment.CreatedAt)
+                .Select(attachment => new InvoiceExpenseReceiptAttachment(
+                    expense.Description,
+                    attachment.FileName,
+                    attachment.ContentType,
+                    attachment.SizeBytes,
+                    attachment.StorageKey)))
+            .ToList();
+    }
+
+    private static string FormatBytes(long byteCount)
+    {
+        const decimal oneMegabyte = 1024m * 1024m;
+        return byteCount < oneMegabyte
+            ? $"{byteCount} bytes"
+            : $"{byteCount / oneMegabyte:0.##} MB";
+    }
+
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
     private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);
-    private sealed record InvoiceEmailDeliveryRequest(string? Message);
+    private sealed record InvoiceEmailDeliveryRequest(string? Message, bool IncludeReceipts = false);
     private sealed record InvoiceGoogleDrivePublishResponse(
         Invoice Invoice,
         string? FileId,

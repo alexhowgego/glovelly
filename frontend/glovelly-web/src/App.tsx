@@ -2419,6 +2419,9 @@ function App({ appMetadata }: AppProps) {
     if (message === null) {
       return
     }
+    const includeReceipts = window.confirm(
+      `Include any expense receipt attachments for ${invoice.invoiceNumber}?`
+    )
 
     setIsInvoiceLoading(true)
     setInvoiceStatus(`Sending ${invoice.invoiceNumber} to client...`)
@@ -2431,6 +2434,7 @@ function App({ appMetadata }: AppProps) {
         },
         body: JSON.stringify({
           message: message.trim() || null,
+          includeReceipts,
         }),
       })
 
@@ -2438,9 +2442,11 @@ function App({ appMetadata }: AppProps) {
         const problem = await parseProblemDetails(response)
         const recipientError = problem?.errors?.recipient?.[0]
         const pdfError = problem?.errors?.pdf?.[0]
+        const attachmentError = problem?.errors?.attachments?.[0]
         throw new Error(
           recipientError ??
             pdfError ??
+            attachmentError ??
             problem?.detail ??
             problem?.title ??
             'Unable to send invoice email.'

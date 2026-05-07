@@ -15,13 +15,22 @@ public sealed class InvoiceDeliveryService(
         string emailSubject,
         string attachmentFileName,
         InvoiceEmailSenderIdentity senderIdentity,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<InvoiceExpenseReceiptAttachment>? expenseReceiptAttachments = null)
     {
         var deliveryChannel = deliveryChannels.FirstOrDefault(value => value.Channel == channel)
             ?? throw new InvalidOperationException($"Invoice delivery channel {channel} is not registered.");
 
         var result = await deliveryChannel.DeliverAsync(
-            new InvoiceDeliveryRequest(invoice, client, userId, message, emailSubject, attachmentFileName, senderIdentity),
+            new InvoiceDeliveryRequest(
+                invoice,
+                client,
+                userId,
+                message,
+                emailSubject,
+                attachmentFileName,
+                senderIdentity,
+                expenseReceiptAttachments ?? []),
             cancellationToken);
 
         invoice.DeliveryCount += 1;

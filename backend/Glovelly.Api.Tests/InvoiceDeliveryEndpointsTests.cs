@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
@@ -86,6 +87,90 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal("bookings@foxandfinch.co.uk", updatedInvoice.GetProperty("lastDeliveryRecipient").GetString());
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastDeliveredByUserId").GetGuid());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("lastDeliveredUtc").ValueKind);
+    }
+
+    [Fact]
+    public async Task SendEmail_WhenReceiptInclusionRequested_AttachesReceiptZip()
+    {
+        var (invoiceId, receiptBytes) = await SeedInvoiceWithReceiptAsync(
+            "GLV-SEND-RECEIPTS",
+            "Taxi - airport",
+            "taxi/receipt.jpg",
+            "image/jpeg",
+            Encoding.ASCII.GetBytes("receipt image bytes"));
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
+        {
+            message = "Receipt attached too.",
+            includeReceipts = true,
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var message = Assert.Single(_factory.Emails.SentEmails);
+        Assert.Equal(2, message.Attachments.Count);
+        var pdfAttachment = Assert.Single(message.Attachments, attachment => attachment.ContentType == "application/pdf");
+        Assert.Equal("GLV-SEND-RECEIPTS.pdf", pdfAttachment.FileName);
+
+        var zipAttachment = Assert.Single(message.Attachments, attachment => attachment.ContentType == "application/zip");
+        Assert.Equal("Invoice-GLV-SEND-RECEIPTS-Receipts.zip", zipAttachment.FileName);
+        using var zipStream = new MemoryStream(zipAttachment.Content);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        var entry = Assert.Single(archive.Entries);
+        Assert.Equal("Taxi - airport-taxi-receipt.jpg", entry.FullName);
+        using var entryStream = entry.Open();
+        using var entryMemory = new MemoryStream();
+        await entryStream.CopyToAsync(entryMemory);
+        Assert.Equal(receiptBytes, entryMemory.ToArray());
+    }
+
+    [Fact]
+    public async Task SendEmail_WhenReceiptInclusionOmitted_DoesNotAttachReceiptZip()
+    {
+        var (invoiceId, _) = await SeedInvoiceWithReceiptAsync(
+            "GLV-SEND-NO-RECEIPTS",
+            "Parking",
+            "parking.pdf",
+            "application/pdf",
+            Encoding.ASCII.GetBytes("%PDF-1.4 receipt"));
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
+        {
+            message = "No receipt pack please.",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var message = Assert.Single(_factory.Emails.SentEmails);
+        var attachment = Assert.Single(message.Attachments);
+        Assert.Equal("GLV-SEND-NO-RECEIPTS.pdf", attachment.FileName);
+    }
+
+    [Fact]
+    public async Task SendEmail_WhenReceiptPackExceedsConfiguredLimit_ReturnsValidationProblem()
+    {
+        using var factory = CreateFactoryWithEmailAttachmentLimit(maxTotalAttachmentBytes: 32);
+        var client = factory.CreateClient();
+        var (invoiceId, _) = await SeedInvoiceWithReceiptAsync(
+            factory,
+            "GLV-SEND-TOO-LARGE",
+            "Hotel",
+            "hotel.pdf",
+            "application/pdf",
+            Encoding.ASCII.GetBytes("%PDF-1.4 oversized receipt content"));
+
+        var response = await client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
+        {
+            includeReceipts = true,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_factory.Emails.SentEmails);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Contains(
+            "exceeding the configured",
+            problem.GetProperty("errors").GetProperty("attachments")[0].GetString());
     }
 
     [Fact]
@@ -490,6 +575,124 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
                 services.AddSingleton<IGoogleDriveApiClient>(driveClient);
             });
         });
+    }
+
+    private WebApplicationFactory<Program> CreateFactoryWithEmailAttachmentLimit(long maxTotalAttachmentBytes)
+    {
+        return _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.PostConfigure<EmailSettings>(settings =>
+                {
+                    settings.MaxTotalAttachmentBytes = maxTotalAttachmentBytes;
+                });
+            });
+        });
+    }
+
+    private Task<(Guid InvoiceId, byte[] ReceiptBytes)> SeedInvoiceWithReceiptAsync(
+        string invoiceNumber,
+        string expenseDescription,
+        string receiptFileName,
+        string receiptContentType,
+        byte[] receiptBytes)
+    {
+        return SeedInvoiceWithReceiptAsync(
+            _factory,
+            invoiceNumber,
+            expenseDescription,
+            receiptFileName,
+            receiptContentType,
+            receiptBytes);
+    }
+
+    private static async Task<(Guid InvoiceId, byte[] ReceiptBytes)> SeedInvoiceWithReceiptAsync(
+        WebApplicationFactory<Program> factory,
+        string invoiceNumber,
+        string expenseDescription,
+        string receiptFileName,
+        string receiptContentType,
+        byte[] receiptBytes)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var attachmentStore = scope.ServiceProvider.GetRequiredService<IExpenseAttachmentStore>();
+        var invoiceId = Guid.NewGuid();
+        var gigId = Guid.NewGuid();
+        var expenseId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+        var storageKey = $"tests/{attachmentId}";
+
+        await using (var receiptStream = new MemoryStream(receiptBytes))
+        {
+            await attachmentStore.SaveAsync(storageKey, receiptStream, receiptContentType);
+        }
+
+        dbContext.Invoices.Add(new Invoice
+        {
+            Id = invoiceId,
+            InvoiceNumber = invoiceNumber,
+            ClientId = TestData.FoxAndFinchId,
+            InvoiceDate = new DateOnly(2026, 4, 20),
+            DueDate = new DateOnly(2026, 5, 4),
+            Status = InvoiceStatus.Issued,
+            Description = "Receipt delivery test.",
+            PdfBlob = Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"),
+            CreatedByUserId = TestAuthContext.UserId,
+            UpdatedByUserId = TestAuthContext.UserId,
+        });
+        dbContext.Gigs.Add(new Gig
+        {
+            Id = gigId,
+            ClientId = TestData.FoxAndFinchId,
+            InvoiceId = invoiceId,
+            Title = "Receipt gig",
+            Date = new DateOnly(2026, 4, 19),
+            Venue = "Test venue",
+            Status = GigStatus.Confirmed,
+            CreatedByUserId = TestAuthContext.UserId,
+            UpdatedByUserId = TestAuthContext.UserId,
+            Expenses =
+            [
+                new GigExpense
+                {
+                    Id = expenseId,
+                    SortOrder = 1,
+                    Description = expenseDescription,
+                    Amount = 42m,
+                    Attachments =
+                    [
+                        new ExpenseAttachment
+                        {
+                            Id = attachmentId,
+                            FileName = receiptFileName,
+                            ContentType = receiptContentType,
+                            SizeBytes = receiptBytes.Length,
+                            StorageKey = storageKey,
+                            CreatedAt = DateTimeOffset.UtcNow,
+                        }
+                    ],
+                }
+            ],
+        });
+        dbContext.InvoiceLines.Add(new InvoiceLine
+        {
+            Id = Guid.NewGuid(),
+            InvoiceId = invoiceId,
+            SortOrder = 1,
+            Type = InvoiceLineType.MiscExpense,
+            Description = expenseDescription,
+            Quantity = 1m,
+            UnitPrice = 42m,
+            GigId = gigId,
+            IsSystemGenerated = true,
+            CreatedByUserId = TestAuthContext.UserId,
+            CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        return (invoiceId, receiptBytes);
     }
 
     private sealed class FakeGoogleDriveApiClient : IGoogleDriveApiClient

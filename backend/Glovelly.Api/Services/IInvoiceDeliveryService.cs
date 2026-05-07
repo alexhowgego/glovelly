@@ -13,5 +13,6 @@ public interface IInvoiceDeliveryService
         string emailSubject,
         string attachmentFileName,
         InvoiceEmailSenderIdentity senderIdentity,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<InvoiceExpenseReceiptAttachment>? expenseReceiptAttachments = null);
 }
