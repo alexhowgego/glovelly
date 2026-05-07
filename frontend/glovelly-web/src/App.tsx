@@ -1622,15 +1622,19 @@ function App({ appMetadata }: AppProps) {
       },
     }
 
-    const clientRates =
+    const preservedClientSettings =
       mode === 'edit' && selectedClient
         ? {
             mileageRate: selectedClient.mileageRate,
             passengerMileageRate: selectedClient.passengerMileageRate,
+            invoiceFilenamePattern: selectedClient.invoiceFilenamePattern,
+            invoiceEmailSubjectPattern: selectedClient.invoiceEmailSubjectPattern,
           }
         : {
             mileageRate: null,
             passengerMileageRate: null,
+            invoiceFilenamePattern: null,
+            invoiceEmailSubjectPattern: null,
           }
 
     if (
@@ -1656,7 +1660,7 @@ function App({ appMetadata }: AppProps) {
         : buildApiUrl('/clients')
       const requestBody = JSON.stringify({
         ...payload,
-        ...clientRates,
+        ...preservedClientSettings,
       })
 
       const response = await fetchWithSession(endpoint, {
