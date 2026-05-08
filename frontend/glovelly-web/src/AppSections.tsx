@@ -688,6 +688,7 @@ type GigsSectionProps = {
   filteredGigs: Gig[]
   gigExpenseAmount: string
   gigExpenseDescription: string
+  gigQuickAdd: string
   gigForm: GigForm
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
@@ -700,6 +701,8 @@ type GigsSectionProps = {
   onCloseEditor: () => void
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
+  onQuickAddGigExpense: () => void
+  onQuickAddGigExpenseChange: (value: string) => void
   onGenerateInvoice: () => void
   onDownloadExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onOpenLinkedInvoice: () => void
@@ -737,6 +740,7 @@ export function GigsSection({
   filteredGigs,
   gigExpenseAmount,
   gigExpenseDescription,
+  gigQuickAdd,
   gigForm,
   isEditorOpen,
   gigMode,
@@ -749,6 +753,8 @@ export function GigsSection({
   onCloseEditor,
   onExpenseAmountChange,
   onExpenseDescriptionChange,
+  onQuickAddGigExpense,
+  onQuickAddGigExpenseChange,
   onGenerateInvoice,
   onDownloadExpenseAttachment,
   onOpenLinkedInvoice,
@@ -1085,6 +1091,23 @@ export function GigsSection({
             </div>
 
             <div className="invoice-adjustment-form">
+              <label className="full-width">
+                Quick add
+                <input
+                  value={gigQuickAdd}
+                  onChange={(event) => onQuickAddGigExpenseChange(event.target.value)}
+                  placeholder="Parking 12.50"
+                  disabled={isGigLoading}
+                />
+              </label>
+              <button
+                className="ghost-button"
+                onClick={onQuickAddGigExpense}
+                type="button"
+                disabled={isGigLoading}
+              >
+                Parse quick add
+              </button>
               <label>
                 Amount
                 <input

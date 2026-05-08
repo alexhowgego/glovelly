@@ -181,6 +181,7 @@ function App({ appMetadata }: AppProps) {
   const [isGigLoading, setIsGigLoading] = useState(false)
   const [gigExpenseAmount, setGigExpenseAmount] = useState('')
   const [gigExpenseDescription, setGigExpenseDescription] = useState('')
+  const [gigQuickAdd, setGigQuickAdd] = useState('')
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -988,6 +989,36 @@ function App({ appMetadata }: AppProps) {
     setGigExpenseAmount('')
     setGigExpenseDescription('')
     setGigStatus('Expense added to the gig form. Save the gig to persist it.')
+  }
+
+
+  const handleQuickAddGigExpense = () => {
+    const quickAdd = gigQuickAdd.trim()
+    const match = quickAdd.match(/^(.*?)(?:\s+|\s*[-:]\s*)(\d+(?:\.\d{1,2})?)$/)
+
+    if (!match) {
+      setGigStatus('Use quick add format: "Description 12.50".')
+      return
+    }
+
+    const description = match[1].trim()
+    const amountText = match[2]
+    const amount = Number(amountText)
+
+    if (!description) {
+      setGigStatus('Quick add needs a description before the amount.')
+      return
+    }
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      setGigStatus('Quick add amount must be a valid non-negative number.')
+      return
+    }
+
+    setGigExpenseDescription(description)
+    setGigExpenseAmount(amountText)
+    setGigQuickAdd('')
+    setGigStatus('Quick add parsed. Review or press Add expense to confirm.')
   }
 
   const updateGigExpenseField = (
@@ -2404,7 +2435,9 @@ function App({ appMetadata }: AppProps) {
       if (isRedraft) {
         setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} draft regenerated.`)
       } else {
-        const reissuedAt = formatDateTime(updatedInvoice.lastReissuedUtc)
+        const reissuedAt = updatedInvoice.lastReissuedUtc
+          ? formatDateTime(updatedInvoice.lastReissuedUtc)
+          : 'an unknown time'
         setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
       }
     } catch (error) {
@@ -2723,6 +2756,9 @@ function App({ appMetadata }: AppProps) {
         onCloseEditor={closeGigEditor}
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
+        gigQuickAdd={gigQuickAdd}
+        onQuickAddGigExpenseChange={setGigQuickAdd}
+        onQuickAddGigExpense={handleQuickAddGigExpense}
         onGenerateInvoice={handleGenerateInvoice}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
         onOpenLinkedInvoice={openSelectedGigInvoice}
