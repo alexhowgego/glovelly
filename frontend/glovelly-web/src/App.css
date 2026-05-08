@@ -885,9 +885,19 @@
   justify-self: start;
 }
 
+
+.quick-add-button {
+  grid-column: auto;
+  justify-self: stretch;
+}
+
 @media (max-width: 1380px) {
   .invoice-adjustment-form {
     grid-template-columns: 1fr;
+  }
+
+  .quick-add-button {
+    grid-column: 1 / -1;
   }
 }
 

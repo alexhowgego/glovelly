@@ -1101,12 +1101,12 @@ export function GigsSection({
                 />
               </label>
               <button
-                className="ghost-button"
+                className="primary-button quick-add-button"
                 onClick={onQuickAddGigExpense}
                 type="button"
                 disabled={isGigLoading}
               >
-                Parse quick add
+                Quick add expense
               </button>
               <label>
                 Amount
