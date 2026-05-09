@@ -372,6 +372,269 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task QuickReceiptDraft_WithNearbyGig_CreatesDraftExpenseAndAttachment()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Yesterday receipt match",
+            date = today.AddDays(-1).ToString("yyyy-MM-dd"),
+            venue = "Station",
+            fee = 120.00m,
+            travelMiles = 0.00m,
+            notes = "Receipt draft test",
+            wasDriving = true,
+            status = 1,
+            expenses = Array.Empty<object>(),
+            invoicedAt = (string?)null,
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+
+        using var form = BuildReceiptDraftForm("taxi receipt"u8.ToArray(), "taxi.jpg", "image/jpeg");
+
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.True(result.GetProperty("inferredGig").GetBoolean());
+
+        var gig = result.GetProperty("gig");
+        var expense = Assert.Single(gig.GetProperty("expenses").EnumerateArray());
+        Assert.Equal("Receipt draft", expense.GetProperty("description").GetString());
+        Assert.Equal(0m, expense.GetProperty("amount").GetDecimal());
+
+        var attachment = Assert.Single(expense.GetProperty("attachments").EnumerateArray());
+        Assert.Equal("taxi.jpg", attachment.GetProperty("fileName").GetString());
+        Assert.Equal("image/jpeg", attachment.GetProperty("contentType").GetString());
+        Assert.Equal("taxi receipt"u8.Length, attachment.GetProperty("sizeBytes").GetInt64());
+
+        var candidates = result.GetProperty("candidates").EnumerateArray().ToArray();
+        Assert.Single(candidates);
+        Assert.Equal(1, candidates[0].GetProperty("daysFromToday").GetInt32());
+        Assert.True(candidates[0].GetProperty("isSelected").GetBoolean());
+    }
+
+    [Fact]
+    public async Task QuickReceiptDraft_WithCandidateInsideAmbiguityWindow_FlagsNearbyCandidates()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        foreach (var (title, offset) in new[] { ("Yesterday show", -1), ("Tomorrow show", 1), ("Next week show", 7) })
+        {
+            var createResponse = await _client.PostAsJsonAsync("/gigs", new
+            {
+                clientId = TestData.FoxAndFinchId,
+                title,
+                date = today.AddDays(offset).ToString("yyyy-MM-dd"),
+                venue = "Theatre",
+                fee = 120.00m,
+                travelMiles = 0.00m,
+                notes = "Ambiguous receipt draft test",
+                wasDriving = true,
+                status = 1,
+                expenses = Array.Empty<object>(),
+                invoicedAt = (string?)null,
+            });
+
+            createResponse.EnsureSuccessStatusCode();
+        }
+
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
+
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.True(result.GetProperty("hasNearbyCandidates").GetBoolean());
+
+        var gig = result.GetProperty("gig");
+        Assert.Equal("Yesterday show", gig.GetProperty("title").GetString());
+
+        var candidates = result.GetProperty("candidates").EnumerateArray().ToArray();
+        Assert.Equal(3, candidates.Length);
+        Assert.Equal("Yesterday show", candidates[0].GetProperty("title").GetString());
+        Assert.True(candidates[0].GetProperty("isSelected").GetBoolean());
+    }
+
+    [Fact]
+    public async Task QuickReceiptDraft_WithCandidateOutsideAmbiguityWindow_DoesNotFlagNearbyCandidates()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        foreach (var (title, offset) in new[] { ("Today show", 0), ("Last month show", -20) })
+        {
+            var createResponse = await _client.PostAsJsonAsync("/gigs", new
+            {
+                clientId = TestData.FoxAndFinchId,
+                title,
+                date = today.AddDays(offset).ToString("yyyy-MM-dd"),
+                venue = "Theatre",
+                fee = 120.00m,
+                travelMiles = 0.00m,
+                notes = "Distant ambiguity test",
+                wasDriving = true,
+                status = 1,
+                expenses = Array.Empty<object>(),
+                invoicedAt = (string?)null,
+            });
+
+            createResponse.EnsureSuccessStatusCode();
+        }
+
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
+
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.False(result.GetProperty("hasNearbyCandidates").GetBoolean());
+
+        var candidates = result.GetProperty("candidates").EnumerateArray().ToArray();
+        Assert.Equal(2, candidates.Length);
+    }
+
+    [Fact]
+    public async Task QuickReceiptDraft_WithNoCandidateInsideWindow_ReturnsEmptyCandidates()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        foreach (var (title, offset) in new[] { ("Old show", -45), ("Future show", 60) })
+        {
+            var createResponse = await _client.PostAsJsonAsync("/gigs", new
+            {
+                clientId = TestData.FoxAndFinchId,
+                title,
+                date = today.AddDays(offset).ToString("yyyy-MM-dd"),
+                venue = "Theatre",
+                fee = 120.00m,
+                travelMiles = 0.00m,
+                notes = "Distant receipt draft test",
+                wasDriving = true,
+                status = 1,
+                expenses = Array.Empty<object>(),
+                invoicedAt = (string?)null,
+            });
+
+            createResponse.EnsureSuccessStatusCode();
+        }
+
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
+
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("No gig was within 30 days. Choose a gig before saving this receipt draft.", result.GetProperty("message").GetString());
+        Assert.Empty(result.GetProperty("candidates").EnumerateArray());
+        Assert.Equal(30, result.GetProperty("autoAttachWindowDays").GetInt32());
+    }
+
+    [Fact]
+    public async Task QuickReceiptDraft_WithExplicitGig_CreatesDraftWhenNearestIsOutsideWindow()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Future receipt target",
+            date = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime).AddDays(60).ToString("yyyy-MM-dd"),
+            venue = "Airport",
+            fee = 120.00m,
+            travelMiles = 0.00m,
+            notes = "Explicit receipt draft test",
+            wasDriving = true,
+            status = 1,
+            expenses = Array.Empty<object>(),
+            invoicedAt = (string?)null,
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf", gigId);
+
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.False(result.GetProperty("inferredGig").GetBoolean());
+        Assert.Equal(gigId, result.GetProperty("gig").GetProperty("id").GetGuid());
+    }
+
+    [Fact]
+    public async Task UpdateQuickReceiptDraft_SavesDetailsAndMovesGig()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var firstGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Receipt first target",
+            date = today.ToString("yyyy-MM-dd"),
+            venue = "Station",
+            fee = 120.00m,
+            travelMiles = 0.00m,
+            notes = "Receipt update test",
+            wasDriving = true,
+            status = 1,
+            expenses = Array.Empty<object>(),
+            invoicedAt = (string?)null,
+        });
+        firstGigResponse.EnsureSuccessStatusCode();
+
+        var secondGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Receipt corrected target",
+            date = today.AddDays(2).ToString("yyyy-MM-dd"),
+            venue = "Hotel",
+            fee = 120.00m,
+            travelMiles = 0.00m,
+            notes = "Receipt update test",
+            wasDriving = true,
+            status = 1,
+            expenses = Array.Empty<object>(),
+            invoicedAt = (string?)null,
+        });
+        secondGigResponse.EnsureSuccessStatusCode();
+
+        var secondGig = await secondGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var secondGigId = secondGig.GetProperty("id").GetGuid();
+
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
+        var quickResponse = await _client.PostAsync("/gigs/receipt-drafts", form);
+        quickResponse.EnsureSuccessStatusCode();
+
+        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var expenseId = quickDraft.GetProperty("expenseId").GetGuid();
+
+        var updateResponse = await _client.PatchAsJsonAsync($"/gigs/receipt-drafts/{expenseId}", new
+        {
+            gigId = secondGigId,
+            description = "Taxi from station",
+            amount = 18.75m,
+        });
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var result = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.True(result.GetProperty("moved").GetBoolean());
+
+        var targetGig = result.GetProperty("gig");
+        Assert.Equal(secondGigId, targetGig.GetProperty("id").GetGuid());
+        var expense = Assert.Single(targetGig.GetProperty("expenses").EnumerateArray());
+        Assert.Equal("Taxi from station", expense.GetProperty("description").GetString());
+        Assert.Equal(18.75m, expense.GetProperty("amount").GetDecimal());
+        Assert.Single(expense.GetProperty("attachments").EnumerateArray());
+
+        var previousGig = result.GetProperty("previousGig");
+        Assert.Empty(previousGig.GetProperty("expenses").EnumerateArray());
+    }
+
+    [Fact]
     public async Task CreateGig_WithInvoice_GeneratesMileagePassengerAndExpenseLines()
     {
         var response = await _client.PostAsJsonAsync("/gigs", new
@@ -437,6 +700,25 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(20.00m, lines[4].GetProperty("lineTotal").GetDecimal());
 
         Assert.Equal(340.61m, invoice.GetProperty("total").GetDecimal());
+    }
+
+    private static MultipartFormDataContent BuildReceiptDraftForm(
+        byte[] content,
+        string fileName,
+        string contentType,
+        Guid? gigId = null)
+    {
+        var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent(content);
+        file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        form.Add(file, "file", fileName);
+
+        if (gigId.HasValue)
+        {
+            form.Add(new StringContent(gigId.Value.ToString()), "gigId");
+        }
+
+        return form;
     }
 
     [Fact]

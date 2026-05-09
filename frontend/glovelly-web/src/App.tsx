@@ -29,6 +29,7 @@ import {
   fetchWithSession,
   formatCurrency,
   formatBuildMetadata,
+  formatDate,
   formatDateTime,
   getStoredThemePreference,
   parseProblemDetails,
@@ -50,6 +51,9 @@ import type {
   GigForm,
   Invoice,
   InvoiceStatus,
+  QuickReceiptCandidate,
+  QuickReceiptDraftResponse,
+  QuickReceiptDraftUpdateResponse,
   SellerProfile,
   SellerProfileForm,
   ThemePreference,
@@ -191,6 +195,15 @@ function App({ appMetadata }: AppProps) {
   const [googleDrivePublishLink, setGoogleDrivePublishLink] =
     useState<GoogleDrivePublishLink | null>(null)
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
+  const [pendingReceiptFile, setPendingReceiptFile] = useState<File | null>(null)
+  const [quickReceiptDraft, setQuickReceiptDraft] =
+    useState<QuickReceiptDraftResponse | null>(null)
+  const [quickReceiptCandidates, setQuickReceiptCandidates] = useState<QuickReceiptCandidate[]>([])
+  const [quickReceiptSelectedGigId, setQuickReceiptSelectedGigId] = useState('')
+  const [quickReceiptAmount, setQuickReceiptAmount] = useState('')
+  const [quickReceiptDescription, setQuickReceiptDescription] = useState('')
+  const [quickReceiptStatus, setQuickReceiptStatus] = useState('')
+  const [isQuickReceiptSaving, setIsQuickReceiptSaving] = useState(false)
   const [adjustmentAmount, setAdjustmentAmount] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
@@ -305,6 +318,14 @@ function App({ appMetadata }: AppProps) {
       setIsInvoiceEditorOpen(false)
       setInvoiceSearchQuery('')
       setInvoiceStatus(defaultInvoiceStatus)
+      setPendingReceiptFile(null)
+      setQuickReceiptDraft(null)
+      setQuickReceiptCandidates([])
+      setQuickReceiptSelectedGigId('')
+      setQuickReceiptAmount('')
+      setQuickReceiptDescription('')
+      setQuickReceiptStatus('')
+      setIsQuickReceiptSaving(false)
       setIsClientSettingsOpen(false)
       setClientSettingsForm(emptyClientSettingsForm())
       setClientSettingsStatus(
@@ -1146,6 +1167,255 @@ function App({ appMetadata }: AppProps) {
     } finally {
       setIsGigLoading(false)
     }
+  }
+
+  const openGigReceiptDraft = (savedGig: Gig) => {
+    mergeSavedGig(savedGig)
+    setSelectedGigId(savedGig.id)
+    setActiveSection('gigs')
+    setGigMode('edit')
+    setGigForm({
+      clientId: savedGig.clientId,
+      title: savedGig.title,
+      date: savedGig.date,
+      venue: savedGig.venue,
+      fee: String(savedGig.fee),
+      notes: savedGig.notes ?? '',
+      wasDriving: savedGig.wasDriving,
+      status: savedGig.status,
+      expenses: savedGig.expenses
+        .slice()
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map(toGigExpenseForm),
+    })
+    setGigExpenseAmount('')
+    setGigExpenseDescription('')
+    setIsGigEditorOpen(true)
+  }
+
+  const promptForReceiptGig = (
+    file: File,
+    candidates: QuickReceiptCandidate[],
+    message: string
+  ) => {
+    setPendingReceiptFile(file)
+    setQuickReceiptDraft(null)
+    setQuickReceiptCandidates(candidates)
+    setQuickReceiptSelectedGigId(candidates[0]?.id ?? '')
+    setQuickReceiptAmount('')
+    setQuickReceiptDescription('Receipt draft')
+    setQuickReceiptStatus(message)
+  }
+
+  const clearQuickReceiptDialog = () => {
+    setPendingReceiptFile(null)
+    setQuickReceiptDraft(null)
+    setQuickReceiptCandidates([])
+    setQuickReceiptSelectedGigId('')
+    setQuickReceiptAmount('')
+    setQuickReceiptDescription('')
+    setQuickReceiptStatus('')
+  }
+
+  const uploadQuickReceiptDraft = async (file: File, gigId?: string) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (gigId) {
+      formData.append('gigId', gigId)
+    }
+
+    setIsQuickReceiptSaving(true)
+    setQuickReceiptStatus('Saving receipt draft...')
+    setPendingReceiptFile(file)
+    setQuickReceiptDraft(null)
+    if (!gigId) {
+      setQuickReceiptCandidates([])
+      setQuickReceiptSelectedGigId('')
+      setQuickReceiptAmount('')
+      setQuickReceiptDescription('')
+    }
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/gigs/receipt-drafts'), {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setStatus('Your session expired. Sign in again to add receipts.')
+        return
+      }
+
+      if (response.status === 409) {
+        const conflict = (await response.json()) as {
+          message?: string
+          candidates?: QuickReceiptCandidate[]
+        }
+        promptForReceiptGig(
+          file,
+          conflict.candidates ?? [],
+          conflict.message ?? 'Choose a gig before saving this receipt draft.'
+        )
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to save receipt draft.')
+      }
+
+      const receiptDraft = (await response.json()) as QuickReceiptDraftResponse
+      openGigReceiptDraft(receiptDraft.gig)
+      setPendingReceiptFile(null)
+      setQuickReceiptDraft(receiptDraft)
+      setQuickReceiptCandidates(receiptDraft.candidates)
+      setQuickReceiptSelectedGigId(receiptDraft.gig.id)
+      setQuickReceiptAmount('')
+      setQuickReceiptDescription('Receipt draft')
+      setQuickReceiptStatus(
+        receiptDraft.hasNearbyCandidates
+          ? 'Receipt saved. There are other nearby gigs, so please check the selected gig.'
+          : 'Receipt saved. Add details now or come back later.'
+      )
+      setGigStatus(
+        receiptDraft.inferredGig
+          ? 'Receipt draft saved to the nearest matching gig.'
+          : 'Receipt draft saved. Add the amount and description when you are ready.'
+      )
+    } catch (error) {
+      setQuickReceiptStatus(
+        error instanceof Error ? error.message : 'Unable to save receipt draft.'
+      )
+    } finally {
+      setIsQuickReceiptSaving(false)
+    }
+  }
+
+  const handleQuickReceiptFile = (file: File) => {
+    void uploadQuickReceiptDraft(file)
+  }
+
+  const savePendingReceiptToSelectedGig = () => {
+    if (!pendingReceiptFile || !quickReceiptSelectedGigId) {
+      setQuickReceiptStatus('Choose a gig before saving this receipt draft.')
+      return
+    }
+
+    void uploadQuickReceiptDraft(pendingReceiptFile, quickReceiptSelectedGigId)
+  }
+
+  const saveQuickReceiptDetails = async () => {
+    if (!quickReceiptDraft || !quickReceiptSelectedGigId) {
+      setQuickReceiptStatus('Choose a gig before saving this receipt draft.')
+      return
+    }
+
+    const description = quickReceiptDescription.trim()
+    const amount = Number(quickReceiptAmount || '0')
+
+    if (!description) {
+      setQuickReceiptStatus('Add a description before saving receipt details.')
+      return
+    }
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      setQuickReceiptStatus('Receipt amount must be a valid non-negative number.')
+      return
+    }
+
+    setIsQuickReceiptSaving(true)
+    setQuickReceiptStatus('Saving receipt details...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/receipt-drafts/${quickReceiptDraft.expenseId}`),
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            gigId: quickReceiptSelectedGigId,
+            description,
+            amount,
+          }),
+        }
+      )
+
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        setAuthUser(null)
+        setIsApiConnected(false)
+        setStatus('Your session expired. Sign in again to add receipts.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to save receipt details.')
+      }
+
+      const update = (await response.json()) as QuickReceiptDraftUpdateResponse
+      mergeSavedGig(update.gig)
+      if (update.previousGig) {
+        mergeSavedGig(update.previousGig)
+      }
+
+      setQuickReceiptDraft((current) =>
+        current
+          ? {
+              ...current,
+              gig: update.gig,
+              expenseId: update.expenseId,
+              inferredGig: false,
+            }
+          : current
+      )
+      setSelectedGigId(update.gig.id)
+      setQuickReceiptSelectedGigId(update.gig.id)
+      setGigStatus('Receipt details saved.')
+      setQuickReceiptStatus(
+        update.moved
+          ? 'Receipt moved and details saved.'
+          : 'Receipt details saved.'
+      )
+    } catch (error) {
+      setQuickReceiptStatus(
+        error instanceof Error ? error.message : 'Unable to save receipt details.'
+      )
+    } finally {
+      setIsQuickReceiptSaving(false)
+    }
+  }
+
+  const goToQuickReceiptGig = () => {
+    const targetGig =
+      gigsById.get(quickReceiptSelectedGigId) ?? quickReceiptDraft?.gig ?? null
+    if (!targetGig) {
+      return
+    }
+
+    openGigReceiptDraft(targetGig)
+    clearQuickReceiptDialog()
+  }
+
+  const closeQuickReceiptPrompt = () => {
+    if (isQuickReceiptSaving) {
+      return
+    }
+
+    clearQuickReceiptDialog()
   }
 
   const signIn = () => {
@@ -2796,92 +3066,111 @@ function App({ appMetadata }: AppProps) {
                 </p>
               </div>
 
-              <div className="profile-menu" ref={profileMenuRef}>
-                <button
-                  aria-expanded={isProfileMenuOpen}
-                  aria-haspopup="menu"
-                  aria-label="Open profile menu"
-                  className={`profile-trigger ${isProfileMenuOpen ? 'open' : ''}`}
-                  onClick={() => setIsProfileMenuOpen((current) => !current)}
-                  type="button"
-                >
-                  <span className="profile-avatar" aria-hidden="true">
-                    {profileImageUrl ? (
-                      <img
-                        className="profile-avatar-image"
-                        src={profileImageUrl}
-                        alt=""
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      profileInitials || 'U'
-                    )}
-                  </span>
-                </button>
+              <div className="header-actions">
+                <label className="primary-button quick-receipt-button">
+                  <span aria-hidden="true">+</span>
+                  Scan receipt
+                  <input
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+                    disabled={isLoading || isGigLoading || isQuickReceiptSaving}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ''
+                      if (file) {
+                        handleQuickReceiptFile(file)
+                      }
+                    }}
+                  />
+                </label>
 
-                {isProfileMenuOpen && (
-                  <div className="profile-dropdown" role="menu" aria-label="Profile menu">
-                    <div className="profile-summary">
-                      <p className="section-label">Signed in</p>
-                      <strong>{profileDisplayName}</strong>
-                      <span>{authUser?.email}</span>
-                    </div>
-                    <div className="profile-meta">
-                      <span>{isAdmin ? 'Administrator' : 'Standard access'}</span>
-                    </div>
-                    <div className="profile-meta">
-                      <span>
-                        {sellerProfile.isInvoiceReady
-                          ? 'Seller profile ready'
-                          : sellerProfile.isConfigured
-                            ? 'Seller profile needs attention'
-                            : 'Seller profile not set up'}
-                      </span>
-                    </div>
-                    <label className="theme-field" htmlFor="theme-preference-select">
-                      <span>Theme</span>
-                      <select
-                        id="theme-preference-select"
-                        value={themePreference}
-                        onChange={(event) =>
-                          handleThemePreferenceChange(event.target.value as ThemePreference)
-                        }
+                <div className="profile-menu" ref={profileMenuRef}>
+                  <button
+                    aria-expanded={isProfileMenuOpen}
+                    aria-haspopup="menu"
+                    aria-label="Open profile menu"
+                    className={`profile-trigger ${isProfileMenuOpen ? 'open' : ''}`}
+                    onClick={() => setIsProfileMenuOpen((current) => !current)}
+                    type="button"
+                  >
+                    <span className="profile-avatar" aria-hidden="true">
+                      {profileImageUrl ? (
+                        <img
+                          className="profile-avatar-image"
+                          src={profileImageUrl}
+                          alt=""
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        profileInitials || 'U'
+                      )}
+                    </span>
+                  </button>
+
+                  {isProfileMenuOpen && (
+                    <div className="profile-dropdown" role="menu" aria-label="Profile menu">
+                      <div className="profile-summary">
+                        <p className="section-label">Signed in</p>
+                        <strong>{profileDisplayName}</strong>
+                        <span>{authUser?.email}</span>
+                      </div>
+                      <div className="profile-meta">
+                        <span>{isAdmin ? 'Administrator' : 'Standard access'}</span>
+                      </div>
+                      <div className="profile-meta">
+                        <span>
+                          {sellerProfile.isInvoiceReady
+                            ? 'Seller profile ready'
+                            : sellerProfile.isConfigured
+                              ? 'Seller profile needs attention'
+                              : 'Seller profile not set up'}
+                        </span>
+                      </div>
+                      <label className="theme-field" htmlFor="theme-preference-select">
+                        <span>Theme</span>
+                        <select
+                          id="theme-preference-select"
+                          value={themePreference}
+                          onChange={(event) =>
+                            handleThemePreferenceChange(event.target.value as ThemePreference)
+                          }
+                        >
+                          <option value="system">System</option>
+                          <option value="light">Light</option>
+                          <option value="dark">Dark</option>
+                        </select>
+                      </label>
+                      <button
+                        className="ghost-button profile-settings"
+                        onClick={openSellerProfile}
+                        role="menuitem"
+                        type="button"
+                        disabled={isLoading || isAdminLoading || isSellerProfileSaving}
                       >
-                        <option value="system">System</option>
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                      </select>
-                    </label>
-                    <button
-                      className="ghost-button profile-settings"
-                      onClick={openSellerProfile}
-                      role="menuitem"
-                      type="button"
-                      disabled={isLoading || isAdminLoading || isSellerProfileSaving}
-                    >
-                      Seller profile
-                    </button>
-                    <button
-                      className="ghost-button profile-settings"
-                      onClick={openUserSettings}
-                      role="menuitem"
-                      type="button"
-                      disabled={isLoading || isAdminLoading || isUserSettingsSaving}
-                    >
-                      Settings
-                    </button>
-                    <button
-                      className="ghost-button profile-signout"
-                      onClick={signOut}
-                      role="menuitem"
-                      type="button"
-                      disabled={isLoading || isAdminLoading}
-                    >
-                      Sign out
-                    </button>
-                  </div>
-                )}
+                        Seller profile
+                      </button>
+                      <button
+                        className="ghost-button profile-settings"
+                        onClick={openUserSettings}
+                        role="menuitem"
+                        type="button"
+                        disabled={isLoading || isAdminLoading || isUserSettingsSaving}
+                      >
+                        Settings
+                      </button>
+                      <button
+                        className="ghost-button profile-signout"
+                        onClick={signOut}
+                        role="menuitem"
+                        type="button"
+                        disabled={isLoading || isAdminLoading}
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2975,6 +3264,145 @@ function App({ appMetadata }: AppProps) {
         profile={sellerProfile}
         status={sellerProfileStatus}
       />
+
+      {(pendingReceiptFile || quickReceiptDraft) && (
+        <div className="settings-overlay" role="presentation">
+          <section
+            aria-labelledby="quick-receipt-title"
+            className="settings-modal quick-receipt-modal panel"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Receipt capture</p>
+                <h2 id="quick-receipt-title">
+                  {quickReceiptDraft ? 'Receipt saved' : 'Choose a gig'}
+                </h2>
+              </div>
+              <button
+                className="ghost-button"
+                onClick={closeQuickReceiptPrompt}
+                type="button"
+                disabled={isQuickReceiptSaving}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="quick-receipt-summary">
+              <strong>
+                {pendingReceiptFile?.name ||
+                  quickReceiptDraft?.gig.expenses
+                    .find((expense) => expense.id === quickReceiptDraft.expenseId)
+                    ?.attachments.find(
+                      (attachment) => attachment.id === quickReceiptDraft.attachmentId
+                    )?.fileName ||
+                  'Receipt upload'}
+              </strong>
+              <span>{quickReceiptStatus}</span>
+              {isQuickReceiptSaving && !quickReceiptDraft ? (
+                <div className="quick-receipt-progress" aria-label="Receipt upload in progress">
+                  <span />
+                </div>
+              ) : null}
+            </div>
+
+            {quickReceiptDraft?.hasNearbyCandidates ? (
+              <div className="quick-receipt-warning">
+                <strong>Check the gig before moving on.</strong>
+                <span>
+                  There are other gigs close to this date. The nearest one has been
+                  selected, but this receipt may belong somewhere else.
+                </span>
+              </div>
+            ) : null}
+
+            {quickReceiptCandidates.length > 0 ? (
+              <label className="quick-receipt-select">
+                <span>Gig</span>
+                <select
+                  value={quickReceiptSelectedGigId}
+                  onChange={(event) => setQuickReceiptSelectedGigId(event.target.value)}
+                  disabled={isQuickReceiptSaving}
+                >
+                  {quickReceiptCandidates.map((gig) => (
+                    <option key={gig.id} value={gig.id}>
+                      {gig.title} · {formatDate(gig.date)} · {gig.venue} ·{' '}
+                      {clientNamesById.get(gig.clientId) ?? 'Unknown client'} ·{' '}
+                      {gig.daysFromToday === 0
+                        ? 'today'
+                        : `${gig.daysFromToday} day${gig.daysFromToday === 1 ? '' : 's'} away`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : isQuickReceiptSaving && !quickReceiptDraft ? null : (
+              <div className="empty-state">
+                <strong>No candidate gigs are available.</strong>
+                <p>Create or update a gig near this receipt date, then try again.</p>
+              </div>
+            )}
+
+            {quickReceiptDraft ? (
+              <div className="form-grid quick-receipt-details">
+                <label>
+                  <span>Amount</span>
+                  <input
+                    inputMode="decimal"
+                    value={quickReceiptAmount}
+                    onChange={(event) => setQuickReceiptAmount(event.target.value)}
+                    placeholder="0.00"
+                    disabled={isQuickReceiptSaving}
+                  />
+                </label>
+                <label>
+                  <span>Description</span>
+                  <input
+                    value={quickReceiptDescription}
+                    onChange={(event) => setQuickReceiptDescription(event.target.value)}
+                    placeholder="Taxi, parking, hotel..."
+                    disabled={isQuickReceiptSaving}
+                  />
+                </label>
+              </div>
+            ) : null}
+
+            <div className="form-actions">
+              {quickReceiptDraft ? (
+                <>
+                  <button
+                    className="primary-button"
+                    onClick={saveQuickReceiptDetails}
+                    type="button"
+                    disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
+                  >
+                    {isQuickReceiptSaving ? 'Saving...' : 'Save details'}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    onClick={goToQuickReceiptGig}
+                    type="button"
+                    disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
+                  >
+                    Go to gig
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="primary-button"
+                  onClick={savePendingReceiptToSelectedGig}
+                  type="button"
+                  disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
+                >
+                  {isQuickReceiptSaving ? 'Saving...' : 'Save receipt draft'}
+                </button>
+              )}
+              <span className="status-pill">{quickReceiptStatus}</span>
+            </div>
+          </section>
+        </div>
+      )}
 
       <ClientSettingsModal
         authUser={authUser}
