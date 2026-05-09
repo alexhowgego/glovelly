@@ -18,6 +18,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceGoogleDriveDeliveryChannel>();
         services.AddOptions<ExpenseAttachmentSettings>()
             .BindConfiguration(ExpenseAttachmentSettings.SectionName);
+        services.AddOptions<QuickReceiptCaptureSettings>()
+            .BindConfiguration(QuickReceiptCaptureSettings.SectionName);
         services.AddSingleton<IExpenseAttachmentStore>(provider =>
         {
             var settings = provider.GetRequiredService<IOptions<ExpenseAttachmentSettings>>().Value;

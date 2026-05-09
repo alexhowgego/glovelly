@@ -401,11 +401,24 @@ export function ClientsSection({
             </div>
 
             <div className="form-actions">
-              <button className="primary-button" type="submit" disabled={isLoading}>
-                {mode === 'create' ? 'Save client' : 'Update client'}
+              <button
+                className="primary-button"
+                data-close-after-save="true"
+                type="submit"
+                disabled={isLoading}
+              >
+                Save and close
+              </button>
+              <button
+                className="ghost-button"
+                data-close-after-save="false"
+                type="submit"
+                disabled={isLoading}
+              >
+                Save
               </button>
               <button className="ghost-button" onClick={onCloseEditor} type="button">
-                Done
+                Discard changes
               </button>
             </div>
           </form>
@@ -1212,13 +1225,22 @@ export function GigsSection({
             <div className="form-actions">
               <button
                 className="primary-button"
+                data-close-after-save="true"
                 type="submit"
                 disabled={isGigLoading || clients.length === 0}
               >
-                {gigMode === 'create' ? 'Save gig' : 'Update gig'}
+                Save and close
+              </button>
+              <button
+                className="ghost-button"
+                data-close-after-save="false"
+                type="submit"
+                disabled={isGigLoading || clients.length === 0}
+              >
+                Save
               </button>
               <button className="ghost-button" onClick={onCloseEditor} type="button">
-                Done
+                Discard changes
               </button>
             </div>
 

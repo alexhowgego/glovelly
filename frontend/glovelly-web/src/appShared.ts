@@ -159,6 +159,31 @@ export type Gig = {
   expenses: GigExpense[]
 }
 
+export type QuickReceiptCandidate = Pick<
+  Gig,
+  'id' | 'clientId' | 'title' | 'date' | 'venue' | 'status'
+> & {
+  daysFromToday: number
+  isSelected: boolean
+}
+
+export type QuickReceiptDraftResponse = {
+  gig: Gig
+  expenseId: string
+  attachmentId: string
+  inferredGig: boolean
+  candidates: QuickReceiptCandidate[]
+  autoAttachWindowDays: number
+  hasNearbyCandidates: boolean
+}
+
+export type QuickReceiptDraftUpdateResponse = {
+  gig: Gig
+  previousGig: Gig | null
+  expenseId: string
+  moved: boolean
+}
+
 export type InvoiceLine = {
   id: string
   createdByUserId: string | null

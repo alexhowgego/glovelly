@@ -51,6 +51,7 @@ env:
 jobs:
   container:
     runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'pull_request' && 'staging' || 'production' }}
 
     steps:
       - name: Check out repository
@@ -132,7 +133,7 @@ jobs:
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly
             Email__Invoices__FromDisplayName=Glovelly
-            ExpenseAttachments__BucketName=glovelly-storage-production
+            ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest
@@ -162,7 +163,7 @@ jobs:
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly
             Email__Invoices__FromDisplayName=Glovelly
-            ExpenseAttachments__BucketName=glovelly-storage-staging
+            ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest
