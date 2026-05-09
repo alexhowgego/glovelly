@@ -1876,8 +1876,17 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
+  const shouldCloseAfterSave = (event: FormEvent<HTMLFormElement>) => {
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as
+      | HTMLButtonElement
+      | null
+
+    return submitter?.dataset.closeAfterSave !== 'false'
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const closeAfterSave = shouldCloseAfterSave(event)
 
     const payload: ClientForm = {
       name: form.name.trim(),
@@ -1968,7 +1977,7 @@ function App({ appMetadata }: AppProps) {
       setSelectedClientId(savedClient.id)
       setMode('edit')
       setStatus(isEdit ? 'Client updated.' : 'Client created.')
-      setIsClientEditorOpen(false)
+      setIsClientEditorOpen(!closeAfterSave)
     } catch {
       setStatus('Unable to save right now. Please try again.')
     } finally {
@@ -2103,6 +2112,7 @@ function App({ appMetadata }: AppProps) {
 
   const handleGigSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const closeAfterSave = shouldCloseAfterSave(event)
 
     const payload = {
       clientId: gigForm.clientId,
@@ -2225,7 +2235,7 @@ function App({ appMetadata }: AppProps) {
       setGigExpenseAmount('')
       setGigExpenseDescription('')
       setGigStatus(isEdit ? 'Gig updated.' : 'Gig created.')
-      setIsGigEditorOpen(false)
+      setIsGigEditorOpen(!closeAfterSave)
     } catch (error) {
       setGigStatus(
         error instanceof Error ? error.message : 'Unable to save this gig right now.'
