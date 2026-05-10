@@ -20,55 +20,32 @@ import {
   buildInvoiceFilenamePreview,
   buildReturnUrl,
   defaultAdminStatus,
-  defaultGigStatus,
-  defaultInvoiceStatus,
   emptyAdminForm,
-  emptyClientSettingsForm,
-  emptyForm,
-  emptyGigForm,
   invoiceFilenameTokens,
   fetchWithSession,
-  formatCurrency,
-  formatDateTime,
   getStoredThemePreference,
   parseProblemDetails,
   themeStorageKey,
-  toGigExpenseForm,
 } from './appShared'
+import { useClientsWorkspace } from './hooks/useClientsWorkspace'
+import { useGigsWorkspace } from './hooks/useGigsWorkspace'
+import { useInvoicesWorkspace } from './hooks/useInvoicesWorkspace'
 import { useQuickReceipt } from './hooks/useQuickReceipt'
 import { useSellerProfile } from './hooks/useSellerProfile'
 import { useUserSettings } from './hooks/useUserSettings'
 import type {
-  Address,
   AdminUser,
   AdminUserForm,
   AppMetadata,
   AppSection,
   AuthUser,
   Client,
-  ClientForm,
-  ClientSettingsForm,
   Gig,
-  GigExpenseForm,
-  GigForm,
   Invoice,
-  InvoiceStatus,
   SellerProfile,
   ThemePreference,
 } from './appShared'
 import './App.css'
-
-type GoogleDrivePublishLink = {
-  href: string
-  fileName: string | null
-}
-
-type GoogleDrivePublishResponse = {
-  invoice: Invoice
-  fileId: string | null
-  fileName: string | null
-  webViewLink: string | null
-}
 
 function getCurrentMonthValue() {
   return new Date().toISOString().slice(0, 7)
@@ -85,18 +62,6 @@ type AppProps = {
 
 function App({ appMetadata }: AppProps) {
   const [activeSection, setActiveSection] = useState<AppSection>('gigs')
-  const [clients, setClients] = useState<Client[]>([])
-  const [selectedClientId, setSelectedClientId] = useState<string>('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isClientEditorOpen, setIsClientEditorOpen] = useState(false)
-  const [mode, setMode] = useState<'create' | 'edit'>('create')
-  const [form, setForm] = useState<ClientForm>(emptyForm)
-  const [isClientSettingsOpen, setIsClientSettingsOpen] = useState(false)
-  const [clientSettingsForm, setClientSettingsForm] =
-    useState<ClientSettingsForm>(emptyClientSettingsForm)
-  const [clientSettingsStatus, setClientSettingsStatus] =
-    useState('Client-specific rates override your personal defaults when set.')
-  const [isClientSettingsSaving, setIsClientSettingsSaving] = useState(false)
   const [status, setStatus] = useState('Checking your session...')
   const [isLoading, setIsLoading] = useState(false)
   const [isApiConnected, setIsApiConnected] = useState(false)
@@ -117,35 +82,152 @@ function App({ appMetadata }: AppProps) {
   const [adminForm, setAdminForm] = useState<AdminUserForm>(emptyAdminForm)
   const [adminStatus, setAdminStatus] = useState(defaultAdminStatus)
   const [isAdminLoading, setIsAdminLoading] = useState(false)
-  const [gigs, setGigs] = useState<Gig[]>([])
-  const [selectedGigId, setSelectedGigId] = useState<string>('')
-  const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
-  const [gigSearchQuery, setGigSearchQuery] = useState('')
-  const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
-  const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
-  const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
-  const [gigStatus, setGigStatus] = useState(defaultGigStatus)
-  const [isGigLoading, setIsGigLoading] = useState(false)
-  const [gigExpenseAmount, setGigExpenseAmount] = useState('')
-  const [gigExpenseDescription, setGigExpenseDescription] = useState('')
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
-  const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
-  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
-  const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
-  const [googleDrivePublishLink, setGoogleDrivePublishLink] =
-    useState<GoogleDrivePublishLink | null>(null)
-  const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
-  const [adjustmentAmount, setAdjustmentAmount] = useState('')
-  const [adjustmentReason, setAdjustmentReason] = useState('')
-  const deferredSearchQuery = useDeferredValue(searchQuery)
   const deferredAdminSearchQuery = useDeferredValue(adminSearchQuery)
-  const deferredGigSearchQuery = useDeferredValue(gigSearchQuery)
-  const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery)
 
   const isAdmin = authUser?.role === 'Admin'
+  const {
+    applyClients,
+    clientNamesById,
+    clientSettingsForm,
+    clientSettingsStatus,
+    clients,
+    closeClientEditor,
+    closeClientSettings,
+    filteredClients,
+    form,
+    handleClientSettingsSubmit,
+    handleDelete,
+    handleSubmit,
+    isClientEditorOpen,
+    isClientSettingsOpen,
+    isClientSettingsSaving,
+    mode,
+    openClientSettings,
+    resetClientsWorkspace,
+    searchQuery,
+    selectedClient,
+    setSelectedClientId,
+    setSearchQuery,
+    startCreating,
+    startEditing,
+    updateAddressField,
+    updateClientSettingsField,
+    updateField,
+  } = useClientsWorkspace({
+    isApiConnected,
+    onSessionExpired: (message) => {
+      setIsAuthenticated(false)
+      setAuthUser(null)
+      setIsApiConnected(false)
+      setStatus(message)
+    },
+    setIsLoading,
+    setStatus,
+  })
+  const {
+    applyGigs,
+    closeGigEditor,
+    completedGigCount,
+    deleteExpenseAttachment,
+    downloadExpenseAttachment,
+    filteredGigs,
+    gigExpenseAmount,
+    gigExpenseDescription,
+    gigForm,
+    gigMode,
+    gigSearchQuery,
+    gigStatus,
+    gigs,
+    gigsById,
+    handleAddGigExpense,
+    handleGigSubmit,
+    handleToggleGigSelection,
+    isGigEditorOpen,
+    isGigLoading,
+    mergeSavedGig,
+    openGigReceiptDraft,
+    plannedGigCount,
+    removeGigExpense,
+    resetGigsWorkspace,
+    selectedGig,
+    selectedGigIds,
+    selectedGigs,
+    setGigExpenseAmount,
+    setGigExpenseDescription,
+    setGigs,
+    setGigSearchQuery,
+    setGigStatus,
+    setSelectedGigId,
+    setSelectedGigIds,
+    startGigCreate,
+    startGigEdit,
+    uninvoicedGigCount,
+    upcomingGigCount,
+    updateGigExpenseField,
+    updateGigField,
+    uploadExpenseAttachment,
+  } = useGigsWorkspace({
+    clientNamesById,
+    clients,
+    onOpenSection: (section) => setActiveSection(section),
+    onSessionExpired: (message) => {
+      setIsAuthenticated(false)
+      setAuthUser(null)
+      setIsApiConnected(false)
+      setStatus(message)
+    },
+  })
+  const {
+    adjustmentAmount,
+    adjustmentReason,
+    applyInvoices,
+    closeInvoiceEditor,
+    draftInvoiceCount,
+    filteredInvoices,
+    googleDrivePublishLink,
+    handleAddInvoiceAdjustment,
+    handleDeleteInvoice,
+    handleDownloadInvoicePdf,
+    handleInvoiceReissue,
+    handleInvoiceStatusChange,
+    handlePublishInvoiceGoogleDrive,
+    handleSendInvoiceEmail,
+    invoices,
+    invoiceSearchQuery,
+    invoiceStatus,
+    isInvoiceEditorOpen,
+    issuedInvoiceCount,
+    isInvoiceLoading,
+    overdueInvoiceCount,
+    resetInvoicesWorkspace,
+    selectedInvoice,
+    setAdjustmentAmount,
+    setAdjustmentReason,
+    setInvoices,
+    setInvoiceStatus,
+    setIsInvoiceLoading,
+    setSelectedInvoiceId,
+    setInvoiceSearchQuery,
+    startInvoiceEdit,
+  } = useInvoicesWorkspace({
+    clientNamesById,
+    onInvoiceDeleted: (invoice) => {
+      setGigs((current) =>
+        current.map((gig) =>
+          gig.invoiceId === invoice.id
+            ? {
+                ...gig,
+                invoiceId: null,
+                invoicedAt: null,
+                isInvoiced: false,
+              }
+            : gig
+        )
+      )
+    },
+  })
   const {
     clearQuickReceiptDialog,
     closeQuickReceiptPrompt,
@@ -298,32 +380,12 @@ function App({ appMetadata }: AppProps) {
     let ignore = false
 
     const resetSignedInState = () => {
-      setClients([])
-      setSelectedClientId('')
-      setSearchQuery('')
-      setIsClientEditorOpen(false)
-      setMode('create')
-      setForm(emptyForm())
-      setGigs([])
-      setSelectedGigId('')
-      setGigSearchQuery('')
-      setIsGigEditorOpen(false)
-      setGigMode('create')
-      setGigForm(emptyGigForm())
-      setGigStatus(defaultGigStatus)
+      resetClientsWorkspace()
+      resetGigsWorkspace()
       setMonthlyInvoiceMonth(getCurrentMonthValue())
       setMonthlyInvoiceStatus('')
-      setInvoices([])
-      setSelectedInvoiceId('')
-      setIsInvoiceEditorOpen(false)
-      setInvoiceSearchQuery('')
-      setInvoiceStatus(defaultInvoiceStatus)
+      resetInvoicesWorkspace()
       clearQuickReceiptDialog()
-      setIsClientSettingsOpen(false)
-      setClientSettingsForm(emptyClientSettingsForm())
-      setClientSettingsStatus(
-        'Client-specific rates override your personal defaults when set.'
-      )
       resetUserSettings()
       resetSellerProfile()
       resetAdminWorkspace()
@@ -434,12 +496,9 @@ function App({ appMetadata }: AppProps) {
           return
         }
 
-        setClients(data)
-        setSelectedClientId(data[0]?.id ?? '')
-        setGigs(gigData)
-        setSelectedGigId(gigData[0]?.id ?? '')
-        setInvoices(invoiceData)
-        setSelectedInvoiceId(invoiceData[0]?.id ?? '')
+        applyClients(data)
+        applyGigs(gigData)
+        applyInvoices(invoiceData)
         applySellerProfile(sellerProfileData)
         setIsApiConnected(true)
         setShouldCloseBrowserNotice(false)
@@ -470,8 +529,7 @@ function App({ appMetadata }: AppProps) {
             setStatus('Your session expired. Sign in again to keep working.')
           } else {
             setIsApiConnected(false)
-            setClients([])
-            setSelectedClientId('')
+            resetClientsWorkspace()
             setAdminUsers([])
             setSelectedAdminUserId('')
             setShouldCloseBrowserNotice(false)
@@ -492,49 +550,22 @@ function App({ appMetadata }: AppProps) {
       ignore = true
     }
   }, [
+    applyClients,
+    applyGigs,
+    applyInvoices,
     applySellerProfile,
     clearQuickReceiptDialog,
+    resetClientsWorkspace,
+    resetGigsWorkspace,
+    resetInvoicesWorkspace,
     resetSellerProfile,
     resetUserSettings,
   ])
 
-  const clientNamesById = useMemo(
-    () => new Map(clients.map((client) => [client.id, client.name])),
-    [clients]
-  )
-  const clientsById = useMemo(
-    () => new Map(clients.map((client) => [client.id, client])),
-    [clients]
-  )
   const adminUsersById = useMemo(
     () => new Map(adminUsers.map((user) => [user.id, user])),
     [adminUsers]
   )
-  const gigsById = useMemo(() => new Map(gigs.map((gig) => [gig.id, gig])), [gigs])
-  const invoicesById = useMemo(
-    () => new Map(invoices.map((invoice) => [invoice.id, invoice])),
-    [invoices]
-  )
-
-  const filteredClients = useMemo(() => {
-    const query = deferredSearchQuery.trim().toLowerCase()
-    if (!query) {
-      return clients
-    }
-
-    return clients.filter((client) =>
-      [
-        client.name,
-        client.email,
-        client.billingAddress.city,
-        client.billingAddress.country,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    )
-  }, [clients, deferredSearchQuery])
-
   const filteredAdminUsers = useMemo(() => {
     const query = deferredAdminSearchQuery.trim().toLowerCase()
     if (!query) {
@@ -549,81 +580,8 @@ function App({ appMetadata }: AppProps) {
     )
   }, [adminUsers, deferredAdminSearchQuery])
 
-  const filteredGigs = useMemo(() => {
-    const query = deferredGigSearchQuery.trim().toLowerCase()
-    const sortedGigs = [...gigs].sort((left, right) => {
-      const dateComparison = right.date.localeCompare(left.date)
-      if (dateComparison !== 0) {
-        return dateComparison
-      }
-
-      return left.title.localeCompare(right.title)
-    })
-
-    if (!query) {
-      return sortedGigs
-    }
-
-    return sortedGigs.filter((gig) => {
-      const clientName = clientNamesById.get(gig.clientId) ?? ''
-
-      return [gig.title, gig.venue, gig.date, gig.status, clientName]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    })
-  }, [clientNamesById, deferredGigSearchQuery, gigs])
-
-  const filteredInvoices = useMemo(() => {
-    const query = deferredInvoiceSearchQuery.trim().toLowerCase()
-    const sortedInvoices = [...invoices].sort((left, right) => {
-      const dateComparison = right.invoiceDate.localeCompare(left.invoiceDate)
-      if (dateComparison !== 0) {
-        return dateComparison
-      }
-
-      return left.invoiceNumber.localeCompare(right.invoiceNumber)
-    })
-
-    if (!query) {
-      return sortedInvoices
-    }
-
-    return sortedInvoices.filter((invoice) => {
-      const clientName = clientNamesById.get(invoice.clientId) ?? ''
-
-      return [
-        invoice.invoiceNumber,
-        invoice.description ?? '',
-        invoice.status,
-        clientName,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    })
-  }, [clientNamesById, deferredInvoiceSearchQuery, invoices])
-
-  const selectedClient = clientsById.get(selectedClientId) ?? filteredClients[0] ?? null
-
   const selectedAdminUser =
     adminUsersById.get(selectedAdminUserId) ?? filteredAdminUsers[0] ?? null
-
-  const selectedGig = gigsById.get(selectedGigId) ?? filteredGigs[0] ?? null
-
-  const selectedGigs = useMemo(
-    () => {
-      const selectedGigIdSet = new Set(selectedGigIds)
-
-      return gigs
-        .filter((gig) => selectedGigIdSet.has(gig.id))
-        .sort((left, right) => left.date.localeCompare(right.date))
-    },
-    [gigs, selectedGigIds]
-  )
-
-  const selectedInvoice =
-    invoicesById.get(selectedInvoiceId) ?? filteredInvoices[0] ?? null
 
   const monthlyInvoiceEligibleGigs = useMemo(() => {
     if (!selectedClient || !monthlyInvoiceMonth) {
@@ -672,57 +630,17 @@ function App({ appMetadata }: AppProps) {
   }
 
   useEffect(() => {
-    if (selectedClient) {
-      setSelectedClientId(selectedClient.id)
-    }
-  }, [selectedClient])
-
-  useEffect(() => {
     if (selectedAdminUser) {
       setSelectedAdminUserId(selectedAdminUser.id)
     }
   }, [selectedAdminUser])
 
   useEffect(() => {
-    if (selectedGig) {
-      setSelectedGigId(selectedGig.id)
-    }
-  }, [selectedGig])
-
-  useEffect(() => {
-    setSelectedGigIds((current) => current.filter((gigId) => gigs.some((gig) => gig.id === gigId)))
-  }, [gigs])
-
-  useEffect(() => {
-    if (selectedInvoice) {
-      setSelectedInvoiceId(selectedInvoice.id)
-    }
-  }, [selectedInvoice])
-
-  useEffect(() => {
     setMonthlyInvoiceStatus('')
   }, [selectedClient?.id, monthlyInvoiceMonth])
 
-  useEffect(() => {
-    if (gigForm.clientId || clients.length === 0) {
-      return
-    }
-
-    setGigForm((current) => ({
-      ...current,
-      clientId: clients[0]?.id ?? '',
-    }))
-  }, [clients, gigForm.clientId])
-
   const activeUsersCount = adminUsers.filter((user) => user.isActive).length
   const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
-  const plannedGigCount = gigs.filter((gig) => gig.status === 'Confirmed').length
-  const completedGigCount = gigs.filter((gig) => gig.status === 'Completed').length
-  const upcomingGigCount = gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length
-  const uninvoicedGigCount = gigs.filter((gig) => !gig.isInvoiced && gig.status !== 'Cancelled').length
-  const draftInvoiceCount = invoices.filter((invoice) => invoice.status === 'Draft').length
-  const issuedInvoiceCount = invoices.filter((invoice) => invoice.status === 'Issued').length
-  const overdueInvoiceCount = invoices.filter((invoice) => invoice.status === 'Overdue').length
   const outstandingInvoiceCount = issuedInvoiceCount + overdueInvoiceCount
   const sellerProfileMissingLabels = useMemo(() => {
     const labels: Record<string, string> = {
@@ -794,33 +712,6 @@ function App({ appMetadata }: AppProps) {
     },
   ]
 
-  const startCreating = () => {
-    setMode('create')
-    setForm(emptyForm())
-    setIsClientEditorOpen(true)
-  }
-
-  const startEditing = () => {
-    if (!selectedClient) {
-      return
-    }
-
-    setMode('edit')
-    setForm({
-      name: selectedClient.name,
-      email: selectedClient.email,
-      billingAddress: {
-        line1: selectedClient.billingAddress.line1 ?? '',
-        line2: selectedClient.billingAddress.line2 ?? '',
-        city: selectedClient.billingAddress.city ?? '',
-        stateOrCounty: selectedClient.billingAddress.stateOrCounty ?? '',
-        postalCode: selectedClient.billingAddress.postalCode ?? '',
-        country: selectedClient.billingAddress.country ?? '',
-      },
-    })
-    setIsClientEditorOpen(true)
-  }
-
   const startAdminCreate = () => {
     setAdminMode('create')
     setAdminForm(emptyAdminForm())
@@ -843,102 +734,10 @@ function App({ appMetadata }: AppProps) {
     setIsAdminEditorOpen(true)
   }
 
-  const startGigCreate = () => {
-    setGigMode('create')
-    setGigForm({
-      ...emptyGigForm(),
-      clientId: clients[0]?.id ?? '',
-    })
-    setGigStatus(
-      clients.length > 0
-        ? 'Capture the essentials now and we can build invoicing on top later.'
-        : 'Create a client first so the gig can be linked correctly.'
-    )
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setSelectedGigIds([])
-    setIsGigEditorOpen(true)
-  }
-
-  const startGigEdit = () => {
-    if (!selectedGig) {
-      return
-    }
-
-    setGigMode('edit')
-    setGigForm({
-      clientId: selectedGig.clientId,
-      title: selectedGig.title,
-      date: selectedGig.date,
-      venue: selectedGig.venue,
-      fee: String(selectedGig.fee),
-      notes: selectedGig.notes ?? '',
-      wasDriving: selectedGig.wasDriving,
-      status: selectedGig.status,
-      expenses: selectedGig.expenses
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map(toGigExpenseForm),
-    })
-    setGigStatus('Editing the selected gig.')
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setIsGigEditorOpen(true)
-  }
-
-  const closeClientEditor = () => {
-    setIsClientEditorOpen(false)
-    setMode('create')
-    setForm(emptyForm())
-  }
-
   const closeAdminEditor = () => {
     setIsAdminEditorOpen(false)
     setAdminMode('create')
     setAdminForm(emptyAdminForm())
-  }
-
-  const closeGigEditor = () => {
-    setIsGigEditorOpen(false)
-    setGigMode('create')
-    setGigForm({
-      ...emptyGigForm(),
-      clientId: clients[0]?.id ?? '',
-    })
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setGigStatus(defaultGigStatus)
-  }
-
-  const startInvoiceEdit = () => {
-    if (!selectedInvoice) {
-      return
-    }
-
-    setIsInvoiceEditorOpen(true)
-  }
-
-  const closeInvoiceEditor = () => {
-    setIsInvoiceEditorOpen(false)
-    setAdjustmentAmount('')
-    setAdjustmentReason('')
-  }
-
-  const updateField = (field: keyof ClientForm, value: string | Address) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const updateAddressField = (field: keyof Address, value: string) => {
-    setForm((current) => ({
-      ...current,
-      billingAddress: {
-        ...current.billingAddress,
-        [field]: value,
-      },
-    }))
   }
 
   const updateAdminField = (
@@ -949,230 +748,6 @@ function App({ appMetadata }: AppProps) {
       ...current,
       [field]: value,
     }))
-  }
-
-  const updateGigField = (
-    field: keyof GigForm,
-    value: string | boolean | GigExpenseForm[]
-  ) => {
-    setGigForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const handleAddGigExpense = () => {
-    const description = gigExpenseDescription.trim()
-    const amount = Number(gigExpenseAmount)
-
-    if (!description) {
-      setGigStatus('Add an expense description before saving it to the gig.')
-      return
-    }
-
-    if (!Number.isFinite(amount) || amount < 0) {
-      setGigStatus('Expense amount must be a valid non-negative number.')
-      return
-    }
-
-    setGigForm((current) => ({
-      ...current,
-      expenses: [
-        ...current.expenses,
-        {
-          id: '',
-          sortOrder: current.expenses.length + 1,
-          description,
-          amount: gigExpenseAmount,
-          attachments: [],
-        },
-      ],
-    }))
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setGigStatus('Expense added to the gig form. Save the gig to persist it.')
-  }
-
-  const updateGigExpenseField = (
-    index: number,
-    field: keyof Pick<GigExpenseForm, 'description' | 'amount'>,
-    value: string
-  ) => {
-    setGigForm((current) => ({
-      ...current,
-      expenses: current.expenses.map((expense, expenseIndex) =>
-        expenseIndex === index
-          ? {
-              ...expense,
-              [field]: value,
-            }
-          : expense
-      ),
-    }))
-  }
-
-  const removeGigExpense = (index: number) => {
-    setGigForm((current) => ({
-      ...current,
-      expenses: current.expenses
-        .filter((_, expenseIndex) => expenseIndex !== index)
-        .map((expense, expenseIndex) => ({
-          ...expense,
-          sortOrder: expenseIndex + 1,
-        })),
-    }))
-  }
-
-  const mergeSavedGig = (savedGig: Gig) => {
-    setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
-    setGigForm((current) => ({
-      ...current,
-      expenses: savedGig.expenses
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map(toGigExpenseForm),
-    }))
-  }
-
-  const refreshGig = async (gigId: string) => {
-    const response = await fetchWithSession(buildApiUrl(`/gigs/${gigId}`))
-
-    if (response.status === 401) {
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
-      setStatus('Your session expired. Sign in again to keep managing gigs.')
-      return null
-    }
-
-    if (!response.ok) {
-      throw new Error('Unable to refresh gig receipts.')
-    }
-
-    const savedGig = (await response.json()) as Gig
-    mergeSavedGig(savedGig)
-    return savedGig
-  }
-
-  const uploadExpenseAttachment = async (index: number, file: File) => {
-    const expense = gigForm.expenses[index]
-    if (!selectedGig || !expense?.id) {
-      setGigStatus('Save the gig before adding receipts.')
-      return
-    }
-
-    const formData = new FormData()
-    formData.append('file', file)
-    setIsGigLoading(true)
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments`),
-        {
-          method: 'POST',
-          body: formData,
-        }
-      )
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing gigs.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to upload receipt.')
-      }
-
-      await refreshGig(selectedGig.id)
-      setGigStatus('Receipt uploaded.')
-    } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to upload receipt.')
-    } finally {
-      setIsGigLoading(false)
-    }
-  }
-
-  const downloadExpenseAttachment = (expense: GigExpenseForm, attachmentId: string) => {
-    if (!selectedGig || !expense.id) {
-      return
-    }
-
-    window.open(
-      buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments/${attachmentId}`),
-      '_blank',
-      'noopener,noreferrer'
-    )
-  }
-
-  const deleteExpenseAttachment = async (
-    expense: GigExpenseForm,
-    attachmentId: string
-  ) => {
-    if (!selectedGig || !expense.id) {
-      return
-    }
-
-    setIsGigLoading(true)
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments/${attachmentId}`),
-        {
-          method: 'DELETE',
-        }
-      )
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing gigs.')
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Unable to delete receipt.')
-      }
-
-      await refreshGig(selectedGig.id)
-      setGigStatus('Receipt deleted.')
-    } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to delete receipt.')
-    } finally {
-      setIsGigLoading(false)
-    }
-  }
-
-  const openGigReceiptDraft = (savedGig: Gig) => {
-    mergeSavedGig(savedGig)
-    setSelectedGigId(savedGig.id)
-    setActiveSection('gigs')
-    setGigMode('edit')
-    setGigForm({
-      clientId: savedGig.clientId,
-      title: savedGig.title,
-      date: savedGig.date,
-      venue: savedGig.venue,
-      fee: String(savedGig.fee),
-      notes: savedGig.notes ?? '',
-      wasDriving: savedGig.wasDriving,
-      status: savedGig.status,
-      expenses: savedGig.expenses
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map(toGigExpenseForm),
-    })
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setIsGigEditorOpen(true)
   }
 
   const signIn = () => {
@@ -1198,24 +773,9 @@ function App({ appMetadata }: AppProps) {
       setIsAuthenticated(false)
       setAuthUser(null)
       setIsApiConnected(false)
-      setClients([])
-      setSelectedClientId('')
-      setSearchQuery('')
-      setIsClientEditorOpen(false)
-      setMode('create')
-      setForm(emptyForm())
-      setGigs([])
-      setSelectedGigId('')
-      setGigSearchQuery('')
-      setIsGigEditorOpen(false)
-      setGigMode('create')
-      setGigForm(emptyGigForm())
-      setGigStatus(defaultGigStatus)
-      setInvoices([])
-      setSelectedInvoiceId('')
-      setIsInvoiceEditorOpen(false)
-      setInvoiceSearchQuery('')
-      setInvoiceStatus(defaultInvoiceStatus)
+      resetClientsWorkspace()
+      resetGigsWorkspace()
+      resetInvoicesWorkspace()
       resetSellerProfile()
       resetAdminWorkspace()
       setShouldCloseBrowserNotice(true)
@@ -1231,299 +791,8 @@ function App({ appMetadata }: AppProps) {
     setThemePreference(nextPreference)
   }
 
-  const openClientSettings = () => {
-    if (!selectedClient) {
-      return
-    }
-
-    setClientSettingsForm({
-      mileageRate:
-        selectedClient.mileageRate === null ? '' : String(selectedClient.mileageRate),
-      passengerMileageRate:
-        selectedClient.passengerMileageRate === null
-          ? ''
-          : String(selectedClient.passengerMileageRate),
-      invoiceFilenamePattern: selectedClient.invoiceFilenamePattern ?? '',
-      invoiceEmailSubjectPattern: selectedClient.invoiceEmailSubjectPattern ?? '',
-    })
-    setClientSettingsStatus(
-      'Client-specific rates override your personal defaults when set.'
-    )
-    setIsClientSettingsOpen(true)
-  }
-
-  const closeClientSettings = () => {
-    setIsClientSettingsOpen(false)
-  }
-
-  const updateClientSettingsField = (
-    field: keyof ClientSettingsForm,
-    value: string
-  ) => {
-    setClientSettingsForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const handleClientSettingsSubmit = async (
-    event: FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault()
-
-    if (!selectedClient) {
-      return
-    }
-
-    const parseOptionalDecimal = (value: string) => {
-      const trimmed = value.trim()
-      if (!trimmed) {
-        return null
-      }
-
-      const parsed = Number(trimmed)
-      return Number.isFinite(parsed) ? parsed : Number.NaN
-    }
-
-    const mileageRate = parseOptionalDecimal(clientSettingsForm.mileageRate)
-    const passengerMileageRate = parseOptionalDecimal(
-      clientSettingsForm.passengerMileageRate
-    )
-    const invoiceFilenamePattern = clientSettingsForm.invoiceFilenamePattern.trim()
-    const invoiceEmailSubjectPattern =
-      clientSettingsForm.invoiceEmailSubjectPattern.trim()
-
-    if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
-      setClientSettingsStatus('Rates must be valid numbers, for example 0.45.')
-      return
-    }
-
-    setIsClientSettingsSaving(true)
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/clients/${selectedClient.id}`),
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id: selectedClient.id,
-            name: selectedClient.name,
-            email: selectedClient.email,
-            billingAddress: selectedClient.billingAddress,
-            mileageRate,
-            passengerMileageRate,
-            invoiceFilenamePattern: invoiceFilenamePattern || null,
-            invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
-          }),
-        }
-      )
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setIsClientSettingsOpen(false)
-        setStatus('Your session expired. Sign in again to update client settings.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save client settings.')
-      }
-
-      const savedClient = (await response.json()) as Client
-
-      setClients((current) =>
-        current.map((client) => (client.id === savedClient.id ? savedClient : client))
-      )
-      setClientSettingsForm({
-        mileageRate: savedClient.mileageRate === null ? '' : String(savedClient.mileageRate),
-        passengerMileageRate:
-          savedClient.passengerMileageRate === null
-            ? ''
-            : String(savedClient.passengerMileageRate),
-        invoiceFilenamePattern: savedClient.invoiceFilenamePattern ?? '',
-        invoiceEmailSubjectPattern: savedClient.invoiceEmailSubjectPattern ?? '',
-      })
-      setClientSettingsStatus('Client settings updated.')
-    } catch (error) {
-      setClientSettingsStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to save client settings right now.'
-      )
-    } finally {
-      setIsClientSettingsSaving(false)
-    }
-  }
-
   const openSellerProfile = () => {
     openSellerProfileModal(sellerProfileNotice)
-  }
-
-  const shouldCloseAfterSave = (event: FormEvent<HTMLFormElement>) => {
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as
-      | HTMLButtonElement
-      | null
-
-    return submitter?.dataset.closeAfterSave !== 'false'
-  }
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const closeAfterSave = shouldCloseAfterSave(event)
-
-    const payload: ClientForm = {
-      name: form.name.trim(),
-      email: form.email.trim(),
-      billingAddress: {
-        line1: form.billingAddress.line1.trim(),
-        line2: form.billingAddress.line2.trim(),
-        city: form.billingAddress.city.trim(),
-        stateOrCounty: form.billingAddress.stateOrCounty.trim(),
-        postalCode: form.billingAddress.postalCode.trim(),
-        country: form.billingAddress.country.trim(),
-      },
-    }
-
-    const preservedClientSettings =
-      mode === 'edit' && selectedClient
-        ? {
-            mileageRate: selectedClient.mileageRate,
-            passengerMileageRate: selectedClient.passengerMileageRate,
-            invoiceFilenamePattern: selectedClient.invoiceFilenamePattern,
-            invoiceEmailSubjectPattern: selectedClient.invoiceEmailSubjectPattern,
-          }
-        : {
-            mileageRate: null,
-            passengerMileageRate: null,
-            invoiceFilenamePattern: null,
-            invoiceEmailSubjectPattern: null,
-          }
-
-    if (
-      !payload.name ||
-      !payload.email ||
-      !payload.billingAddress.line1 ||
-      !payload.billingAddress.city
-    ) {
-      setStatus('Name, email, address line 1 and city are required.')
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      if (!isApiConnected) {
-        throw new Error('API unavailable.')
-      }
-
-      const isEdit = mode === 'edit' && selectedClient
-      const endpoint = isEdit
-        ? buildApiUrl(`/clients/${selectedClient.id}`)
-        : buildApiUrl('/clients')
-      const requestBody = JSON.stringify({
-        ...payload,
-        ...preservedClientSettings,
-      })
-
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: requestBody,
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to save changes.')
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Save failed.')
-      }
-
-      const savedClient = (await response.json()) as Client
-
-      setClients((current) => {
-        if (isEdit) {
-          return current.map((client) =>
-            client.id === savedClient.id ? savedClient : client
-          )
-        }
-
-        return [savedClient, ...current]
-      })
-
-      setSelectedClientId(savedClient.id)
-      setMode('edit')
-      setStatus(isEdit ? 'Client updated.' : 'Client created.')
-      setIsClientEditorOpen(!closeAfterSave)
-    } catch {
-      setStatus('Unable to save right now. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!selectedClient) {
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      if (!isApiConnected) {
-        throw new Error('API unavailable.')
-      }
-
-      const response = await fetchWithSession(buildApiUrl(`/clients/${selectedClient.id}`), {
-        method: 'DELETE',
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to delete clients.')
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Delete failed.')
-      }
-
-      let nextSelectedClientId = ''
-
-      setClients((current) => {
-        const remaining = current.filter((client) => client.id !== selectedClient.id)
-        nextSelectedClientId = remaining[0]?.id ?? ''
-        return remaining
-      })
-
-      setSelectedClientId(nextSelectedClientId)
-      setMode('create')
-      setForm(emptyForm())
-      setStatus('Client deleted.')
-      setIsClientEditorOpen(false)
-    } catch {
-      setStatus('Unable to delete right now.')
-    } finally {
-      setIsLoading(false)
-    }
   }
 
   const handleAdminSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1600,141 +869,6 @@ function App({ appMetadata }: AppProps) {
       )
     } finally {
       setIsAdminLoading(false)
-    }
-  }
-
-  const handleGigSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const closeAfterSave = shouldCloseAfterSave(event)
-
-    const payload = {
-      clientId: gigForm.clientId,
-      title: gigForm.title.trim(),
-      date: gigForm.date,
-      venue: gigForm.venue.trim(),
-      fee: gigForm.fee.trim(),
-      notes: gigForm.notes.trim(),
-      wasDriving: gigForm.wasDriving,
-      status: gigForm.status,
-      expenses: gigForm.expenses,
-    }
-
-    if (!payload.clientId || !payload.title || !payload.date || !payload.venue) {
-      setGigStatus('Client, title, date and location are required.')
-      return
-    }
-
-    const fee = Number(payload.fee)
-    if (!Number.isFinite(fee) || fee < 0) {
-      setGigStatus('Fee must be a valid non-negative number.')
-      return
-    }
-
-    const normalizedExpenses = []
-    for (const [index, expense] of payload.expenses.entries()) {
-      const description = expense.description.trim()
-      const amount = Number(expense.amount)
-
-      if (!description) {
-        setGigStatus(`Expense ${index + 1} needs a description.`)
-        return
-      }
-
-      if (!Number.isFinite(amount) || amount < 0) {
-        setGigStatus(`Expense ${index + 1} must have a valid non-negative amount.`)
-        return
-      }
-
-      normalizedExpenses.push({
-        sortOrder: index + 1,
-        description,
-        amount,
-      })
-    }
-
-    setIsGigLoading(true)
-
-    try {
-      const isEdit = gigMode === 'edit' && selectedGig
-      const endpoint = isEdit
-        ? buildApiUrl(`/gigs/${selectedGig.id}`)
-        : buildApiUrl('/gigs')
-
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          clientId: payload.clientId,
-          title: payload.title,
-          date: payload.date,
-          venue: payload.venue,
-          fee,
-          travelMiles: 0,
-          passengerCount: null,
-          notes: payload.notes || null,
-          wasDriving: payload.wasDriving,
-          status: payload.status,
-          invoiceId: null,
-          expenses: normalizedExpenses,
-          invoicedAt: null,
-        }),
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing gigs.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save gig.')
-      }
-
-      const savedGig = (await response.json()) as Gig
-
-      setGigs((current) => {
-        if (isEdit) {
-          return current.map((gig) => (gig.id === savedGig.id ? savedGig : gig))
-        }
-
-        return [savedGig, ...current]
-      })
-
-      setSelectedGigId(savedGig.id)
-      setGigMode('edit')
-      setGigForm({
-        clientId: savedGig.clientId,
-        title: savedGig.title,
-        date: savedGig.date,
-        venue: savedGig.venue,
-        fee: String(savedGig.fee),
-        notes: savedGig.notes ?? '',
-        wasDriving: savedGig.wasDriving,
-        status: savedGig.status,
-        expenses: savedGig.expenses
-          .slice()
-          .sort((left, right) => left.sortOrder - right.sortOrder)
-          .map(toGigExpenseForm),
-      })
-      setGigExpenseAmount('')
-      setGigExpenseDescription('')
-      setGigStatus(isEdit ? 'Gig updated.' : 'Gig created.')
-      setIsGigEditorOpen(!closeAfterSave)
-    } catch (error) {
-      setGigStatus(
-        error instanceof Error ? error.message : 'Unable to save this gig right now.'
-      )
-    } finally {
-      setIsGigLoading(false)
     }
   }
 
@@ -1889,14 +1023,6 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
-  const handleToggleGigSelection = (gigId: string) => {
-    setSelectedGigIds((current) =>
-      current.includes(gigId)
-        ? current.filter((value) => value !== gigId)
-        : [...current, gigId]
-    )
-  }
-
   const handleGenerateMonthlyInvoice = async () => {
     if (!selectedClient) {
       setMonthlyInvoiceStatus('Choose a client before running a monthly invoice.')
@@ -2040,373 +1166,6 @@ function App({ appMetadata }: AppProps) {
       setMonthlyInvoiceStatus(
         error instanceof Error ? error.message : 'Unable to generate monthly invoice.'
       )
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleDownloadInvoicePdf = async (invoice: Invoice) => {
-    const fallbackFilename = `${invoice.invoiceNumber}.pdf`
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Preparing ${fallbackFilename}...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/pdf`))
-      if (!response.ok) {
-        throw new Error('Unable to download the invoice PDF.')
-      }
-
-      const contentDisposition = response.headers.get('Content-Disposition')
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = downloadUrl
-      link.download = extractDownloadFilename(contentDisposition) ?? fallbackFilename
-      document.body.append(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(downloadUrl)
-      setInvoiceStatus(`Downloaded ${link.download}.`)
-    } catch (error) {
-      setInvoiceStatus(
-        error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
-      )
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const extractDownloadFilename = (contentDisposition: string | null) => {
-    if (!contentDisposition) {
-      return null
-    }
-
-    const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-    if (encodedMatch?.[1]) {
-      try {
-        return decodeURIComponent(encodedMatch[1])
-      } catch {
-        return encodedMatch[1]
-      }
-    }
-
-    const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
-    if (quotedMatch?.[1]) {
-      return quotedMatch[1]
-    }
-
-    const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
-    return plainMatch?.[1]?.trim() ?? null
-  }
-
-  const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus) => {
-    if (invoice.status === status) {
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Updating ${invoice.invoiceNumber} to ${status}...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/status`), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const fieldError = problem?.errors?.status?.[0]
-        throw new Error(fieldError ?? problem?.detail ?? problem?.title ?? 'Unable to update status.')
-      }
-
-      const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
-    } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to update invoice status.')
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleInvoiceReissue = async (invoice: Invoice) => {
-    const isRedraft = invoice.status === 'Draft'
-    const actionLabel = isRedraft ? 'Redraft' : 'Re-issue'
-    const actionVerb = isRedraft ? 'Redrafting' : 'Re-issuing'
-    const shouldProceed = window.confirm(
-      isRedraft
-        ? `Redraft ${invoice.invoiceNumber}? This will regenerate the draft document without changing reissue history.`
-        : `Re-issue ${invoice.invoiceNumber}? This will regenerate the document and log the action.`
-    )
-    if (!shouldProceed) {
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`${actionVerb} ${invoice.invoiceNumber}...`)
-
-    try {
-      const actionPath = isRedraft ? 'redraft' : 'reissue'
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/${actionPath}`), {
-        method: 'POST',
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const fieldError = problem?.errors?.recipient?.[0]
-        const statusError = problem?.errors?.status?.[0]
-        throw new Error(
-          fieldError ??
-            statusError ??
-            problem?.detail ??
-            problem?.title ??
-            `Unable to ${actionLabel.toLowerCase()} invoice.`
-        )
-      }
-
-      const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-
-      if (isRedraft) {
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} draft regenerated.`)
-      } else {
-        const reissuedAt = formatDateTime(updatedInvoice.lastReissuedUtc)
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
-      }
-    } catch (error) {
-      setInvoiceStatus(
-        error instanceof Error ? error.message : `Unable to ${actionLabel.toLowerCase()} invoice.`
-      )
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleSendInvoiceEmail = async (invoice: Invoice) => {
-    const message = window.prompt(
-      `Add an optional message for ${invoice.invoiceNumber}, or leave blank to send the standard note.`
-    )
-    if (message === null) {
-      return
-    }
-    const includeReceipts = window.confirm(
-      `Include any expense receipt attachments for ${invoice.invoiceNumber}?`
-    )
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Sending ${invoice.invoiceNumber} to client...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/send-email`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: message.trim() || null,
-          includeReceipts,
-        }),
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const recipientError = problem?.errors?.recipient?.[0]
-        const pdfError = problem?.errors?.pdf?.[0]
-        const attachmentError = problem?.errors?.attachments?.[0]
-        throw new Error(
-          recipientError ??
-            pdfError ??
-            attachmentError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to send invoice email.'
-        )
-      }
-
-      const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      setInvoiceStatus(
-        `Invoice ${updatedInvoice.invoiceNumber} sent to ${updatedInvoice.lastDeliveryRecipient}.`
-      )
-    } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to send invoice email.')
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handlePublishInvoiceGoogleDrive = async (invoice: Invoice) => {
-    const shouldProceed = window.confirm(
-      `Publish ${invoice.invoiceNumber} to your connected Google Drive?`
-    )
-    if (!shouldProceed) {
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setGoogleDrivePublishLink(null)
-    setInvoiceStatus(`Publishing ${invoice.invoiceNumber} to Google Drive...`)
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/invoices/${invoice.id}/publish/google-drive`),
-        {
-          method: 'POST',
-        }
-      )
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const pdfError = problem?.errors?.pdf?.[0]
-        throw new Error(
-          pdfError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to publish invoice to Google Drive.'
-        )
-      }
-
-      const publishResult = (await response.json()) as GoogleDrivePublishResponse
-      const updatedInvoice = publishResult.invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      const driveLink = publishResult.webViewLink?.trim()
-      if (driveLink) {
-        setGoogleDrivePublishLink({
-          href: driveLink,
-          fileName: publishResult.fileName,
-        })
-        setInvoiceStatus(`Uploaded ${updatedInvoice.invoiceNumber} to Google Drive.`)
-      } else {
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} published to Google Drive.`)
-      }
-    } catch (error) {
-      setGoogleDrivePublishLink(null)
-      setInvoiceStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to publish invoice to Google Drive.'
-      )
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleAddInvoiceAdjustment = async (invoice: Invoice) => {
-    const amount = Number.parseFloat(adjustmentAmount)
-    if (!Number.isFinite(amount) || amount === 0) {
-      setInvoiceStatus('Enter a non-zero adjustment amount.')
-      return
-    }
-
-    const reason = adjustmentReason.trim()
-    if (!reason) {
-      setInvoiceStatus('Add a reason before saving an adjustment.')
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Saving adjustment on ${invoice.invoiceNumber}...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/adjustments`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount,
-          reason,
-        }),
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const reasonError = problem?.errors?.reason?.[0]
-        const amountError = problem?.errors?.amount?.[0]
-        throw new Error(
-          reasonError ??
-            amountError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to add invoice adjustment.'
-        )
-      }
-
-      const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      setAdjustmentAmount('')
-      setAdjustmentReason('')
-      setInvoiceStatus(`Adjustment saved. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`)
-      setIsInvoiceEditorOpen(false)
-    } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to add invoice adjustment.')
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleDeleteInvoice = async (invoice: Invoice) => {
-    if (invoice.status !== 'Draft') {
-      setInvoiceStatus(
-        `Only Draft invoices can be deleted. ${invoice.invoiceNumber} is currently ${invoice.status}.`
-      )
-      return
-    }
-
-    const shouldDelete = window.confirm(
-      `Delete ${invoice.invoiceNumber}? This cannot be undone and should only be used for draft mistakes.`
-    )
-    if (!shouldDelete) {
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Deleting ${invoice.invoiceNumber}...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}`), {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const statusError = problem?.errors?.status?.[0]
-        throw new Error(
-          statusError ?? problem?.detail ?? problem?.title ?? 'Unable to delete invoice.'
-        )
-      }
-
-      setInvoices((current) => current.filter((value) => value.id !== invoice.id))
-      setGigs((current) =>
-        current.map((gig) =>
-          gig.invoiceId === invoice.id
-            ? {
-                ...gig,
-                invoiceId: null,
-                invoicedAt: null,
-                isInvoiced: false,
-              }
-            : gig
-        )
-      )
-      setSelectedInvoiceId((current) => (current === invoice.id ? '' : current))
-      setInvoiceStatus(`Invoice ${invoice.invoiceNumber} deleted.`)
-      setIsInvoiceEditorOpen(false)
-    } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to delete invoice.')
     } finally {
       setIsInvoiceLoading(false)
     }
