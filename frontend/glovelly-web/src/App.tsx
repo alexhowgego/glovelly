@@ -2,15 +2,18 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   AdminSection,
+  AppShell,
   ClientSettingsModal,
   ClientsSection,
   GigsSection,
   InvoicesSection,
+  QuickReceiptModal,
   SellerProfileModal,
   SessionCheckingScreen,
   SignInScreen,
   UserSettingsModal,
 } from './AppSections'
+import type { AppNavigationItem, HeaderMetric } from './AppSections'
 import {
   buildApiUrl,
   buildInvoiceEmailSubjectPreview,
@@ -28,8 +31,6 @@ import {
   invoiceFilenameTokens,
   fetchWithSession,
   formatCurrency,
-  formatBuildMetadata,
-  formatDate,
   formatDateTime,
   getStoredThemePreference,
   parseProblemDetails,
@@ -212,14 +213,6 @@ function App({ appMetadata }: AppProps) {
   const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery)
 
   const isAdmin = authUser?.role === 'Admin'
-  const profileDisplayName = authUser?.name?.trim() || authUser?.email || 'User'
-  const profileImageUrl = authUser?.profileImageUrl?.trim() || ''
-  const profileInitials = profileDisplayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
 
   useEffect(() => {
     if (!isAdmin && activeSection === 'admin') {
@@ -755,13 +748,7 @@ function App({ appMetadata }: AppProps) {
       ? ` Seller profile is incomplete. Missing: ${sellerProfileMissingLabels.join(', ')}. You can still generate invoices, but some sender details may be omitted.`
       : ' Seller profile is not set up yet. You can still generate invoices, but sender and payment details will be missing until you configure them.'
 
-  const navigationItems: Array<{
-    id: AppSection
-    label: string
-    eyebrow: string
-    description: string
-    disabled?: boolean
-  }> = [
+  const navigationItems: AppNavigationItem[] = [
     {
       id: 'clients',
       label: 'Clients',
@@ -793,7 +780,7 @@ function App({ appMetadata }: AppProps) {
   ]
 
   const currentSection = navigationItems.find((item) => item.id === activeSection)
-  const headerMetrics = [
+  const headerMetrics: HeaderMetric[] = [
     {
       value: upcomingGigCount,
       label: 'upcoming gigs',
@@ -3063,185 +3050,33 @@ function App({ appMetadata }: AppProps) {
     )
 
   return (
-    <main className="app-shell">
-      <section className="hero-panel app-frame">
-        <div className="content-shell">
-          <div className="content-header panel">
-            <div className="content-header-top">
-              <div className="content-header-copy">
-                <p className="eyebrow">Workspace</p>
-                <h1>Your work, all in one place.</h1>
-                <p className="hero-text">
-                  Move between clients, gigs, invoices and admin tools with everything easy to find.
-                </p>
-              </div>
-
-              <div className="header-actions">
-                <label className="primary-button quick-receipt-button">
-                  <span aria-hidden="true">+</span>
-                  Scan receipt
-                  <input
-                    type="file"
-                    accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
-                    disabled={isLoading || isGigLoading || isQuickReceiptSaving}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      event.target.value = ''
-                      if (file) {
-                        handleQuickReceiptFile(file)
-                      }
-                    }}
-                  />
-                </label>
-
-                <div className="profile-menu" ref={profileMenuRef}>
-                  <button
-                    aria-expanded={isProfileMenuOpen}
-                    aria-haspopup="menu"
-                    aria-label="Open profile menu"
-                    className={`profile-trigger ${isProfileMenuOpen ? 'open' : ''}`}
-                    onClick={() => setIsProfileMenuOpen((current) => !current)}
-                    type="button"
-                  >
-                    <span className="profile-avatar" aria-hidden="true">
-                      {profileImageUrl ? (
-                        <img
-                          className="profile-avatar-image"
-                          src={profileImageUrl}
-                          alt=""
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        profileInitials || 'U'
-                      )}
-                    </span>
-                  </button>
-
-                  {isProfileMenuOpen && (
-                    <div className="profile-dropdown" role="menu" aria-label="Profile menu">
-                      <div className="profile-summary">
-                        <p className="section-label">Signed in</p>
-                        <strong>{profileDisplayName}</strong>
-                        <span>{authUser?.email}</span>
-                      </div>
-                      <div className="profile-meta">
-                        <span>{isAdmin ? 'Administrator' : 'Standard access'}</span>
-                      </div>
-                      <div className="profile-meta">
-                        <span>
-                          {sellerProfile.isInvoiceReady
-                            ? 'Seller profile ready'
-                            : sellerProfile.isConfigured
-                              ? 'Seller profile needs attention'
-                              : 'Seller profile not set up'}
-                        </span>
-                      </div>
-                      <label className="theme-field" htmlFor="theme-preference-select">
-                        <span>Theme</span>
-                        <select
-                          id="theme-preference-select"
-                          value={themePreference}
-                          onChange={(event) =>
-                            handleThemePreferenceChange(event.target.value as ThemePreference)
-                          }
-                        >
-                          <option value="system">System</option>
-                          <option value="light">Light</option>
-                          <option value="dark">Dark</option>
-                        </select>
-                      </label>
-                      <button
-                        className="ghost-button profile-settings"
-                        onClick={openSellerProfile}
-                        role="menuitem"
-                        type="button"
-                        disabled={isLoading || isAdminLoading || isSellerProfileSaving}
-                      >
-                        Seller profile
-                      </button>
-                      <button
-                        className="ghost-button profile-settings"
-                        onClick={openUserSettings}
-                        role="menuitem"
-                        type="button"
-                        disabled={isLoading || isAdminLoading || isUserSettingsSaving}
-                      >
-                        Settings
-                      </button>
-                      <button
-                        className="ghost-button profile-signout"
-                        onClick={signOut}
-                        role="menuitem"
-                        type="button"
-                        disabled={isLoading || isAdminLoading}
-                      >
-                        Sign out
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="content-header-body">
-              <div className="content-header-copy">
-                <p className="eyebrow">{currentSection?.eyebrow ?? 'Workspace'}</p>
-                <h2>{currentSection?.label ?? 'Glovelly'}</h2>
-                <p className="hero-text">{currentSection?.description}</p>
-              </div>
-
-              <div className="hero-mascot header-mascot">
-                <img
-                  src="/gordon-192.png"
-                  alt="Gordon the Glovelly mascot"
-                  decoding="async"
-                  loading="lazy"
-                />
-                <div>
-                  <p className="section-label">Meet Gordon</p>
-                  <strong>Mozart wig. Rubber chicken. Unreasonably good taste in admin.</strong>
-                </div>
-              </div>
-            </div>
-
-            <nav className="charm-bar" aria-label="Primary">
-              {navigationItems.map((item) => (
-                <button
-                  key={item.id}
-                  className={`charm-item ${activeSection === item.id ? 'selected' : ''}`}
-                  onClick={() => setActiveSection(item.id)}
-                  type="button"
-                  disabled={item.disabled}
-                >
-                  <span className="charm-meta">{item.eyebrow}</span>
-                  <strong>{item.label}</strong>
-                  <span>{item.description}</span>
-                </button>
-              ))}
-            </nav>
-
-            <div className="content-header-aside">
-              <div className="hero-metrics">
-                {headerMetrics.map((metric) => (
-                  <article key={metric.label}>
-                    <span>{metric.value}</span>
-                    <p>{metric.label}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {currentSectionContent}
-        </div>
-      </section>
-
-      <p className="build-meta">
-        {appMetadata.deploymentName ? `${appMetadata.deploymentName} • ` : ''}
-        {formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}
-      </p>
-
+    <AppShell
+      activeSection={activeSection}
+      appMetadata={appMetadata}
+      authUser={authUser}
+      currentSection={currentSection}
+      currentSectionContent={currentSectionContent}
+      headerMetrics={headerMetrics}
+      isAdmin={isAdmin}
+      isAdminLoading={isAdminLoading}
+      isGigLoading={isGigLoading}
+      isLoading={isLoading}
+      isProfileMenuOpen={isProfileMenuOpen}
+      isQuickReceiptSaving={isQuickReceiptSaving}
+      isSellerProfileSaving={isSellerProfileSaving}
+      isUserSettingsSaving={isUserSettingsSaving}
+      navigationItems={navigationItems}
+      onOpenSellerProfile={openSellerProfile}
+      onOpenUserSettings={openUserSettings}
+      onProfileMenuToggle={() => setIsProfileMenuOpen((current) => !current)}
+      onQuickReceiptFile={handleQuickReceiptFile}
+      onSectionChange={setActiveSection}
+      onSignOut={signOut}
+      onThemePreferenceChange={handleThemePreferenceChange}
+      profileMenuRef={profileMenuRef}
+      sellerProfile={sellerProfile}
+      themePreference={themePreference}
+    >
       <UserSettingsModal
         form={userSettingsForm}
         invoiceEmailSubjectPreview={buildInvoiceEmailSubjectPreview(
@@ -3275,144 +3110,24 @@ function App({ appMetadata }: AppProps) {
         status={sellerProfileStatus}
       />
 
-      {(pendingReceiptFile || quickReceiptDraft) && (
-        <div className="settings-overlay" role="presentation">
-          <section
-            aria-labelledby="quick-receipt-title"
-            className="settings-modal quick-receipt-modal panel"
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="panel-heading">
-              <div>
-                <p className="section-label">Receipt capture</p>
-                <h2 id="quick-receipt-title">
-                  {quickReceiptDraft ? 'Receipt saved' : 'Choose a gig'}
-                </h2>
-              </div>
-              <button
-                className="ghost-button"
-                onClick={closeQuickReceiptPrompt}
-                type="button"
-                disabled={isQuickReceiptSaving}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="quick-receipt-summary">
-              <strong>
-                {pendingReceiptFile?.name ||
-                  quickReceiptDraft?.gig.expenses
-                    .find((expense) => expense.id === quickReceiptDraft.expenseId)
-                    ?.attachments.find(
-                      (attachment) => attachment.id === quickReceiptDraft.attachmentId
-                    )?.fileName ||
-                  'Receipt upload'}
-              </strong>
-              <span>{quickReceiptStatus}</span>
-              {isQuickReceiptSaving && !quickReceiptDraft ? (
-                <div className="quick-receipt-progress" aria-label="Receipt upload in progress">
-                  <span />
-                </div>
-              ) : null}
-            </div>
-
-            {quickReceiptDraft?.hasNearbyCandidates ? (
-              <div className="quick-receipt-warning">
-                <strong>Check the gig before moving on.</strong>
-                <span>
-                  There are other gigs close to this date. The nearest one has been
-                  selected, but this receipt may belong somewhere else.
-                </span>
-              </div>
-            ) : null}
-
-            {quickReceiptCandidates.length > 0 ? (
-              <label className="quick-receipt-select">
-                <span>Gig</span>
-                <select
-                  value={quickReceiptSelectedGigId}
-                  onChange={(event) => setQuickReceiptSelectedGigId(event.target.value)}
-                  disabled={isQuickReceiptSaving}
-                >
-                  {quickReceiptCandidates.map((gig) => (
-                    <option key={gig.id} value={gig.id}>
-                      {gig.title} · {formatDate(gig.date)} · {gig.venue} ·{' '}
-                      {clientNamesById.get(gig.clientId) ?? 'Unknown client'} ·{' '}
-                      {gig.daysFromToday === 0
-                        ? 'today'
-                        : `${gig.daysFromToday} day${gig.daysFromToday === 1 ? '' : 's'} away`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : isQuickReceiptSaving && !quickReceiptDraft ? null : (
-              <div className="empty-state">
-                <strong>No candidate gigs are available.</strong>
-                <p>Create or update a gig near this receipt date, then try again.</p>
-              </div>
-            )}
-
-            {quickReceiptDraft ? (
-              <div className="form-grid quick-receipt-details">
-                <label>
-                  <span>Amount</span>
-                  <input
-                    inputMode="decimal"
-                    value={quickReceiptAmount}
-                    onChange={(event) => setQuickReceiptAmount(event.target.value)}
-                    placeholder="0.00"
-                    disabled={isQuickReceiptSaving}
-                  />
-                </label>
-                <label>
-                  <span>Description</span>
-                  <input
-                    value={quickReceiptDescription}
-                    onChange={(event) => setQuickReceiptDescription(event.target.value)}
-                    placeholder="Taxi, parking, hotel..."
-                    disabled={isQuickReceiptSaving}
-                  />
-                </label>
-              </div>
-            ) : null}
-
-            <div className="form-actions">
-              {quickReceiptDraft ? (
-                <>
-                  <button
-                    className="primary-button"
-                    onClick={saveQuickReceiptDetails}
-                    type="button"
-                    disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
-                  >
-                    {isQuickReceiptSaving ? 'Saving...' : 'Save details'}
-                  </button>
-                  <button
-                    className="ghost-button"
-                    onClick={goToQuickReceiptGig}
-                    type="button"
-                    disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
-                  >
-                    Go to gig
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="primary-button"
-                  onClick={savePendingReceiptToSelectedGig}
-                  type="button"
-                  disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
-                >
-                  {isQuickReceiptSaving ? 'Saving...' : 'Save receipt draft'}
-                </button>
-              )}
-              <span className="status-pill">{quickReceiptStatus}</span>
-            </div>
-          </section>
-        </div>
-      )}
+      <QuickReceiptModal
+        amount={quickReceiptAmount}
+        candidates={quickReceiptCandidates}
+        clientNamesById={clientNamesById}
+        description={quickReceiptDescription}
+        draft={quickReceiptDraft}
+        isSaving={isQuickReceiptSaving}
+        onAmountChange={setQuickReceiptAmount}
+        onClose={closeQuickReceiptPrompt}
+        onDescriptionChange={setQuickReceiptDescription}
+        onGoToGig={goToQuickReceiptGig}
+        onSaveDetails={saveQuickReceiptDetails}
+        onSaveDraft={savePendingReceiptToSelectedGig}
+        onSelectedGigChange={setQuickReceiptSelectedGigId}
+        pendingFile={pendingReceiptFile}
+        selectedGigId={quickReceiptSelectedGigId}
+        status={quickReceiptStatus}
+      />
 
       <ClientSettingsModal
         authUser={authUser}
@@ -3435,7 +3150,7 @@ function App({ appMetadata }: AppProps) {
         selectedClient={selectedClient}
         status={clientSettingsStatus}
       />
-    </main>
+    </AppShell>
   )
 }
 
