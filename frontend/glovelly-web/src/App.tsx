@@ -26,8 +26,6 @@ import {
   emptyClientSettingsForm,
   emptyForm,
   emptyGigForm,
-  emptySellerProfileForm,
-  emptyUserSettingsForm,
   invoiceFilenameTokens,
   fetchWithSession,
   formatCurrency,
@@ -37,6 +35,9 @@ import {
   themeStorageKey,
   toGigExpenseForm,
 } from './appShared'
+import { useQuickReceipt } from './hooks/useQuickReceipt'
+import { useSellerProfile } from './hooks/useSellerProfile'
+import { useUserSettings } from './hooks/useUserSettings'
 import type {
   Address,
   AdminUser,
@@ -52,13 +53,8 @@ import type {
   GigForm,
   Invoice,
   InvoiceStatus,
-  QuickReceiptCandidate,
-  QuickReceiptDraftResponse,
-  QuickReceiptDraftUpdateResponse,
   SellerProfile,
-  SellerProfileForm,
   ThemePreference,
-  UserSettingsForm,
 } from './appShared'
 import './App.css'
 
@@ -82,46 +78,6 @@ function buildMonthlyInvoiceNumber(month: string, sequence: number) {
   return `GLV-${month.replace('-', '')}-${String(sequence).padStart(3, '0')}`
 }
 
-
-function toSellerProfileForm(profile: SellerProfile): SellerProfileForm {
-  return {
-    sellerName: profile.sellerName ?? '',
-    addressLine1: profile.addressLine1 ?? '',
-    addressLine2: profile.addressLine2 ?? '',
-    city: profile.city ?? '',
-    region: profile.region ?? '',
-    postcode: profile.postcode ?? '',
-    country: profile.country ?? 'United Kingdom',
-    email: profile.email ?? '',
-    phone: profile.phone ?? '',
-    accountName: profile.accountName ?? '',
-    sortCode: profile.sortCode ?? '',
-    accountNumber: profile.accountNumber ?? '',
-    paymentReferenceNote: profile.paymentReferenceNote ?? '',
-  }
-}
-
-function emptySellerProfile(): SellerProfile {
-  return {
-    id: null,
-    sellerName: null,
-    addressLine1: null,
-    addressLine2: null,
-    city: null,
-    region: null,
-    postcode: null,
-    country: 'United Kingdom',
-    email: null,
-    phone: null,
-    accountName: null,
-    sortCode: null,
-    accountNumber: null,
-    paymentReferenceNote: null,
-    isConfigured: false,
-    isInvoiceReady: false,
-    missingFields: ['sellerName', 'addressLine1', 'city', 'country'],
-  }
-}
 
 type AppProps = {
   appMetadata: AppMetadata
@@ -149,23 +105,9 @@ function App({ appMetadata }: AppProps) {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
-  const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const [themePreference, setThemePreference] =
     useState<ThemePreference>(getStoredThemePreference)
-  const [userSettingsForm, setUserSettingsForm] =
-    useState<UserSettingsForm>(emptyUserSettingsForm)
-  const [userSettingsStatus, setUserSettingsStatus] =
-    useState('Set the mileage defaults used when a client has no custom rates.')
-  const [isUserSettingsSaving, setIsUserSettingsSaving] = useState(false)
-  const [sellerProfile, setSellerProfile] = useState<SellerProfile>(emptySellerProfile)
-  const [sellerProfileForm, setSellerProfileForm] =
-    useState<SellerProfileForm>(emptySellerProfileForm)
-  const [sellerProfileStatus, setSellerProfileStatus] = useState(
-    'Add the seller details that should appear on your invoices.'
-  )
-  const [isSellerProfileOpen, setIsSellerProfileOpen] = useState(false)
-  const [isSellerProfileSaving, setIsSellerProfileSaving] = useState(false)
 
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
@@ -196,15 +138,6 @@ function App({ appMetadata }: AppProps) {
   const [googleDrivePublishLink, setGoogleDrivePublishLink] =
     useState<GoogleDrivePublishLink | null>(null)
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
-  const [pendingReceiptFile, setPendingReceiptFile] = useState<File | null>(null)
-  const [quickReceiptDraft, setQuickReceiptDraft] =
-    useState<QuickReceiptDraftResponse | null>(null)
-  const [quickReceiptCandidates, setQuickReceiptCandidates] = useState<QuickReceiptCandidate[]>([])
-  const [quickReceiptSelectedGigId, setQuickReceiptSelectedGigId] = useState('')
-  const [quickReceiptAmount, setQuickReceiptAmount] = useState('')
-  const [quickReceiptDescription, setQuickReceiptDescription] = useState('')
-  const [quickReceiptStatus, setQuickReceiptStatus] = useState('')
-  const [isQuickReceiptSaving, setIsQuickReceiptSaving] = useState(false)
   const [adjustmentAmount, setAdjustmentAmount] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
@@ -213,6 +146,80 @@ function App({ appMetadata }: AppProps) {
   const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery)
 
   const isAdmin = authUser?.role === 'Admin'
+  const {
+    clearQuickReceiptDialog,
+    closeQuickReceiptPrompt,
+    goToQuickReceiptGig,
+    handleQuickReceiptFile,
+    isQuickReceiptSaving,
+    pendingReceiptFile,
+    quickReceiptAmount,
+    quickReceiptCandidates,
+    quickReceiptDescription,
+    quickReceiptDraft,
+    quickReceiptSelectedGigId,
+    quickReceiptStatus,
+    savePendingReceiptToSelectedGig,
+    saveQuickReceiptDetails,
+    setQuickReceiptAmount,
+    setQuickReceiptDescription,
+    setQuickReceiptSelectedGigId,
+  } = useQuickReceipt({
+    getGigById: (gigId) => gigsById.get(gigId),
+    onMergeSavedGig: (gig) => mergeSavedGig(gig),
+    onOpenReceiptDraft: (gig) => openGigReceiptDraft(gig),
+    onSelectGig: setSelectedGigId,
+    onSessionExpired: (message) => {
+      setIsAuthenticated(false)
+      setAuthUser(null)
+      setIsApiConnected(false)
+      setStatus(message)
+    },
+    setGigStatus,
+  })
+  const {
+    closeUserSettings,
+    connectGoogleDrive,
+    handleUserSettingsSubmit,
+    isUserSettingsOpen,
+    isUserSettingsSaving,
+    openUserSettings,
+    resetUserSettings,
+    updateUserSettingsField,
+    userSettingsForm,
+    userSettingsStatus,
+  } = useUserSettings({
+    authUser,
+    onCloseProfileMenu: () => setIsProfileMenuOpen(false),
+    onSessionExpired: (message) => {
+      setIsAuthenticated(false)
+      setAuthUser(null)
+      setIsApiConnected(false)
+      setStatus(message)
+    },
+    setAuthUser,
+  })
+  const {
+    applySellerProfile,
+    closeSellerProfile,
+    handleSellerProfileSubmit,
+    isSellerProfileOpen,
+    isSellerProfileSaving,
+    openSellerProfile: openSellerProfileModal,
+    resetSellerProfile,
+    sellerProfile,
+    sellerProfileForm,
+    sellerProfileStatus,
+    updateSellerProfileField,
+  } = useSellerProfile({
+    onCloseProfileMenu: () => setIsProfileMenuOpen(false),
+    onSessionExpired: (message) => {
+      setIsAuthenticated(false)
+      setAuthUser(null)
+      setIsApiConnected(false)
+      setStatus(message)
+    },
+  })
 
   useEffect(() => {
     if (!isAdmin && activeSection === 'admin') {
@@ -311,30 +318,14 @@ function App({ appMetadata }: AppProps) {
       setIsInvoiceEditorOpen(false)
       setInvoiceSearchQuery('')
       setInvoiceStatus(defaultInvoiceStatus)
-      setPendingReceiptFile(null)
-      setQuickReceiptDraft(null)
-      setQuickReceiptCandidates([])
-      setQuickReceiptSelectedGigId('')
-      setQuickReceiptAmount('')
-      setQuickReceiptDescription('')
-      setQuickReceiptStatus('')
-      setIsQuickReceiptSaving(false)
+      clearQuickReceiptDialog()
       setIsClientSettingsOpen(false)
       setClientSettingsForm(emptyClientSettingsForm())
       setClientSettingsStatus(
         'Client-specific rates override your personal defaults when set.'
       )
-      setIsUserSettingsOpen(false)
-      setUserSettingsForm(emptyUserSettingsForm())
-      setUserSettingsStatus(
-        'Set the mileage defaults used when a client has no custom rates.'
-      )
-      setIsSellerProfileOpen(false)
-      setSellerProfile(emptySellerProfile())
-      setSellerProfileForm(emptySellerProfileForm())
-      setSellerProfileStatus(
-        'Add the seller details that should appear on your invoices.'
-      )
+      resetUserSettings()
+      resetSellerProfile()
       resetAdminWorkspace()
     }
 
@@ -449,8 +440,7 @@ function App({ appMetadata }: AppProps) {
         setSelectedGigId(gigData[0]?.id ?? '')
         setInvoices(invoiceData)
         setSelectedInvoiceId(invoiceData[0]?.id ?? '')
-        setSellerProfile(sellerProfileData)
-        setSellerProfileForm(toSellerProfileForm(sellerProfileData))
+        applySellerProfile(sellerProfileData)
         setIsApiConnected(true)
         setShouldCloseBrowserNotice(false)
         setStatus(
@@ -501,7 +491,12 @@ function App({ appMetadata }: AppProps) {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [
+    applySellerProfile,
+    clearQuickReceiptDialog,
+    resetSellerProfile,
+    resetUserSettings,
+  ])
 
   const clientNamesById = useMemo(
     () => new Map(clients.map((client) => [client.id, client.name])),
@@ -1180,231 +1175,6 @@ function App({ appMetadata }: AppProps) {
     setIsGigEditorOpen(true)
   }
 
-  const promptForReceiptGig = (
-    file: File,
-    candidates: QuickReceiptCandidate[],
-    message: string
-  ) => {
-    setPendingReceiptFile(file)
-    setQuickReceiptDraft(null)
-    setQuickReceiptCandidates(candidates)
-    setQuickReceiptSelectedGigId(candidates[0]?.id ?? '')
-    setQuickReceiptAmount('')
-    setQuickReceiptDescription('Receipt draft')
-    setQuickReceiptStatus(message)
-  }
-
-  const clearQuickReceiptDialog = () => {
-    setPendingReceiptFile(null)
-    setQuickReceiptDraft(null)
-    setQuickReceiptCandidates([])
-    setQuickReceiptSelectedGigId('')
-    setQuickReceiptAmount('')
-    setQuickReceiptDescription('')
-    setQuickReceiptStatus('')
-  }
-
-  const uploadQuickReceiptDraft = async (file: File, gigId?: string) => {
-    const formData = new FormData()
-    formData.append('file', file)
-    if (gigId) {
-      formData.append('gigId', gigId)
-    }
-
-    setIsQuickReceiptSaving(true)
-    setQuickReceiptStatus('Saving receipt draft...')
-    setPendingReceiptFile(file)
-    setQuickReceiptDraft(null)
-    if (!gigId) {
-      setQuickReceiptCandidates([])
-      setQuickReceiptSelectedGigId('')
-      setQuickReceiptAmount('')
-      setQuickReceiptDescription('')
-    }
-
-    try {
-      const response = await fetchWithSession(buildApiUrl('/gigs/receipt-drafts'), {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to add receipts.')
-        return
-      }
-
-      if (response.status === 409) {
-        const conflict = (await response.json()) as {
-          message?: string
-          candidates?: QuickReceiptCandidate[]
-        }
-        promptForReceiptGig(
-          file,
-          conflict.candidates ?? [],
-          conflict.message ?? 'Choose a gig before saving this receipt draft.'
-        )
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save receipt draft.')
-      }
-
-      const receiptDraft = (await response.json()) as QuickReceiptDraftResponse
-      openGigReceiptDraft(receiptDraft.gig)
-      setPendingReceiptFile(null)
-      setQuickReceiptDraft(receiptDraft)
-      setQuickReceiptCandidates(receiptDraft.candidates)
-      setQuickReceiptSelectedGigId(receiptDraft.gig.id)
-      setQuickReceiptAmount('')
-      setQuickReceiptDescription('Receipt draft')
-      setQuickReceiptStatus(
-        receiptDraft.hasNearbyCandidates
-          ? 'Receipt saved. There are other nearby gigs, so please check the selected gig.'
-          : 'Receipt saved. Add details now or come back later.'
-      )
-      setGigStatus(
-        receiptDraft.inferredGig
-          ? 'Receipt draft saved to the nearest matching gig.'
-          : 'Receipt draft saved. Add the amount and description when you are ready.'
-      )
-    } catch (error) {
-      setQuickReceiptStatus(
-        error instanceof Error ? error.message : 'Unable to save receipt draft.'
-      )
-    } finally {
-      setIsQuickReceiptSaving(false)
-    }
-  }
-
-  const handleQuickReceiptFile = (file: File) => {
-    void uploadQuickReceiptDraft(file)
-  }
-
-  const savePendingReceiptToSelectedGig = () => {
-    if (!pendingReceiptFile || !quickReceiptSelectedGigId) {
-      setQuickReceiptStatus('Choose a gig before saving this receipt draft.')
-      return
-    }
-
-    void uploadQuickReceiptDraft(pendingReceiptFile, quickReceiptSelectedGigId)
-  }
-
-  const saveQuickReceiptDetails = async () => {
-    if (!quickReceiptDraft || !quickReceiptSelectedGigId) {
-      setQuickReceiptStatus('Choose a gig before saving this receipt draft.')
-      return
-    }
-
-    const description = quickReceiptDescription.trim()
-    const amount = Number(quickReceiptAmount || '0')
-
-    if (!description) {
-      setQuickReceiptStatus('Add a description before saving receipt details.')
-      return
-    }
-
-    if (!Number.isFinite(amount) || amount < 0) {
-      setQuickReceiptStatus('Receipt amount must be a valid non-negative number.')
-      return
-    }
-
-    setIsQuickReceiptSaving(true)
-    setQuickReceiptStatus('Saving receipt details...')
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/gigs/receipt-drafts/${quickReceiptDraft.expenseId}`),
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            gigId: quickReceiptSelectedGigId,
-            description,
-            amount,
-          }),
-        }
-      )
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to add receipts.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save receipt details.')
-      }
-
-      const update = (await response.json()) as QuickReceiptDraftUpdateResponse
-      mergeSavedGig(update.gig)
-      if (update.previousGig) {
-        mergeSavedGig(update.previousGig)
-      }
-
-      setQuickReceiptDraft((current) =>
-        current
-          ? {
-              ...current,
-              gig: update.gig,
-              expenseId: update.expenseId,
-              inferredGig: false,
-            }
-          : current
-      )
-      setSelectedGigId(update.gig.id)
-      setQuickReceiptSelectedGigId(update.gig.id)
-      setGigStatus('Receipt details saved.')
-      setQuickReceiptStatus(
-        update.moved
-          ? 'Receipt moved and details saved.'
-          : 'Receipt details saved.'
-      )
-    } catch (error) {
-      setQuickReceiptStatus(
-        error instanceof Error ? error.message : 'Unable to save receipt details.'
-      )
-    } finally {
-      setIsQuickReceiptSaving(false)
-    }
-  }
-
-  const goToQuickReceiptGig = () => {
-    const targetGig =
-      gigsById.get(quickReceiptSelectedGigId) ?? quickReceiptDraft?.gig ?? null
-    if (!targetGig) {
-      return
-    }
-
-    openGigReceiptDraft(targetGig)
-    clearQuickReceiptDialog()
-  }
-
-  const closeQuickReceiptPrompt = () => {
-    if (isQuickReceiptSaving) {
-      return
-    }
-
-    clearQuickReceiptDialog()
-  }
-
   const signIn = () => {
     const loginUrl = buildApiUrl(
       `/auth/login?returnUrl=${encodeURIComponent(buildReturnUrl())}`
@@ -1446,11 +1216,7 @@ function App({ appMetadata }: AppProps) {
       setIsInvoiceEditorOpen(false)
       setInvoiceSearchQuery('')
       setInvoiceStatus(defaultInvoiceStatus)
-      setSellerProfile(emptySellerProfile())
-      setSellerProfileForm(emptySellerProfileForm())
-      setSellerProfileStatus(
-        'Add the seller details that should appear on your invoices.'
-      )
+      resetSellerProfile()
       resetAdminWorkspace()
       setShouldCloseBrowserNotice(true)
       setStatus('Signed out successfully.')
@@ -1599,268 +1365,8 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
-  const openUserSettings = () => {
-    setUserSettingsForm({
-      mileageRate:
-        authUser?.mileageRate === null || authUser?.mileageRate === undefined
-          ? ''
-          : String(authUser.mileageRate),
-      passengerMileageRate:
-        authUser?.passengerMileageRate === null ||
-        authUser?.passengerMileageRate === undefined
-          ? ''
-          : String(authUser.passengerMileageRate),
-      defaultPaymentWindowDays:
-        authUser?.defaultPaymentWindowDays === null ||
-        authUser?.defaultPaymentWindowDays === undefined
-          ? ''
-          : String(authUser.defaultPaymentWindowDays),
-      invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? '',
-      invoiceEmailSubjectPattern: authUser?.invoiceEmailSubjectPattern ?? '',
-      invoiceReplyToEmail: authUser?.invoiceReplyToEmail ?? '',
-      invoiceUploadFolderId: authUser?.invoiceUploadFolderId ?? '',
-    })
-    setUserSettingsStatus(
-      'Set the defaults used when a client does not provide its own overrides.'
-    )
-    setIsProfileMenuOpen(false)
-    setIsUserSettingsOpen(true)
-  }
-
-  const connectGoogleDrive = () => {
-    window.location.assign(buildApiUrl('/integrations/google-drive/connect'))
-  }
-
   const openSellerProfile = () => {
-    setSellerProfileForm(toSellerProfileForm(sellerProfile))
-    setSellerProfileStatus(
-      sellerProfile.isConfigured
-        ? sellerProfileNotice
-        : 'Add the seller details that should appear on your invoices.'
-    )
-    setIsProfileMenuOpen(false)
-    setIsSellerProfileOpen(true)
-  }
-
-  const closeSellerProfile = () => {
-    setIsSellerProfileOpen(false)
-  }
-
-  const updateSellerProfileField = (
-    field: keyof SellerProfileForm,
-    value: string
-  ) => {
-    setSellerProfileForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const closeUserSettings = () => {
-    setIsUserSettingsOpen(false)
-  }
-
-  const updateUserSettingsField = (
-    field: keyof UserSettingsForm,
-    value: string
-  ) => {
-    setUserSettingsForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const handleUserSettingsSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const parseOptionalDecimal = (value: string) => {
-      const trimmed = value.trim()
-      if (!trimmed) {
-        return null
-      }
-
-      const parsed = Number(trimmed)
-      return Number.isFinite(parsed) ? parsed : Number.NaN
-    }
-
-    const mileageRate = parseOptionalDecimal(userSettingsForm.mileageRate)
-    const passengerMileageRate = parseOptionalDecimal(
-      userSettingsForm.passengerMileageRate
-    )
-    const defaultPaymentWindowDaysText = userSettingsForm.defaultPaymentWindowDays.trim()
-    const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
-    const invoiceEmailSubjectPattern =
-      userSettingsForm.invoiceEmailSubjectPattern.trim()
-    const invoiceReplyToEmail = userSettingsForm.invoiceReplyToEmail.trim()
-    const invoiceUploadFolderId = userSettingsForm.invoiceUploadFolderId.trim()
-
-    if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
-      setUserSettingsStatus('Rates must be valid numbers, for example 0.45.')
-      return
-    }
-
-    const defaultPaymentWindowDays = defaultPaymentWindowDaysText
-      ? Number(defaultPaymentWindowDaysText)
-      : null
-    if (
-      defaultPaymentWindowDays !== null &&
-      (!Number.isInteger(defaultPaymentWindowDays) || defaultPaymentWindowDays < 0)
-    ) {
-      setUserSettingsStatus('Payment window must be a whole number of days.')
-      return
-    }
-
-    setIsUserSettingsSaving(true)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl('/auth/me/settings'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mileageRate,
-          passengerMileageRate,
-          defaultPaymentWindowDays,
-          invoiceFilenamePattern: invoiceFilenamePattern || null,
-          invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
-          invoiceReplyToEmail: invoiceReplyToEmail || null,
-          invoiceUploadFolderId: invoiceUploadFolderId || null,
-        }),
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setIsUserSettingsOpen(false)
-        setStatus('Your session expired. Sign in again to update your settings.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save your settings.')
-      }
-
-      const savedSettings = (await response.json()) as {
-        mileageRate: number | null
-        passengerMileageRate: number | null
-        defaultPaymentWindowDays: number | null
-        invoiceFilenamePattern: string | null
-        invoiceEmailSubjectPattern: string | null
-        invoiceReplyToEmail: string | null
-        invoiceUploadFolderId: string | null
-      }
-
-      setAuthUser((current) =>
-        current
-          ? {
-              ...current,
-              mileageRate: savedSettings.mileageRate,
-              passengerMileageRate: savedSettings.passengerMileageRate,
-              defaultPaymentWindowDays: savedSettings.defaultPaymentWindowDays,
-              invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
-              invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern,
-              invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
-              invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
-            }
-          : current
-      )
-      setUserSettingsForm({
-        mileageRate:
-          savedSettings.mileageRate === null ? '' : String(savedSettings.mileageRate),
-        passengerMileageRate:
-          savedSettings.passengerMileageRate === null
-            ? ''
-            : String(savedSettings.passengerMileageRate),
-        defaultPaymentWindowDays:
-          savedSettings.defaultPaymentWindowDays === null
-            ? ''
-            : String(savedSettings.defaultPaymentWindowDays),
-        invoiceFilenamePattern: savedSettings.invoiceFilenamePattern ?? '',
-        invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern ?? '',
-        invoiceReplyToEmail: savedSettings.invoiceReplyToEmail ?? '',
-        invoiceUploadFolderId: savedSettings.invoiceUploadFolderId ?? '',
-      })
-      setUserSettingsStatus('Settings updated.')
-    } catch (error) {
-      setUserSettingsStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to save your settings right now.'
-      )
-    } finally {
-      setIsUserSettingsSaving(false)
-    }
-  }
-
-  const handleSellerProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setIsSellerProfileSaving(true)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl('/seller-profile'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sellerName: sellerProfileForm.sellerName.trim() || null,
-          addressLine1: sellerProfileForm.addressLine1.trim() || null,
-          addressLine2: sellerProfileForm.addressLine2.trim() || null,
-          city: sellerProfileForm.city.trim() || null,
-          region: sellerProfileForm.region.trim() || null,
-          postcode: sellerProfileForm.postcode.trim() || null,
-          country: sellerProfileForm.country.trim() || null,
-          email: sellerProfileForm.email.trim() || null,
-          phone: sellerProfileForm.phone.trim() || null,
-          accountName: sellerProfileForm.accountName.trim() || null,
-          sortCode: sellerProfileForm.sortCode.trim() || null,
-          accountNumber: sellerProfileForm.accountNumber.trim() || null,
-          paymentReferenceNote: sellerProfileForm.paymentReferenceNote.trim() || null,
-        }),
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setIsSellerProfileOpen(false)
-        setStatus('Your session expired. Sign in again to update your seller profile.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save seller profile.')
-      }
-
-      const savedProfile = (await response.json()) as SellerProfile
-      setSellerProfile(savedProfile)
-      setSellerProfileForm(toSellerProfileForm(savedProfile))
-      setSellerProfileStatus(
-        savedProfile.isInvoiceReady
-          ? 'Seller profile updated and ready for invoice generation.'
-          : `Seller profile saved. Missing: ${savedProfile.missingFields.join(', ')}.`
-      )
-    } catch (error) {
-      setSellerProfileStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to save your seller profile right now.'
-      )
-    } finally {
-      setIsSellerProfileSaving(false)
-    }
+    openSellerProfileModal(sellerProfileNotice)
   }
 
   const shouldCloseAfterSave = (event: FormEvent<HTMLFormElement>) => {
