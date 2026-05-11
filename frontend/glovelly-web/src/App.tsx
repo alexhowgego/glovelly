@@ -1,77 +1,50 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AdminSection,
+  AppShell,
   ClientSettingsModal,
   ClientsSection,
   GigsSection,
   InvoicesSection,
+  QuickReceiptModal,
   SellerProfileModal,
   SessionCheckingScreen,
   SignInScreen,
   UserSettingsModal,
 } from './AppSections'
+import type { AppNavigationItem, HeaderMetric } from './AppSections'
 import {
   buildApiUrl,
+  buildReturnUrl,
+  fetchWithSession,
+  isSessionExpiredError,
+  isSessionExpiredResponse,
+  parseProblemDetails,
+} from './api'
+import {
   buildInvoiceEmailSubjectPreview,
   buildInvoiceFilenamePreview,
-  buildReturnUrl,
-  defaultAdminStatus,
-  defaultGigStatus,
-  defaultInvoiceStatus,
-  emptyAdminForm,
-  emptyClientSettingsForm,
-  emptyForm,
-  emptyGigForm,
-  emptySellerProfileForm,
-  emptyUserSettingsForm,
   invoiceFilenameTokens,
-  fetchWithSession,
-  formatCurrency,
-  formatBuildMetadata,
-  formatDate,
-  formatDateTime,
-  getStoredThemePreference,
-  parseProblemDetails,
-  themeStorageKey,
-  toGigExpenseForm,
-} from './appShared'
+} from './invoicePreview'
+import { useAdminWorkspace } from './hooks/useAdminWorkspace'
+import { useClientsWorkspace } from './hooks/useClientsWorkspace'
+import { useGigsWorkspace } from './hooks/useGigsWorkspace'
+import { useInvoicesWorkspace } from './hooks/useInvoicesWorkspace'
+import { useProfileMenu } from './hooks/useProfileMenu'
+import { useQuickReceipt } from './hooks/useQuickReceipt'
+import { useSellerProfile } from './hooks/useSellerProfile'
+import { useThemePreference } from './hooks/useThemePreference'
+import { useUserSettings } from './hooks/useUserSettings'
 import type {
-  Address,
-  AdminUser,
-  AdminUserForm,
   AppMetadata,
   AppSection,
   AuthUser,
   Client,
-  ClientForm,
-  ClientSettingsForm,
   Gig,
-  GigExpenseForm,
-  GigForm,
   Invoice,
-  InvoiceStatus,
-  QuickReceiptCandidate,
-  QuickReceiptDraftResponse,
-  QuickReceiptDraftUpdateResponse,
   SellerProfile,
-  SellerProfileForm,
-  ThemePreference,
-  UserSettingsForm,
-} from './appShared'
+} from './types'
 import './App.css'
-
-type GoogleDrivePublishLink = {
-  href: string
-  fileName: string | null
-}
-
-type GoogleDrivePublishResponse = {
-  invoice: Invoice
-  fileId: string | null
-  fileName: string | null
-  webViewLink: string | null
-}
 
 function getCurrentMonthValue() {
   return new Date().toISOString().slice(0, 7)
@@ -82,64 +55,12 @@ function buildMonthlyInvoiceNumber(month: string, sequence: number) {
 }
 
 
-function toSellerProfileForm(profile: SellerProfile): SellerProfileForm {
-  return {
-    sellerName: profile.sellerName ?? '',
-    addressLine1: profile.addressLine1 ?? '',
-    addressLine2: profile.addressLine2 ?? '',
-    city: profile.city ?? '',
-    region: profile.region ?? '',
-    postcode: profile.postcode ?? '',
-    country: profile.country ?? 'United Kingdom',
-    email: profile.email ?? '',
-    phone: profile.phone ?? '',
-    accountName: profile.accountName ?? '',
-    sortCode: profile.sortCode ?? '',
-    accountNumber: profile.accountNumber ?? '',
-    paymentReferenceNote: profile.paymentReferenceNote ?? '',
-  }
-}
-
-function emptySellerProfile(): SellerProfile {
-  return {
-    id: null,
-    sellerName: null,
-    addressLine1: null,
-    addressLine2: null,
-    city: null,
-    region: null,
-    postcode: null,
-    country: 'United Kingdom',
-    email: null,
-    phone: null,
-    accountName: null,
-    sortCode: null,
-    accountNumber: null,
-    paymentReferenceNote: null,
-    isConfigured: false,
-    isInvoiceReady: false,
-    missingFields: ['sellerName', 'addressLine1', 'city', 'country'],
-  }
-}
-
 type AppProps = {
   appMetadata: AppMetadata
 }
 
 function App({ appMetadata }: AppProps) {
   const [activeSection, setActiveSection] = useState<AppSection>('gigs')
-  const [clients, setClients] = useState<Client[]>([])
-  const [selectedClientId, setSelectedClientId] = useState<string>('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isClientEditorOpen, setIsClientEditorOpen] = useState(false)
-  const [mode, setMode] = useState<'create' | 'edit'>('create')
-  const [form, setForm] = useState<ClientForm>(emptyForm)
-  const [isClientSettingsOpen, setIsClientSettingsOpen] = useState(false)
-  const [clientSettingsForm, setClientSettingsForm] =
-    useState<ClientSettingsForm>(emptyClientSettingsForm)
-  const [clientSettingsStatus, setClientSettingsStatus] =
-    useState('Client-specific rates override your personal defaults when set.')
-  const [isClientSettingsSaving, setIsClientSettingsSaving] = useState(false)
   const [status, setStatus] = useState('Checking your session...')
   const [isLoading, setIsLoading] = useState(false)
   const [isApiConnected, setIsApiConnected] = useState(false)
@@ -147,79 +68,244 @@ function App({ appMetadata }: AppProps) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
-  const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false)
-  const profileMenuRef = useRef<HTMLDivElement | null>(null)
-  const [themePreference, setThemePreference] =
-    useState<ThemePreference>(getStoredThemePreference)
-  const [userSettingsForm, setUserSettingsForm] =
-    useState<UserSettingsForm>(emptyUserSettingsForm)
-  const [userSettingsStatus, setUserSettingsStatus] =
-    useState('Set the mileage defaults used when a client has no custom rates.')
-  const [isUserSettingsSaving, setIsUserSettingsSaving] = useState(false)
-  const [sellerProfile, setSellerProfile] = useState<SellerProfile>(emptySellerProfile)
-  const [sellerProfileForm, setSellerProfileForm] =
-    useState<SellerProfileForm>(emptySellerProfileForm)
-  const [sellerProfileStatus, setSellerProfileStatus] = useState(
-    'Add the seller details that should appear on your invoices.'
-  )
-  const [isSellerProfileOpen, setIsSellerProfileOpen] = useState(false)
-  const [isSellerProfileSaving, setIsSellerProfileSaving] = useState(false)
-
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
-  const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
-  const [adminSearchQuery, setAdminSearchQuery] = useState('')
-  const [isAdminEditorOpen, setIsAdminEditorOpen] = useState(false)
-  const [adminMode, setAdminMode] = useState<'create' | 'edit'>('create')
-  const [adminForm, setAdminForm] = useState<AdminUserForm>(emptyAdminForm)
-  const [adminStatus, setAdminStatus] = useState(defaultAdminStatus)
-  const [isAdminLoading, setIsAdminLoading] = useState(false)
-  const [gigs, setGigs] = useState<Gig[]>([])
-  const [selectedGigId, setSelectedGigId] = useState<string>('')
-  const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
-  const [gigSearchQuery, setGigSearchQuery] = useState('')
-  const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
-  const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
-  const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
-  const [gigStatus, setGigStatus] = useState(defaultGigStatus)
-  const [isGigLoading, setIsGigLoading] = useState(false)
-  const [gigExpenseAmount, setGigExpenseAmount] = useState('')
-  const [gigExpenseDescription, setGigExpenseDescription] = useState('')
+  const {
+    closeProfileMenu,
+    isProfileMenuOpen,
+    profileMenuRef,
+    toggleProfileMenu,
+  } = useProfileMenu()
+  const { setThemePreference, themePreference } = useThemePreference()
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
-  const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
-  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
-  const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
-  const [googleDrivePublishLink, setGoogleDrivePublishLink] =
-    useState<GoogleDrivePublishLink | null>(null)
-  const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
-  const [pendingReceiptFile, setPendingReceiptFile] = useState<File | null>(null)
-  const [quickReceiptDraft, setQuickReceiptDraft] =
-    useState<QuickReceiptDraftResponse | null>(null)
-  const [quickReceiptCandidates, setQuickReceiptCandidates] = useState<QuickReceiptCandidate[]>([])
-  const [quickReceiptSelectedGigId, setQuickReceiptSelectedGigId] = useState('')
-  const [quickReceiptAmount, setQuickReceiptAmount] = useState('')
-  const [quickReceiptDescription, setQuickReceiptDescription] = useState('')
-  const [quickReceiptStatus, setQuickReceiptStatus] = useState('')
-  const [isQuickReceiptSaving, setIsQuickReceiptSaving] = useState(false)
-  const [adjustmentAmount, setAdjustmentAmount] = useState('')
-  const [adjustmentReason, setAdjustmentReason] = useState('')
-  const deferredSearchQuery = useDeferredValue(searchQuery)
-  const deferredAdminSearchQuery = useDeferredValue(adminSearchQuery)
-  const deferredGigSearchQuery = useDeferredValue(gigSearchQuery)
-  const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery)
 
   const isAdmin = authUser?.role === 'Admin'
-  const profileDisplayName = authUser?.name?.trim() || authUser?.email || 'User'
-  const profileImageUrl = authUser?.profileImageUrl?.trim() || ''
-  const profileInitials = profileDisplayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
+  const clearSession = useCallback(() => {
+    setIsAuthenticated(false)
+    setAuthUser(null)
+    setIsApiConnected(false)
+  }, [])
+  const expireSession = useCallback(
+    (message: string) => {
+      clearSession()
+      setStatus(message)
+    },
+    [clearSession]
+  )
+  const {
+    activeUsersCount,
+    adminForm,
+    adminMode,
+    adminSearchQuery,
+    adminStatus,
+    adminUsers,
+    closeAdminEditor,
+    filteredAdminUsers,
+    handleAdminSubmit,
+    isAdminEditorOpen,
+    isAdminLoading,
+    loadAdminUsers,
+    markAdminLoadFailed,
+    resetAdminWorkspace,
+    selectedAdminUser,
+    setAdminSearchQuery,
+    setSelectedAdminUserId,
+    startAdminCreate,
+    startAdminEdit,
+    totalAdmins,
+    updateAdminField,
+  } = useAdminWorkspace({
+    onSessionExpired: expireSession,
+  })
+  const {
+    applyClients,
+    clientNamesById,
+    clientSettingsForm,
+    clientSettingsStatus,
+    clients,
+    closeClientEditor,
+    closeClientSettings,
+    filteredClients,
+    form,
+    handleClientSettingsSubmit,
+    handleDelete,
+    handleSubmit,
+    isClientEditorOpen,
+    isClientSettingsOpen,
+    isClientSettingsSaving,
+    mode,
+    openClientSettings,
+    resetClientsWorkspace,
+    searchQuery,
+    selectedClient,
+    setSelectedClientId,
+    setSearchQuery,
+    startCreating,
+    startEditing,
+    updateAddressField,
+    updateClientSettingsField,
+    updateField,
+  } = useClientsWorkspace({
+    isApiConnected,
+    onSessionExpired: expireSession,
+    setIsLoading,
+    setStatus,
+  })
+  const {
+    applyGigs,
+    closeGigEditor,
+    completedGigCount,
+    deleteExpenseAttachment,
+    downloadExpenseAttachment,
+    filteredGigs,
+    gigExpenseAmount,
+    gigExpenseDescription,
+    gigForm,
+    gigMode,
+    gigSearchQuery,
+    gigStatus,
+    gigs,
+    gigsById,
+    handleAddGigExpense,
+    handleGigSubmit,
+    handleToggleGigSelection,
+    isGigEditorOpen,
+    isGigLoading,
+    mergeSavedGig,
+    openGigReceiptDraft,
+    plannedGigCount,
+    removeGigExpense,
+    resetGigsWorkspace,
+    selectedGig,
+    selectedGigIds,
+    selectedGigs,
+    setGigExpenseAmount,
+    setGigExpenseDescription,
+    setGigs,
+    setGigSearchQuery,
+    setGigStatus,
+    setSelectedGigId,
+    setSelectedGigIds,
+    startGigCreate,
+    startGigEdit,
+    uninvoicedGigCount,
+    upcomingGigCount,
+    updateGigExpenseField,
+    updateGigField,
+    uploadExpenseAttachment,
+  } = useGigsWorkspace({
+    clientNamesById,
+    clients,
+    onOpenSection: (section) => setActiveSection(section),
+    onSessionExpired: expireSession,
+  })
+  const {
+    adjustmentAmount,
+    adjustmentReason,
+    applyInvoices,
+    closeInvoiceEditor,
+    draftInvoiceCount,
+    filteredInvoices,
+    googleDrivePublishLink,
+    handleAddInvoiceAdjustment,
+    handleDeleteInvoice,
+    handleDownloadInvoicePdf,
+    handleInvoiceReissue,
+    handleInvoiceStatusChange,
+    handlePublishInvoiceGoogleDrive,
+    handleSendInvoiceEmail,
+    invoices,
+    invoiceSearchQuery,
+    invoiceStatus,
+    isInvoiceEditorOpen,
+    issuedInvoiceCount,
+    isInvoiceLoading,
+    overdueInvoiceCount,
+    resetInvoicesWorkspace,
+    selectedInvoice,
+    setAdjustmentAmount,
+    setAdjustmentReason,
+    setInvoices,
+    setInvoiceStatus,
+    setIsInvoiceLoading,
+    setSelectedInvoiceId,
+    setInvoiceSearchQuery,
+    startInvoiceEdit,
+  } = useInvoicesWorkspace({
+    clientNamesById,
+    onInvoiceDeleted: (invoice) => {
+      setGigs((current) =>
+        current.map((gig) =>
+          gig.invoiceId === invoice.id
+            ? {
+                ...gig,
+                invoiceId: null,
+                invoicedAt: null,
+                isInvoiced: false,
+              }
+            : gig
+        )
+      )
+    },
+  })
+  const {
+    clearQuickReceiptDialog,
+    closeQuickReceiptPrompt,
+    goToQuickReceiptGig,
+    handleQuickReceiptFile,
+    isQuickReceiptSaving,
+    pendingReceiptFile,
+    quickReceiptAmount,
+    quickReceiptCandidates,
+    quickReceiptDescription,
+    quickReceiptDraft,
+    quickReceiptSelectedGigId,
+    quickReceiptStatus,
+    savePendingReceiptToSelectedGig,
+    saveQuickReceiptDetails,
+    setQuickReceiptAmount,
+    setQuickReceiptDescription,
+    setQuickReceiptSelectedGigId,
+  } = useQuickReceipt({
+    getGigById: (gigId) => gigsById.get(gigId),
+    onMergeSavedGig: (gig) => mergeSavedGig(gig),
+    onOpenReceiptDraft: (gig) => openGigReceiptDraft(gig),
+    onSelectGig: setSelectedGigId,
+    onSessionExpired: expireSession,
+    setGigStatus,
+  })
+  const {
+    closeUserSettings,
+    connectGoogleDrive,
+    handleUserSettingsSubmit,
+    isUserSettingsOpen,
+    isUserSettingsSaving,
+    openUserSettings,
+    resetUserSettings,
+    updateUserSettingsField,
+    userSettingsForm,
+    userSettingsStatus,
+  } = useUserSettings({
+    authUser,
+    onCloseProfileMenu: closeProfileMenu,
+    onSessionExpired: expireSession,
+    setAuthUser,
+  })
+  const {
+    applySellerProfile,
+    closeSellerProfile,
+    handleSellerProfileSubmit,
+    isSellerProfileOpen,
+    isSellerProfileSaving,
+    openSellerProfile: openSellerProfileModal,
+    resetSellerProfile,
+    sellerProfile,
+    sellerProfileForm,
+    sellerProfileStatus,
+    updateSellerProfileField,
+  } = useSellerProfile({
+    onCloseProfileMenu: closeProfileMenu,
+    onSessionExpired: expireSession,
+  })
 
   useEffect(() => {
     if (!isAdmin && activeSection === 'admin') {
@@ -228,149 +314,23 @@ function App({ appMetadata }: AppProps) {
   }, [activeSection, isAdmin])
 
   useEffect(() => {
-    if (!isProfileMenuOpen) {
-      return
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!profileMenuRef.current?.contains(event.target as Node)) {
-        setIsProfileMenuOpen(false)
-      }
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsProfileMenuOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleEscape)
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isProfileMenuOpen])
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-
-    const applyTheme = () => {
-      const nextResolvedTheme =
-        themePreference === 'system'
-          ? mediaQuery.matches
-            ? 'dark'
-            : 'light'
-          : themePreference
-
-      document.documentElement.setAttribute('data-theme', nextResolvedTheme)
-    }
-
-    applyTheme()
-    window.localStorage.setItem(themeStorageKey, themePreference)
-
-    if (themePreference !== 'system') {
-      return
-    }
-
-    const handleSystemThemeChange = () => {
-      applyTheme()
-    }
-
-    mediaQuery.addEventListener('change', handleSystemThemeChange)
-    return () => {
-      mediaQuery.removeEventListener('change', handleSystemThemeChange)
-    }
-  }, [themePreference])
-
-  const resetAdminWorkspace = () => {
-    setAdminUsers([])
-    setSelectedAdminUserId('')
-    setAdminSearchQuery('')
-    setIsAdminEditorOpen(false)
-    setAdminMode('create')
-    setAdminForm(emptyAdminForm())
-    setAdminStatus(defaultAdminStatus)
-  }
-
-  useEffect(() => {
     let ignore = false
 
     const resetSignedInState = () => {
-      setClients([])
-      setSelectedClientId('')
-      setSearchQuery('')
-      setIsClientEditorOpen(false)
-      setMode('create')
-      setForm(emptyForm())
-      setGigs([])
-      setSelectedGigId('')
-      setGigSearchQuery('')
-      setIsGigEditorOpen(false)
-      setGigMode('create')
-      setGigForm(emptyGigForm())
-      setGigStatus(defaultGigStatus)
+      resetClientsWorkspace()
+      resetGigsWorkspace()
       setMonthlyInvoiceMonth(getCurrentMonthValue())
       setMonthlyInvoiceStatus('')
-      setInvoices([])
-      setSelectedInvoiceId('')
-      setIsInvoiceEditorOpen(false)
-      setInvoiceSearchQuery('')
-      setInvoiceStatus(defaultInvoiceStatus)
-      setPendingReceiptFile(null)
-      setQuickReceiptDraft(null)
-      setQuickReceiptCandidates([])
-      setQuickReceiptSelectedGigId('')
-      setQuickReceiptAmount('')
-      setQuickReceiptDescription('')
-      setQuickReceiptStatus('')
-      setIsQuickReceiptSaving(false)
-      setIsClientSettingsOpen(false)
-      setClientSettingsForm(emptyClientSettingsForm())
-      setClientSettingsStatus(
-        'Client-specific rates override your personal defaults when set.'
-      )
-      setIsUserSettingsOpen(false)
-      setUserSettingsForm(emptyUserSettingsForm())
-      setUserSettingsStatus(
-        'Set the mileage defaults used when a client has no custom rates.'
-      )
-      setIsSellerProfileOpen(false)
-      setSellerProfile(emptySellerProfile())
-      setSellerProfileForm(emptySellerProfileForm())
-      setSellerProfileStatus(
-        'Add the seller details that should appear on your invoices.'
-      )
+      resetInvoicesWorkspace()
+      clearQuickReceiptDialog()
+      resetUserSettings()
+      resetSellerProfile()
       resetAdminWorkspace()
     }
 
-    const loadAdminUsers = async () => {
-      const response = await fetchWithSession(buildApiUrl('/admin/users'))
-      if (response.status === 401) {
-        throw new Error('SESSION_EXPIRED')
-      }
-
-      if (response.status === 403) {
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Unable to load user enrolments.')
-      }
-
-      const users = (await response.json()) as AdminUser[]
-      if (ignore) {
-        return
-      }
-
-      setAdminUsers(users)
-      setSelectedAdminUserId((current) => current || users[0]?.id || '')
-      setAdminStatus(
-        users.length > 0
-          ? 'Manage access, roles and account status.'
-          : 'No users added yet. Add the first one below.'
-      )
+    const expireSignedInSession = (message: string) => {
+      expireSession(message)
+      resetSignedInState()
     }
 
     const loadApp = async () => {
@@ -378,17 +338,13 @@ function App({ appMetadata }: AppProps) {
 
       try {
         const sessionResponse = await fetchWithSession(buildApiUrl('/auth/me'))
-        if (sessionResponse.status === 401) {
+        if (isSessionExpiredResponse(sessionResponse)) {
           if (ignore) {
             return
           }
 
-          setIsAuthenticated(false)
-          setAuthUser(null)
-          setIsApiConnected(false)
-          resetSignedInState()
+          expireSignedInSession('Sign in to access Glovelly.')
           setShouldCloseBrowserNotice(false)
-          setStatus('Sign in to access Glovelly.')
           return
         }
 
@@ -413,16 +369,12 @@ function App({ appMetadata }: AppProps) {
         ])
 
         if (
-          clientsResponse.status === 401 ||
-          gigsResponse.status === 401 ||
-          invoicesResponse.status === 401 ||
-          sellerProfileResponse.status === 401
+          isSessionExpiredResponse(clientsResponse) ||
+          isSessionExpiredResponse(gigsResponse) ||
+          isSessionExpiredResponse(invoicesResponse) ||
+          isSessionExpiredResponse(sellerProfileResponse)
         ) {
-          setIsAuthenticated(false)
-          setAuthUser(null)
-          setIsApiConnected(false)
-          resetSignedInState()
-          setStatus('Your session expired. Sign in again to keep working.')
+          expireSignedInSession('Your session expired. Sign in again to keep working.')
           return
         }
 
@@ -450,14 +402,10 @@ function App({ appMetadata }: AppProps) {
           return
         }
 
-        setClients(data)
-        setSelectedClientId(data[0]?.id ?? '')
-        setGigs(gigData)
-        setSelectedGigId(gigData[0]?.id ?? '')
-        setInvoices(invoiceData)
-        setSelectedInvoiceId(invoiceData[0]?.id ?? '')
-        setSellerProfile(sellerProfileData)
-        setSellerProfileForm(toSellerProfileForm(sellerProfileData))
+        applyClients(data)
+        applyGigs(gigData)
+        applyInvoices(invoiceData)
+        applySellerProfile(sellerProfileData)
         setIsApiConnected(true)
         setShouldCloseBrowserNotice(false)
         setStatus(
@@ -471,26 +419,18 @@ function App({ appMetadata }: AppProps) {
             await loadAdminUsers()
           } catch {
             if (!ignore) {
-              setAdminUsers([])
-              setSelectedAdminUserId('')
-              setAdminStatus('The admin area could not be loaded right now.')
+              markAdminLoadFailed()
             }
           }
         }
       } catch (error) {
         if (!ignore) {
-          if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
-            setIsAuthenticated(false)
-            setAuthUser(null)
-            setIsApiConnected(false)
-            resetSignedInState()
-            setStatus('Your session expired. Sign in again to keep working.')
+          if (isSessionExpiredError(error)) {
+            expireSignedInSession('Your session expired. Sign in again to keep working.')
           } else {
             setIsApiConnected(false)
-            setClients([])
-            setSelectedClientId('')
-            setAdminUsers([])
-            setSelectedAdminUserId('')
+            resetClientsWorkspace()
+            markAdminLoadFailed()
             setShouldCloseBrowserNotice(false)
             setStatus('We could not load your workspace right now. Please try again.')
           }
@@ -508,134 +448,22 @@ function App({ appMetadata }: AppProps) {
     return () => {
       ignore = true
     }
-  }, [])
-
-  const clientNamesById = useMemo(
-    () => new Map(clients.map((client) => [client.id, client.name])),
-    [clients]
-  )
-  const clientsById = useMemo(
-    () => new Map(clients.map((client) => [client.id, client])),
-    [clients]
-  )
-  const adminUsersById = useMemo(
-    () => new Map(adminUsers.map((user) => [user.id, user])),
-    [adminUsers]
-  )
-  const gigsById = useMemo(() => new Map(gigs.map((gig) => [gig.id, gig])), [gigs])
-  const invoicesById = useMemo(
-    () => new Map(invoices.map((invoice) => [invoice.id, invoice])),
-    [invoices]
-  )
-
-  const filteredClients = useMemo(() => {
-    const query = deferredSearchQuery.trim().toLowerCase()
-    if (!query) {
-      return clients
-    }
-
-    return clients.filter((client) =>
-      [
-        client.name,
-        client.email,
-        client.billingAddress.city,
-        client.billingAddress.country,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    )
-  }, [clients, deferredSearchQuery])
-
-  const filteredAdminUsers = useMemo(() => {
-    const query = deferredAdminSearchQuery.trim().toLowerCase()
-    if (!query) {
-      return adminUsers
-    }
-
-    return adminUsers.filter((user) =>
-      [user.email, user.displayName ?? '', user.role, user.googleSubject ?? '']
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    )
-  }, [adminUsers, deferredAdminSearchQuery])
-
-  const filteredGigs = useMemo(() => {
-    const query = deferredGigSearchQuery.trim().toLowerCase()
-    const sortedGigs = [...gigs].sort((left, right) => {
-      const dateComparison = right.date.localeCompare(left.date)
-      if (dateComparison !== 0) {
-        return dateComparison
-      }
-
-      return left.title.localeCompare(right.title)
-    })
-
-    if (!query) {
-      return sortedGigs
-    }
-
-    return sortedGigs.filter((gig) => {
-      const clientName = clientNamesById.get(gig.clientId) ?? ''
-
-      return [gig.title, gig.venue, gig.date, gig.status, clientName]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    })
-  }, [clientNamesById, deferredGigSearchQuery, gigs])
-
-  const filteredInvoices = useMemo(() => {
-    const query = deferredInvoiceSearchQuery.trim().toLowerCase()
-    const sortedInvoices = [...invoices].sort((left, right) => {
-      const dateComparison = right.invoiceDate.localeCompare(left.invoiceDate)
-      if (dateComparison !== 0) {
-        return dateComparison
-      }
-
-      return left.invoiceNumber.localeCompare(right.invoiceNumber)
-    })
-
-    if (!query) {
-      return sortedInvoices
-    }
-
-    return sortedInvoices.filter((invoice) => {
-      const clientName = clientNamesById.get(invoice.clientId) ?? ''
-
-      return [
-        invoice.invoiceNumber,
-        invoice.description ?? '',
-        invoice.status,
-        clientName,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    })
-  }, [clientNamesById, deferredInvoiceSearchQuery, invoices])
-
-  const selectedClient = clientsById.get(selectedClientId) ?? filteredClients[0] ?? null
-
-  const selectedAdminUser =
-    adminUsersById.get(selectedAdminUserId) ?? filteredAdminUsers[0] ?? null
-
-  const selectedGig = gigsById.get(selectedGigId) ?? filteredGigs[0] ?? null
-
-  const selectedGigs = useMemo(
-    () => {
-      const selectedGigIdSet = new Set(selectedGigIds)
-
-      return gigs
-        .filter((gig) => selectedGigIdSet.has(gig.id))
-        .sort((left, right) => left.date.localeCompare(right.date))
-    },
-    [gigs, selectedGigIds]
-  )
-
-  const selectedInvoice =
-    invoicesById.get(selectedInvoiceId) ?? filteredInvoices[0] ?? null
+  }, [
+    applyClients,
+    applyGigs,
+    applyInvoices,
+    applySellerProfile,
+    clearQuickReceiptDialog,
+    expireSession,
+    loadAdminUsers,
+    markAdminLoadFailed,
+    resetClientsWorkspace,
+    resetAdminWorkspace,
+    resetGigsWorkspace,
+    resetInvoicesWorkspace,
+    resetSellerProfile,
+    resetUserSettings,
+  ])
 
   const monthlyInvoiceEligibleGigs = useMemo(() => {
     if (!selectedClient || !monthlyInvoiceMonth) {
@@ -684,57 +512,9 @@ function App({ appMetadata }: AppProps) {
   }
 
   useEffect(() => {
-    if (selectedClient) {
-      setSelectedClientId(selectedClient.id)
-    }
-  }, [selectedClient])
-
-  useEffect(() => {
-    if (selectedAdminUser) {
-      setSelectedAdminUserId(selectedAdminUser.id)
-    }
-  }, [selectedAdminUser])
-
-  useEffect(() => {
-    if (selectedGig) {
-      setSelectedGigId(selectedGig.id)
-    }
-  }, [selectedGig])
-
-  useEffect(() => {
-    setSelectedGigIds((current) => current.filter((gigId) => gigs.some((gig) => gig.id === gigId)))
-  }, [gigs])
-
-  useEffect(() => {
-    if (selectedInvoice) {
-      setSelectedInvoiceId(selectedInvoice.id)
-    }
-  }, [selectedInvoice])
-
-  useEffect(() => {
     setMonthlyInvoiceStatus('')
   }, [selectedClient?.id, monthlyInvoiceMonth])
 
-  useEffect(() => {
-    if (gigForm.clientId || clients.length === 0) {
-      return
-    }
-
-    setGigForm((current) => ({
-      ...current,
-      clientId: clients[0]?.id ?? '',
-    }))
-  }, [clients, gigForm.clientId])
-
-  const activeUsersCount = adminUsers.filter((user) => user.isActive).length
-  const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
-  const plannedGigCount = gigs.filter((gig) => gig.status === 'Confirmed').length
-  const completedGigCount = gigs.filter((gig) => gig.status === 'Completed').length
-  const upcomingGigCount = gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length
-  const uninvoicedGigCount = gigs.filter((gig) => !gig.isInvoiced && gig.status !== 'Cancelled').length
-  const draftInvoiceCount = invoices.filter((invoice) => invoice.status === 'Draft').length
-  const issuedInvoiceCount = invoices.filter((invoice) => invoice.status === 'Issued').length
-  const overdueInvoiceCount = invoices.filter((invoice) => invoice.status === 'Overdue').length
   const outstandingInvoiceCount = issuedInvoiceCount + overdueInvoiceCount
   const sellerProfileMissingLabels = useMemo(() => {
     const labels: Record<string, string> = {
@@ -755,13 +535,7 @@ function App({ appMetadata }: AppProps) {
       ? ` Seller profile is incomplete. Missing: ${sellerProfileMissingLabels.join(', ')}. You can still generate invoices, but some sender details may be omitted.`
       : ' Seller profile is not set up yet. You can still generate invoices, but sender and payment details will be missing until you configure them.'
 
-  const navigationItems: Array<{
-    id: AppSection
-    label: string
-    eyebrow: string
-    description: string
-    disabled?: boolean
-  }> = [
+  const navigationItems: AppNavigationItem[] = [
     {
       id: 'clients',
       label: 'Clients',
@@ -793,7 +567,7 @@ function App({ appMetadata }: AppProps) {
   ]
 
   const currentSection = navigationItems.find((item) => item.id === activeSection)
-  const headerMetrics = [
+  const headerMetrics: HeaderMetric[] = [
     {
       value: upcomingGigCount,
       label: 'upcoming gigs',
@@ -812,612 +586,6 @@ function App({ appMetadata }: AppProps) {
     },
   ]
 
-  const startCreating = () => {
-    setMode('create')
-    setForm(emptyForm())
-    setIsClientEditorOpen(true)
-  }
-
-  const startEditing = () => {
-    if (!selectedClient) {
-      return
-    }
-
-    setMode('edit')
-    setForm({
-      name: selectedClient.name,
-      email: selectedClient.email,
-      billingAddress: {
-        line1: selectedClient.billingAddress.line1 ?? '',
-        line2: selectedClient.billingAddress.line2 ?? '',
-        city: selectedClient.billingAddress.city ?? '',
-        stateOrCounty: selectedClient.billingAddress.stateOrCounty ?? '',
-        postalCode: selectedClient.billingAddress.postalCode ?? '',
-        country: selectedClient.billingAddress.country ?? '',
-      },
-    })
-    setIsClientEditorOpen(true)
-  }
-
-  const startAdminCreate = () => {
-    setAdminMode('create')
-    setAdminForm(emptyAdminForm())
-    setIsAdminEditorOpen(true)
-  }
-
-  const startAdminEdit = () => {
-    if (!selectedAdminUser) {
-      return
-    }
-
-    setAdminMode('edit')
-    setAdminForm({
-      email: selectedAdminUser.email,
-      displayName: selectedAdminUser.displayName ?? '',
-      googleSubject: selectedAdminUser.googleSubject ?? '',
-      role: selectedAdminUser.role === 'Admin' ? 'Admin' : 'User',
-      isActive: selectedAdminUser.isActive,
-    })
-    setIsAdminEditorOpen(true)
-  }
-
-  const startGigCreate = () => {
-    setGigMode('create')
-    setGigForm({
-      ...emptyGigForm(),
-      clientId: clients[0]?.id ?? '',
-    })
-    setGigStatus(
-      clients.length > 0
-        ? 'Capture the essentials now and we can build invoicing on top later.'
-        : 'Create a client first so the gig can be linked correctly.'
-    )
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setSelectedGigIds([])
-    setIsGigEditorOpen(true)
-  }
-
-  const startGigEdit = () => {
-    if (!selectedGig) {
-      return
-    }
-
-    setGigMode('edit')
-    setGigForm({
-      clientId: selectedGig.clientId,
-      title: selectedGig.title,
-      date: selectedGig.date,
-      venue: selectedGig.venue,
-      fee: String(selectedGig.fee),
-      notes: selectedGig.notes ?? '',
-      wasDriving: selectedGig.wasDriving,
-      status: selectedGig.status,
-      expenses: selectedGig.expenses
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map(toGigExpenseForm),
-    })
-    setGigStatus('Editing the selected gig.')
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setIsGigEditorOpen(true)
-  }
-
-  const closeClientEditor = () => {
-    setIsClientEditorOpen(false)
-    setMode('create')
-    setForm(emptyForm())
-  }
-
-  const closeAdminEditor = () => {
-    setIsAdminEditorOpen(false)
-    setAdminMode('create')
-    setAdminForm(emptyAdminForm())
-  }
-
-  const closeGigEditor = () => {
-    setIsGigEditorOpen(false)
-    setGigMode('create')
-    setGigForm({
-      ...emptyGigForm(),
-      clientId: clients[0]?.id ?? '',
-    })
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setGigStatus(defaultGigStatus)
-  }
-
-  const startInvoiceEdit = () => {
-    if (!selectedInvoice) {
-      return
-    }
-
-    setIsInvoiceEditorOpen(true)
-  }
-
-  const closeInvoiceEditor = () => {
-    setIsInvoiceEditorOpen(false)
-    setAdjustmentAmount('')
-    setAdjustmentReason('')
-  }
-
-  const updateField = (field: keyof ClientForm, value: string | Address) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const updateAddressField = (field: keyof Address, value: string) => {
-    setForm((current) => ({
-      ...current,
-      billingAddress: {
-        ...current.billingAddress,
-        [field]: value,
-      },
-    }))
-  }
-
-  const updateAdminField = (
-    field: keyof AdminUserForm,
-    value: string | boolean
-  ) => {
-    setAdminForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const updateGigField = (
-    field: keyof GigForm,
-    value: string | boolean | GigExpenseForm[]
-  ) => {
-    setGigForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const handleAddGigExpense = () => {
-    const description = gigExpenseDescription.trim()
-    const amount = Number(gigExpenseAmount)
-
-    if (!description) {
-      setGigStatus('Add an expense description before saving it to the gig.')
-      return
-    }
-
-    if (!Number.isFinite(amount) || amount < 0) {
-      setGigStatus('Expense amount must be a valid non-negative number.')
-      return
-    }
-
-    setGigForm((current) => ({
-      ...current,
-      expenses: [
-        ...current.expenses,
-        {
-          id: '',
-          sortOrder: current.expenses.length + 1,
-          description,
-          amount: gigExpenseAmount,
-          attachments: [],
-        },
-      ],
-    }))
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setGigStatus('Expense added to the gig form. Save the gig to persist it.')
-  }
-
-  const updateGigExpenseField = (
-    index: number,
-    field: keyof Pick<GigExpenseForm, 'description' | 'amount'>,
-    value: string
-  ) => {
-    setGigForm((current) => ({
-      ...current,
-      expenses: current.expenses.map((expense, expenseIndex) =>
-        expenseIndex === index
-          ? {
-              ...expense,
-              [field]: value,
-            }
-          : expense
-      ),
-    }))
-  }
-
-  const removeGigExpense = (index: number) => {
-    setGigForm((current) => ({
-      ...current,
-      expenses: current.expenses
-        .filter((_, expenseIndex) => expenseIndex !== index)
-        .map((expense, expenseIndex) => ({
-          ...expense,
-          sortOrder: expenseIndex + 1,
-        })),
-    }))
-  }
-
-  const mergeSavedGig = (savedGig: Gig) => {
-    setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
-    setGigForm((current) => ({
-      ...current,
-      expenses: savedGig.expenses
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map(toGigExpenseForm),
-    }))
-  }
-
-  const refreshGig = async (gigId: string) => {
-    const response = await fetchWithSession(buildApiUrl(`/gigs/${gigId}`))
-
-    if (response.status === 401) {
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
-      setStatus('Your session expired. Sign in again to keep managing gigs.')
-      return null
-    }
-
-    if (!response.ok) {
-      throw new Error('Unable to refresh gig receipts.')
-    }
-
-    const savedGig = (await response.json()) as Gig
-    mergeSavedGig(savedGig)
-    return savedGig
-  }
-
-  const uploadExpenseAttachment = async (index: number, file: File) => {
-    const expense = gigForm.expenses[index]
-    if (!selectedGig || !expense?.id) {
-      setGigStatus('Save the gig before adding receipts.')
-      return
-    }
-
-    const formData = new FormData()
-    formData.append('file', file)
-    setIsGigLoading(true)
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments`),
-        {
-          method: 'POST',
-          body: formData,
-        }
-      )
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing gigs.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to upload receipt.')
-      }
-
-      await refreshGig(selectedGig.id)
-      setGigStatus('Receipt uploaded.')
-    } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to upload receipt.')
-    } finally {
-      setIsGigLoading(false)
-    }
-  }
-
-  const downloadExpenseAttachment = (expense: GigExpenseForm, attachmentId: string) => {
-    if (!selectedGig || !expense.id) {
-      return
-    }
-
-    window.open(
-      buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments/${attachmentId}`),
-      '_blank',
-      'noopener,noreferrer'
-    )
-  }
-
-  const deleteExpenseAttachment = async (
-    expense: GigExpenseForm,
-    attachmentId: string
-  ) => {
-    if (!selectedGig || !expense.id) {
-      return
-    }
-
-    setIsGigLoading(true)
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments/${attachmentId}`),
-        {
-          method: 'DELETE',
-        }
-      )
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing gigs.')
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Unable to delete receipt.')
-      }
-
-      await refreshGig(selectedGig.id)
-      setGigStatus('Receipt deleted.')
-    } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to delete receipt.')
-    } finally {
-      setIsGigLoading(false)
-    }
-  }
-
-  const openGigReceiptDraft = (savedGig: Gig) => {
-    mergeSavedGig(savedGig)
-    setSelectedGigId(savedGig.id)
-    setActiveSection('gigs')
-    setGigMode('edit')
-    setGigForm({
-      clientId: savedGig.clientId,
-      title: savedGig.title,
-      date: savedGig.date,
-      venue: savedGig.venue,
-      fee: String(savedGig.fee),
-      notes: savedGig.notes ?? '',
-      wasDriving: savedGig.wasDriving,
-      status: savedGig.status,
-      expenses: savedGig.expenses
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map(toGigExpenseForm),
-    })
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setIsGigEditorOpen(true)
-  }
-
-  const promptForReceiptGig = (
-    file: File,
-    candidates: QuickReceiptCandidate[],
-    message: string
-  ) => {
-    setPendingReceiptFile(file)
-    setQuickReceiptDraft(null)
-    setQuickReceiptCandidates(candidates)
-    setQuickReceiptSelectedGigId(candidates[0]?.id ?? '')
-    setQuickReceiptAmount('')
-    setQuickReceiptDescription('Receipt draft')
-    setQuickReceiptStatus(message)
-  }
-
-  const clearQuickReceiptDialog = () => {
-    setPendingReceiptFile(null)
-    setQuickReceiptDraft(null)
-    setQuickReceiptCandidates([])
-    setQuickReceiptSelectedGigId('')
-    setQuickReceiptAmount('')
-    setQuickReceiptDescription('')
-    setQuickReceiptStatus('')
-  }
-
-  const uploadQuickReceiptDraft = async (file: File, gigId?: string) => {
-    const formData = new FormData()
-    formData.append('file', file)
-    if (gigId) {
-      formData.append('gigId', gigId)
-    }
-
-    setIsQuickReceiptSaving(true)
-    setQuickReceiptStatus('Saving receipt draft...')
-    setPendingReceiptFile(file)
-    setQuickReceiptDraft(null)
-    if (!gigId) {
-      setQuickReceiptCandidates([])
-      setQuickReceiptSelectedGigId('')
-      setQuickReceiptAmount('')
-      setQuickReceiptDescription('')
-    }
-
-    try {
-      const response = await fetchWithSession(buildApiUrl('/gigs/receipt-drafts'), {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to add receipts.')
-        return
-      }
-
-      if (response.status === 409) {
-        const conflict = (await response.json()) as {
-          message?: string
-          candidates?: QuickReceiptCandidate[]
-        }
-        promptForReceiptGig(
-          file,
-          conflict.candidates ?? [],
-          conflict.message ?? 'Choose a gig before saving this receipt draft.'
-        )
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save receipt draft.')
-      }
-
-      const receiptDraft = (await response.json()) as QuickReceiptDraftResponse
-      openGigReceiptDraft(receiptDraft.gig)
-      setPendingReceiptFile(null)
-      setQuickReceiptDraft(receiptDraft)
-      setQuickReceiptCandidates(receiptDraft.candidates)
-      setQuickReceiptSelectedGigId(receiptDraft.gig.id)
-      setQuickReceiptAmount('')
-      setQuickReceiptDescription('Receipt draft')
-      setQuickReceiptStatus(
-        receiptDraft.hasNearbyCandidates
-          ? 'Receipt saved. There are other nearby gigs, so please check the selected gig.'
-          : 'Receipt saved. Add details now or come back later.'
-      )
-      setGigStatus(
-        receiptDraft.inferredGig
-          ? 'Receipt draft saved to the nearest matching gig.'
-          : 'Receipt draft saved. Add the amount and description when you are ready.'
-      )
-    } catch (error) {
-      setQuickReceiptStatus(
-        error instanceof Error ? error.message : 'Unable to save receipt draft.'
-      )
-    } finally {
-      setIsQuickReceiptSaving(false)
-    }
-  }
-
-  const handleQuickReceiptFile = (file: File) => {
-    void uploadQuickReceiptDraft(file)
-  }
-
-  const savePendingReceiptToSelectedGig = () => {
-    if (!pendingReceiptFile || !quickReceiptSelectedGigId) {
-      setQuickReceiptStatus('Choose a gig before saving this receipt draft.')
-      return
-    }
-
-    void uploadQuickReceiptDraft(pendingReceiptFile, quickReceiptSelectedGigId)
-  }
-
-  const saveQuickReceiptDetails = async () => {
-    if (!quickReceiptDraft || !quickReceiptSelectedGigId) {
-      setQuickReceiptStatus('Choose a gig before saving this receipt draft.')
-      return
-    }
-
-    const description = quickReceiptDescription.trim()
-    const amount = Number(quickReceiptAmount || '0')
-
-    if (!description) {
-      setQuickReceiptStatus('Add a description before saving receipt details.')
-      return
-    }
-
-    if (!Number.isFinite(amount) || amount < 0) {
-      setQuickReceiptStatus('Receipt amount must be a valid non-negative number.')
-      return
-    }
-
-    setIsQuickReceiptSaving(true)
-    setQuickReceiptStatus('Saving receipt details...')
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/gigs/receipt-drafts/${quickReceiptDraft.expenseId}`),
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            gigId: quickReceiptSelectedGigId,
-            description,
-            amount,
-          }),
-        }
-      )
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to add receipts.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save receipt details.')
-      }
-
-      const update = (await response.json()) as QuickReceiptDraftUpdateResponse
-      mergeSavedGig(update.gig)
-      if (update.previousGig) {
-        mergeSavedGig(update.previousGig)
-      }
-
-      setQuickReceiptDraft((current) =>
-        current
-          ? {
-              ...current,
-              gig: update.gig,
-              expenseId: update.expenseId,
-              inferredGig: false,
-            }
-          : current
-      )
-      setSelectedGigId(update.gig.id)
-      setQuickReceiptSelectedGigId(update.gig.id)
-      setGigStatus('Receipt details saved.')
-      setQuickReceiptStatus(
-        update.moved
-          ? 'Receipt moved and details saved.'
-          : 'Receipt details saved.'
-      )
-    } catch (error) {
-      setQuickReceiptStatus(
-        error instanceof Error ? error.message : 'Unable to save receipt details.'
-      )
-    } finally {
-      setIsQuickReceiptSaving(false)
-    }
-  }
-
-  const goToQuickReceiptGig = () => {
-    const targetGig =
-      gigsById.get(quickReceiptSelectedGigId) ?? quickReceiptDraft?.gig ?? null
-    if (!targetGig) {
-      return
-    }
-
-    openGigReceiptDraft(targetGig)
-    clearQuickReceiptDialog()
-  }
-
-  const closeQuickReceiptPrompt = () => {
-    if (isQuickReceiptSaving) {
-      return
-    }
-
-    clearQuickReceiptDialog()
-  }
-
   const signIn = () => {
     const loginUrl = buildApiUrl(
       `/auth/login?returnUrl=${encodeURIComponent(buildReturnUrl())}`
@@ -1427,7 +595,7 @@ function App({ appMetadata }: AppProps) {
 
   const signOut = async () => {
     setIsLoading(true)
-    setIsProfileMenuOpen(false)
+    closeProfileMenu()
 
     try {
       const response = await fetchWithSession(buildApiUrl('/auth/logout'), {
@@ -1438,32 +606,11 @@ function App({ appMetadata }: AppProps) {
         throw new Error('Unable to sign out.')
       }
 
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
-      setClients([])
-      setSelectedClientId('')
-      setSearchQuery('')
-      setIsClientEditorOpen(false)
-      setMode('create')
-      setForm(emptyForm())
-      setGigs([])
-      setSelectedGigId('')
-      setGigSearchQuery('')
-      setIsGigEditorOpen(false)
-      setGigMode('create')
-      setGigForm(emptyGigForm())
-      setGigStatus(defaultGigStatus)
-      setInvoices([])
-      setSelectedInvoiceId('')
-      setIsInvoiceEditorOpen(false)
-      setInvoiceSearchQuery('')
-      setInvoiceStatus(defaultInvoiceStatus)
-      setSellerProfile(emptySellerProfile())
-      setSellerProfileForm(emptySellerProfileForm())
-      setSellerProfileStatus(
-        'Add the seller details that should appear on your invoices.'
-      )
+      clearSession()
+      resetClientsWorkspace()
+      resetGigsWorkspace()
+      resetInvoicesWorkspace()
+      resetSellerProfile()
       resetAdminWorkspace()
       setShouldCloseBrowserNotice(true)
       setStatus('Signed out successfully.')
@@ -1474,775 +621,8 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
-  const handleThemePreferenceChange = (nextPreference: ThemePreference) => {
-    setThemePreference(nextPreference)
-  }
-
-  const openClientSettings = () => {
-    if (!selectedClient) {
-      return
-    }
-
-    setClientSettingsForm({
-      mileageRate:
-        selectedClient.mileageRate === null ? '' : String(selectedClient.mileageRate),
-      passengerMileageRate:
-        selectedClient.passengerMileageRate === null
-          ? ''
-          : String(selectedClient.passengerMileageRate),
-      invoiceFilenamePattern: selectedClient.invoiceFilenamePattern ?? '',
-      invoiceEmailSubjectPattern: selectedClient.invoiceEmailSubjectPattern ?? '',
-    })
-    setClientSettingsStatus(
-      'Client-specific rates override your personal defaults when set.'
-    )
-    setIsClientSettingsOpen(true)
-  }
-
-  const closeClientSettings = () => {
-    setIsClientSettingsOpen(false)
-  }
-
-  const updateClientSettingsField = (
-    field: keyof ClientSettingsForm,
-    value: string
-  ) => {
-    setClientSettingsForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const handleClientSettingsSubmit = async (
-    event: FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault()
-
-    if (!selectedClient) {
-      return
-    }
-
-    const parseOptionalDecimal = (value: string) => {
-      const trimmed = value.trim()
-      if (!trimmed) {
-        return null
-      }
-
-      const parsed = Number(trimmed)
-      return Number.isFinite(parsed) ? parsed : Number.NaN
-    }
-
-    const mileageRate = parseOptionalDecimal(clientSettingsForm.mileageRate)
-    const passengerMileageRate = parseOptionalDecimal(
-      clientSettingsForm.passengerMileageRate
-    )
-    const invoiceFilenamePattern = clientSettingsForm.invoiceFilenamePattern.trim()
-    const invoiceEmailSubjectPattern =
-      clientSettingsForm.invoiceEmailSubjectPattern.trim()
-
-    if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
-      setClientSettingsStatus('Rates must be valid numbers, for example 0.45.')
-      return
-    }
-
-    setIsClientSettingsSaving(true)
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/clients/${selectedClient.id}`),
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id: selectedClient.id,
-            name: selectedClient.name,
-            email: selectedClient.email,
-            billingAddress: selectedClient.billingAddress,
-            mileageRate,
-            passengerMileageRate,
-            invoiceFilenamePattern: invoiceFilenamePattern || null,
-            invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
-          }),
-        }
-      )
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setIsClientSettingsOpen(false)
-        setStatus('Your session expired. Sign in again to update client settings.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save client settings.')
-      }
-
-      const savedClient = (await response.json()) as Client
-
-      setClients((current) =>
-        current.map((client) => (client.id === savedClient.id ? savedClient : client))
-      )
-      setClientSettingsForm({
-        mileageRate: savedClient.mileageRate === null ? '' : String(savedClient.mileageRate),
-        passengerMileageRate:
-          savedClient.passengerMileageRate === null
-            ? ''
-            : String(savedClient.passengerMileageRate),
-        invoiceFilenamePattern: savedClient.invoiceFilenamePattern ?? '',
-        invoiceEmailSubjectPattern: savedClient.invoiceEmailSubjectPattern ?? '',
-      })
-      setClientSettingsStatus('Client settings updated.')
-    } catch (error) {
-      setClientSettingsStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to save client settings right now.'
-      )
-    } finally {
-      setIsClientSettingsSaving(false)
-    }
-  }
-
-  const openUserSettings = () => {
-    setUserSettingsForm({
-      mileageRate:
-        authUser?.mileageRate === null || authUser?.mileageRate === undefined
-          ? ''
-          : String(authUser.mileageRate),
-      passengerMileageRate:
-        authUser?.passengerMileageRate === null ||
-        authUser?.passengerMileageRate === undefined
-          ? ''
-          : String(authUser.passengerMileageRate),
-      defaultPaymentWindowDays:
-        authUser?.defaultPaymentWindowDays === null ||
-        authUser?.defaultPaymentWindowDays === undefined
-          ? ''
-          : String(authUser.defaultPaymentWindowDays),
-      invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? '',
-      invoiceEmailSubjectPattern: authUser?.invoiceEmailSubjectPattern ?? '',
-      invoiceReplyToEmail: authUser?.invoiceReplyToEmail ?? '',
-      invoiceUploadFolderId: authUser?.invoiceUploadFolderId ?? '',
-    })
-    setUserSettingsStatus(
-      'Set the defaults used when a client does not provide its own overrides.'
-    )
-    setIsProfileMenuOpen(false)
-    setIsUserSettingsOpen(true)
-  }
-
-  const connectGoogleDrive = () => {
-    window.location.assign(buildApiUrl('/integrations/google-drive/connect'))
-  }
-
   const openSellerProfile = () => {
-    setSellerProfileForm(toSellerProfileForm(sellerProfile))
-    setSellerProfileStatus(
-      sellerProfile.isConfigured
-        ? sellerProfileNotice
-        : 'Add the seller details that should appear on your invoices.'
-    )
-    setIsProfileMenuOpen(false)
-    setIsSellerProfileOpen(true)
-  }
-
-  const closeSellerProfile = () => {
-    setIsSellerProfileOpen(false)
-  }
-
-  const updateSellerProfileField = (
-    field: keyof SellerProfileForm,
-    value: string
-  ) => {
-    setSellerProfileForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const closeUserSettings = () => {
-    setIsUserSettingsOpen(false)
-  }
-
-  const updateUserSettingsField = (
-    field: keyof UserSettingsForm,
-    value: string
-  ) => {
-    setUserSettingsForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const handleUserSettingsSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const parseOptionalDecimal = (value: string) => {
-      const trimmed = value.trim()
-      if (!trimmed) {
-        return null
-      }
-
-      const parsed = Number(trimmed)
-      return Number.isFinite(parsed) ? parsed : Number.NaN
-    }
-
-    const mileageRate = parseOptionalDecimal(userSettingsForm.mileageRate)
-    const passengerMileageRate = parseOptionalDecimal(
-      userSettingsForm.passengerMileageRate
-    )
-    const defaultPaymentWindowDaysText = userSettingsForm.defaultPaymentWindowDays.trim()
-    const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
-    const invoiceEmailSubjectPattern =
-      userSettingsForm.invoiceEmailSubjectPattern.trim()
-    const invoiceReplyToEmail = userSettingsForm.invoiceReplyToEmail.trim()
-    const invoiceUploadFolderId = userSettingsForm.invoiceUploadFolderId.trim()
-
-    if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
-      setUserSettingsStatus('Rates must be valid numbers, for example 0.45.')
-      return
-    }
-
-    const defaultPaymentWindowDays = defaultPaymentWindowDaysText
-      ? Number(defaultPaymentWindowDaysText)
-      : null
-    if (
-      defaultPaymentWindowDays !== null &&
-      (!Number.isInteger(defaultPaymentWindowDays) || defaultPaymentWindowDays < 0)
-    ) {
-      setUserSettingsStatus('Payment window must be a whole number of days.')
-      return
-    }
-
-    setIsUserSettingsSaving(true)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl('/auth/me/settings'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mileageRate,
-          passengerMileageRate,
-          defaultPaymentWindowDays,
-          invoiceFilenamePattern: invoiceFilenamePattern || null,
-          invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
-          invoiceReplyToEmail: invoiceReplyToEmail || null,
-          invoiceUploadFolderId: invoiceUploadFolderId || null,
-        }),
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setIsUserSettingsOpen(false)
-        setStatus('Your session expired. Sign in again to update your settings.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save your settings.')
-      }
-
-      const savedSettings = (await response.json()) as {
-        mileageRate: number | null
-        passengerMileageRate: number | null
-        defaultPaymentWindowDays: number | null
-        invoiceFilenamePattern: string | null
-        invoiceEmailSubjectPattern: string | null
-        invoiceReplyToEmail: string | null
-        invoiceUploadFolderId: string | null
-      }
-
-      setAuthUser((current) =>
-        current
-          ? {
-              ...current,
-              mileageRate: savedSettings.mileageRate,
-              passengerMileageRate: savedSettings.passengerMileageRate,
-              defaultPaymentWindowDays: savedSettings.defaultPaymentWindowDays,
-              invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
-              invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern,
-              invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
-              invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
-            }
-          : current
-      )
-      setUserSettingsForm({
-        mileageRate:
-          savedSettings.mileageRate === null ? '' : String(savedSettings.mileageRate),
-        passengerMileageRate:
-          savedSettings.passengerMileageRate === null
-            ? ''
-            : String(savedSettings.passengerMileageRate),
-        defaultPaymentWindowDays:
-          savedSettings.defaultPaymentWindowDays === null
-            ? ''
-            : String(savedSettings.defaultPaymentWindowDays),
-        invoiceFilenamePattern: savedSettings.invoiceFilenamePattern ?? '',
-        invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern ?? '',
-        invoiceReplyToEmail: savedSettings.invoiceReplyToEmail ?? '',
-        invoiceUploadFolderId: savedSettings.invoiceUploadFolderId ?? '',
-      })
-      setUserSettingsStatus('Settings updated.')
-    } catch (error) {
-      setUserSettingsStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to save your settings right now.'
-      )
-    } finally {
-      setIsUserSettingsSaving(false)
-    }
-  }
-
-  const handleSellerProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setIsSellerProfileSaving(true)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl('/seller-profile'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sellerName: sellerProfileForm.sellerName.trim() || null,
-          addressLine1: sellerProfileForm.addressLine1.trim() || null,
-          addressLine2: sellerProfileForm.addressLine2.trim() || null,
-          city: sellerProfileForm.city.trim() || null,
-          region: sellerProfileForm.region.trim() || null,
-          postcode: sellerProfileForm.postcode.trim() || null,
-          country: sellerProfileForm.country.trim() || null,
-          email: sellerProfileForm.email.trim() || null,
-          phone: sellerProfileForm.phone.trim() || null,
-          accountName: sellerProfileForm.accountName.trim() || null,
-          sortCode: sellerProfileForm.sortCode.trim() || null,
-          accountNumber: sellerProfileForm.accountNumber.trim() || null,
-          paymentReferenceNote: sellerProfileForm.paymentReferenceNote.trim() || null,
-        }),
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setIsSellerProfileOpen(false)
-        setStatus('Your session expired. Sign in again to update your seller profile.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save seller profile.')
-      }
-
-      const savedProfile = (await response.json()) as SellerProfile
-      setSellerProfile(savedProfile)
-      setSellerProfileForm(toSellerProfileForm(savedProfile))
-      setSellerProfileStatus(
-        savedProfile.isInvoiceReady
-          ? 'Seller profile updated and ready for invoice generation.'
-          : `Seller profile saved. Missing: ${savedProfile.missingFields.join(', ')}.`
-      )
-    } catch (error) {
-      setSellerProfileStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to save your seller profile right now.'
-      )
-    } finally {
-      setIsSellerProfileSaving(false)
-    }
-  }
-
-  const shouldCloseAfterSave = (event: FormEvent<HTMLFormElement>) => {
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as
-      | HTMLButtonElement
-      | null
-
-    return submitter?.dataset.closeAfterSave !== 'false'
-  }
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const closeAfterSave = shouldCloseAfterSave(event)
-
-    const payload: ClientForm = {
-      name: form.name.trim(),
-      email: form.email.trim(),
-      billingAddress: {
-        line1: form.billingAddress.line1.trim(),
-        line2: form.billingAddress.line2.trim(),
-        city: form.billingAddress.city.trim(),
-        stateOrCounty: form.billingAddress.stateOrCounty.trim(),
-        postalCode: form.billingAddress.postalCode.trim(),
-        country: form.billingAddress.country.trim(),
-      },
-    }
-
-    const preservedClientSettings =
-      mode === 'edit' && selectedClient
-        ? {
-            mileageRate: selectedClient.mileageRate,
-            passengerMileageRate: selectedClient.passengerMileageRate,
-            invoiceFilenamePattern: selectedClient.invoiceFilenamePattern,
-            invoiceEmailSubjectPattern: selectedClient.invoiceEmailSubjectPattern,
-          }
-        : {
-            mileageRate: null,
-            passengerMileageRate: null,
-            invoiceFilenamePattern: null,
-            invoiceEmailSubjectPattern: null,
-          }
-
-    if (
-      !payload.name ||
-      !payload.email ||
-      !payload.billingAddress.line1 ||
-      !payload.billingAddress.city
-    ) {
-      setStatus('Name, email, address line 1 and city are required.')
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      if (!isApiConnected) {
-        throw new Error('API unavailable.')
-      }
-
-      const isEdit = mode === 'edit' && selectedClient
-      const endpoint = isEdit
-        ? buildApiUrl(`/clients/${selectedClient.id}`)
-        : buildApiUrl('/clients')
-      const requestBody = JSON.stringify({
-        ...payload,
-        ...preservedClientSettings,
-      })
-
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: requestBody,
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to save changes.')
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Save failed.')
-      }
-
-      const savedClient = (await response.json()) as Client
-
-      setClients((current) => {
-        if (isEdit) {
-          return current.map((client) =>
-            client.id === savedClient.id ? savedClient : client
-          )
-        }
-
-        return [savedClient, ...current]
-      })
-
-      setSelectedClientId(savedClient.id)
-      setMode('edit')
-      setStatus(isEdit ? 'Client updated.' : 'Client created.')
-      setIsClientEditorOpen(!closeAfterSave)
-    } catch {
-      setStatus('Unable to save right now. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!selectedClient) {
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      if (!isApiConnected) {
-        throw new Error('API unavailable.')
-      }
-
-      const response = await fetchWithSession(buildApiUrl(`/clients/${selectedClient.id}`), {
-        method: 'DELETE',
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to delete clients.')
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Delete failed.')
-      }
-
-      let nextSelectedClientId = ''
-
-      setClients((current) => {
-        const remaining = current.filter((client) => client.id !== selectedClient.id)
-        nextSelectedClientId = remaining[0]?.id ?? ''
-        return remaining
-      })
-
-      setSelectedClientId(nextSelectedClientId)
-      setMode('create')
-      setForm(emptyForm())
-      setStatus('Client deleted.')
-      setIsClientEditorOpen(false)
-    } catch {
-      setStatus('Unable to delete right now.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleAdminSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const payload: AdminUserForm = {
-      email: adminForm.email.trim(),
-      displayName: adminForm.displayName.trim(),
-      googleSubject: adminForm.googleSubject.trim(),
-      role: adminForm.role,
-      isActive: adminForm.isActive,
-    }
-
-    if (!payload.email) {
-      setAdminStatus('Email is required.')
-      return
-    }
-
-    setIsAdminLoading(true)
-
-    try {
-      const isEdit = adminMode === 'edit' && selectedAdminUser
-      const endpoint = isEdit
-        ? buildApiUrl(`/admin/users/${selectedAdminUser.id}`)
-        : buildApiUrl('/admin/users')
-
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing access.')
-        return
-      }
-
-      if (response.status === 403) {
-        setAdminStatus('Administrator access is required to manage users.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save enrolment.')
-      }
-
-      const savedUser = (await response.json()) as AdminUser
-
-      setAdminUsers((current) => {
-        if (isEdit) {
-          return current.map((user) => (user.id === savedUser.id ? savedUser : user))
-        }
-
-        return [savedUser, ...current]
-      })
-
-      setSelectedAdminUserId(savedUser.id)
-      setAdminMode('edit')
-      setAdminStatus(isEdit ? 'User updated.' : 'User added.')
-      setIsAdminEditorOpen(false)
-    } catch (error) {
-      setAdminStatus(
-        error instanceof Error ? error.message : 'Unable to save right now.'
-      )
-    } finally {
-      setIsAdminLoading(false)
-    }
-  }
-
-  const handleGigSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const closeAfterSave = shouldCloseAfterSave(event)
-
-    const payload = {
-      clientId: gigForm.clientId,
-      title: gigForm.title.trim(),
-      date: gigForm.date,
-      venue: gigForm.venue.trim(),
-      fee: gigForm.fee.trim(),
-      notes: gigForm.notes.trim(),
-      wasDriving: gigForm.wasDriving,
-      status: gigForm.status,
-      expenses: gigForm.expenses,
-    }
-
-    if (!payload.clientId || !payload.title || !payload.date || !payload.venue) {
-      setGigStatus('Client, title, date and location are required.')
-      return
-    }
-
-    const fee = Number(payload.fee)
-    if (!Number.isFinite(fee) || fee < 0) {
-      setGigStatus('Fee must be a valid non-negative number.')
-      return
-    }
-
-    const normalizedExpenses = []
-    for (const [index, expense] of payload.expenses.entries()) {
-      const description = expense.description.trim()
-      const amount = Number(expense.amount)
-
-      if (!description) {
-        setGigStatus(`Expense ${index + 1} needs a description.`)
-        return
-      }
-
-      if (!Number.isFinite(amount) || amount < 0) {
-        setGigStatus(`Expense ${index + 1} must have a valid non-negative amount.`)
-        return
-      }
-
-      normalizedExpenses.push({
-        sortOrder: index + 1,
-        description,
-        amount,
-      })
-    }
-
-    setIsGigLoading(true)
-
-    try {
-      const isEdit = gigMode === 'edit' && selectedGig
-      const endpoint = isEdit
-        ? buildApiUrl(`/gigs/${selectedGig.id}`)
-        : buildApiUrl('/gigs')
-
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          clientId: payload.clientId,
-          title: payload.title,
-          date: payload.date,
-          venue: payload.venue,
-          fee,
-          travelMiles: 0,
-          passengerCount: null,
-          notes: payload.notes || null,
-          wasDriving: payload.wasDriving,
-          status: payload.status,
-          invoiceId: null,
-          expenses: normalizedExpenses,
-          invoicedAt: null,
-        }),
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing gigs.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save gig.')
-      }
-
-      const savedGig = (await response.json()) as Gig
-
-      setGigs((current) => {
-        if (isEdit) {
-          return current.map((gig) => (gig.id === savedGig.id ? savedGig : gig))
-        }
-
-        return [savedGig, ...current]
-      })
-
-      setSelectedGigId(savedGig.id)
-      setGigMode('edit')
-      setGigForm({
-        clientId: savedGig.clientId,
-        title: savedGig.title,
-        date: savedGig.date,
-        venue: savedGig.venue,
-        fee: String(savedGig.fee),
-        notes: savedGig.notes ?? '',
-        wasDriving: savedGig.wasDriving,
-        status: savedGig.status,
-        expenses: savedGig.expenses
-          .slice()
-          .sort((left, right) => left.sortOrder - right.sortOrder)
-          .map(toGigExpenseForm),
-      })
-      setGigExpenseAmount('')
-      setGigExpenseDescription('')
-      setGigStatus(isEdit ? 'Gig updated.' : 'Gig created.')
-      setIsGigEditorOpen(!closeAfterSave)
-    } catch (error) {
-      setGigStatus(
-        error instanceof Error ? error.message : 'Unable to save this gig right now.'
-      )
-    } finally {
-      setIsGigLoading(false)
-    }
+    openSellerProfileModal(sellerProfileNotice)
   }
 
   const handleGenerateInvoice = async () => {
@@ -2396,14 +776,6 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
-  const handleToggleGigSelection = (gigId: string) => {
-    setSelectedGigIds((current) =>
-      current.includes(gigId)
-        ? current.filter((value) => value !== gigId)
-        : [...current, gigId]
-    )
-  }
-
   const handleGenerateMonthlyInvoice = async () => {
     if (!selectedClient) {
       setMonthlyInvoiceStatus('Choose a client before running a monthly invoice.')
@@ -2547,373 +919,6 @@ function App({ appMetadata }: AppProps) {
       setMonthlyInvoiceStatus(
         error instanceof Error ? error.message : 'Unable to generate monthly invoice.'
       )
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleDownloadInvoicePdf = async (invoice: Invoice) => {
-    const fallbackFilename = `${invoice.invoiceNumber}.pdf`
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Preparing ${fallbackFilename}...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/pdf`))
-      if (!response.ok) {
-        throw new Error('Unable to download the invoice PDF.')
-      }
-
-      const contentDisposition = response.headers.get('Content-Disposition')
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = downloadUrl
-      link.download = extractDownloadFilename(contentDisposition) ?? fallbackFilename
-      document.body.append(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(downloadUrl)
-      setInvoiceStatus(`Downloaded ${link.download}.`)
-    } catch (error) {
-      setInvoiceStatus(
-        error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
-      )
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const extractDownloadFilename = (contentDisposition: string | null) => {
-    if (!contentDisposition) {
-      return null
-    }
-
-    const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-    if (encodedMatch?.[1]) {
-      try {
-        return decodeURIComponent(encodedMatch[1])
-      } catch {
-        return encodedMatch[1]
-      }
-    }
-
-    const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
-    if (quotedMatch?.[1]) {
-      return quotedMatch[1]
-    }
-
-    const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
-    return plainMatch?.[1]?.trim() ?? null
-  }
-
-  const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus) => {
-    if (invoice.status === status) {
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Updating ${invoice.invoiceNumber} to ${status}...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/status`), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const fieldError = problem?.errors?.status?.[0]
-        throw new Error(fieldError ?? problem?.detail ?? problem?.title ?? 'Unable to update status.')
-      }
-
-      const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
-    } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to update invoice status.')
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleInvoiceReissue = async (invoice: Invoice) => {
-    const isRedraft = invoice.status === 'Draft'
-    const actionLabel = isRedraft ? 'Redraft' : 'Re-issue'
-    const actionVerb = isRedraft ? 'Redrafting' : 'Re-issuing'
-    const shouldProceed = window.confirm(
-      isRedraft
-        ? `Redraft ${invoice.invoiceNumber}? This will regenerate the draft document without changing reissue history.`
-        : `Re-issue ${invoice.invoiceNumber}? This will regenerate the document and log the action.`
-    )
-    if (!shouldProceed) {
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`${actionVerb} ${invoice.invoiceNumber}...`)
-
-    try {
-      const actionPath = isRedraft ? 'redraft' : 'reissue'
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/${actionPath}`), {
-        method: 'POST',
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const fieldError = problem?.errors?.recipient?.[0]
-        const statusError = problem?.errors?.status?.[0]
-        throw new Error(
-          fieldError ??
-            statusError ??
-            problem?.detail ??
-            problem?.title ??
-            `Unable to ${actionLabel.toLowerCase()} invoice.`
-        )
-      }
-
-      const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-
-      if (isRedraft) {
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} draft regenerated.`)
-      } else {
-        const reissuedAt = formatDateTime(updatedInvoice.lastReissuedUtc)
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
-      }
-    } catch (error) {
-      setInvoiceStatus(
-        error instanceof Error ? error.message : `Unable to ${actionLabel.toLowerCase()} invoice.`
-      )
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleSendInvoiceEmail = async (invoice: Invoice) => {
-    const message = window.prompt(
-      `Add an optional message for ${invoice.invoiceNumber}, or leave blank to send the standard note.`
-    )
-    if (message === null) {
-      return
-    }
-    const includeReceipts = window.confirm(
-      `Include any expense receipt attachments for ${invoice.invoiceNumber}?`
-    )
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Sending ${invoice.invoiceNumber} to client...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/send-email`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: message.trim() || null,
-          includeReceipts,
-        }),
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const recipientError = problem?.errors?.recipient?.[0]
-        const pdfError = problem?.errors?.pdf?.[0]
-        const attachmentError = problem?.errors?.attachments?.[0]
-        throw new Error(
-          recipientError ??
-            pdfError ??
-            attachmentError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to send invoice email.'
-        )
-      }
-
-      const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      setInvoiceStatus(
-        `Invoice ${updatedInvoice.invoiceNumber} sent to ${updatedInvoice.lastDeliveryRecipient}.`
-      )
-    } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to send invoice email.')
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handlePublishInvoiceGoogleDrive = async (invoice: Invoice) => {
-    const shouldProceed = window.confirm(
-      `Publish ${invoice.invoiceNumber} to your connected Google Drive?`
-    )
-    if (!shouldProceed) {
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setGoogleDrivePublishLink(null)
-    setInvoiceStatus(`Publishing ${invoice.invoiceNumber} to Google Drive...`)
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/invoices/${invoice.id}/publish/google-drive`),
-        {
-          method: 'POST',
-        }
-      )
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const pdfError = problem?.errors?.pdf?.[0]
-        throw new Error(
-          pdfError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to publish invoice to Google Drive.'
-        )
-      }
-
-      const publishResult = (await response.json()) as GoogleDrivePublishResponse
-      const updatedInvoice = publishResult.invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      const driveLink = publishResult.webViewLink?.trim()
-      if (driveLink) {
-        setGoogleDrivePublishLink({
-          href: driveLink,
-          fileName: publishResult.fileName,
-        })
-        setInvoiceStatus(`Uploaded ${updatedInvoice.invoiceNumber} to Google Drive.`)
-      } else {
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} published to Google Drive.`)
-      }
-    } catch (error) {
-      setGoogleDrivePublishLink(null)
-      setInvoiceStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to publish invoice to Google Drive.'
-      )
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleAddInvoiceAdjustment = async (invoice: Invoice) => {
-    const amount = Number.parseFloat(adjustmentAmount)
-    if (!Number.isFinite(amount) || amount === 0) {
-      setInvoiceStatus('Enter a non-zero adjustment amount.')
-      return
-    }
-
-    const reason = adjustmentReason.trim()
-    if (!reason) {
-      setInvoiceStatus('Add a reason before saving an adjustment.')
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Saving adjustment on ${invoice.invoiceNumber}...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/adjustments`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount,
-          reason,
-        }),
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const reasonError = problem?.errors?.reason?.[0]
-        const amountError = problem?.errors?.amount?.[0]
-        throw new Error(
-          reasonError ??
-            amountError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to add invoice adjustment.'
-        )
-      }
-
-      const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      setAdjustmentAmount('')
-      setAdjustmentReason('')
-      setInvoiceStatus(`Adjustment saved. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`)
-      setIsInvoiceEditorOpen(false)
-    } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to add invoice adjustment.')
-    } finally {
-      setIsInvoiceLoading(false)
-    }
-  }
-
-  const handleDeleteInvoice = async (invoice: Invoice) => {
-    if (invoice.status !== 'Draft') {
-      setInvoiceStatus(
-        `Only Draft invoices can be deleted. ${invoice.invoiceNumber} is currently ${invoice.status}.`
-      )
-      return
-    }
-
-    const shouldDelete = window.confirm(
-      `Delete ${invoice.invoiceNumber}? This cannot be undone and should only be used for draft mistakes.`
-    )
-    if (!shouldDelete) {
-      return
-    }
-
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Deleting ${invoice.invoiceNumber}...`)
-
-    try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}`), {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const statusError = problem?.errors?.status?.[0]
-        throw new Error(
-          statusError ?? problem?.detail ?? problem?.title ?? 'Unable to delete invoice.'
-        )
-      }
-
-      setInvoices((current) => current.filter((value) => value.id !== invoice.id))
-      setGigs((current) =>
-        current.map((gig) =>
-          gig.invoiceId === invoice.id
-            ? {
-                ...gig,
-                invoiceId: null,
-                invoicedAt: null,
-                isInvoiced: false,
-              }
-            : gig
-        )
-      )
-      setSelectedInvoiceId((current) => (current === invoice.id ? '' : current))
-      setInvoiceStatus(`Invoice ${invoice.invoiceNumber} deleted.`)
-      setIsInvoiceEditorOpen(false)
-    } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to delete invoice.')
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -3063,185 +1068,33 @@ function App({ appMetadata }: AppProps) {
     )
 
   return (
-    <main className="app-shell">
-      <section className="hero-panel app-frame">
-        <div className="content-shell">
-          <div className="content-header panel">
-            <div className="content-header-top">
-              <div className="content-header-copy">
-                <p className="eyebrow">Workspace</p>
-                <h1>Your work, all in one place.</h1>
-                <p className="hero-text">
-                  Move between clients, gigs, invoices and admin tools with everything easy to find.
-                </p>
-              </div>
-
-              <div className="header-actions">
-                <label className="primary-button quick-receipt-button">
-                  <span aria-hidden="true">+</span>
-                  Scan receipt
-                  <input
-                    type="file"
-                    accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
-                    disabled={isLoading || isGigLoading || isQuickReceiptSaving}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      event.target.value = ''
-                      if (file) {
-                        handleQuickReceiptFile(file)
-                      }
-                    }}
-                  />
-                </label>
-
-                <div className="profile-menu" ref={profileMenuRef}>
-                  <button
-                    aria-expanded={isProfileMenuOpen}
-                    aria-haspopup="menu"
-                    aria-label="Open profile menu"
-                    className={`profile-trigger ${isProfileMenuOpen ? 'open' : ''}`}
-                    onClick={() => setIsProfileMenuOpen((current) => !current)}
-                    type="button"
-                  >
-                    <span className="profile-avatar" aria-hidden="true">
-                      {profileImageUrl ? (
-                        <img
-                          className="profile-avatar-image"
-                          src={profileImageUrl}
-                          alt=""
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        profileInitials || 'U'
-                      )}
-                    </span>
-                  </button>
-
-                  {isProfileMenuOpen && (
-                    <div className="profile-dropdown" role="menu" aria-label="Profile menu">
-                      <div className="profile-summary">
-                        <p className="section-label">Signed in</p>
-                        <strong>{profileDisplayName}</strong>
-                        <span>{authUser?.email}</span>
-                      </div>
-                      <div className="profile-meta">
-                        <span>{isAdmin ? 'Administrator' : 'Standard access'}</span>
-                      </div>
-                      <div className="profile-meta">
-                        <span>
-                          {sellerProfile.isInvoiceReady
-                            ? 'Seller profile ready'
-                            : sellerProfile.isConfigured
-                              ? 'Seller profile needs attention'
-                              : 'Seller profile not set up'}
-                        </span>
-                      </div>
-                      <label className="theme-field" htmlFor="theme-preference-select">
-                        <span>Theme</span>
-                        <select
-                          id="theme-preference-select"
-                          value={themePreference}
-                          onChange={(event) =>
-                            handleThemePreferenceChange(event.target.value as ThemePreference)
-                          }
-                        >
-                          <option value="system">System</option>
-                          <option value="light">Light</option>
-                          <option value="dark">Dark</option>
-                        </select>
-                      </label>
-                      <button
-                        className="ghost-button profile-settings"
-                        onClick={openSellerProfile}
-                        role="menuitem"
-                        type="button"
-                        disabled={isLoading || isAdminLoading || isSellerProfileSaving}
-                      >
-                        Seller profile
-                      </button>
-                      <button
-                        className="ghost-button profile-settings"
-                        onClick={openUserSettings}
-                        role="menuitem"
-                        type="button"
-                        disabled={isLoading || isAdminLoading || isUserSettingsSaving}
-                      >
-                        Settings
-                      </button>
-                      <button
-                        className="ghost-button profile-signout"
-                        onClick={signOut}
-                        role="menuitem"
-                        type="button"
-                        disabled={isLoading || isAdminLoading}
-                      >
-                        Sign out
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="content-header-body">
-              <div className="content-header-copy">
-                <p className="eyebrow">{currentSection?.eyebrow ?? 'Workspace'}</p>
-                <h2>{currentSection?.label ?? 'Glovelly'}</h2>
-                <p className="hero-text">{currentSection?.description}</p>
-              </div>
-
-              <div className="hero-mascot header-mascot">
-                <img
-                  src="/gordon-192.png"
-                  alt="Gordon the Glovelly mascot"
-                  decoding="async"
-                  loading="lazy"
-                />
-                <div>
-                  <p className="section-label">Meet Gordon</p>
-                  <strong>Mozart wig. Rubber chicken. Unreasonably good taste in admin.</strong>
-                </div>
-              </div>
-            </div>
-
-            <nav className="charm-bar" aria-label="Primary">
-              {navigationItems.map((item) => (
-                <button
-                  key={item.id}
-                  className={`charm-item ${activeSection === item.id ? 'selected' : ''}`}
-                  onClick={() => setActiveSection(item.id)}
-                  type="button"
-                  disabled={item.disabled}
-                >
-                  <span className="charm-meta">{item.eyebrow}</span>
-                  <strong>{item.label}</strong>
-                  <span>{item.description}</span>
-                </button>
-              ))}
-            </nav>
-
-            <div className="content-header-aside">
-              <div className="hero-metrics">
-                {headerMetrics.map((metric) => (
-                  <article key={metric.label}>
-                    <span>{metric.value}</span>
-                    <p>{metric.label}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {currentSectionContent}
-        </div>
-      </section>
-
-      <p className="build-meta">
-        {appMetadata.deploymentName ? `${appMetadata.deploymentName} • ` : ''}
-        {formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}
-      </p>
-
+    <AppShell
+      activeSection={activeSection}
+      appMetadata={appMetadata}
+      authUser={authUser}
+      currentSection={currentSection}
+      currentSectionContent={currentSectionContent}
+      headerMetrics={headerMetrics}
+      isAdmin={isAdmin}
+      isAdminLoading={isAdminLoading}
+      isGigLoading={isGigLoading}
+      isLoading={isLoading}
+      isProfileMenuOpen={isProfileMenuOpen}
+      isQuickReceiptSaving={isQuickReceiptSaving}
+      isSellerProfileSaving={isSellerProfileSaving}
+      isUserSettingsSaving={isUserSettingsSaving}
+      navigationItems={navigationItems}
+      onOpenSellerProfile={openSellerProfile}
+      onOpenUserSettings={openUserSettings}
+      onProfileMenuToggle={toggleProfileMenu}
+      onQuickReceiptFile={handleQuickReceiptFile}
+      onSectionChange={setActiveSection}
+      onSignOut={signOut}
+      onThemePreferenceChange={setThemePreference}
+      profileMenuRef={profileMenuRef}
+      sellerProfile={sellerProfile}
+      themePreference={themePreference}
+    >
       <UserSettingsModal
         form={userSettingsForm}
         invoiceEmailSubjectPreview={buildInvoiceEmailSubjectPreview(
@@ -3275,144 +1128,24 @@ function App({ appMetadata }: AppProps) {
         status={sellerProfileStatus}
       />
 
-      {(pendingReceiptFile || quickReceiptDraft) && (
-        <div className="settings-overlay" role="presentation">
-          <section
-            aria-labelledby="quick-receipt-title"
-            className="settings-modal quick-receipt-modal panel"
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="panel-heading">
-              <div>
-                <p className="section-label">Receipt capture</p>
-                <h2 id="quick-receipt-title">
-                  {quickReceiptDraft ? 'Receipt saved' : 'Choose a gig'}
-                </h2>
-              </div>
-              <button
-                className="ghost-button"
-                onClick={closeQuickReceiptPrompt}
-                type="button"
-                disabled={isQuickReceiptSaving}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="quick-receipt-summary">
-              <strong>
-                {pendingReceiptFile?.name ||
-                  quickReceiptDraft?.gig.expenses
-                    .find((expense) => expense.id === quickReceiptDraft.expenseId)
-                    ?.attachments.find(
-                      (attachment) => attachment.id === quickReceiptDraft.attachmentId
-                    )?.fileName ||
-                  'Receipt upload'}
-              </strong>
-              <span>{quickReceiptStatus}</span>
-              {isQuickReceiptSaving && !quickReceiptDraft ? (
-                <div className="quick-receipt-progress" aria-label="Receipt upload in progress">
-                  <span />
-                </div>
-              ) : null}
-            </div>
-
-            {quickReceiptDraft?.hasNearbyCandidates ? (
-              <div className="quick-receipt-warning">
-                <strong>Check the gig before moving on.</strong>
-                <span>
-                  There are other gigs close to this date. The nearest one has been
-                  selected, but this receipt may belong somewhere else.
-                </span>
-              </div>
-            ) : null}
-
-            {quickReceiptCandidates.length > 0 ? (
-              <label className="quick-receipt-select">
-                <span>Gig</span>
-                <select
-                  value={quickReceiptSelectedGigId}
-                  onChange={(event) => setQuickReceiptSelectedGigId(event.target.value)}
-                  disabled={isQuickReceiptSaving}
-                >
-                  {quickReceiptCandidates.map((gig) => (
-                    <option key={gig.id} value={gig.id}>
-                      {gig.title} · {formatDate(gig.date)} · {gig.venue} ·{' '}
-                      {clientNamesById.get(gig.clientId) ?? 'Unknown client'} ·{' '}
-                      {gig.daysFromToday === 0
-                        ? 'today'
-                        : `${gig.daysFromToday} day${gig.daysFromToday === 1 ? '' : 's'} away`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : isQuickReceiptSaving && !quickReceiptDraft ? null : (
-              <div className="empty-state">
-                <strong>No candidate gigs are available.</strong>
-                <p>Create or update a gig near this receipt date, then try again.</p>
-              </div>
-            )}
-
-            {quickReceiptDraft ? (
-              <div className="form-grid quick-receipt-details">
-                <label>
-                  <span>Amount</span>
-                  <input
-                    inputMode="decimal"
-                    value={quickReceiptAmount}
-                    onChange={(event) => setQuickReceiptAmount(event.target.value)}
-                    placeholder="0.00"
-                    disabled={isQuickReceiptSaving}
-                  />
-                </label>
-                <label>
-                  <span>Description</span>
-                  <input
-                    value={quickReceiptDescription}
-                    onChange={(event) => setQuickReceiptDescription(event.target.value)}
-                    placeholder="Taxi, parking, hotel..."
-                    disabled={isQuickReceiptSaving}
-                  />
-                </label>
-              </div>
-            ) : null}
-
-            <div className="form-actions">
-              {quickReceiptDraft ? (
-                <>
-                  <button
-                    className="primary-button"
-                    onClick={saveQuickReceiptDetails}
-                    type="button"
-                    disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
-                  >
-                    {isQuickReceiptSaving ? 'Saving...' : 'Save details'}
-                  </button>
-                  <button
-                    className="ghost-button"
-                    onClick={goToQuickReceiptGig}
-                    type="button"
-                    disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
-                  >
-                    Go to gig
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="primary-button"
-                  onClick={savePendingReceiptToSelectedGig}
-                  type="button"
-                  disabled={isQuickReceiptSaving || !quickReceiptSelectedGigId}
-                >
-                  {isQuickReceiptSaving ? 'Saving...' : 'Save receipt draft'}
-                </button>
-              )}
-              <span className="status-pill">{quickReceiptStatus}</span>
-            </div>
-          </section>
-        </div>
-      )}
+      <QuickReceiptModal
+        amount={quickReceiptAmount}
+        candidates={quickReceiptCandidates}
+        clientNamesById={clientNamesById}
+        description={quickReceiptDescription}
+        draft={quickReceiptDraft}
+        isSaving={isQuickReceiptSaving}
+        onAmountChange={setQuickReceiptAmount}
+        onClose={closeQuickReceiptPrompt}
+        onDescriptionChange={setQuickReceiptDescription}
+        onGoToGig={goToQuickReceiptGig}
+        onSaveDetails={saveQuickReceiptDetails}
+        onSaveDraft={savePendingReceiptToSelectedGig}
+        onSelectedGigChange={setQuickReceiptSelectedGigId}
+        pendingFile={pendingReceiptFile}
+        selectedGigId={quickReceiptSelectedGigId}
+        status={quickReceiptStatus}
+      />
 
       <ClientSettingsModal
         authUser={authUser}
@@ -3435,7 +1168,7 @@ function App({ appMetadata }: AppProps) {
         selectedClient={selectedClient}
         status={clientSettingsStatus}
       />
-    </main>
+    </AppShell>
   )
 }
 
