@@ -3,6 +3,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  handleSessionExpired,
   parseProblemDetails,
 } from '../api'
 import { emptyUserSettingsForm } from '../forms'
@@ -162,9 +163,14 @@ export function useUserSettings({
         }),
       })
 
-      if (response.status === 401) {
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to update your settings.'
+        )
+      ) {
         setIsUserSettingsOpen(false)
-        onSessionExpired('Your session expired. Sign in again to update your settings.')
         return
       }
 

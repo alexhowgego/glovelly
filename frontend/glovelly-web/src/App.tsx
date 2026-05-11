@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AdminSection,
   AppShell,
@@ -17,6 +17,8 @@ import {
   buildApiUrl,
   buildReturnUrl,
   fetchWithSession,
+  isSessionExpiredError,
+  isSessionExpiredResponse,
   parseProblemDetails,
 } from './api'
 import {
@@ -77,12 +79,18 @@ function App({ appMetadata }: AppProps) {
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
 
   const isAdmin = authUser?.role === 'Admin'
-  const expireSession = (message: string) => {
+  const clearSession = useCallback(() => {
     setIsAuthenticated(false)
     setAuthUser(null)
     setIsApiConnected(false)
-    setStatus(message)
-  }
+  }, [])
+  const expireSession = useCallback(
+    (message: string) => {
+      clearSession()
+      setStatus(message)
+    },
+    [clearSession]
+  )
   const {
     activeUsersCount,
     adminForm,
@@ -320,22 +328,23 @@ function App({ appMetadata }: AppProps) {
       resetAdminWorkspace()
     }
 
+    const expireSignedInSession = (message: string) => {
+      expireSession(message)
+      resetSignedInState()
+    }
+
     const loadApp = async () => {
       setIsCheckingSession(true)
 
       try {
         const sessionResponse = await fetchWithSession(buildApiUrl('/auth/me'))
-        if (sessionResponse.status === 401) {
+        if (isSessionExpiredResponse(sessionResponse)) {
           if (ignore) {
             return
           }
 
-          setIsAuthenticated(false)
-          setAuthUser(null)
-          setIsApiConnected(false)
-          resetSignedInState()
+          expireSignedInSession('Sign in to access Glovelly.')
           setShouldCloseBrowserNotice(false)
-          setStatus('Sign in to access Glovelly.')
           return
         }
 
@@ -360,16 +369,12 @@ function App({ appMetadata }: AppProps) {
         ])
 
         if (
-          clientsResponse.status === 401 ||
-          gigsResponse.status === 401 ||
-          invoicesResponse.status === 401 ||
-          sellerProfileResponse.status === 401
+          isSessionExpiredResponse(clientsResponse) ||
+          isSessionExpiredResponse(gigsResponse) ||
+          isSessionExpiredResponse(invoicesResponse) ||
+          isSessionExpiredResponse(sellerProfileResponse)
         ) {
-          setIsAuthenticated(false)
-          setAuthUser(null)
-          setIsApiConnected(false)
-          resetSignedInState()
-          setStatus('Your session expired. Sign in again to keep working.')
+          expireSignedInSession('Your session expired. Sign in again to keep working.')
           return
         }
 
@@ -420,12 +425,8 @@ function App({ appMetadata }: AppProps) {
         }
       } catch (error) {
         if (!ignore) {
-          if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
-            setIsAuthenticated(false)
-            setAuthUser(null)
-            setIsApiConnected(false)
-            resetSignedInState()
-            setStatus('Your session expired. Sign in again to keep working.')
+          if (isSessionExpiredError(error)) {
+            expireSignedInSession('Your session expired. Sign in again to keep working.')
           } else {
             setIsApiConnected(false)
             resetClientsWorkspace()
@@ -453,6 +454,7 @@ function App({ appMetadata }: AppProps) {
     applyInvoices,
     applySellerProfile,
     clearQuickReceiptDialog,
+    expireSession,
     loadAdminUsers,
     markAdminLoadFailed,
     resetClientsWorkspace,
@@ -604,9 +606,7 @@ function App({ appMetadata }: AppProps) {
         throw new Error('Unable to sign out.')
       }
 
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
+      clearSession()
       resetClientsWorkspace()
       resetGigsWorkspace()
       resetInvoicesWorkspace()

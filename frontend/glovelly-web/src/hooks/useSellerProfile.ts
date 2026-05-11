@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  handleSessionExpired,
   parseProblemDetails,
 } from '../api'
 import { emptySellerProfileForm } from '../forms'
@@ -132,9 +133,14 @@ export function useSellerProfile({
         }),
       })
 
-      if (response.status === 401) {
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to update your seller profile.'
+        )
+      ) {
         setIsSellerProfileOpen(false)
-        onSessionExpired('Your session expired. Sign in again to update your seller profile.')
         return
       }
 

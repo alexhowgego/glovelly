@@ -1,6 +1,12 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { buildApiUrl, fetchWithSession, parseProblemDetails } from '../api'
+import {
+  buildApiUrl,
+  fetchWithSession,
+  handleSessionExpired,
+  parseProblemDetails,
+  throwIfSessionExpired,
+} from '../api'
 import { defaultAdminStatus, emptyAdminForm } from '../forms'
 import type { AdminUser, AdminUserForm } from '../types'
 
@@ -40,9 +46,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
 
   const loadAdminUsers = useCallback(async () => {
     const response = await fetchWithSession(buildApiUrl('/admin/users'))
-    if (response.status === 401) {
-      throw new Error('SESSION_EXPIRED')
-    }
+    throwIfSessionExpired(response)
 
     if (response.status === 403) {
       return
@@ -169,8 +173,13 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
         body: JSON.stringify(payload),
       })
 
-      if (response.status === 401) {
-        onSessionExpired('Your session expired. Sign in again to keep managing access.')
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing access.'
+        )
+      ) {
         return
       }
 

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  handleSessionExpired,
   parseProblemDetails,
 } from '../api'
 import type {
@@ -87,8 +88,13 @@ export function useQuickReceipt({
         body: formData,
       })
 
-      if (response.status === 401) {
-        onSessionExpired('Your session expired. Sign in again to add receipts.')
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to add receipts.'
+        )
+      ) {
         return
       }
 
@@ -192,8 +198,13 @@ export function useQuickReceipt({
         }
       )
 
-      if (response.status === 401) {
-        onSessionExpired('Your session expired. Sign in again to add receipts.')
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to add receipts.'
+        )
+      ) {
         return
       }
 

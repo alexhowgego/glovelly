@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  handleSessionExpired,
   parseProblemDetails,
 } from '../api'
 import { emptyClientSettingsForm, emptyForm } from '../forms'
@@ -219,8 +220,13 @@ export function useClientsWorkspace({
         body: requestBody,
       })
 
-      if (response.status === 401) {
-        onSessionExpired('Your session expired. Sign in again to save changes.')
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to save changes.'
+        )
+      ) {
         return
       }
 
@@ -267,8 +273,13 @@ export function useClientsWorkspace({
         method: 'DELETE',
       })
 
-      if (response.status === 401) {
-        onSessionExpired('Your session expired. Sign in again to delete clients.')
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to delete clients.'
+        )
+      ) {
         return
       }
 
@@ -376,9 +387,14 @@ export function useClientsWorkspace({
         }
       )
 
-      if (response.status === 401) {
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to update client settings.'
+        )
+      ) {
         setIsClientSettingsOpen(false)
-        onSessionExpired('Your session expired. Sign in again to update client settings.')
         return
       }
 

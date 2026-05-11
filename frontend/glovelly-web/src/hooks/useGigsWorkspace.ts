@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  handleSessionExpired,
   parseProblemDetails,
 } from '../api'
 import { defaultGigStatus, emptyGigForm } from '../forms'
@@ -261,8 +262,13 @@ export function useGigsWorkspace({
   const refreshGig = async (gigId: string) => {
     const response = await fetchWithSession(buildApiUrl(`/gigs/${gigId}`))
 
-    if (response.status === 401) {
-      onSessionExpired('Your session expired. Sign in again to keep managing gigs.')
+    if (
+      handleSessionExpired(
+        response,
+        onSessionExpired,
+        'Your session expired. Sign in again to keep managing gigs.'
+      )
+    ) {
       return null
     }
 
@@ -295,8 +301,13 @@ export function useGigsWorkspace({
         }
       )
 
-      if (response.status === 401) {
-        onSessionExpired('Your session expired. Sign in again to keep managing gigs.')
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
         return
       }
 
@@ -348,8 +359,13 @@ export function useGigsWorkspace({
         }
       )
 
-      if (response.status === 401) {
-        onSessionExpired('Your session expired. Sign in again to keep managing gigs.')
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
         return
       }
 
@@ -456,8 +472,13 @@ export function useGigsWorkspace({
         }),
       })
 
-      if (response.status === 401) {
-        onSessionExpired('Your session expired. Sign in again to keep managing gigs.')
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
         return
       }
 
