@@ -1,5 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AdminSection,
   AppShell,
@@ -21,27 +20,20 @@ import {
   parseProblemDetails,
 } from './api'
 import {
-  defaultAdminStatus,
-  emptyAdminForm,
-} from './forms'
-import {
   buildInvoiceEmailSubjectPreview,
   buildInvoiceFilenamePreview,
   invoiceFilenameTokens,
 } from './invoicePreview'
-import {
-  getStoredThemePreference,
-  themeStorageKey,
-} from './theme'
+import { useAdminWorkspace } from './hooks/useAdminWorkspace'
 import { useClientsWorkspace } from './hooks/useClientsWorkspace'
 import { useGigsWorkspace } from './hooks/useGigsWorkspace'
 import { useInvoicesWorkspace } from './hooks/useInvoicesWorkspace'
+import { useProfileMenu } from './hooks/useProfileMenu'
 import { useQuickReceipt } from './hooks/useQuickReceipt'
 import { useSellerProfile } from './hooks/useSellerProfile'
+import { useThemePreference } from './hooks/useThemePreference'
 import { useUserSettings } from './hooks/useUserSettings'
 import type {
-  AdminUser,
-  AdminUserForm,
   AppMetadata,
   AppSection,
   AuthUser,
@@ -49,7 +41,6 @@ import type {
   Gig,
   Invoice,
   SellerProfile,
-  ThemePreference,
 } from './types'
 import './App.css'
 
@@ -75,24 +66,48 @@ function App({ appMetadata }: AppProps) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
-  const profileMenuRef = useRef<HTMLDivElement | null>(null)
-  const [themePreference, setThemePreference] =
-    useState<ThemePreference>(getStoredThemePreference)
-
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
-  const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
-  const [adminSearchQuery, setAdminSearchQuery] = useState('')
-  const [isAdminEditorOpen, setIsAdminEditorOpen] = useState(false)
-  const [adminMode, setAdminMode] = useState<'create' | 'edit'>('create')
-  const [adminForm, setAdminForm] = useState<AdminUserForm>(emptyAdminForm)
-  const [adminStatus, setAdminStatus] = useState(defaultAdminStatus)
-  const [isAdminLoading, setIsAdminLoading] = useState(false)
+  const {
+    closeProfileMenu,
+    isProfileMenuOpen,
+    profileMenuRef,
+    toggleProfileMenu,
+  } = useProfileMenu()
+  const { setThemePreference, themePreference } = useThemePreference()
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
-  const deferredAdminSearchQuery = useDeferredValue(adminSearchQuery)
 
   const isAdmin = authUser?.role === 'Admin'
+  const expireSession = (message: string) => {
+    setIsAuthenticated(false)
+    setAuthUser(null)
+    setIsApiConnected(false)
+    setStatus(message)
+  }
+  const {
+    activeUsersCount,
+    adminForm,
+    adminMode,
+    adminSearchQuery,
+    adminStatus,
+    adminUsers,
+    closeAdminEditor,
+    filteredAdminUsers,
+    handleAdminSubmit,
+    isAdminEditorOpen,
+    isAdminLoading,
+    loadAdminUsers,
+    markAdminLoadFailed,
+    resetAdminWorkspace,
+    selectedAdminUser,
+    setAdminSearchQuery,
+    setSelectedAdminUserId,
+    startAdminCreate,
+    startAdminEdit,
+    totalAdmins,
+    updateAdminField,
+  } = useAdminWorkspace({
+    onSessionExpired: expireSession,
+  })
   const {
     applyClients,
     clientNamesById,
@@ -123,12 +138,7 @@ function App({ appMetadata }: AppProps) {
     updateField,
   } = useClientsWorkspace({
     isApiConnected,
-    onSessionExpired: (message) => {
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
-      setStatus(message)
-    },
+    onSessionExpired: expireSession,
     setIsLoading,
     setStatus,
   })
@@ -178,12 +188,7 @@ function App({ appMetadata }: AppProps) {
     clientNamesById,
     clients,
     onOpenSection: (section) => setActiveSection(section),
-    onSessionExpired: (message) => {
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
-      setStatus(message)
-    },
+    onSessionExpired: expireSession,
   })
   const {
     adjustmentAmount,
@@ -257,12 +262,7 @@ function App({ appMetadata }: AppProps) {
     onMergeSavedGig: (gig) => mergeSavedGig(gig),
     onOpenReceiptDraft: (gig) => openGigReceiptDraft(gig),
     onSelectGig: setSelectedGigId,
-    onSessionExpired: (message) => {
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
-      setStatus(message)
-    },
+    onSessionExpired: expireSession,
     setGigStatus,
   })
   const {
@@ -278,13 +278,8 @@ function App({ appMetadata }: AppProps) {
     userSettingsStatus,
   } = useUserSettings({
     authUser,
-    onCloseProfileMenu: () => setIsProfileMenuOpen(false),
-    onSessionExpired: (message) => {
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
-      setStatus(message)
-    },
+    onCloseProfileMenu: closeProfileMenu,
+    onSessionExpired: expireSession,
     setAuthUser,
   })
   const {
@@ -300,13 +295,8 @@ function App({ appMetadata }: AppProps) {
     sellerProfileStatus,
     updateSellerProfileField,
   } = useSellerProfile({
-    onCloseProfileMenu: () => setIsProfileMenuOpen(false),
-    onSessionExpired: (message) => {
-      setIsAuthenticated(false)
-      setAuthUser(null)
-      setIsApiConnected(false)
-      setStatus(message)
-    },
+    onCloseProfileMenu: closeProfileMenu,
+    onSessionExpired: expireSession,
   })
 
   useEffect(() => {
@@ -314,73 +304,6 @@ function App({ appMetadata }: AppProps) {
       setActiveSection('gigs')
     }
   }, [activeSection, isAdmin])
-
-  useEffect(() => {
-    if (!isProfileMenuOpen) {
-      return
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!profileMenuRef.current?.contains(event.target as Node)) {
-        setIsProfileMenuOpen(false)
-      }
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsProfileMenuOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleEscape)
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isProfileMenuOpen])
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-
-    const applyTheme = () => {
-      const nextResolvedTheme =
-        themePreference === 'system'
-          ? mediaQuery.matches
-            ? 'dark'
-            : 'light'
-          : themePreference
-
-      document.documentElement.setAttribute('data-theme', nextResolvedTheme)
-    }
-
-    applyTheme()
-    window.localStorage.setItem(themeStorageKey, themePreference)
-
-    if (themePreference !== 'system') {
-      return
-    }
-
-    const handleSystemThemeChange = () => {
-      applyTheme()
-    }
-
-    mediaQuery.addEventListener('change', handleSystemThemeChange)
-    return () => {
-      mediaQuery.removeEventListener('change', handleSystemThemeChange)
-    }
-  }, [themePreference])
-
-  const resetAdminWorkspace = () => {
-    setAdminUsers([])
-    setSelectedAdminUserId('')
-    setAdminSearchQuery('')
-    setIsAdminEditorOpen(false)
-    setAdminMode('create')
-    setAdminForm(emptyAdminForm())
-    setAdminStatus(defaultAdminStatus)
-  }
 
   useEffect(() => {
     let ignore = false
@@ -395,34 +318,6 @@ function App({ appMetadata }: AppProps) {
       resetUserSettings()
       resetSellerProfile()
       resetAdminWorkspace()
-    }
-
-    const loadAdminUsers = async () => {
-      const response = await fetchWithSession(buildApiUrl('/admin/users'))
-      if (response.status === 401) {
-        throw new Error('SESSION_EXPIRED')
-      }
-
-      if (response.status === 403) {
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Unable to load user enrolments.')
-      }
-
-      const users = (await response.json()) as AdminUser[]
-      if (ignore) {
-        return
-      }
-
-      setAdminUsers(users)
-      setSelectedAdminUserId((current) => current || users[0]?.id || '')
-      setAdminStatus(
-        users.length > 0
-          ? 'Manage access, roles and account status.'
-          : 'No users added yet. Add the first one below.'
-      )
     }
 
     const loadApp = async () => {
@@ -519,9 +414,7 @@ function App({ appMetadata }: AppProps) {
             await loadAdminUsers()
           } catch {
             if (!ignore) {
-              setAdminUsers([])
-              setSelectedAdminUserId('')
-              setAdminStatus('The admin area could not be loaded right now.')
+              markAdminLoadFailed()
             }
           }
         }
@@ -536,8 +429,7 @@ function App({ appMetadata }: AppProps) {
           } else {
             setIsApiConnected(false)
             resetClientsWorkspace()
-            setAdminUsers([])
-            setSelectedAdminUserId('')
+            markAdminLoadFailed()
             setShouldCloseBrowserNotice(false)
             setStatus('We could not load your workspace right now. Please try again.')
           }
@@ -561,33 +453,15 @@ function App({ appMetadata }: AppProps) {
     applyInvoices,
     applySellerProfile,
     clearQuickReceiptDialog,
+    loadAdminUsers,
+    markAdminLoadFailed,
     resetClientsWorkspace,
+    resetAdminWorkspace,
     resetGigsWorkspace,
     resetInvoicesWorkspace,
     resetSellerProfile,
     resetUserSettings,
   ])
-
-  const adminUsersById = useMemo(
-    () => new Map(adminUsers.map((user) => [user.id, user])),
-    [adminUsers]
-  )
-  const filteredAdminUsers = useMemo(() => {
-    const query = deferredAdminSearchQuery.trim().toLowerCase()
-    if (!query) {
-      return adminUsers
-    }
-
-    return adminUsers.filter((user) =>
-      [user.email, user.displayName ?? '', user.role, user.googleSubject ?? '']
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    )
-  }, [adminUsers, deferredAdminSearchQuery])
-
-  const selectedAdminUser =
-    adminUsersById.get(selectedAdminUserId) ?? filteredAdminUsers[0] ?? null
 
   const monthlyInvoiceEligibleGigs = useMemo(() => {
     if (!selectedClient || !monthlyInvoiceMonth) {
@@ -636,17 +510,9 @@ function App({ appMetadata }: AppProps) {
   }
 
   useEffect(() => {
-    if (selectedAdminUser) {
-      setSelectedAdminUserId(selectedAdminUser.id)
-    }
-  }, [selectedAdminUser])
-
-  useEffect(() => {
     setMonthlyInvoiceStatus('')
   }, [selectedClient?.id, monthlyInvoiceMonth])
 
-  const activeUsersCount = adminUsers.filter((user) => user.isActive).length
-  const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
   const outstandingInvoiceCount = issuedInvoiceCount + overdueInvoiceCount
   const sellerProfileMissingLabels = useMemo(() => {
     const labels: Record<string, string> = {
@@ -718,44 +584,6 @@ function App({ appMetadata }: AppProps) {
     },
   ]
 
-  const startAdminCreate = () => {
-    setAdminMode('create')
-    setAdminForm(emptyAdminForm())
-    setIsAdminEditorOpen(true)
-  }
-
-  const startAdminEdit = () => {
-    if (!selectedAdminUser) {
-      return
-    }
-
-    setAdminMode('edit')
-    setAdminForm({
-      email: selectedAdminUser.email,
-      displayName: selectedAdminUser.displayName ?? '',
-      googleSubject: selectedAdminUser.googleSubject ?? '',
-      role: selectedAdminUser.role === 'Admin' ? 'Admin' : 'User',
-      isActive: selectedAdminUser.isActive,
-    })
-    setIsAdminEditorOpen(true)
-  }
-
-  const closeAdminEditor = () => {
-    setIsAdminEditorOpen(false)
-    setAdminMode('create')
-    setAdminForm(emptyAdminForm())
-  }
-
-  const updateAdminField = (
-    field: keyof AdminUserForm,
-    value: string | boolean
-  ) => {
-    setAdminForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
   const signIn = () => {
     const loginUrl = buildApiUrl(
       `/auth/login?returnUrl=${encodeURIComponent(buildReturnUrl())}`
@@ -765,7 +593,7 @@ function App({ appMetadata }: AppProps) {
 
   const signOut = async () => {
     setIsLoading(true)
-    setIsProfileMenuOpen(false)
+    closeProfileMenu()
 
     try {
       const response = await fetchWithSession(buildApiUrl('/auth/logout'), {
@@ -793,89 +621,8 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
-  const handleThemePreferenceChange = (nextPreference: ThemePreference) => {
-    setThemePreference(nextPreference)
-  }
-
   const openSellerProfile = () => {
     openSellerProfileModal(sellerProfileNotice)
-  }
-
-  const handleAdminSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const payload: AdminUserForm = {
-      email: adminForm.email.trim(),
-      displayName: adminForm.displayName.trim(),
-      googleSubject: adminForm.googleSubject.trim(),
-      role: adminForm.role,
-      isActive: adminForm.isActive,
-    }
-
-    if (!payload.email) {
-      setAdminStatus('Email is required.')
-      return
-    }
-
-    setIsAdminLoading(true)
-
-    try {
-      const isEdit = adminMode === 'edit' && selectedAdminUser
-      const endpoint = isEdit
-        ? buildApiUrl(`/admin/users/${selectedAdminUser.id}`)
-        : buildApiUrl('/admin/users')
-
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        setAuthUser(null)
-        setIsApiConnected(false)
-        setStatus('Your session expired. Sign in again to keep managing access.')
-        return
-      }
-
-      if (response.status === 403) {
-        setAdminStatus('Administrator access is required to manage users.')
-        return
-      }
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save enrolment.')
-      }
-
-      const savedUser = (await response.json()) as AdminUser
-
-      setAdminUsers((current) => {
-        if (isEdit) {
-          return current.map((user) => (user.id === savedUser.id ? savedUser : user))
-        }
-
-        return [savedUser, ...current]
-      })
-
-      setSelectedAdminUserId(savedUser.id)
-      setAdminMode('edit')
-      setAdminStatus(isEdit ? 'User updated.' : 'User added.')
-      setIsAdminEditorOpen(false)
-    } catch (error) {
-      setAdminStatus(
-        error instanceof Error ? error.message : 'Unable to save right now.'
-      )
-    } finally {
-      setIsAdminLoading(false)
-    }
   }
 
   const handleGenerateInvoice = async () => {
@@ -1339,11 +1086,11 @@ function App({ appMetadata }: AppProps) {
       navigationItems={navigationItems}
       onOpenSellerProfile={openSellerProfile}
       onOpenUserSettings={openUserSettings}
-      onProfileMenuToggle={() => setIsProfileMenuOpen((current) => !current)}
+      onProfileMenuToggle={toggleProfileMenu}
       onQuickReceiptFile={handleQuickReceiptFile}
       onSectionChange={setActiveSection}
       onSignOut={signOut}
-      onThemePreferenceChange={handleThemePreferenceChange}
+      onThemePreferenceChange={setThemePreference}
       profileMenuRef={profileMenuRef}
       sellerProfile={sellerProfile}
       themePreference={themePreference}

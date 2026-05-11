@@ -250,11 +250,24 @@ export function AdminSection({
             </div>
 
             <div className="form-actions">
-              <button className="primary-button" type="submit" disabled={isAdminLoading}>
-                {adminMode === 'create' ? 'Add user' : 'Save changes'}
+              <button
+                className="primary-button"
+                data-close-after-save="true"
+                type="submit"
+                disabled={isAdminLoading}
+              >
+                Save and close
+              </button>
+              <button
+                className="ghost-button"
+                data-close-after-save="false"
+                type="submit"
+                disabled={isAdminLoading}
+              >
+                Save
               </button>
               <button className="ghost-button" onClick={onCloseEditor} type="button">
-                Done
+                Discard changes
               </button>
             </div>
             <p className="auth-note">
