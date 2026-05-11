@@ -2,11 +2,11 @@ import { useCallback, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   buildApiUrl,
-  emptySellerProfileForm,
   fetchWithSession,
   parseProblemDetails,
-} from '../appShared'
-import type { SellerProfile, SellerProfileForm } from '../appShared'
+} from '../api'
+import { emptySellerProfileForm } from '../forms'
+import type { SellerProfile, SellerProfileForm } from '../types'
 
 type UseSellerProfileOptions = {
   onCloseProfileMenu: () => void

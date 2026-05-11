@@ -2,13 +2,12 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'rea
 import type { FormEvent } from 'react'
 import {
   buildApiUrl,
-  defaultGigStatus,
-  emptyGigForm,
   fetchWithSession,
   parseProblemDetails,
-  toGigExpenseForm,
-} from '../appShared'
-import type { Client, Gig, GigExpenseForm, GigForm } from '../appShared'
+} from '../api'
+import { defaultGigStatus, emptyGigForm } from '../forms'
+import { toGigExpenseForm } from '../formatters'
+import type { Client, Gig, GigExpenseForm, GigForm } from '../types'
 
 type UseGigsWorkspaceOptions = {
   clientNamesById: ReadonlyMap<string, string>

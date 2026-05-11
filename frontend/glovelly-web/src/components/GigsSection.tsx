@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
-import type { Client, Gig, GigExpenseForm, GigForm, GigStatus, SellerProfile } from '../appShared'
-import { formatCurrency, formatDate, formatGigStatus } from '../appShared'
+import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
+import type { Client, Gig, GigExpenseForm, GigForm, GigStatus, SellerProfile } from '../types'
 
 type GigsSectionProps = {
   clientNamesById: ReadonlyMap<string, string>

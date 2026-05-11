@@ -3,13 +3,13 @@ import {
   buildApiUrl,
   fetchWithSession,
   parseProblemDetails,
-} from '../appShared'
+} from '../api'
 import type {
   Gig,
   QuickReceiptCandidate,
   QuickReceiptDraftResponse,
   QuickReceiptDraftUpdateResponse,
-} from '../appShared'
+} from '../types'
 
 type UseQuickReceiptOptions = {
   getGigById: (gigId: string) => Gig | undefined

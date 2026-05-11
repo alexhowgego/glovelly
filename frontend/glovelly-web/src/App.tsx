@@ -16,17 +16,23 @@ import {
 import type { AppNavigationItem, HeaderMetric } from './AppSections'
 import {
   buildApiUrl,
-  buildInvoiceEmailSubjectPreview,
-  buildInvoiceFilenamePreview,
   buildReturnUrl,
+  fetchWithSession,
+  parseProblemDetails,
+} from './api'
+import {
   defaultAdminStatus,
   emptyAdminForm,
+} from './forms'
+import {
+  buildInvoiceEmailSubjectPreview,
+  buildInvoiceFilenamePreview,
   invoiceFilenameTokens,
-  fetchWithSession,
+} from './invoicePreview'
+import {
   getStoredThemePreference,
-  parseProblemDetails,
   themeStorageKey,
-} from './appShared'
+} from './theme'
 import { useClientsWorkspace } from './hooks/useClientsWorkspace'
 import { useGigsWorkspace } from './hooks/useGigsWorkspace'
 import { useInvoicesWorkspace } from './hooks/useInvoicesWorkspace'
@@ -44,7 +50,7 @@ import type {
   Invoice,
   SellerProfile,
   ThemePreference,
-} from './appShared'
+} from './types'
 import './App.css'
 
 function getCurrentMonthValue() {

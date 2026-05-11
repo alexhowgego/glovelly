@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import type { SellerProfile, SellerProfileForm } from '../appShared'
+import type { SellerProfile, SellerProfileForm } from '../types'
 
 type SellerProfileModalProps = {
   form: SellerProfileForm

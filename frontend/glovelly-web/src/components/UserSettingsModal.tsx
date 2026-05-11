@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import type { UserSettingsForm } from '../appShared'
+import type { UserSettingsForm } from '../types'
 
 type UserSettingsModalProps = {
   form: UserSettingsForm

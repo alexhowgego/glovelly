@@ -5,8 +5,8 @@ import type {
   AuthUser,
   SellerProfile,
   ThemePreference,
-} from '../appShared'
-import { formatBuildMetadata } from '../appShared'
+} from '../types'
+import { formatBuildMetadata } from '../formatters'
 
 export type AppNavigationItem = {
   id: AppSection

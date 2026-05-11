@@ -1,8 +1,8 @@
 import type {
   QuickReceiptCandidate,
   QuickReceiptDraftResponse,
-} from '../appShared'
-import { formatDate } from '../appShared'
+} from '../types'
+import { formatDate } from '../formatters'
 
 type QuickReceiptModalProps = {
   candidates: QuickReceiptCandidate[]

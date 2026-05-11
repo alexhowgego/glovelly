@@ -2,11 +2,11 @@ import { useCallback, useState } from 'react'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import {
   buildApiUrl,
-  emptyUserSettingsForm,
   fetchWithSession,
   parseProblemDetails,
-} from '../appShared'
-import type { AuthUser, UserSettingsForm } from '../appShared'
+} from '../api'
+import { emptyUserSettingsForm } from '../forms'
+import type { AuthUser, UserSettingsForm } from '../types'
 
 type SavedUserSettings = {
   mileageRate: number | null

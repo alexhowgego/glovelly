@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { loadAppMetadata } from './appShared'
+import { loadAppMetadata } from './api'
 
 const THEME_STORAGE_KEY = 'glovelly.theme-preference'
 

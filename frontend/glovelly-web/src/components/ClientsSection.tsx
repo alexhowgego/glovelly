@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import type { Client, ClientForm } from '../appShared'
+import type { Client, ClientForm } from '../types'
 
 type ClientsSectionProps = {
   filteredClients: Client[]

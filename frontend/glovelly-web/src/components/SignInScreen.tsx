@@ -1,5 +1,5 @@
-import type { AppMetadata } from '../appShared'
-import { formatBuildMetadata } from '../appShared'
+import { formatBuildMetadata } from '../formatters'
+import type { AppMetadata } from '../types'
 
 type SignInScreenProps = {
   appMetadata: AppMetadata

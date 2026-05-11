@@ -2,12 +2,11 @@ import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   buildApiUrl,
-  emptyClientSettingsForm,
-  emptyForm,
   fetchWithSession,
   parseProblemDetails,
-} from '../appShared'
-import type { Address, Client, ClientForm, ClientSettingsForm } from '../appShared'
+} from '../api'
+import { emptyClientSettingsForm, emptyForm } from '../forms'
+import type { Address, Client, ClientForm, ClientSettingsForm } from '../types'
 
 type UseClientsWorkspaceOptions = {
   isApiConnected: boolean

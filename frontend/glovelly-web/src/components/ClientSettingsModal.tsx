@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import type { AuthUser, Client, ClientSettingsForm } from '../appShared'
-import { formatRate } from '../appShared'
+import { formatRate } from '../formatters'
+import type { AuthUser, Client, ClientSettingsForm } from '../types'
 
 type ClientSettingsModalProps = {
   authUser: AuthUser | null
