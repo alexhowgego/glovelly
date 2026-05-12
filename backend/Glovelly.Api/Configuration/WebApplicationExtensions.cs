@@ -29,7 +29,9 @@ internal static class WebApplicationExtensions
             app.UseSwagger();
             app.UseSwaggerUI();
 
-            app.UseHttpsRedirection();
+            app.UseWhen(
+                context => !context.Request.Path.StartsWithSegments("/mcp"),
+                branch => branch.UseHttpsRedirection());
             app.UseCors(settings.DevCorsPolicy);
         }
 

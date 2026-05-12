@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.AspNetCore.Authorization.Policy;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
 namespace Glovelly.Api.Tests.Infrastructure;
 
@@ -17,21 +17,48 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
     private readonly string _databaseName = $"glovelly-tests-{Guid.NewGuid()}";
     private readonly object _databaseResetLock = new();
     private readonly FakeEmailSender _fakeEmailSender = new();
+    private readonly Dictionary<string, string?> _configuration = new();
+    private bool _useRealAuthentication;
+    private string _environmentName = "Testing";
 
     internal FakeEmailSender Emails => _fakeEmailSender;
 
+    public GlovellyApiFactory WithConfiguration(Dictionary<string, string?> configuration)
+    {
+        var factory = new GlovellyApiFactory();
+        foreach (var pair in configuration)
+        {
+            factory._configuration[pair.Key] = pair.Value;
+        }
+        factory._useRealAuthentication = true;
+        factory._environmentName = "Development";
+
+        return factory;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(_environmentName);
+        builder.ConfigureAppConfiguration(configurationBuilder =>
+        {
+            if (_configuration.Count > 0)
+            {
+                configurationBuilder.AddInMemoryCollection(_configuration);
+            }
+        });
 
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
-            services.RemoveAll<IPolicyEvaluator>();
             services.RemoveAll<IEmailSender>();
             services.RemoveAll<IExpenseAttachmentStore>();
 
-            services.AddSingleton<IPolicyEvaluator, TestPolicyEvaluator>();
+            if (!_useRealAuthentication)
+            {
+                services.RemoveAll<IPolicyEvaluator>();
+                services.AddSingleton<IPolicyEvaluator, TestPolicyEvaluator>();
+            }
+
             services.AddSingleton<IEmailSender>(_fakeEmailSender);
             services.AddSingleton<IExpenseAttachmentStore, InMemoryExpenseAttachmentStore>();
             services.PostConfigure<EmailSettings>(settings =>
@@ -79,6 +106,7 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
         dbContext.Users.Add(new User
         {
             Id = TestAuthContext.UserId,
+            GoogleSubject = TestAuthContext.DefaultSubject,
             Email = "test-admin@glovelly.local",
             DisplayName = "Test Admin",
             MileageRate = 0.45m,

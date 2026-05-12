@@ -55,7 +55,10 @@ internal static class AuthenticationServiceCollectionExtensions
                     OnRedirectToLogin = context => RedirectApiRequestsOrContinue(context, StatusCodes.Status401Unauthorized),
                     OnRedirectToAccessDenied = context => RedirectApiRequestsOrContinue(context, StatusCodes.Status403Forbidden),
                 };
-            });
+            })
+            .AddScheme<McpDevelopmentAuthenticationOptions, McpDevelopmentAuthenticationHandler>(
+                McpDevelopmentAuthenticationOptions.SchemeName,
+                _ => { });
 
         if (!string.IsNullOrWhiteSpace(settings.GoogleClientId) &&
             !string.IsNullOrWhiteSpace(settings.GoogleClientSecret))
