@@ -28,6 +28,10 @@ internal static class InfrastructureServiceCollectionExtensions
             .Bind(configuration.GetSection("Email"));
         services.AddOptions<AccessRequestProtectionSettings>()
             .Bind(configuration.GetSection(AccessRequestProtectionSettings.SectionName));
+        services.AddOptions<McpDevelopmentAuthenticationOptions>(McpDevelopmentAuthenticationOptions.SchemeName)
+            .Bind(configuration.GetSection(McpDevelopmentAuthenticationOptions.SectionName));
+        services.AddOptions<McpOAuthOptions>()
+            .Bind(configuration.GetSection(McpOAuthOptions.SectionName));
         services.AddGlovellyApplicationServices();
         services.AddScoped<IGoogleDriveTokenProtector, GoogleDriveTokenProtector>();
         services.AddHttpClient<IGoogleDriveOAuthTokenExchanger, GoogleDriveOAuthTokenExchanger>();
@@ -42,6 +46,8 @@ internal static class InfrastructureServiceCollectionExtensions
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
         });
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+        services.AddScoped<IGlovellyMcpQueryService, GlovellyMcpQueryService>();
+        services.AddScoped<IMcpOAuthService, McpOAuthService>();
         services.AddScoped<IClaimsTransformation, GoogleOidcClaimsTransformation>();
         services.AddDbContext<AppDbContext>(options =>
         {
@@ -70,11 +76,21 @@ internal static class InfrastructureServiceCollectionExtensions
         {
             options.AddPolicy(GlovellyPolicies.GlovellyUser, policy =>
             {
+                policy.AuthenticationSchemes.Add(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(GlovellyClaimTypes.UserId);
+            });
+            options.AddPolicy(GlovellyPolicies.McpUser, policy =>
+            {
+                policy.AuthenticationSchemes.Add(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
+                policy.AuthenticationSchemes.Add(McpDevelopmentAuthenticationOptions.SchemeName);
+                policy.AuthenticationSchemes.Add(McpOAuthAuthenticationOptions.SchemeName);
                 policy.RequireAuthenticatedUser();
                 policy.RequireClaim(GlovellyClaimTypes.UserId);
             });
             options.AddPolicy(GlovellyPolicies.AdminUser, policy =>
             {
+                policy.AuthenticationSchemes.Add(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
                 policy.RequireAuthenticatedUser();
                 policy.RequireClaim(GlovellyClaimTypes.UserId);
                 policy.RequireRole(UserRole.Admin.ToString());

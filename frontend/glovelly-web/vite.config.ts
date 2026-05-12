@@ -1,10 +1,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const extraAllowedHosts = (process.env.VITE_ALLOWED_HOSTS ?? '')
+  .split(',')
+  .map((host) => host.trim())
+  .filter(Boolean)
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
+    allowedHosts: ['localhost', ...extraAllowedHosts],
     proxy: {
       '/auth': {
         target: 'http://localhost:5153',
@@ -27,6 +33,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/integrations': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
+      '/mcp': {
         target: 'http://localhost:5153',
         changeOrigin: true,
       },

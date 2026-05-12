@@ -17,6 +17,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<SellerProfile> SellerProfiles => Set<SellerProfile>();
     public DbSet<GoogleDriveConnection> GoogleDriveConnections => Set<GoogleDriveConnection>();
+    public DbSet<McpOAuthAuthorizationCode> McpOAuthAuthorizationCodes => Set<McpOAuthAuthorizationCode>();
+    public DbSet<McpOAuthAccessToken> McpOAuthAccessTokens => Set<McpOAuthAccessToken>();
+    public DbSet<McpOAuthRefreshToken> McpOAuthRefreshTokens => Set<McpOAuthRefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,6 +101,87 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(connection => connection.User)
                 .WithOne(user => user.GoogleDriveConnection)
                 .HasForeignKey<GoogleDriveConnection>(connection => connection.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<McpOAuthAuthorizationCode>(entity =>
+        {
+            entity.HasKey(code => code.Id);
+            entity.Property(code => code.CodeHash)
+                .IsRequired()
+                .HasMaxLength(128);
+            entity.Property(code => code.ClientId)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(code => code.RedirectUri)
+                .IsRequired()
+                .HasMaxLength(1000);
+            entity.Property(code => code.Scope)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(code => code.Resource)
+                .IsRequired()
+                .HasMaxLength(1000);
+            entity.Property(code => code.CodeChallenge)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(code => code.CodeChallengeMethod)
+                .IsRequired()
+                .HasMaxLength(20);
+            entity.HasIndex(code => code.CodeHash)
+                .IsUnique();
+            entity.HasIndex(code => code.ExpiresUtc);
+            entity.HasOne(code => code.User)
+                .WithMany()
+                .HasForeignKey(code => code.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<McpOAuthAccessToken>(entity =>
+        {
+            entity.HasKey(token => token.Id);
+            entity.Property(token => token.TokenHash)
+                .IsRequired()
+                .HasMaxLength(128);
+            entity.Property(token => token.ClientId)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(token => token.Scope)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(token => token.Resource)
+                .IsRequired()
+                .HasMaxLength(1000);
+            entity.HasIndex(token => token.TokenHash)
+                .IsUnique();
+            entity.HasIndex(token => token.ExpiresUtc);
+            entity.HasOne(token => token.User)
+                .WithMany()
+                .HasForeignKey(token => token.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<McpOAuthRefreshToken>(entity =>
+        {
+            entity.HasKey(token => token.Id);
+            entity.Property(token => token.TokenHash)
+                .IsRequired()
+                .HasMaxLength(128);
+            entity.Property(token => token.ClientId)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(token => token.Scope)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(token => token.Resource)
+                .IsRequired()
+                .HasMaxLength(1000);
+            entity.HasIndex(token => token.TokenHash)
+                .IsUnique();
+            entity.HasIndex(token => token.ExpiresUtc);
+            entity.HasOne(token => token.User)
+                .WithMany()
+                .HasForeignKey(token => token.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
