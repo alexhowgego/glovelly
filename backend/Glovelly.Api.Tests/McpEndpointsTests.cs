@@ -1,9 +1,14 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using Glovelly.Api.Services;
 using Glovelly.Api.Models;
 using Glovelly.Api.Tests.Infrastructure;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -97,6 +102,101 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Contains("resource_metadata=", response.Headers.WwwAuthenticate.ToString());
+    }
+
+    [Fact]
+    public async Task OAuthProtectedResourceMetadata_AdvertisesAuthorizationServer()
+    {
+        using var factory = CreateMcpOAuthFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/.well-known/oauth-protected-resource");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("https://glovelly.test/mcp", payload.GetProperty("resource").GetString());
+        Assert.Equal(
+            "https://glovelly.test",
+            payload.GetProperty("authorization_servers").EnumerateArray().Single().GetString());
+        Assert.Equal("mcp:read", payload.GetProperty("scopes_supported").EnumerateArray().Single().GetString());
+    }
+
+    [Fact]
+    public async Task OAuthAuthorizationServerMetadata_AdvertisesCodeFlowWithPkce()
+    {
+        using var factory = CreateMcpOAuthFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/.well-known/oauth-authorization-server");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("https://glovelly.test", payload.GetProperty("issuer").GetString());
+        Assert.Equal("https://glovelly.test/oauth/authorize", payload.GetProperty("authorization_endpoint").GetString());
+        Assert.Equal("https://glovelly.test/oauth/token", payload.GetProperty("token_endpoint").GetString());
+        Assert.Contains(
+            payload.GetProperty("code_challenge_methods_supported").EnumerateArray(),
+            value => value.GetString() == "S256");
+    }
+
+    [Fact]
+    public async Task PostMcp_WithOAuthBearerToken_AuthenticatesTokenUser()
+    {
+        using var factory = CreateMcpOAuthFactory();
+        using var client = factory.CreateClient();
+        var codeVerifier = "test-code-verifier-with-enough-entropy";
+        var codeChallenge = WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier)));
+        string authorizationCode;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var oauthService = scope.ServiceProvider.GetRequiredService<IMcpOAuthService>();
+            var issuedCode = await oauthService.CreateAuthorizationCodeAsync(
+                "chatgpt-test",
+                TestAuthContext.UserId,
+                "https://chatgpt.test/callback",
+                "mcp:read",
+                "https://glovelly.test/mcp",
+                codeChallenge,
+                "S256",
+                CancellationToken.None);
+            authorizationCode = issuedCode.Code;
+        }
+
+        var tokenResponse = await client.PostAsync(
+            "/oauth/token",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "authorization_code",
+                ["client_id"] = "chatgpt-test",
+                ["client_secret"] = "secret-test",
+                ["code"] = authorizationCode,
+                ["redirect_uri"] = "https://chatgpt.test/callback",
+                ["code_verifier"] = codeVerifier,
+                ["resource"] = "https://glovelly.test/mcp",
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, tokenResponse.StatusCode);
+        var tokenPayload = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var accessToken = tokenPayload.GetProperty("access_token").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(accessToken));
+
+        using var request = CreateMcpRequest(ListInvoicesPayload());
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.NotEmpty(payload
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("invoices")
+            .EnumerateArray());
     }
 
     [Fact]
@@ -426,6 +526,20 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             ["DevelopmentSeeding:AdminGoogleSubject"] = TestAuthContext.DefaultSubject,
             ["Mcp:DevelopmentAuth:AllowAnonymous"] = allowAnonymous.ToString(),
+        });
+    }
+
+    private static GlovellyApiFactory CreateMcpOAuthFactory()
+    {
+        return new GlovellyApiFactory().WithConfiguration(new Dictionary<string, string?>
+        {
+            ["Mcp:OAuth:Issuer"] = "https://glovelly.test",
+            ["Mcp:OAuth:Resource"] = "https://glovelly.test/mcp",
+            ["Mcp:OAuth:Clients:0:ClientId"] = "chatgpt-test",
+            ["Mcp:OAuth:Clients:0:ClientSecret"] = "secret-test",
+            ["Mcp:OAuth:Clients:0:DisplayName"] = "ChatGPT Test",
+            ["Mcp:OAuth:Clients:0:RedirectUris:0"] = "https://chatgpt.test/callback",
+            ["Mcp:OAuth:Clients:0:Scopes:0"] = "mcp:read",
         });
     }
 

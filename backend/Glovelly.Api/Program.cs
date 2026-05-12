@@ -16,6 +16,7 @@ app.MapAppMetadataEndpoints(startupSettings);
 app.MapAuthEndpoints(startupSettings);
 app.MapAccessEndpoints(startupSettings);
 app.MapGoogleDriveIntegrationEndpoints(startupSettings);
+app.MapMcpOAuthEndpoints();
 app.MapMcpEndpoints();
 app.MapCrudEndpoints();
 app.MapAdminEndpoints();

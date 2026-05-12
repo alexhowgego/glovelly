@@ -132,6 +132,10 @@ jobs:
             Email__AccessRequests__FromDisplayName=Glovelly
             Email__Invoices__FromDisplayName=Glovelly
             ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
+            Mcp__OAuth__Issuer=${{ vars.DEPLOYMENT_URL }}
+            Mcp__OAuth__Resource=${{ vars.DEPLOYMENT_URL }}/mcp
+            Mcp__OAuth__Clients__0__DisplayName=ChatGPT
+            Mcp__OAuth__Clients__0__Scopes__0=mcp:read
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest
@@ -139,6 +143,9 @@ jobs:
             Email__Resend__ApiKey=glovelly-resend-api-key:latest
             Email__AccessRequests__FromAddress=glovelly-access-requests-from-address:latest
             Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
+            Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
+            Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest
+            Mcp__OAuth__Clients__0__RedirectUris__0=${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}:latest
           secrets_update_strategy: merge
           flags: >-
             --allow-unauthenticated

@@ -58,6 +58,9 @@ internal static class AuthenticationServiceCollectionExtensions
             })
             .AddScheme<McpDevelopmentAuthenticationOptions, McpDevelopmentAuthenticationHandler>(
                 McpDevelopmentAuthenticationOptions.SchemeName,
+                _ => { })
+            .AddScheme<McpOAuthAuthenticationOptions, McpOAuthAuthenticationHandler>(
+                McpOAuthAuthenticationOptions.SchemeName,
                 _ => { });
 
         if (!string.IsNullOrWhiteSpace(settings.GoogleClientId) &&

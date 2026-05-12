@@ -44,7 +44,7 @@ public static class McpEndpoints
             .WithTags("MCP");
 
         app.MapPost("/mcp", HandleRpcAsync)
-            .RequireAuthorization(GlovellyPolicies.GlovellyUser)
+            .RequireAuthorization(GlovellyPolicies.McpUser)
             .WithTags("MCP");
 
         return app;
