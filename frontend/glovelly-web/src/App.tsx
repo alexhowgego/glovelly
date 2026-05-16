@@ -191,6 +191,7 @@ function App({ appMetadata }: AppProps) {
     upcomingGigCount,
     updateGigExpenseField,
     updateGigField,
+    updateExpenseReimbursement,
     uploadExpenseAttachment,
   } = useGigsWorkspace({
     clientNamesById,
@@ -1023,6 +1024,7 @@ function App({ appMetadata }: AppProps) {
         onSubmit={handleGigSubmit}
         onUpdateGigExpenseField={updateGigExpenseField}
         onUpdateGigField={updateGigField}
+        onUpdateExpenseReimbursement={updateExpenseReimbursement}
         plannedGigCount={plannedGigCount}
         sellerProfile={sellerProfile}
         sellerProfileNotice={sellerProfileNotice}

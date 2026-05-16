@@ -8,7 +8,13 @@ import {
 } from '../api'
 import { defaultGigStatus, emptyGigForm } from '../forms'
 import { toGigExpenseForm } from '../formatters'
-import type { Client, Gig, GigExpenseForm, GigForm } from '../types'
+import type {
+  Client,
+  Gig,
+  GigExpenseForm,
+  GigExpenseReimbursementStatus,
+  GigForm,
+} from '../types'
 
 type UseGigsWorkspaceOptions = {
   clientNamesById: ReadonlyMap<string, string>
@@ -220,6 +226,11 @@ export function useGigsWorkspace({
           sortOrder: current.expenses.length + 1,
           description,
           amount: gigExpenseAmount,
+          reimbursementStatus: 'Unreimbursed',
+          reimbursedAt: null,
+          reimbursementUpdatedAt: null,
+          reimbursementMethod: null,
+          reimbursementNote: null,
           attachments: [],
         },
       ],
@@ -377,6 +388,95 @@ export function useGigsWorkspace({
       setGigStatus('Receipt deleted.')
     } catch (error) {
       setGigStatus(error instanceof Error ? error.message : 'Unable to delete receipt.')
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const updateExpenseReimbursement = async (
+    expense: GigExpenseForm,
+    status: GigExpenseReimbursementStatus
+  ) => {
+    if (!selectedGig || !expense.id) {
+      setGigStatus('Save the gig before updating reimbursement.')
+      return
+    }
+
+    if (status === expense.reimbursementStatus) {
+      return
+    }
+
+    let reimbursedAt: string | null = null
+    let method: string | null = null
+    let note: string | null = null
+
+    if (status === 'Reimbursed') {
+      const dateValue = window.prompt(
+        'Reimbursed date',
+        new Date().toISOString().slice(0, 10)
+      )
+      if (!dateValue) {
+        return
+      }
+
+      const noteValue = window.prompt('Method or note', expense.reimbursementMethod ?? '')
+      if (!noteValue?.trim()) {
+        setGigStatus('Add a reimbursement method or note.')
+        return
+      }
+
+      reimbursedAt = `${dateValue}T00:00:00.000Z`
+      method = noteValue.trim()
+      note = noteValue.trim()
+    }
+
+    setIsGigLoading(true)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/expenses/reimbursement`),
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            expenseIds: [expense.id],
+            status,
+            reimbursedAt,
+            method,
+            note,
+            linkedInvoiceId: null,
+          }),
+        }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to update reimbursement.')
+      }
+
+      const savedGig = (await response.json()) as Gig
+      mergeSavedGig(savedGig)
+      setGigStatus(`Expense marked as ${formatReimbursementStatus(status).toLowerCase()}.`)
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error ? error.message : 'Unable to update reimbursement.'
+      )
     } finally {
       setIsGigLoading(false)
     }
@@ -566,6 +666,18 @@ export function useGigsWorkspace({
     upcomingGigCount: gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length,
     updateGigExpenseField,
     updateGigField,
+    updateExpenseReimbursement,
     uploadExpenseAttachment,
+  }
+}
+
+function formatReimbursementStatus(status: GigExpenseReimbursementStatus) {
+  switch (status) {
+    case 'Unreimbursed':
+      return 'Claimable'
+    case 'NotClaimable':
+      return 'Not claimable'
+    default:
+      return status
   }
 }

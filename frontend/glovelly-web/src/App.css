@@ -902,6 +902,43 @@
   border: 1px solid color-mix(in srgb, var(--surface-border) 85%, transparent);
 }
 
+.gig-expense-item.is-reimbursed {
+  background: color-mix(in srgb, #2b8c67 8%, var(--surface-elevated));
+  border-color: color-mix(in srgb, #2b8c67 35%, var(--surface-border));
+}
+
+.expense-reimbursement-state {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.expense-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 85%, transparent);
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.expense-status-badge.reimbursed {
+  background: color-mix(in srgb, #2b8c67 14%, var(--surface-subtle));
+  border-color: color-mix(in srgb, #2b8c67 38%, var(--surface-border));
+  color: color-mix(in srgb, #2b8c67 58%, var(--heading));
+}
+
+.expense-status-select {
+  grid-column: 1 / -1;
+  max-width: 220px;
+}
+
 .gig-expense-item label {
   display: grid;
   gap: 6px;

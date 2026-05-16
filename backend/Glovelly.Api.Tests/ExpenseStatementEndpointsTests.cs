@@ -73,17 +73,31 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
     [Fact]
     public async Task Preview_ExcludesReimbursedExpensesByDefault()
     {
-        var invoicedGig = await CreateGigAsync(
-            "Already invoiced expenses",
+        var gig = await CreateGigAsync(
+            "Reimbursed expenses",
             "2026-07-03",
             "Town Hall",
-            [new("Hotel", 120.00m)],
-            TestData.FoxInvoiceId);
+            [new("Hotel", 120.00m)]);
+
+        var updateResponse = await _client.PatchAsJsonAsync($"/gigs/{gig.GigId}/expenses/reimbursement", new
+        {
+            expenseIds = new[] { gig.ExpenseIds[0] },
+            status = "Reimbursed",
+            reimbursedAt = "2026-07-10T00:00:00Z",
+            method = "Bank transfer",
+            note = "Paid by client",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedExpense = updatedGig.GetProperty("expenses")[0];
+        Assert.Equal("Reimbursed", updatedExpense.GetProperty("reimbursementStatus").GetString());
+        Assert.Equal("Bank transfer", updatedExpense.GetProperty("reimbursementMethod").GetString());
 
         var defaultResponse = await _client.PostAsJsonAsync("/expense-statements/preview", new
         {
             clientId = TestData.FoxAndFinchId,
-            gigIds = new[] { invoicedGig.GigId },
+            gigIds = new[] { gig.GigId },
             includeReceiptAttachments = true,
             includeReceiptAppendix = false,
         });
@@ -97,7 +111,7 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
         var includedResponse = await _client.PostAsJsonAsync("/expense-statements/preview", new
         {
             clientId = TestData.FoxAndFinchId,
-            gigIds = new[] { invoicedGig.GigId },
+            gigIds = new[] { gig.GigId },
             includeReceiptAttachments = true,
             includeReceiptAppendix = false,
             includeReimbursedExpenses = true,
@@ -108,6 +122,38 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
         var includedStatement = await includedResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         Assert.Single(includedStatement.GetProperty("gigs").EnumerateArray());
         Assert.Equal(120.00m, includedStatement.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GenerateInvoice_ExcludesReimbursedExpensesByDefault()
+    {
+        var gig = await CreateGigAsync(
+            "Invoice reimbursement filter",
+            "2026-07-07",
+            "Club",
+            [
+                new("Parking", 10.00m),
+                new("Hotel", 120.00m),
+            ]);
+
+        var reimbursementResponse = await _client.PatchAsJsonAsync($"/gigs/{gig.GigId}/expenses/reimbursement", new
+        {
+            expenseIds = new[] { gig.ExpenseIds[1] },
+            status = "Reimbursed",
+            reimbursedAt = "2026-07-11T00:00:00Z",
+            method = "Cash",
+            note = "Settled on the night",
+        });
+        reimbursementResponse.EnsureSuccessStatusCode();
+
+        var invoiceResponse = await _client.PostAsync($"/gigs/{gig.GigId}/generate-invoice", null);
+        Assert.Equal(HttpStatusCode.Created, invoiceResponse.StatusCode);
+
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var lines = invoice.GetProperty("lines").EnumerateArray().ToArray();
+
+        Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Parking");
+        Assert.DoesNotContain(lines, line => line.GetProperty("description").GetString() == "Hotel");
     }
 
     [Fact]

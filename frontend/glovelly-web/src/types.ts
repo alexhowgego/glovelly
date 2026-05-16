@@ -115,6 +115,10 @@ export type SellerProfileForm = {
 }
 
 export type GigStatus = 'Draft' | 'Confirmed' | 'Completed' | 'Cancelled'
+export type GigExpenseReimbursementStatus =
+  | 'Unreimbursed'
+  | 'Reimbursed'
+  | 'NotClaimable'
 
 export type ExpenseAttachment = {
   id: string
@@ -130,6 +134,11 @@ export type GigExpense = {
   sortOrder: number
   description: string
   amount: number
+  reimbursementStatus: GigExpenseReimbursementStatus
+  reimbursedAt: string | null
+  reimbursementUpdatedAt: string | null
+  reimbursementMethod: string | null
+  reimbursementNote: string | null
   attachments: ExpenseAttachment[]
 }
 
@@ -138,6 +147,11 @@ export type GigExpenseForm = {
   sortOrder: number
   description: string
   amount: string
+  reimbursementStatus: GigExpenseReimbursementStatus
+  reimbursedAt: string | null
+  reimbursementUpdatedAt: string | null
+  reimbursementMethod: string | null
+  reimbursementNote: string | null
   attachments: ExpenseAttachment[]
 }
 

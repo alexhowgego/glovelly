@@ -271,6 +271,7 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
 
         foreach (var expense in gig.Expenses
                      .Where(expense => expense.Amount != 0)
+                     .Where(expense => expense.IsChargeableByDefault())
                      .OrderBy(expense => expense.SortOrder)
                      .ThenBy(expense => expense.Description))
         {

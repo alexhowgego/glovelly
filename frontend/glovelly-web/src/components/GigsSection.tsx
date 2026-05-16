@@ -1,6 +1,14 @@
 import type { FormEvent } from 'react'
 import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
-import type { Client, Gig, GigExpenseForm, GigForm, GigStatus, SellerProfile } from '../types'
+import type {
+  Client,
+  Gig,
+  GigExpenseForm,
+  GigExpenseReimbursementStatus,
+  GigForm,
+  GigStatus,
+  SellerProfile,
+} from '../types'
 
 type GigsSectionProps = {
   clientNamesById: ReadonlyMap<string, string>
@@ -34,6 +42,10 @@ type GigsSectionProps = {
   onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onUpdateExpenseReimbursement: (
+    expense: GigExpenseForm,
+    status: GigExpenseReimbursementStatus
+  ) => void
   onUpdateGigExpenseField: (
     index: number,
     field: keyof Pick<GigExpenseForm, 'description' | 'amount'>,
@@ -83,6 +95,7 @@ export function GigsSection({
   onToggleGigSelection,
   onStartEditing,
   onSubmit,
+  onUpdateExpenseReimbursement,
   onUpdateGigExpenseField,
   onUpdateGigField,
   plannedGigCount,
@@ -437,8 +450,25 @@ export function GigsSection({
 
             {gigForm.expenses.length > 0 ? (
               <div className="gig-expense-list">
-                {gigForm.expenses.map((expense, index) => (
-                  <div className="gig-expense-item" key={`${expense.id || 'new'}-${index}`}>
+                {gigForm.expenses.map((expense, index) => {
+                  const isReimbursed = expense.reimbursementStatus === 'Reimbursed'
+                  const statusLabel = formatExpenseReimbursementStatus(expense.reimbursementStatus)
+
+                  return (
+                  <div
+                    className={`gig-expense-item ${isReimbursed ? 'is-reimbursed' : ''}`}
+                    key={`${expense.id || 'new'}-${index}`}
+                  >
+                    <div className="expense-reimbursement-state">
+                      <span className={`expense-status-badge ${isReimbursed ? 'reimbursed' : ''}`}>
+                        {statusLabel}
+                      </span>
+                      {isReimbursed && (
+                        <span>
+                          {expense.reimbursementMethod || expense.reimbursementNote || 'Recorded'}
+                        </span>
+                      )}
+                    </div>
                     <label>
                       <span>Description</span>
                       <input
@@ -468,6 +498,25 @@ export function GigsSection({
                     >
                       Remove
                     </button>
+                    {expense.id && (
+                      <label className="expense-status-select">
+                        <span>Reimbursement</span>
+                        <select
+                          value={expense.reimbursementStatus}
+                          onChange={(event) =>
+                            onUpdateExpenseReimbursement(
+                              expense,
+                              event.target.value as GigExpenseReimbursementStatus
+                            )
+                          }
+                          disabled={isGigLoading}
+                        >
+                          <option value="Unreimbursed">Claimable</option>
+                          <option value="Reimbursed">Reimbursed</option>
+                          <option value="NotClaimable">Not claimable</option>
+                        </select>
+                      </label>
+                    )}
                     <div className="expense-attachments">
                       <div className="expense-attachment-header">
                         <span>
@@ -521,7 +570,8 @@ export function GigsSection({
                       )}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="empty-state">
@@ -562,4 +612,15 @@ export function GigsSection({
       </div>
     </section>
   )
+}
+
+function formatExpenseReimbursementStatus(status: GigExpenseReimbursementStatus) {
+  switch (status) {
+    case 'Unreimbursed':
+      return 'Claimable'
+    case 'NotClaimable':
+      return 'Not claimable'
+    default:
+      return status
+  }
 }

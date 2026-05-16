@@ -1,4 +1,5 @@
 using Glovelly.Api.Data;
+using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Glovelly.Api.Services;
@@ -61,7 +62,7 @@ public sealed class ExpenseStatementBuilder(AppDbContext dbContext) : IExpenseSt
             .Select(gig =>
             {
                 var expenses = gig.Expenses
-                    .Where(expense => request.IncludeReimbursedExpenses || !gig.InvoiceId.HasValue)
+                    .Where(expense => request.IncludeReimbursedExpenses || expense.IsChargeableByDefault())
                     .Where(expense => requestedExpenseIds is null || requestedExpenseIds.Contains(expense.Id))
                     .Where(expense => expense.Amount != 0)
                     .OrderBy(expense => expense.SortOrder)
@@ -143,4 +144,5 @@ public sealed class ExpenseStatementBuilder(AppDbContext dbContext) : IExpenseSt
 
         return errors;
     }
+
 }
