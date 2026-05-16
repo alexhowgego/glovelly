@@ -230,6 +230,7 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         {
             lines.Add(CreateGeneratedLine(
                 gig,
+                userId,
                 nextSortOrder++,
                 InvoiceLineType.PerformanceFee,
                 $"Performance fee for {gig.Title} ({gig.Date:yyyy-MM-dd})",
@@ -237,10 +238,14 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
                 gig.Fee));
         }
 
-        if (gig.TravelMiles > 0 && mileageRate.HasValue && mileageRate.Value != 0)
+        if (gig.WasDriving &&
+            gig.TravelMiles > 0 &&
+            mileageRate.HasValue &&
+            mileageRate.Value != 0)
         {
             lines.Add(CreateGeneratedLine(
                 gig,
+                userId,
                 nextSortOrder++,
                 InvoiceLineType.Mileage,
                 $"Mileage for {gig.Title}",
@@ -251,7 +256,8 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
 
         var passengerCount = gig.PassengerCount.GetValueOrDefault();
 
-        if (gig.TravelMiles > 0 &&
+        if (gig.WasDriving &&
+            gig.TravelMiles > 0 &&
             passengerCount > 0 &&
             passengerMileageRate.HasValue &&
             passengerMileageRate.Value != 0)
@@ -261,6 +267,7 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
 
             lines.Add(CreateGeneratedLine(
                 gig,
+                userId,
                 nextSortOrder++,
                 InvoiceLineType.PassengerMileage,
                 $"Passenger mileage for {gig.Title}",
@@ -277,6 +284,7 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         {
             lines.Add(CreateGeneratedLine(
                 gig,
+                userId,
                 nextSortOrder++,
                 InvoiceLineType.MiscExpense,
                 expense.Description,
@@ -289,6 +297,7 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
 
     private static InvoiceLine CreateGeneratedLine(
         Gig gig,
+        Guid? userId,
         int sortOrder,
         InvoiceLineType type,
         string description,
@@ -308,6 +317,8 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
             GigId = gig.Id,
             CalculationNotes = calculationNotes,
             IsSystemGenerated = true,
+            CreatedByUserId = userId,
+            CreatedUtc = DateTimeOffset.UtcNow,
         };
     }
 

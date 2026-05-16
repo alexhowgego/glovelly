@@ -1,16 +1,25 @@
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using System.Text;
 
 namespace Glovelly.Api.Data;
 
 public static class AppDbSeeder
 {
-    public static async Task SeedAsync(AppDbContext dbContext, IConfiguration configuration)
+    private static readonly DateTimeOffset SeededCreatedUtc = new(2026, 3, 15, 9, 0, 0, TimeSpan.Zero);
+    private static readonly byte[] SeededPdfBlob = "Seeded development invoice PDF placeholder"u8.ToArray();
+
+    public static async Task SeedAsync(
+        AppDbContext dbContext,
+        IConfiguration configuration,
+        IExpenseAttachmentStore? attachmentStore = null)
     {
         await dbContext.Database.EnsureCreatedAsync();
 
         var seededAdminUserId = await SeedDevelopmentAdminUserAsync(dbContext, configuration);
+        await SeedDevelopmentSellerProfileAsync(dbContext, seededAdminUserId);
 
         if (await dbContext.Clients.AnyAsync())
         {
@@ -30,6 +39,8 @@ public static class AppDbSeeder
                 Email = "bookings@foxandfinch.co.uk",
                 MileageRate = 0.45m,
                 PassengerMileageRate = 0.10m,
+                InvoiceFilenamePattern = "{invoiceNumber}-{clientName}-{periodDate}",
+                InvoiceEmailSubjectPattern = "Invoice {invoiceNumber} for {clientName}",
                 CreatedByUserId = seededAdminUserId,
                 UpdatedByUserId = seededAdminUserId,
                 BillingAddress = new Address
@@ -47,6 +58,7 @@ public static class AppDbSeeder
                 Name = "Northlight Weddings",
                 Email = "accounts@northlightweddings.com",
                 MileageRate = 0.45m,
+                InvoiceFilenamePattern = "{clientName}-{invoiceNumber}",
                 CreatedByUserId = seededAdminUserId,
                 UpdatedByUserId = seededAdminUserId,
                 BillingAddress = new Address
@@ -63,6 +75,7 @@ public static class AppDbSeeder
                 Id = riversideId,
                 Name = "Riverside Arts Centre",
                 Email = "finance@riversidearts.org",
+                MileageRate = 0.42m,
                 PassengerMileageRate = 0.08m,
                 CreatedByUserId = seededAdminUserId,
                 UpdatedByUserId = seededAdminUserId,
@@ -90,7 +103,16 @@ public static class AppDbSeeder
                 Status = InvoiceStatus.Issued,
                 FirstIssuedUtc = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
                 FirstIssuedByUserId = seededAdminUserId,
-                Description = "In respect of services provided during April 2026."
+                StatusUpdatedUtc = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
+                DeliveryCount = 1,
+                LastDeliveryChannel = "Email",
+                LastDeliveryRecipient = "bookings@foxandfinch.co.uk",
+                LastDeliveredUtc = new DateTimeOffset(2026, 4, 1, 9, 15, 0, TimeSpan.Zero),
+                LastDeliveredByUserId = seededAdminUserId,
+                Description = "In respect of Spring Product Launch at Albert Hall, Manchester on 2026-04-18.",
+                PdfBlob = SeededPdfBlob,
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId
             },
             new Invoice
             {
@@ -100,7 +122,22 @@ public static class AppDbSeeder
                 InvoiceDate = new DateOnly(2026, 4, 8),
                 DueDate = new DateOnly(2026, 4, 22),
                 Status = InvoiceStatus.Draft,
-                Description = "Community residency weekend."
+                Description = "In respect of Community Residency Weekend at Riverside Arts Centre on 2026-05-11.",
+                PdfBlob = SeededPdfBlob,
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId
+            },
+            new Invoice
+            {
+                Id = Guid.Parse("83c5e4e0-6749-4efe-bb15-e7a63f49f3cb"),
+                InvoiceNumber = "GLV-2026-003",
+                ClientId = northlightId,
+                InvoiceDate = new DateOnly(2026, 4, 18),
+                DueDate = new DateOnly(2026, 5, 2),
+                Status = InvoiceStatus.Draft,
+                Description = "Draft invoice for Lakeside Wedding Reception.",
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId
             }
         };
 
@@ -112,10 +149,14 @@ public static class AppDbSeeder
                 InvoiceId = invoices[0].Id,
                 SortOrder = 1,
                 Type = InvoiceLineType.PerformanceFee,
-                Description = "Performance fee",
+                Description = "Performance fee for Spring Product Launch (2026-04-18)",
                 Quantity = 1m,
                 UnitPrice = 650m,
-                GigId = Guid.Parse("387e596f-a262-4e3e-b224-493a46daf7a1")
+                GigId = Guid.Parse("387e596f-a262-4e3e-b224-493a46daf7a1"),
+                CalculationNotes = null,
+                IsSystemGenerated = true,
+                CreatedByUserId = seededAdminUserId,
+                CreatedUtc = SeededCreatedUtc
             },
             new InvoiceLine
             {
@@ -123,10 +164,43 @@ public static class AppDbSeeder
                 InvoiceId = invoices[0].Id,
                 SortOrder = 2,
                 Type = InvoiceLineType.Mileage,
-                Description = "Travel contribution",
+                Description = "Mileage for Spring Product Launch",
+                Quantity = 24m,
+                UnitPrice = 0.45m,
+                GigId = Guid.Parse("387e596f-a262-4e3e-b224-493a46daf7a1"),
+                CalculationNotes = "24 miles at 0.45 per mile.",
+                IsSystemGenerated = true,
+                CreatedByUserId = seededAdminUserId,
+                CreatedUtc = SeededCreatedUtc
+            },
+            new InvoiceLine
+            {
+                Id = Guid.Parse("13a20439-2947-4e5e-932c-65de19f820a9"),
+                InvoiceId = invoices[0].Id,
+                SortOrder = 3,
+                Type = InvoiceLineType.PassengerMileage,
+                Description = "Passenger mileage for Spring Product Launch",
+                Quantity = 24m,
+                UnitPrice = 0.10m,
+                GigId = Guid.Parse("387e596f-a262-4e3e-b224-493a46daf7a1"),
+                CalculationNotes = "1 passenger x 24 miles.",
+                IsSystemGenerated = true,
+                CreatedByUserId = seededAdminUserId,
+                CreatedUtc = SeededCreatedUtc
+            },
+            new InvoiceLine
+            {
+                Id = Guid.Parse("7b65d5cb-4b64-44ef-8abc-b4fd22195255"),
+                InvoiceId = invoices[0].Id,
+                SortOrder = 4,
+                Type = InvoiceLineType.MiscExpense,
+                Description = "Parking",
                 Quantity = 1m,
-                UnitPrice = 95m,
-                CalculationNotes = "Flat contribution agreed for Manchester travel."
+                UnitPrice = 18m,
+                GigId = Guid.Parse("387e596f-a262-4e3e-b224-493a46daf7a1"),
+                IsSystemGenerated = true,
+                CreatedByUserId = seededAdminUserId,
+                CreatedUtc = SeededCreatedUtc
             },
             new InvoiceLine
             {
@@ -134,10 +208,56 @@ public static class AppDbSeeder
                 InvoiceId = invoices[1].Id,
                 SortOrder = 1,
                 Type = InvoiceLineType.PerformanceFee,
-                Description = "Workshop session",
-                Quantity = 2m,
-                UnitPrice = 180m,
-                GigId = Guid.Parse("51a47dea-4758-4d92-92bf-2be38a0af476")
+                Description = "Performance fee for Community Residency Weekend (2026-05-11)",
+                Quantity = 1m,
+                UnitPrice = 360m,
+                GigId = Guid.Parse("51a47dea-4758-4d92-92bf-2be38a0af476"),
+                IsSystemGenerated = true,
+                CreatedByUserId = seededAdminUserId,
+                CreatedUtc = SeededCreatedUtc
+            },
+            new InvoiceLine
+            {
+                Id = Guid.Parse("d7ff757b-cc41-4b86-af4b-f4a91343812b"),
+                InvoiceId = invoices[1].Id,
+                SortOrder = 2,
+                Type = InvoiceLineType.Mileage,
+                Description = "Mileage for Community Residency Weekend",
+                Quantity = 12m,
+                UnitPrice = 0.42m,
+                GigId = Guid.Parse("51a47dea-4758-4d92-92bf-2be38a0af476"),
+                CalculationNotes = "12 miles at 0.42 per mile.",
+                IsSystemGenerated = true,
+                CreatedByUserId = seededAdminUserId,
+                CreatedUtc = SeededCreatedUtc
+            },
+            new InvoiceLine
+            {
+                Id = Guid.Parse("7d55dd6e-ae83-462e-ac91-8fd140a6f5e9"),
+                InvoiceId = invoices[1].Id,
+                SortOrder = 3,
+                Type = InvoiceLineType.MiscExpense,
+                Description = "Workshop materials",
+                Quantity = 1m,
+                UnitPrice = 42m,
+                GigId = Guid.Parse("51a47dea-4758-4d92-92bf-2be38a0af476"),
+                IsSystemGenerated = true,
+                CreatedByUserId = seededAdminUserId,
+                CreatedUtc = SeededCreatedUtc
+            },
+            new InvoiceLine
+            {
+                Id = Guid.Parse("8ae836fd-936a-4492-ae8d-4b02107c61af"),
+                InvoiceId = invoices[1].Id,
+                SortOrder = 4,
+                Type = InvoiceLineType.ManualAdjustment,
+                Description = "Manual adjustment: venue-funded outreach discount",
+                Quantity = 1m,
+                UnitPrice = -25m,
+                CalculationNotes = "Seeded example of a user-entered invoice adjustment.",
+                IsSystemGenerated = false,
+                CreatedByUserId = seededAdminUserId,
+                CreatedUtc = SeededCreatedUtc
             }
         };
 
@@ -158,6 +278,8 @@ public static class AppDbSeeder
                 WasDriving = true,
                 Status = GigStatus.Confirmed,
                 InvoicedAt = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId,
                 Expenses =
                 [
                     new GigExpense
@@ -165,7 +287,20 @@ public static class AppDbSeeder
                         Id = Guid.Parse("2d7c95d8-d8a0-4ef2-a13a-7d9cb7065c1d"),
                         SortOrder = 1,
                         Description = "Parking",
-                        Amount = 18m
+                        Amount = 18m,
+                        ReimbursementStatus = GigExpenseReimbursementStatus.Unreimbursed,
+                        Attachments =
+                        [
+                            new ExpenseAttachment
+                            {
+                                Id = Guid.Parse("1b952a78-6533-4db4-8aae-c3e5e362d517"),
+                                FileName = "spring-launch-parking.pdf",
+                                ContentType = "application/pdf",
+                                SizeBytes = 48219,
+                                StorageKey = "development/receipts/spring-launch-parking.pdf",
+                                CreatedAt = new DateTimeOffset(2026, 4, 18, 23, 5, 0, TimeSpan.Zero)
+                            }
+                        ]
                     }
                 ]
             },
@@ -178,9 +313,26 @@ public static class AppDbSeeder
                 Venue = "The Glasshouse, Windermere",
                 Fee = 920m,
                 TravelMiles = 78m,
+                PassengerCount = 2,
                 Notes = "Ceremony plus evening set.",
                 WasDriving = true,
-                Status = GigStatus.Confirmed
+                Status = GigStatus.Confirmed,
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId,
+                Expenses =
+                [
+                    new GigExpense
+                    {
+                        Id = Guid.Parse("76d060b3-b900-4e81-a230-f506051422ec"),
+                        SortOrder = 1,
+                        Description = "Strings",
+                        Amount = 24m,
+                        ReimbursementStatus = GigExpenseReimbursementStatus.NotClaimable,
+                        ReimbursementUpdatedByUserId = seededAdminUserId,
+                        ReimbursementUpdatedAt = new DateTimeOffset(2026, 4, 20, 14, 0, 0, TimeSpan.Zero),
+                        ReimbursementNote = "Personal consumables, not billed to the client."
+                    }
+                ]
             },
             new Gig
             {
@@ -192,10 +344,50 @@ public static class AppDbSeeder
                 Venue = "Riverside Arts Centre",
                 Fee = 360m,
                 TravelMiles = 12m,
+                PassengerCount = 0,
                 Notes = "Two workshops and one closing performance.",
-                WasDriving = false,
-                Status = GigStatus.Draft,
-                InvoicedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero)
+                WasDriving = true,
+                Status = GigStatus.Confirmed,
+                InvoicedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero),
+                CreatedByUserId = seededAdminUserId,
+                UpdatedByUserId = seededAdminUserId,
+                Expenses =
+                [
+                    new GigExpense
+                    {
+                        Id = Guid.Parse("01c57be3-5c68-4b18-9cae-5948365c264f"),
+                        SortOrder = 1,
+                        Description = "Workshop materials",
+                        Amount = 42m,
+                        ReimbursementStatus = GigExpenseReimbursementStatus.Unreimbursed,
+                        Attachments =
+                        [
+                            new ExpenseAttachment
+                            {
+                                Id = Guid.Parse("f6c9e875-40a3-408f-9183-a09cb5255128"),
+                                FileName = "riverside-materials.jpg",
+                                ContentType = "image/jpeg",
+                                SizeBytes = 301144,
+                                StorageKey = "development/receipts/riverside-materials.jpg",
+                                CreatedAt = new DateTimeOffset(2026, 5, 11, 18, 30, 0, TimeSpan.Zero)
+                            }
+                        ]
+                    },
+                    new GigExpense
+                    {
+                        Id = Guid.Parse("c980e792-6ace-4fd0-bf76-1573fb6ddb5d"),
+                        SortOrder = 2,
+                        Description = "Lunch",
+                        Amount = 14.50m,
+                        ReimbursementStatus = GigExpenseReimbursementStatus.Reimbursed,
+                        ReimbursementInvoiceId = invoices[1].Id,
+                        ReimbursementUpdatedByUserId = seededAdminUserId,
+                        ReimbursedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero),
+                        ReimbursementUpdatedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero),
+                        ReimbursementMethod = "Invoice GLV-2026-002",
+                        ReimbursementNote = "Seeded example of a reimbursed expense that should not regenerate as a chargeable invoice line."
+                    }
+                ]
             }
         };
 
@@ -205,6 +397,11 @@ public static class AppDbSeeder
         dbContext.Gigs.AddRange(gigs);
 
         await dbContext.SaveChangesAsync();
+
+        if (attachmentStore is not null)
+        {
+            await SeedExpenseAttachmentBlobsAsync(gigs, attachmentStore);
+        }
     }
 
     private static async Task<Guid?> SeedDevelopmentAdminUserAsync(AppDbContext dbContext, IConfiguration configuration)
@@ -251,5 +448,56 @@ public static class AppDbSeeder
         await dbContext.SaveChangesAsync();
 
         return seededUser.Id;
+    }
+
+    private static async Task SeedDevelopmentSellerProfileAsync(AppDbContext dbContext, Guid? seededAdminUserId)
+    {
+        if (!seededAdminUserId.HasValue ||
+            await dbContext.SellerProfiles.AnyAsync(profile => profile.UserId == seededAdminUserId.Value))
+        {
+            return;
+        }
+
+        dbContext.SellerProfiles.Add(new SellerProfile
+        {
+            Id = Guid.Parse("8763be83-8ff3-42ac-9711-7dc13b443e5f"),
+            UserId = seededAdminUserId.Value,
+            SellerName = "Glovelly Music",
+            Email = "alex@glovelly.local",
+            Phone = "07123 456789",
+            AccountName = "Glovelly Music",
+            SortCode = "12-34-56",
+            AccountNumber = "12345678",
+            PaymentReferenceNote = "Please use the invoice number as the payment reference.",
+            Address = new Address
+            {
+                Line1 = "Studio 4",
+                Line2 = "The Old Mill",
+                City = "Bristol",
+                StateOrCounty = "Bristol",
+                PostalCode = "BS1 5AA",
+                Country = "United Kingdom"
+            },
+            CreatedUtc = SeededCreatedUtc,
+            UpdatedUtc = SeededCreatedUtc,
+            CreatedByUserId = seededAdminUserId,
+            UpdatedByUserId = seededAdminUserId
+        });
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedExpenseAttachmentBlobsAsync(
+        IEnumerable<Gig> gigs,
+        IExpenseAttachmentStore attachmentStore)
+    {
+        foreach (var attachment in gigs
+                     .SelectMany(gig => gig.Expenses)
+                     .SelectMany(expense => expense.Attachments))
+        {
+            var content = Encoding.UTF8.GetBytes($"Development receipt placeholder for {attachment.FileName}");
+            await using var stream = new MemoryStream(content);
+            await attachmentStore.SaveAsync(attachment.StorageKey, stream, attachment.ContentType);
+        }
     }
 }

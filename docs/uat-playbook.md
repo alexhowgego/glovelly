@@ -138,6 +138,43 @@ Also test:
 
 Expected result: the expense becomes eligible for generated invoice lines again.
 
+## Invoice Line Refresh Regression Checks
+
+Use these checks with either seeded data or freshly created test data. The important thing is the workflow shape: a gig linked to a draft invoice, with fee, mileage, and expenses that can be regenerated.
+
+1. Create or identify a gig with a performance fee and at least one chargeable expense.
+2. Generate a draft invoice from the gig.
+3. Redraft or otherwise regenerate the invoice.
+4. Open the invoice lines.
+
+Expected result: generated gig lines are replaced cleanly, not appended repeatedly. There should be exactly one generated performance fee for the gig, plus the expected mileage and chargeable expense lines.
+
+Then check reimbursement changes on a linked draft invoice:
+
+1. Start with a gig linked to a draft invoice and at least two expenses.
+2. Mark one expense as `Reimbursed`.
+3. Accept the prompt to regenerate the linked draft invoice.
+4. Confirm the reimbursed expense is removed from the invoice.
+5. Change that same expense back to `Claimable`.
+6. Accept the prompt to regenerate the linked draft invoice.
+7. Reopen the invoice.
+
+Expected result: the expense is added back exactly once. Existing generated lines are not duplicated, and any manual adjustment lines remain intact.
+
+Then check driving and mileage:
+
+1. Start with a gig linked to a draft invoice where `I was driving for this gig` is enabled, travel miles are greater than zero, and passenger count is set if passenger mileage is relevant.
+2. Confirm the linked draft invoice includes mileage, and passenger mileage when applicable.
+3. Edit the gig and clear `I was driving for this gig`.
+4. Save and accept the prompt to regenerate the linked draft invoice.
+5. Confirm mileage and passenger mileage lines are removed from the invoice.
+6. Edit the same gig again and re-enable `I was driving for this gig`.
+7. Confirm the previous travel miles and passenger count are still present in the edit form.
+8. Save and accept the prompt to regenerate the linked draft invoice.
+9. Reopen the invoice.
+
+Expected result: mileage lines disappear while driving is disabled and return when driving is re-enabled. Toggling driving must not erase previously saved mileage or passenger values.
+
 ## Expense Statement Journey
 
 1. Create or identify multiple gigs for the same client with expenses.

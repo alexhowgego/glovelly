@@ -254,7 +254,11 @@ export function GigsSection({
                 </article>
                 <article>
                   <p className="detail-label">Driving</p>
-                  <strong>{selectedGig.wasDriving ? 'Yes' : 'No'}</strong>
+                  <strong>
+                    {selectedGig.wasDriving
+                      ? `${selectedGig.travelMiles || 0} miles`
+                      : 'No'}
+                  </strong>
                 </article>
                 <article>
                   <p className="detail-label">Invoice link</p>
@@ -399,6 +403,30 @@ export function GigsSection({
                 />
                 <span>I was driving for this gig</span>
               </label>
+
+              {gigForm.wasDriving && (
+                <>
+                  <label>
+                    <span>Travel miles</span>
+                    <input
+                      inputMode="decimal"
+                      value={gigForm.travelMiles}
+                      onChange={(event) => onUpdateGigField('travelMiles', event.target.value)}
+                      placeholder="24"
+                    />
+                  </label>
+
+                  <label>
+                    <span>Passengers</span>
+                    <input
+                      inputMode="numeric"
+                      value={gigForm.passengerCount}
+                      onChange={(event) => onUpdateGigField('passengerCount', event.target.value)}
+                      placeholder="0"
+                    />
+                  </label>
+                </>
+              )}
 
               <label className="full-width">
                 <span>Notes</span>

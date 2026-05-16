@@ -244,6 +244,8 @@ export type GigForm = {
   date: string
   venue: string
   fee: string
+  travelMiles: string
+  passengerCount: string
   notes: string
   wasDriving: boolean
   status: GigStatus

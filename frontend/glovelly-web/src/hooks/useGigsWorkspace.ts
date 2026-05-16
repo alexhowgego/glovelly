@@ -32,6 +32,14 @@ type NormalizedGigExpensePayload = {
   amount: number
 }
 
+function formatEditableNumber(value: number | null) {
+  if (value === null || value === 0) {
+    return ''
+  }
+
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
+
 function shouldCloseAfterSave(event: FormEvent<HTMLFormElement>) {
   const submitter = (event.nativeEvent as SubmitEvent).submitter as
     | HTMLButtonElement
@@ -47,6 +55,8 @@ function toEditableGigForm(gig: Gig): GigForm {
     date: gig.date,
     venue: gig.venue,
     fee: String(gig.fee),
+    travelMiles: formatEditableNumber(gig.travelMiles),
+    passengerCount: formatEditableNumber(gig.passengerCount),
     notes: gig.notes ?? '',
     wasDriving: gig.wasDriving,
     status: gig.status,
@@ -625,6 +635,8 @@ export function useGigsWorkspace({
       fee: gigForm.fee.trim(),
       notes: gigForm.notes.trim(),
       wasDriving: gigForm.wasDriving,
+      travelMiles: gigForm.travelMiles.trim(),
+      passengerCount: gigForm.passengerCount.trim(),
       status: gigForm.status,
       expenses: gigForm.expenses,
     }
@@ -637,6 +649,21 @@ export function useGigsWorkspace({
     const fee = Number(payload.fee)
     if (!Number.isFinite(fee) || fee < 0) {
       setGigStatus('Fee must be a valid non-negative number.')
+      return
+    }
+
+    const travelMiles = payload.travelMiles ? Number(payload.travelMiles) : 0
+    if (!Number.isFinite(travelMiles) || travelMiles < 0) {
+      setGigStatus('Travel miles must be a valid non-negative number.')
+      return
+    }
+
+    const passengerCount = payload.passengerCount ? Number(payload.passengerCount) : 0
+    if (
+      !Number.isInteger(passengerCount) ||
+      passengerCount < 0
+    ) {
+      setGigStatus('Passenger count must be a valid whole number.')
       return
     }
 
@@ -685,8 +712,8 @@ export function useGigsWorkspace({
           date: payload.date,
           venue: payload.venue,
           fee,
-          travelMiles: 0,
-          passengerCount: null,
+          travelMiles,
+          passengerCount: passengerCount === 0 ? null : passengerCount,
           notes: payload.notes || null,
           wasDriving: payload.wasDriving,
           status: payload.status,
@@ -827,6 +854,8 @@ function hasInvoiceRelevantGigChanges(
     fee: string
     notes: string
     wasDriving: boolean
+    travelMiles: string
+    passengerCount: string
     status: Gig['status']
     expenses: GigExpenseForm[]
   },
@@ -839,6 +868,9 @@ function hasInvoiceRelevantGigChanges(
     gig.date !== payload.date ||
     gig.venue !== payload.venue ||
     gig.fee !== fee ||
+    gig.travelMiles !== (payload.travelMiles ? Number(payload.travelMiles) : 0) ||
+    (gig.passengerCount ?? 0) !==
+      (payload.passengerCount ? Number(payload.passengerCount) : 0) ||
     (gig.notes ?? '') !== (payload.notes || '') ||
     gig.wasDriving !== payload.wasDriving
   ) {

@@ -1,5 +1,6 @@
 using Glovelly.Api.Data;
 using Glovelly.Api.Endpoints;
+using Glovelly.Api.Services;
 
 namespace Glovelly.Api.Configuration;
 
@@ -15,7 +16,8 @@ internal static class WebApplicationExtensions
 
         if (shouldSeedDevelopmentData)
         {
-            await AppDbSeeder.SeedAsync(dbContext, configuration);
+            var attachmentStore = scope.ServiceProvider.GetRequiredService<IExpenseAttachmentStore>();
+            await AppDbSeeder.SeedAsync(dbContext, configuration, attachmentStore);
             return;
         }
 
