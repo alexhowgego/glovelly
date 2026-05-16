@@ -14,13 +14,22 @@ import type {
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
+  Invoice,
+  InvoiceStatus,
 } from '../types'
 
 type UseGigsWorkspaceOptions = {
   clientNamesById: ReadonlyMap<string, string>
   clients: Client[]
+  onLinkedInvoiceUpdated: (invoice: Invoice, message: string) => void
   onOpenSection: (section: 'gigs') => void
   onSessionExpired: (message: string) => void
+}
+
+type NormalizedGigExpensePayload = {
+  sortOrder: number
+  description: string
+  amount: number
 }
 
 function shouldCloseAfterSave(event: FormEvent<HTMLFormElement>) {
@@ -51,6 +60,7 @@ function toEditableGigForm(gig: Gig): GigForm {
 export function useGigsWorkspace({
   clientNamesById,
   clients,
+  onLinkedInvoiceUpdated,
   onOpenSection,
   onSessionExpired,
 }: UseGigsWorkspaceOptions) {
@@ -473,6 +483,7 @@ export function useGigsWorkspace({
       const savedGig = (await response.json()) as Gig
       mergeSavedGig(savedGig)
       setGigStatus(`Expense marked as ${formatReimbursementStatus(status).toLowerCase()}.`)
+      await handleLinkedInvoiceAfterGigSave(selectedGig, savedGig, true)
     } catch (error) {
       setGigStatus(
         error instanceof Error ? error.message : 'Unable to update reimbursement.'
@@ -491,6 +502,115 @@ export function useGigsWorkspace({
     setGigExpenseAmount('')
     setGigExpenseDescription('')
     setIsGigEditorOpen(true)
+  }
+
+  const handleLinkedInvoiceAfterGigSave = async (
+    previousGig: Gig,
+    savedGig: Gig,
+    hasInvoiceRelevantChanges: boolean
+  ) => {
+    const invoiceId = savedGig.invoiceId ?? previousGig.invoiceId
+    if (!invoiceId) {
+      return
+    }
+
+    const invoiceResponse = await fetchWithSession(buildApiUrl(`/invoices/${invoiceId}`))
+    if (
+      handleSessionExpired(
+        invoiceResponse,
+        onSessionExpired,
+        'Your session expired. Sign in again to keep managing gigs.'
+      )
+    ) {
+      return
+    }
+
+    if (!invoiceResponse.ok) {
+      return
+    }
+
+    const invoice = (await invoiceResponse.json()) as Invoice
+
+    if (previousGig.status !== 'Cancelled' && savedGig.status === 'Cancelled') {
+      await promptToCancelLinkedInvoice(invoice)
+      return
+    }
+
+    if (!hasInvoiceRelevantChanges || invoice.status !== 'Draft') {
+      return
+    }
+
+    const shouldRedraft = window.confirm(
+      `Regenerate draft invoice ${invoice.invoiceNumber} using the latest gig details?`
+    )
+    if (!shouldRedraft) {
+      return
+    }
+
+    const redraftResponse = await fetchWithSession(
+      buildApiUrl(`/invoices/${invoice.id}/redraft`),
+      {
+        method: 'POST',
+      }
+    )
+
+    if (!redraftResponse.ok) {
+      const problem = await parseProblemDetails(redraftResponse)
+      const validationMessages = problem?.errors
+        ? Object.values(problem.errors).flat().join(' ')
+        : problem?.detail ?? problem?.title
+
+      throw new Error(validationMessages || 'Unable to regenerate draft invoice.')
+    }
+
+    const redraftedInvoice = (await redraftResponse.json()) as Invoice
+    onLinkedInvoiceUpdated(
+      redraftedInvoice,
+      `Draft invoice ${redraftedInvoice.invoiceNumber} regenerated from updated gig details.`
+    )
+    setGigStatus(`Gig updated. Draft invoice ${redraftedInvoice.invoiceNumber} regenerated.`)
+  }
+
+  const promptToCancelLinkedInvoice = async (invoice: Invoice) => {
+    if (!canCancelInvoice(invoice.status)) {
+      return
+    }
+
+    const shouldCancel = window.confirm(
+      `Cancel linked invoice ${invoice.invoiceNumber} as well?`
+    )
+    if (!shouldCancel) {
+      return
+    }
+
+    const cancelResponse = await fetchWithSession(
+      buildApiUrl(`/invoices/${invoice.id}/status`),
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'Cancelled',
+        }),
+      }
+    )
+
+    if (!cancelResponse.ok) {
+      const problem = await parseProblemDetails(cancelResponse)
+      const validationMessages = problem?.errors
+        ? Object.values(problem.errors).flat().join(' ')
+        : problem?.detail ?? problem?.title
+
+      throw new Error(validationMessages || 'Unable to cancel linked invoice.')
+    }
+
+    const cancelledInvoice = (await cancelResponse.json()) as Invoice
+    onLinkedInvoiceUpdated(
+      cancelledInvoice,
+      `Linked invoice ${cancelledInvoice.invoiceNumber} cancelled.`
+    )
+    setGigStatus(`Gig updated. Linked invoice ${cancelledInvoice.invoiceNumber} cancelled.`)
   }
 
   const handleGigSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -520,7 +640,7 @@ export function useGigsWorkspace({
       return
     }
 
-    const normalizedExpenses = []
+    const normalizedExpenses: NormalizedGigExpensePayload[] = []
     for (const [index, expense] of payload.expenses.entries()) {
       const description = expense.description.trim()
       const amount = Number(expense.amount)
@@ -546,6 +666,10 @@ export function useGigsWorkspace({
 
     try {
       const isEdit = gigMode === 'edit' && selectedGig
+      const previousGig = isEdit ? selectedGig : null
+      const hasInvoiceRelevantChanges = previousGig
+        ? hasInvoiceRelevantGigChanges(previousGig, payload, fee, normalizedExpenses)
+        : false
       const endpoint = isEdit
         ? buildApiUrl(`/gigs/${selectedGig.id}`)
         : buildApiUrl('/gigs')
@@ -608,6 +732,13 @@ export function useGigsWorkspace({
       setGigExpenseDescription('')
       setGigStatus(isEdit ? 'Gig updated.' : 'Gig created.')
       setIsGigEditorOpen(!closeAfterSave)
+      if (previousGig) {
+        await handleLinkedInvoiceAfterGigSave(
+          previousGig,
+          savedGig,
+          hasInvoiceRelevantChanges
+        )
+      }
     } catch (error) {
       setGigStatus(
         error instanceof Error ? error.message : 'Unable to save this gig right now.'
@@ -680,4 +811,59 @@ function formatReimbursementStatus(status: GigExpenseReimbursementStatus) {
     default:
       return status
   }
+}
+
+function canCancelInvoice(status: InvoiceStatus) {
+  return status === 'Draft' || status === 'Issued' || status === 'Overdue'
+}
+
+function hasInvoiceRelevantGigChanges(
+  gig: Gig,
+  payload: {
+    clientId: string
+    title: string
+    date: string
+    venue: string
+    fee: string
+    notes: string
+    wasDriving: boolean
+    status: Gig['status']
+    expenses: GigExpenseForm[]
+  },
+  fee: number,
+  normalizedExpenses: NormalizedGigExpensePayload[]
+) {
+  if (
+    gig.clientId !== payload.clientId ||
+    gig.title !== payload.title ||
+    gig.date !== payload.date ||
+    gig.venue !== payload.venue ||
+    gig.fee !== fee ||
+    (gig.notes ?? '') !== (payload.notes || '') ||
+    gig.wasDriving !== payload.wasDriving
+  ) {
+    return true
+  }
+
+  const currentExpenses = gig.expenses
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((expense, index) => ({
+      sortOrder: index + 1,
+      description: expense.description,
+      amount: expense.amount,
+    }))
+
+  if (currentExpenses.length !== normalizedExpenses.length) {
+    return true
+  }
+
+  return currentExpenses.some((expense, index) => {
+    const nextExpense = normalizedExpenses[index]
+    return (
+      expense.sortOrder !== nextExpense.sortOrder ||
+      expense.description !== nextExpense.description ||
+      expense.amount !== nextExpense.amount
+    )
+  })
 }

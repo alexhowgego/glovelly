@@ -631,12 +631,14 @@ public static class GigEndpoints
                 });
             }
 
-            if (request.InvoiceId.HasValue)
+            var requestedInvoiceId = request.InvoiceId ?? gig.InvoiceId;
+
+            if (requestedInvoiceId.HasValue)
             {
                 var invoice = await db.Invoices
                     .WhereVisibleTo(userId)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(value => value.Id == request.InvoiceId.Value);
+                    .FirstOrDefaultAsync(value => value.Id == requestedInvoiceId.Value);
 
                 if (invoice is null)
                 {
@@ -663,7 +665,7 @@ public static class GigEndpoints
                 .ToList();
 
             gig.ClientId = request.ClientId;
-            gig.InvoiceId = request.InvoiceId;
+            gig.InvoiceId = requestedInvoiceId;
             gig.Title = request.Title.Trim();
             gig.Date = request.Date;
             gig.Venue = request.Venue.Trim();
@@ -674,7 +676,7 @@ public static class GigEndpoints
             gig.WasDriving = request.WasDriving;
             gig.Status = request.Status;
             gig.InvoicedAt = EndpointSupport.ResolveInvoicedAt(
-                request.InvoiceId,
+                requestedInvoiceId,
                 previousInvoiceId,
                 gig.InvoicedAt,
                 request.InvoicedAt);
@@ -713,9 +715,6 @@ public static class GigEndpoints
                 .Include(value => value.Expenses)
                     .ThenInclude(expense => expense.Attachments)
                 .FirstAsync(value => value.Id == id);
-
-            await invoiceWorkflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, userId);
-            await db.SaveChangesAsync();
 
             return Results.Ok(gig);
         });

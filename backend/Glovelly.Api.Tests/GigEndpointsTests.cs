@@ -125,7 +125,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
-    public async Task UpdateGig_RemovingInvoice_ClearsInvoicedAt()
+    public async Task UpdateGig_WithoutInvoiceInRequest_PreservesExistingInvoiceLink()
     {
         var createResponse = await _client.PostAsJsonAsync("/gigs", new
         {
@@ -169,9 +169,9 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
 
         Assert.Equal(JsonValueKind.Object, updatedGig.ValueKind);
-        Assert.Equal(JsonValueKind.Null, updatedGig.GetProperty("invoiceId").ValueKind);
-        Assert.False(updatedGig.GetProperty("isInvoiced").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, updatedGig.GetProperty("invoicedAt").ValueKind);
+        Assert.Equal(TestData.FoxInvoiceId, updatedGig.GetProperty("invoiceId").GetGuid());
+        Assert.True(updatedGig.GetProperty("isInvoiced").GetBoolean());
+        Assert.NotEqual(JsonValueKind.Null, updatedGig.GetProperty("invoicedAt").ValueKind);
     }
 
     [Fact]
@@ -252,10 +252,12 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         var lines = invoice.GetProperty("lines").EnumerateArray().Where(line => line.GetProperty("gigId").GetGuid() == gigId).ToArray();
 
-        Assert.Equal(3, lines.Length);
+        Assert.Equal(2, lines.Length);
         Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Performance fee for Expense refresh test (2026-06-08)");
-        Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Tolls");
-        Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Parking");
+        Assert.Contains(lines, line =>
+            line.GetProperty("description").GetString() == "Parking" &&
+            line.GetProperty("unitPrice").GetDecimal() == 12.00m);
+        Assert.DoesNotContain(lines, line => line.GetProperty("description").GetString() == "Tolls");
     }
 
     [Fact]

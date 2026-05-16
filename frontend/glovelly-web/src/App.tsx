@@ -196,6 +196,14 @@ function App({ appMetadata }: AppProps) {
   } = useGigsWorkspace({
     clientNamesById,
     clients,
+    onLinkedInvoiceUpdated: (invoice, message) => {
+      setInvoices((current) => [
+        invoice,
+        ...current.filter((value) => value.id !== invoice.id),
+      ])
+      setSelectedInvoiceId(invoice.id)
+      setInvoiceStatus(message)
+    },
     onOpenSection: (section) => setActiveSection(section),
     onSessionExpired: expireSession,
   })
