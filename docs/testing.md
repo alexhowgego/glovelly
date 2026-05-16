@@ -56,6 +56,12 @@ npm --prefix frontend/glovelly-web run build
 
 There is no dedicated frontend unit/e2e test runner configured yet. For frontend changes, lint and build are the available automated checks.
 
+## Manual UAT
+
+Use `docs/uat-playbook.md` for human regression journeys that cut across gigs, expenses, receipts, invoices, expense statements, delivery, seller profile, and admin workflows.
+
+The playbook is especially useful before or after changes where frontend state, backend workflow services, and generated documents interact. Keep it scenario-based so the journeys can later be automated as browser tests.
+
 ## What to Add When Changing Behavior
 
 - New backend route: add endpoint tests for success, validation failure, authorization/session behavior when relevant, and user visibility boundaries.
