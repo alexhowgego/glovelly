@@ -19,6 +19,7 @@ app.MapGoogleDriveIntegrationEndpoints(startupSettings);
 app.MapMcpOAuthEndpoints();
 app.MapMcpEndpoints();
 app.MapCrudEndpoints();
+app.MapExpenseStatementEndpoints();
 app.MapAdminEndpoints();
 app.MapFallbackToFile("index.html");
 
