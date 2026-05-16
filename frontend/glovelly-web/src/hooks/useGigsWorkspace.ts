@@ -32,6 +32,29 @@ type NormalizedGigExpensePayload = {
   amount: number
 }
 
+function extractDownloadFilename(contentDisposition: string | null) {
+  if (!contentDisposition) {
+    return null
+  }
+
+  const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1])
+    } catch {
+      return encodedMatch[1]
+    }
+  }
+
+  const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1]
+  }
+
+  const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
+  return plainMatch?.[1]?.trim() ?? null
+}
+
 function formatEditableNumber(value: number | null) {
   if (value === null || value === 0) {
     return ''
@@ -85,7 +108,28 @@ export function useGigsWorkspace({
   const [isGigLoading, setIsGigLoading] = useState(false)
   const [gigExpenseAmount, setGigExpenseAmount] = useState('')
   const [gigExpenseDescription, setGigExpenseDescription] = useState('')
+  const [isExpenseStatementOpen, setIsExpenseStatementOpen] = useState(false)
+  const [expenseStatementGigIds, setExpenseStatementGigIds] = useState<string[]>([])
+  const [expenseStatementExpenseIds, setExpenseStatementExpenseIds] = useState<string[]>([])
+  const [includeStatementReceiptAttachments, setIncludeStatementReceiptAttachments] =
+    useState(true)
+  const [includeStatementReceiptAppendix, setIncludeStatementReceiptAppendix] =
+    useState(true)
+  const [expenseStatementStatus, setExpenseStatementStatus] = useState('')
+  const [expenseStatementPreviewUrl, setExpenseStatementPreviewUrl] =
+    useState<string | null>(null)
+  const [isExpenseStatementLoading, setIsExpenseStatementLoading] = useState(false)
   const deferredGigSearchQuery = useDeferredValue(gigSearchQuery)
+
+  const clearExpenseStatementPreviewUrl = useCallback(() => {
+    setExpenseStatementPreviewUrl((current) => {
+      if (current) {
+        window.URL.revokeObjectURL(current)
+      }
+
+      return null
+    })
+  }, [])
 
   const gigsById = useMemo(() => new Map(gigs.map((gig) => [gig.id, gig])), [gigs])
 
@@ -124,11 +168,38 @@ export function useGigsWorkspace({
       .sort((left, right) => left.date.localeCompare(right.date))
   }, [gigs, selectedGigIds])
 
+  const expenseStatementGigs = useMemo(() => {
+    const statementGigIdSet = new Set(expenseStatementGigIds)
+
+    return gigs
+      .filter((gig) => statementGigIdSet.has(gig.id))
+      .sort((left, right) => left.date.localeCompare(right.date))
+  }, [expenseStatementGigIds, gigs])
+
+  const expenseStatementSelectedExpenses = useMemo(() => {
+    const selectedExpenseIdSet = new Set(expenseStatementExpenseIds)
+    return expenseStatementGigs.flatMap((gig) =>
+      gig.expenses.filter((expense) => selectedExpenseIdSet.has(expense.id))
+    )
+  }, [expenseStatementExpenseIds, expenseStatementGigs])
+
+  const expenseStatementTotal = expenseStatementSelectedExpenses.reduce(
+    (total, expense) => total + expense.amount,
+    0
+  )
+
+  const expenseStatementReceiptCount = expenseStatementSelectedExpenses.reduce(
+    (count, expense) => count + expense.attachments.length,
+    0
+  )
+
   useEffect(() => {
     setSelectedGigIds((current) =>
       current.filter((gigId) => gigs.some((gig) => gig.id === gigId))
     )
   }, [gigs])
+
+  useEffect(() => clearExpenseStatementPreviewUrl, [clearExpenseStatementPreviewUrl])
 
   useEffect(() => {
     if (gigForm.clientId || clients.length === 0) {
@@ -158,7 +229,13 @@ export function useGigsWorkspace({
     setIsGigLoading(false)
     setGigExpenseAmount('')
     setGigExpenseDescription('')
-  }, [])
+    setIsExpenseStatementOpen(false)
+    setExpenseStatementGigIds([])
+    setExpenseStatementExpenseIds([])
+    setExpenseStatementStatus('')
+    clearExpenseStatementPreviewUrl()
+    setIsExpenseStatementLoading(false)
+  }, [clearExpenseStatementPreviewUrl])
 
   const mergeSavedGig = useCallback((savedGig: Gig) => {
     setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
@@ -776,11 +853,230 @@ export function useGigsWorkspace({
   }
 
   const handleToggleGigSelection = (gigId: string) => {
-    setSelectedGigIds((current) =>
-      current.includes(gigId)
-        ? current.filter((value) => value !== gigId)
-        : [...current, gigId]
+    const gig = gigsById.get(gigId)
+    if (!gig) {
+      return
+    }
+
+    setSelectedGigIds((current) => {
+      if (current.includes(gigId)) {
+        return current.filter((value) => value !== gigId)
+      }
+
+      const selectedClientId = current
+        .map((value) => gigsById.get(value)?.clientId)
+        .find((value): value is string => Boolean(value))
+
+      if (selectedClientId && selectedClientId !== gig.clientId) {
+        setGigStatus('Select gigs for one client at a time.')
+        return current
+      }
+
+      return [...current, gigId]
+    })
+  }
+
+  const openExpenseStatement = async () => {
+    const targetGigs = selectedGigs.length > 0 ? selectedGigs : selectedGig ? [selectedGig] : []
+    const clientIds = new Set(targetGigs.map((gig) => gig.clientId))
+
+    if (targetGigs.length === 0) {
+      setGigStatus('Select a gig before generating an expense statement.')
+      return
+    }
+
+    if (clientIds.size > 1) {
+      setGigStatus('Expense statements can only include gigs for one client.')
+      return
+    }
+
+    if (!targetGigs.some((gig) => gig.expenses.length > 0)) {
+      setGigStatus('Add expenses before generating an expense statement.')
+      return
+    }
+
+    const defaultExpenseIds = targetGigs.flatMap((gig) =>
+      gig.expenses
+        .filter((expense) => expense.reimbursementStatus === 'Unreimbursed')
+        .map((expense) => expense.id)
     )
+
+    setExpenseStatementGigIds(targetGigs.map((gig) => gig.id))
+    setExpenseStatementExpenseIds(defaultExpenseIds)
+    setIncludeStatementReceiptAttachments(true)
+    setIncludeStatementReceiptAppendix(true)
+    clearExpenseStatementPreviewUrl()
+    setExpenseStatementStatus(
+      defaultExpenseIds.length > 0
+        ? 'Review expenses before downloading the PDF.'
+        : 'All expenses are reimbursed or not claimable. Include at least one to download a statement.'
+    )
+    setIsExpenseStatementOpen(true)
+  }
+
+  const closeExpenseStatement = () => {
+    setIsExpenseStatementOpen(false)
+    setExpenseStatementStatus('')
+    clearExpenseStatementPreviewUrl()
+  }
+
+  const toggleExpenseStatementExpense = (expenseId: string) => {
+    setExpenseStatementExpenseIds((current) =>
+      current.includes(expenseId)
+        ? current.filter((value) => value !== expenseId)
+        : [...current, expenseId]
+    )
+    clearExpenseStatementPreviewUrl()
+  }
+
+  const updateIncludeStatementReceiptAttachments = (value: boolean) => {
+    setIncludeStatementReceiptAttachments(value)
+    if (!value) {
+      setIncludeStatementReceiptAppendix(false)
+    }
+    clearExpenseStatementPreviewUrl()
+  }
+
+  const updateIncludeStatementReceiptAppendix = (value: boolean) => {
+    setIncludeStatementReceiptAppendix(value)
+    clearExpenseStatementPreviewUrl()
+  }
+
+  const buildExpenseStatementPayload = () => {
+    const clientId = expenseStatementGigs[0]?.clientId ?? ''
+
+    return {
+      clientId,
+      gigIds: expenseStatementGigIds,
+      expenseIds: expenseStatementExpenseIds,
+      includeReceiptAttachments: includeStatementReceiptAttachments,
+      includeReceiptAppendix:
+        includeStatementReceiptAttachments && includeStatementReceiptAppendix,
+      includeReimbursedExpenses: true,
+    }
+  }
+
+  const previewExpenseStatement = async () => {
+    if (expenseStatementGigs.length === 0 || expenseStatementExpenseIds.length === 0) {
+      clearExpenseStatementPreviewUrl()
+      setExpenseStatementStatus('Select at least one expense to preview the statement.')
+      return null
+    }
+
+    setIsExpenseStatementLoading(true)
+    setExpenseStatementStatus('Preparing PDF preview...')
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/expense-statements/pdf'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(buildExpenseStatementPayload()),
+      })
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return null
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to preview the expense statement PDF.')
+      }
+
+      const blob = await response.blob()
+      const previewUrl = window.URL.createObjectURL(blob)
+      setExpenseStatementPreviewUrl((current) => {
+        if (current) {
+          window.URL.revokeObjectURL(current)
+        }
+
+        return previewUrl
+      })
+      setExpenseStatementStatus('PDF preview ready.')
+      return previewUrl
+    } catch (error) {
+      clearExpenseStatementPreviewUrl()
+      setExpenseStatementStatus(
+        error instanceof Error ? error.message : 'Unable to preview the expense statement PDF.'
+      )
+      return null
+    } finally {
+      setIsExpenseStatementLoading(false)
+    }
+  }
+
+  const downloadExpenseStatementPdf = async () => {
+    if (expenseStatementGigs.length === 0 || expenseStatementExpenseIds.length === 0) {
+      setExpenseStatementStatus('Select at least one expense to download a statement.')
+      return
+    }
+
+    const clientName =
+      clientNamesById.get(expenseStatementGigs[0].clientId) ?? 'Client'
+    const fallbackFilename = `Expense-Statement-${clientName}.pdf`
+    setIsExpenseStatementLoading(true)
+    setExpenseStatementStatus('Preparing expense statement PDF...')
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/expense-statements/pdf'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(buildExpenseStatementPayload()),
+      })
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to download the expense statement PDF.')
+      }
+
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = extractDownloadFilename(contentDisposition) ?? fallbackFilename
+      document.body.append(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(downloadUrl)
+      setExpenseStatementStatus(`Downloaded ${link.download}.`)
+      setGigStatus(`Downloaded ${link.download}.`)
+    } catch (error) {
+      setExpenseStatementStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to download the expense statement PDF.'
+      )
+    } finally {
+      setIsExpenseStatementLoading(false)
+    }
   }
 
   return {
@@ -790,6 +1086,14 @@ export function useGigsWorkspace({
     deleteExpenseAttachment,
     downloadExpenseAttachment,
     filteredGigs,
+    closeExpenseStatement,
+    downloadExpenseStatementPdf,
+    expenseStatementExpenseIds,
+    expenseStatementGigs,
+    expenseStatementPreviewUrl,
+    expenseStatementReceiptCount,
+    expenseStatementStatus,
+    expenseStatementTotal,
     gigExpenseAmount,
     gigExpenseDescription,
     gigForm,
@@ -802,10 +1106,14 @@ export function useGigsWorkspace({
     handleGigSubmit,
     handleToggleGigSelection,
     isGigEditorOpen,
+    isExpenseStatementLoading,
+    isExpenseStatementOpen,
     isGigLoading,
     mergeSavedGig,
     openGigReceiptDraft,
+    openExpenseStatement,
     plannedGigCount: gigs.filter((gig) => gig.status === 'Confirmed').length,
+    previewExpenseStatement,
     removeGigExpense,
     resetGigsWorkspace,
     selectedGig,
@@ -816,6 +1124,8 @@ export function useGigsWorkspace({
     setGigs,
     setGigSearchQuery,
     setGigStatus,
+    setIncludeStatementReceiptAppendix: updateIncludeStatementReceiptAppendix,
+    setIncludeStatementReceiptAttachments: updateIncludeStatementReceiptAttachments,
     setSelectedGigId,
     setSelectedGigIds,
     startGigCreate,
@@ -826,6 +1136,9 @@ export function useGigsWorkspace({
     updateGigField,
     updateExpenseReimbursement,
     uploadExpenseAttachment,
+    includeStatementReceiptAppendix,
+    includeStatementReceiptAttachments,
+    toggleExpenseStatementExpense,
   }
 }
 

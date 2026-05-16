@@ -29,8 +29,9 @@ type InvoicesSectionProps = {
   onDownloadPdf: (invoice: Invoice) => Promise<void>
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<void>
   onOpenSellerProfile: () => void
+  onPreviewPdf: (invoice: Invoice) => Promise<void>
   onPublishGoogleDrive: (invoice: Invoice) => Promise<void>
-  onReissue: (invoice: Invoice) => Promise<void>
+  onReissue: (invoice: Invoice) => Promise<Invoice | null>
   onSendEmail: (invoice: Invoice) => Promise<void>
   onSearchQueryChange: (value: string) => void
   onSelectInvoice: (invoiceId: string) => void
@@ -62,6 +63,7 @@ export function InvoicesSection({
   onDownloadPdf,
   onInvoiceStatusChange,
   onOpenSellerProfile,
+  onPreviewPdf,
   onPublishGoogleDrive,
   onReissue,
   onSendEmail,
@@ -187,6 +189,14 @@ export function InvoicesSection({
                 }
               >
                 {selectedInvoice?.status === 'Draft' ? 'Redraft' : 'Re-issue'}
+              </button>
+              <button
+                className="ghost-button"
+                onClick={() => selectedInvoice && void onPreviewPdf(selectedInvoice)}
+                type="button"
+                disabled={!selectedInvoice || isInvoiceLoading}
+              >
+                Preview
               </button>
               <button
                 className="ghost-button"

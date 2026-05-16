@@ -79,9 +79,10 @@ Expected result: the app asks whether to cancel the linked invoice. If accepted 
 1. Create two uninvoiced gigs for the same client.
 2. Select both gigs in the gig list.
 3. Generate a combined invoice.
-4. Open the invoice.
+4. Confirm the generated invoice preview modal opens.
+5. Download the PDF or open the invoice.
 
-Expected result: one invoice is created, both gigs are linked, and invoice lines are ordered sensibly by gig date and line type.
+Expected result: one invoice is created, both gigs are linked, invoice lines are ordered sensibly by gig date and line type, and the generated PDF can be previewed before navigating away.
 
 Negative check:
 
@@ -96,9 +97,10 @@ Expected result: the app blocks generation and explains that selected gigs must 
 2. Open the client.
 3. Choose the month.
 4. Generate a monthly invoice.
-5. Open the invoice and PDF.
+5. Confirm the generated invoice preview modal opens.
+6. Download the PDF or open the invoice.
 
-Expected result: the invoice is created as a draft, linked gigs remain linked, lines are generated after redraft, and the PDF downloads.
+Expected result: the invoice is created as a draft, linked gigs remain linked, lines are generated after redraft, and the PDF can be previewed and downloaded.
 
 ## Expense Receipt Journey
 
@@ -180,16 +182,52 @@ Expected result: mileage lines disappear while driving is disabled and return wh
 1. Create or identify multiple gigs for the same client with expenses.
 2. Include at least one receipt attachment.
 3. Mark one expense as `Reimbursed`.
-4. Request an expense statement preview for those gigs.
+4. Select the same-client gigs in the Gigs list.
+5. Open the expense statement workflow.
 
-Expected result: expenses are grouped by gig, totals are correct, receipt attachment metadata appears when requested, and reimbursed expenses are excluded by default.
+Expected result: the expense statement modal opens, expenses are grouped by gig, reimbursed or not-claimable expenses are visually distinct, and reimbursed expenses are excluded by default.
 
 Then:
 
-1. Include reimbursed expenses in the request.
-2. Download the PDF with receipt appendix enabled.
+1. Select the reimbursed expense in the modal.
+2. Toggle receipt attachment and receipt appendix options.
+3. Preview the PDF.
+4. Download the PDF.
 
-Expected result: reimbursed expenses appear only when requested, the PDF downloads, and the receipt appendix lists attachment metadata.
+Expected result: selected reimbursed expenses appear in the statement, receipt options affect the generated preview/download, the embedded PDF preview loads in the modal, and the downloaded PDF matches the preview.
+
+Negative checks:
+
+1. Select a gig for one client.
+2. Try to select a gig for a different client.
+
+Expected result: the app prevents mixed-client selections before generating the statement.
+
+Then:
+
+1. Open a gig with no expenses.
+2. Try to launch an expense statement.
+
+Expected result: the app explains that expenses are needed before a statement can be generated. No invoice state changes.
+
+## Invoice Preview Journey
+
+1. Generate an invoice from a gig or from selected gigs.
+2. Confirm the invoice preview modal opens immediately.
+3. Download the PDF from the modal.
+4. Open the invoice from the modal.
+5. Use the invoice pane `Preview` button.
+
+Expected result: the same invoice PDF can be previewed reactively from the invoice pane, downloaded from the modal, and opened in the invoice workspace.
+
+Then:
+
+1. Redraft a draft invoice.
+2. Confirm the regenerated PDF preview modal opens after redraft.
+3. Re-issue an issued invoice.
+4. Confirm the regenerated PDF preview modal opens after re-issue.
+
+Expected result: redraft and re-issue update the PDF, preserve the expected invoice history rules, and show the latest PDF in the preview modal.
 
 ## Invoice Status And Delivery Journey
 

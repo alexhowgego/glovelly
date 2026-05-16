@@ -209,7 +209,7 @@ export function useInvoicesWorkspace({
         : `Re-issue ${invoice.invoiceNumber}? This will regenerate the document and log the action.`
     )
     if (!shouldProceed) {
-      return
+      return null
     }
 
     setIsInvoiceLoading(true)
@@ -245,10 +245,13 @@ export function useInvoicesWorkspace({
         const reissuedAt = formatDateTime(updatedInvoice.lastReissuedUtc)
         setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
       }
+
+      return updatedInvoice
     } catch (error) {
       setInvoiceStatus(
         error instanceof Error ? error.message : `Unable to ${actionLabel.toLowerCase()} invoice.`
       )
+      return null
     } finally {
       setIsInvoiceLoading(false)
     }

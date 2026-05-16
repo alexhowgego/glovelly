@@ -29,6 +29,7 @@ type GigsSectionProps = {
   onCloseEditor: () => void
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
+  onGenerateExpenseStatement: () => void
   onGenerateInvoice: () => void
   onDownloadExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onOpenLinkedInvoice: () => void
@@ -82,6 +83,7 @@ export function GigsSection({
   onCloseEditor,
   onExpenseAmountChange,
   onExpenseDescriptionChange,
+  onGenerateExpenseStatement,
   onGenerateInvoice,
   onDownloadExpenseAttachment,
   onOpenLinkedInvoice,
@@ -107,6 +109,7 @@ export function GigsSection({
 }: GigsSectionProps) {
   const selectedGigClientName =
     (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
+  const selectedClientId = selectedGigs[0]?.clientId ?? null
   const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
 
   return (
@@ -151,6 +154,11 @@ export function GigsSection({
           <div className="client-list">
             {filteredGigs.map((gig) => {
               const clientName = clientNamesById.get(gig.clientId) ?? 'Unknown client'
+              const isDifferentSelectedClient =
+                Boolean(selectedClientId) &&
+                selectedClientId !== gig.clientId &&
+                !selectedGigIds.includes(gig.id)
+              const isSelectionDisabled = gig.isInvoiced || isDifferentSelectedClient
 
               return (
                 <button
@@ -166,10 +174,16 @@ export function GigsSection({
                     <input
                       type="checkbox"
                       checked={selectedGigIds.includes(gig.id)}
-                      disabled={gig.isInvoiced}
+                      disabled={isSelectionDisabled}
                       onChange={() => onToggleGigSelection(gig.id)}
                     />
-                    <span>{gig.isInvoiced ? 'Invoiced' : 'Select'}</span>
+                    <span>
+                      {gig.isInvoiced
+                        ? 'Invoiced'
+                        : isDifferentSelectedClient
+                          ? 'Different client'
+                          : 'Select'}
+                    </span>
                   </label>
                   <div>
                     <strong>{gig.title}</strong>
@@ -217,6 +231,23 @@ export function GigsSection({
                   : selectedGig?.isInvoiced
                     ? 'Already invoiced'
                     : 'Generate invoice'}
+              </button>
+              <button
+                className="ghost-button"
+                onClick={onGenerateExpenseStatement}
+                type="button"
+                disabled={
+                  isGigLoading ||
+                  !selectedGig ||
+                  hasCrossClientSelection ||
+                  (selectedGigIds.length > 0
+                    ? selectedGigs.every((gig) => gig.expenses.length === 0)
+                    : selectedGig.expenses.length === 0)
+                }
+              >
+                {selectedGigIds.length > 0
+                  ? `Expense statement (${selectedGigIds.length})`
+                  : 'Expense statement'}
               </button>
               <button
                 className="ghost-button"

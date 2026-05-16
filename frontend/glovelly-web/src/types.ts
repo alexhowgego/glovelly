@@ -142,6 +142,42 @@ export type GigExpense = {
   attachments: ExpenseAttachment[]
 }
 
+export type ExpenseStatementGig = {
+  gigId: string
+  title: string
+  date: string
+  venue: string
+  isInvoiced: boolean
+  expenses: ExpenseStatementExpense[]
+  total: number
+}
+
+export type ExpenseStatementExpense = {
+  expenseId: string
+  description: string
+  amount: number
+  sortOrder: number
+  attachments: ExpenseStatementAttachment[]
+}
+
+export type ExpenseStatementAttachment = {
+  attachmentId: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+  createdAt: string
+}
+
+export type ExpenseStatementProjection = {
+  clientId: string
+  clientName: string
+  statementDate: string
+  gigs: ExpenseStatementGig[]
+  total: number
+  expenseCount: number
+  receiptAttachmentCount: number
+}
+
 export type GigExpenseForm = {
   id: string
   sortOrder: number
