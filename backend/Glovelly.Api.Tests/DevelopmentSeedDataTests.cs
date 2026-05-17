@@ -121,6 +121,10 @@ public sealed class DevelopmentSeedDataTests
     {
         return new InvoiceWorkflowService(
             dbContext,
+            new InvoiceNumberService(dbContext),
+            new InvoiceLineGenerationService(dbContext),
+            new InvoiceProfileDefaultsService(dbContext),
+            new InvoicePdfRenderer(),
             new InvoicePdfService(new InMemoryBlobStore(), TimeProvider.System));
     }
 

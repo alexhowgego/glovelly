@@ -14,6 +14,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AccessRequestRetentionService>();
         services.AddScoped<IExpenseStatementBuilder, ExpenseStatementBuilder>();
         services.AddScoped<IExpenseStatementPdfRenderer, ExpenseStatementPdfRenderer>();
+        services.AddScoped<IInvoiceNumberService, InvoiceNumberService>();
+        services.AddScoped<IInvoiceLineGenerationService, InvoiceLineGenerationService>();
+        services.AddScoped<IInvoiceProfileDefaultsService, InvoiceProfileDefaultsService>();
+        services.AddScoped<IInvoicePdfRenderer, InvoicePdfRenderer>();
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
