@@ -128,6 +128,7 @@ jobs:
           image: ${{ env.IMAGE_URI }}:sha-${{ github.sha }}
           env_vars: |-
             App__DeploymentName=${{ vars.DEPLOYMENT_NAME }}
+            BlobStorage__BucketName=${{ vars.GCP_BUCKET_NAME }}
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly
             Email__Invoices__FromDisplayName=Glovelly

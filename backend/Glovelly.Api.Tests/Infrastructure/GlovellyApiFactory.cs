@@ -51,6 +51,7 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IEmailSender>();
+            services.RemoveAll<IBlobStore>();
             services.RemoveAll<IExpenseAttachmentStore>();
 
             if (!_useRealAuthentication)
@@ -60,7 +61,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             }
 
             services.AddSingleton<IEmailSender>(_fakeEmailSender);
-            services.AddSingleton<IExpenseAttachmentStore, InMemoryExpenseAttachmentStore>();
+            services.AddSingleton<IBlobStore, InMemoryBlobStore>();
+            services.AddSingleton<IExpenseAttachmentStore, ExpenseAttachmentStore>();
             services.PostConfigure<EmailSettings>(settings =>
             {
                 settings.AccessRequests.FromAddress = "access@glovelly.test";

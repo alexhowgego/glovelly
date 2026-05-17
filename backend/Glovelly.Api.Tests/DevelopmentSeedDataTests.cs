@@ -41,7 +41,7 @@ public sealed class DevelopmentSeedDataTests
             Assert.True(attachmentContent.Length > 0);
         }
 
-        var workflowService = new InvoiceWorkflowService(dbContext);
+        var workflowService = CreateWorkflowService(dbContext);
         var lunchExpense = gig.Expenses.Single(expense => expense.Description == "Lunch");
         lunchExpense.ReimbursementStatus = GigExpenseReimbursementStatus.Unreimbursed;
         lunchExpense.ReimbursedAt = null;
@@ -82,7 +82,7 @@ public sealed class DevelopmentSeedDataTests
         var gig = await dbContext.Gigs
             .Include(value => value.Expenses)
             .SingleAsync(value => value.InvoiceId == invoice.Id);
-        var workflowService = new InvoiceWorkflowService(dbContext);
+        var workflowService = CreateWorkflowService(dbContext);
 
         Assert.True(gig.WasDriving);
         Assert.True(gig.TravelMiles > 0);
@@ -115,6 +115,13 @@ public sealed class DevelopmentSeedDataTests
             .Options;
 
         return new AppDbContext(options);
+    }
+
+    private static InvoiceWorkflowService CreateWorkflowService(AppDbContext dbContext)
+    {
+        return new InvoiceWorkflowService(
+            dbContext,
+            new InvoicePdfService(new InMemoryBlobStore(), TimeProvider.System));
     }
 
     private static IConfiguration CreateSeedConfiguration()

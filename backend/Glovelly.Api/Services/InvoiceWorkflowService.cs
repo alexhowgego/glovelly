@@ -6,7 +6,9 @@ using System.Text;
 
 namespace Glovelly.Api.Services;
 
-public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWorkflowService
+public sealed class InvoiceWorkflowService(
+    AppDbContext dbContext,
+    IInvoicePdfService invoicePdfService) : IInvoiceWorkflowService
 {
     private const int DefaultPaymentWindowDays = 14;
 
@@ -40,7 +42,11 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         var generatedLines = await BuildGeneratedInvoiceLinesForGigAsync(gig, userId, cancellationToken);
         invoice.Lines = generatedLines;
         var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
-        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, gig, generatedLines, sellerProfile);
+        await invoicePdfService.SaveGeneratedPdfAsync(
+            invoice,
+            userId,
+            GenerateInvoicePdf(invoice, client, gig, generatedLines, sellerProfile),
+            cancellationToken);
 
         dbContext.Invoices.Add(invoice);
 
@@ -114,7 +120,11 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         }
 
         var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
-        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
+        await invoicePdfService.SaveGeneratedPdfAsync(
+            invoice,
+            userId,
+            GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
+            cancellationToken);
         StampUpdate(invoice, userId);
     }
 
@@ -130,7 +140,11 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         invoice.InvoiceDate = invoiceDate;
         invoice.DueDate = invoiceDate.AddDays(paymentWindowDays);
         var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
-        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
+        await invoicePdfService.SaveGeneratedPdfAsync(
+            invoice,
+            userId,
+            GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
+            cancellationToken);
         invoice.Status = InvoiceStatus.Draft;
         invoice.StatusUpdatedUtc = reissuedUtc;
         invoice.ReissueCount += 1;
@@ -151,7 +165,11 @@ public sealed class InvoiceWorkflowService(AppDbContext dbContext) : IInvoiceWor
         invoice.InvoiceDate = invoiceDate;
         invoice.DueDate = invoiceDate.AddDays(paymentWindowDays);
         var sellerProfile = await ResolveSellerProfileAsync(userId, cancellationToken);
-        invoice.PdfBlob = GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile);
+        await invoicePdfService.SaveGeneratedPdfAsync(
+            invoice,
+            userId,
+            GenerateInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
+            cancellationToken);
         invoice.Status = InvoiceStatus.Draft;
         StampUpdate(invoice, userId);
     }

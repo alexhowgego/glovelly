@@ -324,6 +324,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(invoice => invoice.Description)
                 .HasMaxLength(4000);
             entity.Property(invoice => invoice.PdfBlob);
+            entity.Property(invoice => invoice.PdfStorageKey)
+                .HasMaxLength(600);
+            entity.Property(invoice => invoice.PdfFileName)
+                .HasMaxLength(255);
+            entity.Property(invoice => invoice.PdfContentType)
+                .HasMaxLength(100);
+            entity.HasIndex(invoice => invoice.PdfStorageKey)
+                .IsUnique();
 
             entity.HasOne(invoice => invoice.CreatedByUser)
                 .WithMany(user => user.InvoicesCreated)

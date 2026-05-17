@@ -15,30 +15,41 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IExpenseStatementBuilder, ExpenseStatementBuilder>();
         services.AddScoped<IExpenseStatementPdfRenderer, ExpenseStatementPdfRenderer>();
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
+        services.AddScoped<IInvoicePdfService, InvoicePdfService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceEmailDeliveryChannel>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceGoogleDriveDeliveryChannel>();
+        services.AddOptions<BlobStorageSettings>()
+            .BindConfiguration(BlobStorageSettings.SectionName)
+            .PostConfigure<IOptions<ExpenseAttachmentSettings>>((blobSettings, expenseAttachmentOptions) =>
+            {
+                if (string.IsNullOrWhiteSpace(blobSettings.BucketName))
+                {
+                    blobSettings.BucketName = expenseAttachmentOptions.Value.BucketName;
+                }
+            });
         services.AddOptions<ExpenseAttachmentSettings>()
             .BindConfiguration(ExpenseAttachmentSettings.SectionName);
         services.AddOptions<QuickReceiptCaptureSettings>()
             .BindConfiguration(QuickReceiptCaptureSettings.SectionName);
-        services.AddSingleton<IExpenseAttachmentStore>(provider =>
+        services.AddSingleton<IBlobStore>(provider =>
         {
-            var settings = provider.GetRequiredService<IOptions<ExpenseAttachmentSettings>>().Value;
+            var settings = provider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;
             if (string.IsNullOrWhiteSpace(settings.BucketName))
             {
                 var startupSettings = provider.GetRequiredService<StartupSettings>();
                 if (!startupSettings.IsDevelopment)
                 {
                     throw new InvalidOperationException(
-                        "Expense attachment storage requires ExpenseAttachments:BucketName outside local development.");
+                        "Blob storage requires BlobStorage:BucketName outside local development.");
                 }
 
-                return new InMemoryExpenseAttachmentStore();
+                return new InMemoryBlobStore();
             }
 
-            return ActivatorUtilities.CreateInstance<GcsExpenseAttachmentStore>(provider, StorageClient.Create());
+            return ActivatorUtilities.CreateInstance<GcsBlobStore>(provider, StorageClient.Create());
         });
+        services.AddSingleton<IExpenseAttachmentStore, ExpenseAttachmentStore>();
         services.AddOptions<ResendClientOptions>()
             .Configure<IOptions<EmailSettings>>((resendOptions, emailOptions) =>
             {

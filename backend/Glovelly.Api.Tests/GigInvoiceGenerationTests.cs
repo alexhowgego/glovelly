@@ -65,18 +65,18 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal(TestData.FoxAndFinchId, invoice.GetProperty("clientId").GetGuid());
         Assert.Equal("In respect of One-off corporate booking at King's House on 2026-06-20.", invoice.GetProperty("description").GetString());
         Assert.False(string.IsNullOrWhiteSpace(invoice.GetProperty("invoiceNumber").GetString()));
-        Assert.False(string.IsNullOrWhiteSpace(invoice.GetProperty("pdfBlob").GetString()));
+        Assert.Equal(JsonValueKind.Null, invoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Contains(
+            $"/invoices/{invoice.GetProperty("id").GetGuid():D}/invoice.pdf",
+            invoice.GetProperty("pdfStorageKey").GetString());
+        Assert.Equal("application/pdf", invoice.GetProperty("pdfContentType").GetString());
+        Assert.True(invoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
+        Assert.Equal(JsonValueKind.String, invoice.GetProperty("pdfGeneratedAt").ValueKind);
         var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         Assert.Equal(today, invoice.GetProperty("invoiceDate").GetString());
         Assert.Equal(
             DateOnly.FromDateTime(DateTime.UtcNow).AddDays(14).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             invoice.GetProperty("dueDate").GetString());
-
-        var initialPdfText = Encoding.ASCII.GetString(
-            Convert.FromBase64String(invoice.GetProperty("pdfBlob").GetString()!));
-        Assert.Contains("Glovelly Music Ltd", initialPdfText);
-        Assert.Contains("Account number: 12345678", initialPdfText);
-        Assert.Contains("Payment note: Use the invoice number as your reference.", initialPdfText);
 
         var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
         Assert.Equal(3, lines.Length);
@@ -116,6 +116,8 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Contains("Total due", pdfText);
         Assert.Contains("Payment details", pdfText);
         Assert.Contains("Glovelly Music Ltd", pdfText);
+        Assert.Contains("Account number: 12345678", pdfText);
+        Assert.Contains("Payment note: Use the invoice number as your reference.", pdfText);
         Assert.Contains("Performance fee for One-off corporate booking", pdfText);
         Assert.Contains(
             $"GBP {invoice.GetProperty("total").GetDecimal().ToString("0.00", CultureInfo.InvariantCulture)}",
@@ -349,7 +351,9 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 
         Assert.Equal(HttpStatusCode.OK, redraftResponse.StatusCode);
         var redraftedInvoice = await redraftResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-        Assert.Equal(JsonValueKind.String, redraftedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal(JsonValueKind.Null, redraftedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal("application/pdf", redraftedInvoice.GetProperty("pdfContentType").GetString());
+        Assert.True(redraftedInvoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
         Assert.Equal(2, redraftedInvoice.GetProperty("lines").GetArrayLength());
         var lines = redraftedInvoice.GetProperty("lines").EnumerateArray().ToArray();
         Assert.Contains(lines, line => line.GetProperty("description").GetString()!.Contains("Monthly draft first gig"));

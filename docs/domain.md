@@ -33,8 +33,22 @@
 - reissueCount
 - lastReissuedUtc?
 - lastReissuedByUserId?
+- pdfStorageKey?
+- pdfFileName?
+- pdfContentType?
+- pdfSizeBytes?
+- pdfGeneratedAt?
+- pdfBlob? (legacy fallback during migration)
 - subtotal
 - notes
+
+Generated invoice PDFs are written through the domain-agnostic blob store using an invoice-layer key:
+
+```text
+users/{userId}/invoices/{invoiceId}/invoice.pdf
+```
+
+During the migration, download and delivery paths prefer `pdfStorageKey` and fall back to `pdfBlob` for older invoices. The backfill path is to enumerate invoices where `pdfBlob` is present and `pdfStorageKey` is null, save each blob through `IBlobStore` with the same key shape, populate the PDF metadata, verify downloads/delivery, and remove `pdfBlob` in a later cleanup.
 
 ## InvoiceLine
 - id

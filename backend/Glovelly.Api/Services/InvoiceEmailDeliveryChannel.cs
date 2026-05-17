@@ -8,6 +8,7 @@ namespace Glovelly.Api.Services;
 public sealed class InvoiceEmailDeliveryChannel(
     IEmailSender emailSender,
     IExpenseAttachmentStore expenseAttachmentStore,
+    IInvoicePdfService invoicePdfService,
     IOptions<EmailSettings> emailSettingsAccessor) : IInvoiceDeliveryChannel
 {
     public InvoiceDeliveryChannel Channel => InvoiceDeliveryChannel.Email;
@@ -23,11 +24,6 @@ public sealed class InvoiceEmailDeliveryChannel(
         if (string.IsNullOrWhiteSpace(client.Email))
         {
             throw new InvalidOperationException("Invoice recipient email is missing.");
-        }
-
-        if (invoice.PdfBlob is null || invoice.PdfBlob.Length == 0)
-        {
-            throw new InvalidOperationException("Invoice PDF is missing.");
         }
 
         var configuredFrom = EmailSenderSupport.ResolveConfiguredFromAddress(
@@ -58,12 +54,18 @@ public sealed class InvoiceEmailDeliveryChannel(
         InvoiceDeliveryRequest request,
         CancellationToken cancellationToken)
     {
+        var invoicePdf = await invoicePdfService.OpenReadAsync(request.Invoice, cancellationToken)
+            ?? throw new InvalidOperationException("Invoice PDF is missing.");
+        await using var invoicePdfContent = invoicePdf.Content;
+        using var invoicePdfMemory = new MemoryStream();
+        await invoicePdf.Content.CopyToAsync(invoicePdfMemory, cancellationToken);
+
         var attachments = new List<EmailAttachment>
         {
             new(
                 request.AttachmentFileName,
-                "application/pdf",
-                request.Invoice.PdfBlob!)
+                invoicePdf.ContentType,
+                invoicePdfMemory.ToArray())
         };
 
         if (request.ExpenseReceiptAttachments.Count > 0)
