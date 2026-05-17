@@ -12,94 +12,26 @@ internal static class GigInvoiceEndpoints
     {
         group.MapPost("/generate-invoice", async (
             GenerateInvoiceFromGigSelectionRequest request,
-            AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceWorkflowService invoiceWorkflowService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
-            var gigIds = request.GigIds
-                .Where(id => id != Guid.Empty)
-                .Distinct()
-                .ToList();
+            var result = await invoiceWorkflowService.GenerateInvoiceFromGigSelectionAsync(request.GigIds, userId);
 
-            if (gigIds.Count == 0)
+            return result.Status switch
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["gigIds"] = ["Select at least one gig."]
-                });
-            }
-
-            var gigs = await db.Gigs
-                .WhereVisibleTo(userId)
-                .Include(value => value.Client)
-                .Include(value => value.Expenses)
-                .Where(value => gigIds.Contains(value.Id))
-                .OrderBy(value => value.Date)
-                .ThenBy(value => value.Title)
-                .ToListAsync();
-
-            if (gigs.Count != gigIds.Count)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["gigIds"] = ["One or more selected gigs do not exist."]
-                });
-            }
-
-            if (gigs.Any(gig => gig.InvoiceId.HasValue))
-            {
-                return Results.Conflict(new
-                {
-                    message = "All selected gigs must be uninvoiced before creating a combined invoice.",
-                });
-            }
-
-            var distinctClientIds = gigs
-                .Select(gig => gig.ClientId)
-                .Distinct()
-                .ToList();
-
-            if (distinctClientIds.Count != 1)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["gigIds"] = ["Selected gigs must all belong to the same client."]
-                });
-            }
-
-            var client = gigs[0].Client;
-            if (client is null)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
-            }
-
-            var firstGig = gigs[0];
-            var invoice = await invoiceWorkflowService.GenerateInvoiceForGigAsync(firstGig, client, userId);
-
-            foreach (var gig in gigs.Skip(1))
-            {
-                gig.InvoiceId = invoice.Id;
-                gig.InvoicedAt = DateTimeOffset.UtcNow;
-                EndpointSupport.StampUpdate(gig, userId);
-                await invoiceWorkflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, userId);
-            }
-
-            await db.SaveChangesAsync();
-
-            var refreshedInvoice = await db.Invoices
-                .WhereVisibleTo(userId)
-                .Include(value => value.Lines)
-                .FirstAsync(value => value.Id == invoice.Id);
-
-            await invoiceWorkflowService.RedraftInvoiceAsync(refreshedInvoice, client, userId);
-            await db.SaveChangesAsync();
-
-            return Results.Created($"/invoices/{refreshedInvoice.Id}", refreshedInvoice);
+                GenerateInvoiceFromGigSelectionStatus.Created =>
+                    Results.Created($"/invoices/{result.Invoice!.Id}", result.Invoice),
+                GenerateInvoiceFromGigSelectionStatus.Conflict =>
+                    Results.Conflict(new
+                    {
+                        message = result.ConflictMessage,
+                    }),
+                GenerateInvoiceFromGigSelectionStatus.ValidationFailed =>
+                    Results.ValidationProblem(result.ValidationErrors!),
+                _ => Results.Problem()
+            };
         });
 
         group.MapPost("/{id:guid}/generate-invoice", async (

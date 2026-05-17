@@ -12,6 +12,85 @@ public sealed class InvoiceWorkflowService(
 {
     private const int DefaultPaymentWindowDays = 14;
 
+    public async Task<GenerateInvoiceFromGigSelectionResult> GenerateInvoiceFromGigSelectionAsync(
+        IReadOnlyCollection<Guid> gigIds,
+        Guid? userId,
+        CancellationToken cancellationToken = default)
+    {
+        var selectedGigIds = gigIds
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+
+        if (selectedGigIds.Count == 0)
+        {
+            return ValidationFailed("gigIds", "Select at least one gig.");
+        }
+
+        var gigs = await dbContext.Gigs
+            .Where(gig => gig.CreatedByUserId == null || gig.CreatedByUserId == userId)
+            .Include(gig => gig.Client)
+            .Include(gig => gig.Expenses)
+            .Where(gig => selectedGigIds.Contains(gig.Id))
+            .OrderBy(gig => gig.Date)
+            .ThenBy(gig => gig.Title)
+            .ToListAsync(cancellationToken);
+
+        if (gigs.Count != selectedGigIds.Count)
+        {
+            return ValidationFailed("gigIds", "One or more selected gigs do not exist.");
+        }
+
+        if (gigs.Any(gig => gig.InvoiceId.HasValue))
+        {
+            return new GenerateInvoiceFromGigSelectionResult(
+                GenerateInvoiceFromGigSelectionStatus.Conflict,
+                ConflictMessage: "All selected gigs must be uninvoiced before creating a combined invoice.");
+        }
+
+        var distinctClientIds = gigs
+            .Select(gig => gig.ClientId)
+            .Distinct()
+            .ToList();
+
+        if (distinctClientIds.Count != 1)
+        {
+            return ValidationFailed("gigIds", "Selected gigs must all belong to the same client.");
+        }
+
+        var client = gigs[0].Client;
+        if (client is null)
+        {
+            return ValidationFailed("clientId", "Client does not exist.");
+        }
+
+        var firstGig = gigs[0];
+        var invoice = await GenerateInvoiceForGigAsync(firstGig, client, userId, cancellationToken);
+
+        foreach (var gig in gigs.Skip(1))
+        {
+            gig.InvoiceId = invoice.Id;
+            gig.InvoicedAt = DateTimeOffset.UtcNow;
+            StampUpdate(gig, userId);
+            await SyncGeneratedInvoiceLinesForGigAsync(gig, userId, cancellationToken);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var invoiceId = invoice.Id;
+        var refreshedInvoice = await dbContext.Invoices
+            .Where(invoice => invoice.CreatedByUserId == null || invoice.CreatedByUserId == userId)
+            .Include(invoice => invoice.Lines)
+            .FirstAsync(value => value.Id == invoiceId, cancellationToken);
+
+        await RedraftInvoiceAsync(refreshedInvoice, client, userId, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new GenerateInvoiceFromGigSelectionResult(
+            GenerateInvoiceFromGigSelectionStatus.Created,
+            Invoice: refreshedInvoice);
+    }
+
     public async Task<Invoice> GenerateInvoiceForGigAsync(
         Gig gig,
         Client client,
@@ -51,6 +130,18 @@ public sealed class InvoiceWorkflowService(
         dbContext.Invoices.Add(invoice);
 
         return invoice;
+    }
+
+    private static GenerateInvoiceFromGigSelectionResult ValidationFailed(
+        string field,
+        string message)
+    {
+        return new GenerateInvoiceFromGigSelectionResult(
+            GenerateInvoiceFromGigSelectionStatus.ValidationFailed,
+            ValidationErrors: new Dictionary<string, string[]>
+            {
+                [field] = [message]
+            });
     }
 
     public async Task SyncGeneratedInvoiceLinesForGigAsync(
