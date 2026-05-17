@@ -148,6 +148,7 @@ function App({ appMetadata }: AppProps) {
     adminStatus,
     adminUsers,
     closeAdminEditor,
+    deleteAdminUser,
     filteredAdminUsers,
     handleAdminSubmit,
     isAdminEditorOpen,
@@ -204,6 +205,7 @@ function App({ appMetadata }: AppProps) {
     closeGigEditor,
     closeExpenseStatement,
     completedGigCount,
+    deleteGig,
     deleteExpenseAttachment,
     downloadExpenseAttachment,
     downloadExpenseStatementPdf,
@@ -1276,6 +1278,7 @@ function App({ appMetadata }: AppProps) {
         filteredAdminUsers={filteredAdminUsers}
         isAdminLoading={isAdminLoading}
         onCloseEditor={closeAdminEditor}
+        onDeleteUser={deleteAdminUser}
         onResetForm={startAdminCreate}
         onSearchQueryChange={setAdminSearchQuery}
         onSelectUser={selectAdminUser}
@@ -1307,6 +1310,7 @@ function App({ appMetadata }: AppProps) {
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateExpenseStatement={openExpenseStatement}
         onGenerateInvoice={handleGenerateInvoice}
+        onDeleteGig={deleteGig}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
         onOpenLinkedInvoice={openSelectedGigInvoice}
         onOpenSellerProfile={openSellerProfile}

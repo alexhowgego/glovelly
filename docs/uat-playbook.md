@@ -117,6 +117,26 @@ Expected result: if the linked invoice is a draft, the app asks whether to regen
 
 Expected result: the app asks whether to cancel the linked invoice. If accepted and the invoice status allows cancellation, the invoice moves to `Cancelled`. If declined, the gig is cancelled but the invoice remains unchanged.
 
+## Deleting A Gig
+
+1. Create or identify an uninvoiced gig with status `Planned`.
+2. Select the gig in Gigs.
+3. Confirm the `Delete gig` button is red and enabled.
+4. Click `Delete gig` and decline the confirmation prompt.
+5. Confirm the gig remains in the list.
+6. Click `Delete gig` again and accept the confirmation prompt.
+
+Expected result: the planned, uninvoiced gig is removed from the list and cannot be reopened.
+
+Negative checks:
+
+1. Select a gig with status `Draft`, `Completed`, or `Cancelled`.
+2. Confirm `Delete gig` is disabled and explains that only planned gigs can be deleted.
+3. Select a planned gig that is linked to an invoice.
+4. Confirm `Delete gig` is disabled and explains that gigs with linked invoices cannot be deleted.
+
+Expected result: only planned gigs with no linked invoice can be deleted. Linked invoice history is never removed by deleting a gig.
+
 ## Combined Invoice Journey
 
 1. Create two uninvoiced gigs for the same client.
@@ -307,6 +327,18 @@ For admin users:
 5. Confirm the user list updates.
 
 Expected result: admin changes persist and non-admin users cannot access admin workflows.
+
+Then test inactive user deletion:
+
+1. Select an active user.
+2. Confirm the `Delete user` button is red and disabled.
+3. Edit that user, mark the account inactive, and save.
+4. Confirm `Delete user` is enabled.
+5. Click `Delete user` and decline the confirmation prompt.
+6. Confirm the user remains in the list.
+7. Click `Delete user` again and accept the confirmation prompt.
+
+Expected result: only inactive users can be deleted. Active users, including the current administrator account, cannot be deleted.
 
 ## Regression Notes
 

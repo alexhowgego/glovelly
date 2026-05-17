@@ -282,6 +282,22 @@ internal static class GigCrudEndpoints
                 return Results.NotFound();
             }
 
+            if (gig.Status != GigStatus.Confirmed)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Only planned gigs can be deleted."]
+                });
+            }
+
+            if (gig.InvoiceId.HasValue)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["invoiceId"] = ["Gigs with linked invoices cannot be deleted."]
+                });
+            }
+
             foreach (var attachment in gig.Expenses.SelectMany(expense => expense.Attachments).ToList())
             {
                 await attachmentStore.DeleteAsync(attachment.StorageKey);

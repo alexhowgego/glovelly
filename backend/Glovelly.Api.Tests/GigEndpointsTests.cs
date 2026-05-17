@@ -906,4 +906,93 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             "Status is invalid.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
     }
+
+    [Fact]
+    public async Task DeleteGig_WhenPlanned_DeletesGig()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Delete planned gig",
+            date = "2026-07-14",
+            venue = "Botanical Gardens",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = "Confirmed",
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var getResponse = await _client.GetAsync($"/gigs/{gigId}");
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteGig_WhenNotPlanned_ReturnsValidationProblem()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Keep completed gig",
+            date = "2026-07-15",
+            venue = "Botanical Gardens",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = "Completed",
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+
+        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Only planned gigs can be deleted.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+
+        var getResponse = await _client.GetAsync($"/gigs/{gigId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteGig_WhenLinkedToInvoice_ReturnsValidationProblem()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Keep invoiced planned gig",
+            date = "2026-07-16",
+            venue = "Botanical Gardens",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = "Confirmed",
+            invoiceId = TestData.FoxInvoiceId,
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+
+        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Gigs with linked invoices cannot be deleted.",
+            problem.GetProperty("errors").GetProperty("invoiceId")[0].GetString());
+
+        var getResponse = await _client.GetAsync($"/gigs/{gigId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+    }
 }

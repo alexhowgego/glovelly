@@ -543,6 +543,72 @@ export function useGigsWorkspace({
     }
   }
 
+  const deleteGig = async () => {
+    if (!selectedGig) {
+      return
+    }
+
+    if (selectedGig.status !== 'Confirmed') {
+      setGigStatus('Only planned gigs can be deleted.')
+      return
+    }
+
+    if (selectedGig.isInvoiced) {
+      setGigStatus('Gigs with linked invoices cannot be deleted.')
+      return
+    }
+
+    if (
+      !window.confirm(
+        `Delete ${selectedGig.title}? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setIsGigLoading(true)
+
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/gigs/${selectedGig.id}`), {
+        method: 'DELETE',
+      })
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to delete gig.')
+      }
+
+      const nextGigs = gigs.filter((gig) => gig.id !== selectedGig.id)
+      setGigs(nextGigs)
+      setSelectedGigId(nextGigs[0]?.id ?? '')
+      setSelectedGigIds((current) => current.filter((gigId) => gigId !== selectedGig.id))
+      setIsGigEditorOpen(false)
+      setGigMode('create')
+      setGigForm(toCreateGigForm(clients))
+      setGigExpenseAmount('')
+      setGigExpenseDescription('')
+      setGigStatus('Gig deleted.')
+    } catch (error) {
+      setGigStatus(error instanceof Error ? error.message : 'Unable to delete gig.')
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
   const updateExpenseReimbursement = async (
     expense: GigExpenseForm,
     status: GigExpenseReimbursementStatus
@@ -1136,6 +1202,7 @@ export function useGigsWorkspace({
     applyGigs,
     closeGigEditor,
     completedGigCount: gigs.filter((gig) => gig.status === 'Completed').length,
+    deleteGig,
     deleteExpenseAttachment,
     downloadExpenseAttachment,
     filteredGigs,

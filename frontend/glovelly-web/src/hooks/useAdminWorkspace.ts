@@ -276,6 +276,72 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
     }
   }
 
+  const deleteAdminUser = async () => {
+    if (!selectedAdminUser) {
+      return
+    }
+
+    if (selectedAdminUser.isActive) {
+      setAdminStatus('Only inactive users can be deleted.')
+      return
+    }
+
+    if (
+      !window.confirm(
+        `Delete ${selectedAdminUser.displayName || selectedAdminUser.email}? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setIsAdminLoading(true)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/admin/users/${selectedAdminUser.id}`),
+        {
+          method: 'DELETE',
+        }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing access.'
+        )
+      ) {
+        return
+      }
+
+      if (response.status === 403) {
+        setAdminStatus('Administrator access is required to manage users.')
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to delete user.')
+      }
+
+      const nextUsers = adminUsers.filter((user) => user.id !== selectedAdminUser.id)
+      setAdminUsers(nextUsers)
+      setSelectedAdminUserId(nextUsers[0]?.id ?? '')
+      setIsAdminEditorOpen(false)
+      setAdminMode('create')
+      setAdminForm(emptyAdminForm())
+      setAdminStatus('User deleted.')
+    } catch (error) {
+      setAdminStatus(error instanceof Error ? error.message : 'Unable to delete user.')
+    } finally {
+      setIsAdminLoading(false)
+    }
+  }
+
   return {
     activeUsersCount,
     adminForm,
@@ -284,6 +350,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
     adminStatus,
     adminUsers,
     closeAdminEditor,
+    deleteAdminUser,
     filteredAdminUsers,
     handleAdminSubmit,
     isAdminEditorOpen,

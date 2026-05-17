@@ -31,6 +31,7 @@ type GigsSectionProps = {
   onExpenseDescriptionChange: (value: string) => void
   onGenerateExpenseStatement: () => void
   onGenerateInvoice: () => void
+  onDeleteGig: () => void
   onDownloadExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onOpenLinkedInvoice: () => void
   onOpenSellerProfile: () => void
@@ -85,6 +86,7 @@ export function GigsSection({
   onExpenseDescriptionChange,
   onGenerateExpenseStatement,
   onGenerateInvoice,
+  onDeleteGig,
   onDownloadExpenseAttachment,
   onOpenLinkedInvoice,
   onOpenSellerProfile,
@@ -256,6 +258,26 @@ export function GigsSection({
                 disabled={!selectedGig}
               >
                 Edit gig
+              </button>
+              <button
+                className="danger-button"
+                onClick={onDeleteGig}
+                type="button"
+                disabled={
+                  isGigLoading ||
+                  !selectedGig ||
+                  selectedGig.status !== 'Confirmed' ||
+                  selectedGig.isInvoiced
+                }
+                title={
+                  selectedGig && selectedGig.status !== 'Confirmed'
+                    ? 'Only planned gigs can be deleted.'
+                    : selectedGig?.isInvoiced
+                      ? 'Gigs with linked invoices cannot be deleted.'
+                    : 'Delete planned gig'
+                }
+              >
+                Delete gig
               </button>
             </div>
           </div>
