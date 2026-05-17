@@ -11,6 +11,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
 WORKDIR /src
 
 COPY glovelly.sln ./
+COPY Directory.Build.props Directory.Packages.props ./
 COPY backend/Glovelly.Api/Glovelly.Api.csproj backend/Glovelly.Api/
 COPY backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj backend/Glovelly.Api.Tests/
 RUN dotnet restore glovelly.sln
