@@ -90,6 +90,13 @@ function toEditableGigForm(gig: Gig): GigForm {
   }
 }
 
+function toCreateGigForm(clients: Client[]): GigForm {
+  return {
+    ...emptyGigForm(),
+    clientId: clients[0]?.id ?? '',
+  }
+}
+
 export function useGigsWorkspace({
   clientNamesById,
   clients,
@@ -193,6 +200,23 @@ export function useGigsWorkspace({
     0
   )
 
+  const hasUnsavedGigEditorChanges = () => {
+    if (!isGigEditorOpen) {
+      return false
+    }
+
+    const baseline =
+      gigMode === 'edit' && selectedGig
+        ? toEditableGigForm(selectedGig)
+        : toCreateGigForm(clients)
+
+    return (
+      JSON.stringify(gigForm) !== JSON.stringify(baseline) ||
+      gigExpenseAmount.trim().length > 0 ||
+      gigExpenseDescription.trim().length > 0
+    )
+  }
+
   useEffect(() => {
     setSelectedGigIds((current) =>
       current.filter((gigId) => gigs.some((gig) => gig.id === gigId))
@@ -249,11 +273,15 @@ export function useGigsWorkspace({
   }, [])
 
   const startGigCreate = () => {
+    if (
+      hasUnsavedGigEditorChanges() &&
+      !window.confirm('Discard unsaved gig changes and add a new gig?')
+    ) {
+      return
+    }
+
     setGigMode('create')
-    setGigForm({
-      ...emptyGigForm(),
-      clientId: clients[0]?.id ?? '',
-    })
+    setGigForm(toCreateGigForm(clients))
     setGigStatus(
       clients.length > 0
         ? 'Capture the essentials now and we can build invoicing on top later.'
@@ -278,13 +306,38 @@ export function useGigsWorkspace({
     setIsGigEditorOpen(true)
   }
 
+  const selectGig = (gigId: string) => {
+    if (gigId === selectedGig?.id) {
+      return
+    }
+
+    const nextGig = gigsById.get(gigId)
+    if (!nextGig) {
+      return
+    }
+
+    if (isGigEditorOpen) {
+      if (
+        hasUnsavedGigEditorChanges() &&
+        !window.confirm('Discard unsaved gig changes and edit the selected gig?')
+      ) {
+        return
+      }
+
+      setGigMode('edit')
+      setGigForm(toEditableGigForm(nextGig))
+      setGigStatus('Editing the selected gig.')
+      setGigExpenseAmount('')
+      setGigExpenseDescription('')
+    }
+
+    setSelectedGigId(gigId)
+  }
+
   const closeGigEditor = () => {
     setIsGigEditorOpen(false)
     setGigMode('create')
-    setGigForm({
-      ...emptyGigForm(),
-      clientId: clients[0]?.id ?? '',
-    })
+    setGigForm(toCreateGigForm(clients))
     setGigExpenseAmount('')
     setGigExpenseDescription('')
     setGigStatus(defaultGigStatus)
@@ -1119,6 +1172,7 @@ export function useGigsWorkspace({
     selectedGig,
     selectedGigIds,
     selectedGigs,
+    selectGig,
     setGigExpenseAmount,
     setGigExpenseDescription,
     setGigs,

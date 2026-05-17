@@ -34,6 +34,21 @@ function parseOptionalDecimal(value: string) {
   return Number.isFinite(parsed) ? parsed : Number.NaN
 }
 
+function toEditableClientForm(client: Client): ClientForm {
+  return {
+    name: client.name,
+    email: client.email,
+    billingAddress: {
+      line1: client.billingAddress.line1 ?? '',
+      line2: client.billingAddress.line2 ?? '',
+      city: client.billingAddress.city ?? '',
+      stateOrCounty: client.billingAddress.stateOrCounty ?? '',
+      postalCode: client.billingAddress.postalCode ?? '',
+      country: client.billingAddress.country ?? '',
+    },
+  }
+}
+
 export function useClientsWorkspace({
   isApiConnected,
   onSessionExpired,
@@ -84,6 +99,19 @@ export function useClientsWorkspace({
 
   const selectedClient = clientsById.get(selectedClientId) ?? filteredClients[0] ?? null
 
+  const hasUnsavedClientEditorChanges = () => {
+    if (!isClientEditorOpen) {
+      return false
+    }
+
+    const baseline =
+      mode === 'edit' && selectedClient
+        ? toEditableClientForm(selectedClient)
+        : emptyForm()
+
+    return JSON.stringify(form) !== JSON.stringify(baseline)
+  }
+
   const applyClients = useCallback((nextClients: Client[]) => {
     setClients(nextClients)
     setSelectedClientId(nextClients[0]?.id ?? '')
@@ -105,6 +133,13 @@ export function useClientsWorkspace({
   }, [])
 
   const startCreating = () => {
+    if (
+      hasUnsavedClientEditorChanges() &&
+      !window.confirm('Discard unsaved client changes and add a new client?')
+    ) {
+      return
+    }
+
     setMode('create')
     setForm(emptyForm())
     setIsClientEditorOpen(true)
@@ -116,19 +151,33 @@ export function useClientsWorkspace({
     }
 
     setMode('edit')
-    setForm({
-      name: selectedClient.name,
-      email: selectedClient.email,
-      billingAddress: {
-        line1: selectedClient.billingAddress.line1 ?? '',
-        line2: selectedClient.billingAddress.line2 ?? '',
-        city: selectedClient.billingAddress.city ?? '',
-        stateOrCounty: selectedClient.billingAddress.stateOrCounty ?? '',
-        postalCode: selectedClient.billingAddress.postalCode ?? '',
-        country: selectedClient.billingAddress.country ?? '',
-      },
-    })
+    setForm(toEditableClientForm(selectedClient))
     setIsClientEditorOpen(true)
+  }
+
+  const selectClient = (clientId: string) => {
+    if (clientId === selectedClient?.id) {
+      return
+    }
+
+    const nextClient = clientsById.get(clientId)
+    if (!nextClient) {
+      return
+    }
+
+    if (isClientEditorOpen) {
+      if (
+        hasUnsavedClientEditorChanges() &&
+        !window.confirm('Discard unsaved client changes and edit the selected client?')
+      ) {
+        return
+      }
+
+      setMode('edit')
+      setForm(toEditableClientForm(nextClient))
+    }
+
+    setSelectedClientId(clientId)
   }
 
   const closeClientEditor = () => {
@@ -454,6 +503,7 @@ export function useClientsWorkspace({
     resetClientsWorkspace,
     searchQuery,
     selectedClient,
+    selectClient,
     setSelectedClientId,
     setSearchQuery,
     startCreating,

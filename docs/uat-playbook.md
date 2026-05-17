@@ -31,6 +31,49 @@ Use a fresh browser session if possible. If you are testing against seeded local
 
 Expected result: navigation, session state, and core reads are healthy.
 
+## Editor Navigation Regression Checks
+
+This guards against issue 121 and nearby editor discard paths.
+
+For Clients:
+
+1. Open Clients, select a client, and click `Edit`.
+2. Change a field without saving.
+3. Select a different client in the list and decline the discard prompt.
+4. Confirm the original client remains selected and the unsaved edit remains visible.
+5. Select the different client again and accept the discard prompt.
+6. Confirm the editor updates to the newly selected client.
+7. Change a field again, click `New client`, and decline the discard prompt.
+8. Click `New client` again and accept the discard prompt.
+
+Expected result: unsaved client edits are never discarded without confirmation. Accepted navigation switches the editor to the selected client or a blank new-client form.
+
+For Gigs:
+
+1. Open Gigs, select a gig, and click `Edit gig`.
+2. Change a field or add an unsaved expense row.
+3. Select a different gig in the list and decline the discard prompt.
+4. Confirm the original gig remains selected and the unsaved edit remains visible.
+5. Select the different gig again and accept the discard prompt.
+6. Confirm the editor updates to the newly selected gig.
+7. Change a field again, click `New gig`, and decline the discard prompt.
+8. Click `New gig` again and accept the discard prompt.
+
+Expected result: unsaved gig edits and unsaved expense draft fields are never discarded without confirmation. Accepted navigation switches the editor to the selected gig or a blank new-gig form.
+
+For Admin:
+
+1. Open Admin as an administrator, select a user, and click `Edit access`.
+2. Change a field without saving.
+3. Select a different user in the list and decline the discard prompt.
+4. Confirm the original user remains selected and the unsaved edit remains visible.
+5. Select the different user again and accept the discard prompt.
+6. Confirm the editor updates to the newly selected user.
+7. Change a field again, click `Add user`, and decline the discard prompt.
+8. Click `Add user` again and accept the discard prompt.
+
+Expected result: unsaved admin access edits are never discarded without confirmation. Accepted navigation switches the editor to the selected user or a blank add-user form.
+
 ## Gig To Invoice Journey
 
 1. Create a client or choose an existing client.

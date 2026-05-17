@@ -22,6 +22,16 @@ function shouldCloseAfterSave(event: FormEvent<HTMLFormElement>) {
   return submitter?.dataset.closeAfterSave !== 'false'
 }
 
+function toEditableAdminForm(user: AdminUser): AdminUserForm {
+  return {
+    email: user.email,
+    displayName: user.displayName ?? '',
+    googleSubject: user.googleSubject ?? '',
+    role: user.role === 'Admin' ? 'Admin' : 'User',
+    isActive: user.isActive,
+  }
+}
+
 export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions) {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
@@ -87,6 +97,19 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
   const selectedAdminUser =
     adminUsersById.get(selectedAdminUserId) ?? filteredAdminUsers[0] ?? null
 
+  const hasUnsavedAdminEditorChanges = () => {
+    if (!isAdminEditorOpen) {
+      return false
+    }
+
+    const baseline =
+      adminMode === 'edit' && selectedAdminUser
+        ? toEditableAdminForm(selectedAdminUser)
+        : emptyAdminForm()
+
+    return JSON.stringify(adminForm) !== JSON.stringify(baseline)
+  }
+
   useEffect(() => {
     if (selectedAdminUser) {
       setSelectedAdminUserId(selectedAdminUser.id)
@@ -97,6 +120,13 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
   const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
 
   const startAdminCreate = () => {
+    if (
+      hasUnsavedAdminEditorChanges() &&
+      !window.confirm('Discard unsaved access changes and add a new user?')
+    ) {
+      return
+    }
+
     setAdminMode('create')
     setAdminForm(emptyAdminForm())
     setIsAdminEditorOpen(true)
@@ -108,14 +138,33 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
     }
 
     setAdminMode('edit')
-    setAdminForm({
-      email: selectedAdminUser.email,
-      displayName: selectedAdminUser.displayName ?? '',
-      googleSubject: selectedAdminUser.googleSubject ?? '',
-      role: selectedAdminUser.role === 'Admin' ? 'Admin' : 'User',
-      isActive: selectedAdminUser.isActive,
-    })
+    setAdminForm(toEditableAdminForm(selectedAdminUser))
     setIsAdminEditorOpen(true)
+  }
+
+  const selectAdminUser = (userId: string) => {
+    if (userId === selectedAdminUser?.id) {
+      return
+    }
+
+    const nextUser = adminUsersById.get(userId)
+    if (!nextUser) {
+      return
+    }
+
+    if (isAdminEditorOpen) {
+      if (
+        hasUnsavedAdminEditorChanges() &&
+        !window.confirm('Discard unsaved access changes and edit the selected user?')
+      ) {
+        return
+      }
+
+      setAdminMode('edit')
+      setAdminForm(toEditableAdminForm(nextUser))
+    }
+
+    setSelectedAdminUserId(userId)
   }
 
   const closeAdminEditor = () => {
@@ -243,6 +292,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
     markAdminLoadFailed,
     resetAdminWorkspace,
     selectedAdminUser,
+    selectAdminUser,
     setAdminSearchQuery,
     setSelectedAdminUserId,
     startAdminCreate,

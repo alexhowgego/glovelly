@@ -156,8 +156,8 @@ function App({ appMetadata }: AppProps) {
     markAdminLoadFailed,
     resetAdminWorkspace,
     selectedAdminUser,
+    selectAdminUser,
     setAdminSearchQuery,
-    setSelectedAdminUserId,
     startAdminCreate,
     startAdminEdit,
     totalAdmins,
@@ -186,7 +186,7 @@ function App({ appMetadata }: AppProps) {
     resetClientsWorkspace,
     searchQuery,
     selectedClient,
-    setSelectedClientId,
+    selectClient,
     setSearchQuery,
     startCreating,
     startEditing,
@@ -241,6 +241,7 @@ function App({ appMetadata }: AppProps) {
     selectedGig,
     selectedGigIds,
     selectedGigs,
+    selectGig,
     setGigExpenseAmount,
     setGigExpenseDescription,
     setGigs,
@@ -1254,7 +1255,7 @@ function App({ appMetadata }: AppProps) {
         onOpenClientSettings={openClientSettings}
         onResetForm={startCreating}
         onSearchQueryChange={setSearchQuery}
-        onSelectClient={setSelectedClientId}
+        onSelectClient={selectClient}
         onStartEditing={startEditing}
         onSubmit={handleSubmit}
         onUpdateAddressField={updateAddressField}
@@ -1277,7 +1278,7 @@ function App({ appMetadata }: AppProps) {
         onCloseEditor={closeAdminEditor}
         onResetForm={startAdminCreate}
         onSearchQueryChange={setAdminSearchQuery}
-        onSelectUser={setSelectedAdminUserId}
+        onSelectUser={selectAdminUser}
         onStartEditing={startAdminEdit}
         onSubmit={handleAdminSubmit}
         onUpdateField={updateAdminField}
@@ -1314,7 +1315,7 @@ function App({ appMetadata }: AppProps) {
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
         onSearchQueryChange={setGigSearchQuery}
-        onSelectGig={setSelectedGigId}
+        onSelectGig={selectGig}
         onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
         onSubmit={handleGigSubmit}
