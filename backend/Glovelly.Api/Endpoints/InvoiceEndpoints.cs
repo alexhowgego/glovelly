@@ -349,6 +349,28 @@ public static class InvoiceEndpoints
                 });
             }
 
+            var linkedGigs = await db.Gigs
+                .WhereVisibleTo(userId)
+                .Include(value => value.Expenses)
+                .Where(value => value.InvoiceId == invoice.Id)
+                .ToListAsync();
+
+            foreach (var gig in linkedGigs)
+            {
+                await invoiceWorkflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, userId);
+            }
+
+            if (linkedGigs.Count > 0)
+            {
+                await db.SaveChangesAsync();
+                db.Entry(invoice)
+                    .Collection(value => value.Lines)
+                    .IsLoaded = false;
+                await db.Entry(invoice)
+                    .Collection(value => value.Lines)
+                    .LoadAsync();
+            }
+
             await invoiceWorkflowService.RedraftInvoiceAsync(invoice, client, userId);
             await db.SaveChangesAsync();
 

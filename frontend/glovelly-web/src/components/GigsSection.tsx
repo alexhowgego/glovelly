@@ -1,6 +1,14 @@
 import type { FormEvent } from 'react'
 import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
-import type { Client, Gig, GigExpenseForm, GigForm, GigStatus, SellerProfile } from '../types'
+import type {
+  Client,
+  Gig,
+  GigExpenseForm,
+  GigExpenseReimbursementStatus,
+  GigForm,
+  GigStatus,
+  SellerProfile,
+} from '../types'
 
 type GigsSectionProps = {
   clientNamesById: ReadonlyMap<string, string>
@@ -21,6 +29,7 @@ type GigsSectionProps = {
   onCloseEditor: () => void
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
+  onGenerateExpenseStatement: () => void
   onGenerateInvoice: () => void
   onDownloadExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onOpenLinkedInvoice: () => void
@@ -34,6 +43,10 @@ type GigsSectionProps = {
   onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onUpdateExpenseReimbursement: (
+    expense: GigExpenseForm,
+    status: GigExpenseReimbursementStatus
+  ) => void
   onUpdateGigExpenseField: (
     index: number,
     field: keyof Pick<GigExpenseForm, 'description' | 'amount'>,
@@ -70,6 +83,7 @@ export function GigsSection({
   onCloseEditor,
   onExpenseAmountChange,
   onExpenseDescriptionChange,
+  onGenerateExpenseStatement,
   onGenerateInvoice,
   onDownloadExpenseAttachment,
   onOpenLinkedInvoice,
@@ -83,6 +97,7 @@ export function GigsSection({
   onToggleGigSelection,
   onStartEditing,
   onSubmit,
+  onUpdateExpenseReimbursement,
   onUpdateGigExpenseField,
   onUpdateGigField,
   plannedGigCount,
@@ -94,6 +109,7 @@ export function GigsSection({
 }: GigsSectionProps) {
   const selectedGigClientName =
     (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
+  const selectedClientId = selectedGigs[0]?.clientId ?? null
   const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
 
   return (
@@ -138,6 +154,11 @@ export function GigsSection({
           <div className="client-list">
             {filteredGigs.map((gig) => {
               const clientName = clientNamesById.get(gig.clientId) ?? 'Unknown client'
+              const isDifferentSelectedClient =
+                Boolean(selectedClientId) &&
+                selectedClientId !== gig.clientId &&
+                !selectedGigIds.includes(gig.id)
+              const isSelectionDisabled = gig.isInvoiced || isDifferentSelectedClient
 
               return (
                 <button
@@ -153,10 +174,16 @@ export function GigsSection({
                     <input
                       type="checkbox"
                       checked={selectedGigIds.includes(gig.id)}
-                      disabled={gig.isInvoiced}
+                      disabled={isSelectionDisabled}
                       onChange={() => onToggleGigSelection(gig.id)}
                     />
-                    <span>{gig.isInvoiced ? 'Invoiced' : 'Select'}</span>
+                    <span>
+                      {gig.isInvoiced
+                        ? 'Invoiced'
+                        : isDifferentSelectedClient
+                          ? 'Different client'
+                          : 'Select'}
+                    </span>
                   </label>
                   <div>
                     <strong>{gig.title}</strong>
@@ -207,6 +234,23 @@ export function GigsSection({
               </button>
               <button
                 className="ghost-button"
+                onClick={onGenerateExpenseStatement}
+                type="button"
+                disabled={
+                  isGigLoading ||
+                  !selectedGig ||
+                  hasCrossClientSelection ||
+                  (selectedGigIds.length > 0
+                    ? selectedGigs.every((gig) => gig.expenses.length === 0)
+                    : selectedGig.expenses.length === 0)
+                }
+              >
+                {selectedGigIds.length > 0
+                  ? `Expense statement (${selectedGigIds.length})`
+                  : 'Expense statement'}
+              </button>
+              <button
+                className="ghost-button"
                 onClick={onStartEditing}
                 type="button"
                 disabled={!selectedGig}
@@ -241,7 +285,11 @@ export function GigsSection({
                 </article>
                 <article>
                   <p className="detail-label">Driving</p>
-                  <strong>{selectedGig.wasDriving ? 'Yes' : 'No'}</strong>
+                  <strong>
+                    {selectedGig.wasDriving
+                      ? `${selectedGig.travelMiles || 0} miles`
+                      : 'No'}
+                  </strong>
                 </article>
                 <article>
                   <p className="detail-label">Invoice link</p>
@@ -387,6 +435,30 @@ export function GigsSection({
                 <span>I was driving for this gig</span>
               </label>
 
+              {gigForm.wasDriving && (
+                <>
+                  <label>
+                    <span>Travel miles</span>
+                    <input
+                      inputMode="decimal"
+                      value={gigForm.travelMiles}
+                      onChange={(event) => onUpdateGigField('travelMiles', event.target.value)}
+                      placeholder="24"
+                    />
+                  </label>
+
+                  <label>
+                    <span>Passengers</span>
+                    <input
+                      inputMode="numeric"
+                      value={gigForm.passengerCount}
+                      onChange={(event) => onUpdateGigField('passengerCount', event.target.value)}
+                      placeholder="0"
+                    />
+                  </label>
+                </>
+              )}
+
               <label className="full-width">
                 <span>Notes</span>
                 <textarea
@@ -437,8 +509,25 @@ export function GigsSection({
 
             {gigForm.expenses.length > 0 ? (
               <div className="gig-expense-list">
-                {gigForm.expenses.map((expense, index) => (
-                  <div className="gig-expense-item" key={`${expense.id || 'new'}-${index}`}>
+                {gigForm.expenses.map((expense, index) => {
+                  const isReimbursed = expense.reimbursementStatus === 'Reimbursed'
+                  const statusLabel = formatExpenseReimbursementStatus(expense.reimbursementStatus)
+
+                  return (
+                  <div
+                    className={`gig-expense-item ${isReimbursed ? 'is-reimbursed' : ''}`}
+                    key={`${expense.id || 'new'}-${index}`}
+                  >
+                    <div className="expense-reimbursement-state">
+                      <span className={`expense-status-badge ${isReimbursed ? 'reimbursed' : ''}`}>
+                        {statusLabel}
+                      </span>
+                      {isReimbursed && (
+                        <span>
+                          {expense.reimbursementMethod || expense.reimbursementNote || 'Recorded'}
+                        </span>
+                      )}
+                    </div>
                     <label>
                       <span>Description</span>
                       <input
@@ -468,6 +557,25 @@ export function GigsSection({
                     >
                       Remove
                     </button>
+                    {expense.id && (
+                      <label className="expense-status-select">
+                        <span>Reimbursement</span>
+                        <select
+                          value={expense.reimbursementStatus}
+                          onChange={(event) =>
+                            onUpdateExpenseReimbursement(
+                              expense,
+                              event.target.value as GigExpenseReimbursementStatus
+                            )
+                          }
+                          disabled={isGigLoading}
+                        >
+                          <option value="Unreimbursed">Claimable</option>
+                          <option value="Reimbursed">Reimbursed</option>
+                          <option value="NotClaimable">Not claimable</option>
+                        </select>
+                      </label>
+                    )}
                     <div className="expense-attachments">
                       <div className="expense-attachment-header">
                         <span>
@@ -521,7 +629,8 @@ export function GigsSection({
                       )}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="empty-state">
@@ -562,4 +671,15 @@ export function GigsSection({
       </div>
     </section>
   )
+}
+
+function formatExpenseReimbursementStatus(status: GigExpenseReimbursementStatus) {
+  switch (status) {
+    case 'Unreimbursed':
+      return 'Claimable'
+    case 'NotClaimable':
+      return 'Not claimable'
+    default:
+      return status
+  }
 }

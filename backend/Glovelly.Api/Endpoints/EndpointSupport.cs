@@ -247,6 +247,13 @@ internal static class EndpointSupport
                 SortOrder = expense.SortOrder == 0 ? index + 1 : expense.SortOrder,
                 Description = expense.Description.Trim(),
                 Amount = expense.Amount,
+                ReimbursementStatus = expense.ReimbursementStatus,
+                ReimbursedAt = expense.ReimbursedAt,
+                ReimbursementMethod = expense.ReimbursementMethod?.Trim(),
+                ReimbursementNote = expense.ReimbursementNote?.Trim(),
+                ReimbursementUpdatedAt = expense.ReimbursementUpdatedAt,
+                ReimbursementUpdatedByUserId = expense.ReimbursementUpdatedByUserId,
+                ReimbursementInvoiceId = expense.ReimbursementInvoiceId,
             })
             .OrderBy(expense => expense.SortOrder)
             .ThenBy(expense => expense.Description)

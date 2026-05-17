@@ -67,6 +67,8 @@ export const emptyGigForm = (): GigForm => ({
   date: '',
   venue: '',
   fee: '',
+  travelMiles: '',
+  passengerCount: '',
   notes: '',
   wasDriving: true,
   status: 'Confirmed',

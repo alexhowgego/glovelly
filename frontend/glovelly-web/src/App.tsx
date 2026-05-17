@@ -4,7 +4,9 @@ import {
   AppShell,
   ClientSettingsModal,
   ClientsSection,
+  ExpenseStatementModal,
   GigsSection,
+  InvoiceGenerationPreviewModal,
   InvoicesSection,
   QuickReceiptModal,
   SellerProfileModal,
@@ -54,6 +56,29 @@ function buildMonthlyInvoiceNumber(month: string, sequence: number) {
   return `GLV-${month.replace('-', '')}-${String(sequence).padStart(3, '0')}`
 }
 
+function extractDownloadFilename(contentDisposition: string | null) {
+  if (!contentDisposition) {
+    return null
+  }
+
+  const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1])
+    } catch {
+      return encodedMatch[1]
+    }
+  }
+
+  const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1]
+  }
+
+  const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
+  return plainMatch?.[1]?.trim() ?? null
+}
+
 
 type AppProps = {
   appMetadata: AppMetadata
@@ -77,6 +102,10 @@ function App({ appMetadata }: AppProps) {
   const { setThemePreference, themePreference } = useThemePreference()
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
+  const [invoicePreviewInvoice, setInvoicePreviewInvoice] = useState<Invoice | null>(null)
+  const [invoicePreviewPdfUrl, setInvoicePreviewPdfUrl] = useState<string | null>(null)
+  const [invoicePreviewStatus, setInvoicePreviewStatus] = useState('')
+  const [isInvoicePreviewLoading, setIsInvoicePreviewLoading] = useState(false)
 
   const isAdmin = authUser?.role === 'Admin'
   const clearSession = useCallback(() => {
@@ -91,6 +120,25 @@ function App({ appMetadata }: AppProps) {
     },
     [clearSession]
   )
+
+  const clearInvoicePreviewPdfUrl = useCallback(() => {
+    setInvoicePreviewPdfUrl((current) => {
+      if (current) {
+        window.URL.revokeObjectURL(current)
+      }
+
+      return null
+    })
+  }, [])
+
+  useEffect(() => clearInvoicePreviewPdfUrl, [clearInvoicePreviewPdfUrl])
+
+  const closeInvoicePreview = useCallback(() => {
+    clearInvoicePreviewPdfUrl()
+    setInvoicePreviewInvoice(null)
+    setInvoicePreviewStatus('')
+    setIsInvoicePreviewLoading(false)
+  }, [clearInvoicePreviewPdfUrl])
   const {
     activeUsersCount,
     adminForm,
@@ -153,9 +201,17 @@ function App({ appMetadata }: AppProps) {
   const {
     applyGigs,
     closeGigEditor,
+    closeExpenseStatement,
     completedGigCount,
     deleteExpenseAttachment,
     downloadExpenseAttachment,
+    downloadExpenseStatementPdf,
+    expenseStatementExpenseIds,
+    expenseStatementGigs,
+    expenseStatementPreviewUrl,
+    expenseStatementReceiptCount,
+    expenseStatementStatus,
+    expenseStatementTotal,
     filteredGigs,
     gigExpenseAmount,
     gigExpenseDescription,
@@ -168,11 +224,17 @@ function App({ appMetadata }: AppProps) {
     handleAddGigExpense,
     handleGigSubmit,
     handleToggleGigSelection,
+    includeStatementReceiptAppendix,
+    includeStatementReceiptAttachments,
+    isExpenseStatementLoading,
+    isExpenseStatementOpen,
     isGigEditorOpen,
     isGigLoading,
     mergeSavedGig,
+    openExpenseStatement,
     openGigReceiptDraft,
     plannedGigCount,
+    previewExpenseStatement,
     removeGigExpense,
     resetGigsWorkspace,
     selectedGig,
@@ -183,6 +245,8 @@ function App({ appMetadata }: AppProps) {
     setGigs,
     setGigSearchQuery,
     setGigStatus,
+    setIncludeStatementReceiptAppendix,
+    setIncludeStatementReceiptAttachments,
     setSelectedGigId,
     setSelectedGigIds,
     startGigCreate,
@@ -191,10 +255,20 @@ function App({ appMetadata }: AppProps) {
     upcomingGigCount,
     updateGigExpenseField,
     updateGigField,
+    updateExpenseReimbursement,
     uploadExpenseAttachment,
+    toggleExpenseStatementExpense,
   } = useGigsWorkspace({
     clientNamesById,
     clients,
+    onLinkedInvoiceUpdated: (invoice, message) => {
+      setInvoices((current) => [
+        invoice,
+        ...current.filter((value) => value.id !== invoice.id),
+      ])
+      setSelectedInvoiceId(invoice.id)
+      setInvoiceStatus(message)
+    },
     onOpenSection: (section) => setActiveSection(section),
     onSessionExpired: expireSession,
   })
@@ -625,6 +699,99 @@ function App({ appMetadata }: AppProps) {
     openSellerProfileModal(sellerProfileNotice)
   }
 
+  const openInvoicePreview = async (invoice: Invoice) => {
+    setInvoicePreviewInvoice(invoice)
+    setInvoicePreviewStatus(`Preparing ${invoice.invoiceNumber} preview...`)
+    setIsInvoicePreviewLoading(true)
+    clearInvoicePreviewPdfUrl()
+
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/pdf`))
+
+      if (!response.ok) {
+        throw new Error('Unable to prepare the invoice PDF preview.')
+      }
+
+      const blob = await response.blob()
+      const previewUrl = window.URL.createObjectURL(blob)
+      setInvoicePreviewPdfUrl((current) => {
+        if (current) {
+          window.URL.revokeObjectURL(current)
+        }
+
+        return previewUrl
+      })
+      setInvoicePreviewStatus(`Invoice ${invoice.invoiceNumber} is ready to review.`)
+    } catch (error) {
+      setInvoicePreviewStatus(
+        error instanceof Error ? error.message : 'Unable to prepare the invoice PDF preview.'
+      )
+    } finally {
+      setIsInvoicePreviewLoading(false)
+    }
+  }
+
+  const downloadInvoicePreviewPdf = async () => {
+    if (!invoicePreviewInvoice) {
+      return
+    }
+
+    const fallbackFilename = `${invoicePreviewInvoice.invoiceNumber}.pdf`
+    setIsInvoicePreviewLoading(true)
+    setInvoicePreviewStatus(`Preparing ${fallbackFilename}...`)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoicePreviewInvoice.id}/pdf`)
+      )
+
+      if (!response.ok) {
+        throw new Error('Unable to download the invoice PDF.')
+      }
+
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = extractDownloadFilename(contentDisposition) ?? fallbackFilename
+      document.body.append(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(downloadUrl)
+      setInvoicePreviewStatus(`Downloaded ${link.download}.`)
+      setInvoiceStatus(`Downloaded ${link.download}.`)
+    } catch (error) {
+      setInvoicePreviewStatus(
+        error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
+      )
+    } finally {
+      setIsInvoicePreviewLoading(false)
+    }
+  }
+
+  const openPreviewedInvoice = () => {
+    if (invoicePreviewInvoice) {
+      setSelectedInvoiceId(invoicePreviewInvoice.id)
+    }
+
+    closeInvoicePreview()
+    setActiveSection('invoices')
+  }
+
+  const previewInvoicePdf = async (invoice: Invoice) => {
+    await openInvoicePreview(invoice)
+  }
+
+  const handleInvoiceReissueWithPreview = async (invoice: Invoice) => {
+    const updatedInvoice = await handleInvoiceReissue(invoice)
+    if (updatedInvoice) {
+      await openInvoicePreview(updatedInvoice)
+    }
+
+    return updatedInvoice
+  }
+
   const handleGenerateInvoice = async () => {
     if (selectedGigs.length > 0) {
       const distinctClientIds = new Set(selectedGigs.map((gig) => gig.clientId))
@@ -698,7 +865,7 @@ function App({ appMetadata }: AppProps) {
             ? `Invoice ${generatedInvoice.invoiceNumber} is ready for review.`
             : `Invoice ${generatedInvoice.invoiceNumber} is ready for review. ${sellerProfileNotice}`
         )
-        setActiveSection('invoices')
+        await openInvoicePreview(generatedInvoice)
       } catch (error) {
         setGigStatus(error instanceof Error ? error.message : 'Unable to generate invoice.')
       } finally {
@@ -768,7 +935,7 @@ function App({ appMetadata }: AppProps) {
           ? 'New invoice generated from the selected gig.'
           : `New invoice generated from the selected gig. ${sellerProfileNotice}`
       )
-      setActiveSection('invoices')
+      await openInvoicePreview(generatedInvoice)
     } catch (error) {
       setGigStatus(error instanceof Error ? error.message : 'Unable to generate invoice.')
     } finally {
@@ -914,7 +1081,7 @@ function App({ appMetadata }: AppProps) {
         `Monthly invoice ${updatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
       )
       setInvoiceStatus(`Monthly invoice ${updatedInvoice.invoiceNumber} is ready for review.`)
-      setActiveSection('invoices')
+      await openInvoicePreview(updatedInvoice)
     } catch (error) {
       setMonthlyInvoiceStatus(
         error instanceof Error ? error.message : 'Unable to generate monthly invoice.'
@@ -1008,6 +1175,7 @@ function App({ appMetadata }: AppProps) {
         onCloseEditor={closeGigEditor}
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
+        onGenerateExpenseStatement={openExpenseStatement}
         onGenerateInvoice={handleGenerateInvoice}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
         onOpenLinkedInvoice={openSelectedGigInvoice}
@@ -1023,6 +1191,7 @@ function App({ appMetadata }: AppProps) {
         onSubmit={handleGigSubmit}
         onUpdateGigExpenseField={updateGigExpenseField}
         onUpdateGigField={updateGigField}
+        onUpdateExpenseReimbursement={updateExpenseReimbursement}
         plannedGigCount={plannedGigCount}
         sellerProfile={sellerProfile}
         sellerProfileNotice={sellerProfileNotice}
@@ -1056,8 +1225,9 @@ function App({ appMetadata }: AppProps) {
         onDownloadPdf={handleDownloadInvoicePdf}
         onInvoiceStatusChange={handleInvoiceStatusChange}
         onOpenSellerProfile={openSellerProfile}
+        onPreviewPdf={previewInvoicePdf}
         onPublishGoogleDrive={handlePublishInvoiceGoogleDrive}
-        onReissue={handleInvoiceReissue}
+        onReissue={handleInvoiceReissueWithPreview}
         onSendEmail={handleSendInvoiceEmail}
         onSearchQueryChange={setInvoiceSearchQuery}
         onSelectInvoice={setSelectedInvoiceId}
@@ -1095,6 +1265,41 @@ function App({ appMetadata }: AppProps) {
       sellerProfile={sellerProfile}
       themePreference={themePreference}
     >
+      <ExpenseStatementModal
+        clientName={
+          (expenseStatementGigs[0]
+            ? clientNamesById.get(expenseStatementGigs[0].clientId)
+            : null) ?? 'Unknown client'
+        }
+        expenseIds={expenseStatementExpenseIds}
+        gigs={expenseStatementGigs}
+        includeReceiptAppendix={includeStatementReceiptAppendix}
+        includeReceiptAttachments={includeStatementReceiptAttachments}
+        isOpen={isExpenseStatementOpen}
+        isSaving={isExpenseStatementLoading}
+        onClose={closeExpenseStatement}
+        onDownload={downloadExpenseStatementPdf}
+        onIncludeReceiptAppendixChange={setIncludeStatementReceiptAppendix}
+        onIncludeReceiptAttachmentsChange={setIncludeStatementReceiptAttachments}
+        onPreview={previewExpenseStatement}
+        onToggleExpense={toggleExpenseStatementExpense}
+        previewPdfUrl={expenseStatementPreviewUrl}
+        receiptCount={expenseStatementReceiptCount}
+        status={expenseStatementStatus}
+        total={expenseStatementTotal}
+      />
+
+      <InvoiceGenerationPreviewModal
+        invoice={invoicePreviewInvoice}
+        isLoading={isInvoicePreviewLoading}
+        isOpen={Boolean(invoicePreviewInvoice)}
+        onClose={closeInvoicePreview}
+        onDownload={downloadInvoicePreviewPdf}
+        onOpenInvoice={openPreviewedInvoice}
+        pdfUrl={invoicePreviewPdfUrl}
+        status={invoicePreviewStatus}
+      />
+
       <UserSettingsModal
         form={userSettingsForm}
         invoiceEmailSubjectPreview={buildInvoiceEmailSubjectPreview(
