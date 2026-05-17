@@ -1,41 +1,27 @@
-using System.Collections.Concurrent;
-
 namespace Glovelly.Api.Services;
 
-public sealed class InMemoryExpenseAttachmentStore : IExpenseAttachmentStore
+public sealed class InMemoryExpenseAttachmentStore() : IExpenseAttachmentStore
 {
-    private readonly ConcurrentDictionary<string, StoredAttachment> _attachments = new();
+    private readonly ExpenseAttachmentStore _inner = new(new InMemoryBlobStore());
 
-    public async Task SaveAsync(
+    public Task SaveAsync(
         string storageKey,
         Stream content,
         string contentType,
         CancellationToken cancellationToken = default)
     {
-        using var memory = new MemoryStream();
-        await content.CopyToAsync(memory, cancellationToken);
-        _attachments[storageKey] = new StoredAttachment(memory.ToArray(), contentType);
+        return _inner.SaveAsync(storageKey, content, contentType, cancellationToken);
     }
 
     public Task<ExpenseAttachmentContent> OpenReadAsync(
         string storageKey,
         CancellationToken cancellationToken = default)
     {
-        if (!_attachments.TryGetValue(storageKey, out var attachment))
-        {
-            throw new FileNotFoundException("Expense attachment blob was not found.", storageKey);
-        }
-
-        return Task.FromResult(new ExpenseAttachmentContent(
-            new MemoryStream(attachment.Content, writable: false),
-            attachment.ContentType));
+        return _inner.OpenReadAsync(storageKey, cancellationToken);
     }
 
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
     {
-        _attachments.TryRemove(storageKey, out _);
-        return Task.CompletedTask;
+        return _inner.DeleteAsync(storageKey, cancellationToken);
     }
-
-    private sealed record StoredAttachment(byte[] Content, string ContentType);
 }

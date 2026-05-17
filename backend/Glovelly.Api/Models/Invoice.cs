@@ -26,6 +26,11 @@ public sealed class Invoice
     public Guid? LastDeliveredByUserId { get; set; }
     public string? Description { get; set; }
     public byte[]? PdfBlob { get; set; }
+    public string? PdfStorageKey { get; set; }
+    public string? PdfFileName { get; set; }
+    public string? PdfContentType { get; set; }
+    public long? PdfSizeBytes { get; set; }
+    public DateTimeOffset? PdfGeneratedAt { get; set; }
 
     [JsonIgnore]
     public Client? Client { get; set; }

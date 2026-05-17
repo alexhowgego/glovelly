@@ -270,6 +270,11 @@ export type Invoice = {
   lastDeliveredByUserId: string | null
   description: string | null
   pdfBlob: string | null
+  pdfStorageKey: string | null
+  pdfFileName: string | null
+  pdfContentType: string | null
+  pdfSizeBytes: number | null
+  pdfGeneratedAt: string | null
   total: number
   lines: InvoiceLine[]
 }

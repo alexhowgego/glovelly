@@ -1,0 +1,74 @@
+using Glovelly.Api.Models;
+
+namespace Glovelly.Api.Services;
+
+public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timeProvider) : IInvoicePdfService
+{
+    private const string PdfContentType = "application/pdf";
+
+    public async Task SaveGeneratedPdfAsync(
+        Invoice invoice,
+        Guid? userId,
+        byte[] content,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+        ArgumentNullException.ThrowIfNull(content);
+
+        var key = BuildStorageKey(invoice, userId);
+        await blobStore.SaveAsync(
+            new BlobWriteRequest(key, new MemoryStream(content, writable: false), PdfContentType, content.Length),
+            cancellationToken);
+
+        invoice.PdfStorageKey = key;
+        invoice.PdfFileName = $"{invoice.InvoiceNumber}.pdf";
+        invoice.PdfContentType = PdfContentType;
+        invoice.PdfSizeBytes = content.Length;
+        invoice.PdfGeneratedAt = timeProvider.GetUtcNow();
+        invoice.PdfBlob = null;
+    }
+
+    public async Task<InvoicePdfContent?> OpenReadAsync(
+        Invoice invoice,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+
+        if (!string.IsNullOrWhiteSpace(invoice.PdfStorageKey))
+        {
+            var blob = await blobStore.OpenReadAsync(invoice.PdfStorageKey, cancellationToken);
+            return new InvoicePdfContent(
+                blob.Content,
+                string.IsNullOrWhiteSpace(blob.ContentType) ? PdfContentType : blob.ContentType,
+                blob.SizeBytes ?? invoice.PdfSizeBytes ?? 0);
+        }
+
+        if (invoice.PdfBlob is { Length: > 0 } legacyPdf)
+        {
+            return new InvoicePdfContent(
+                new MemoryStream(legacyPdf, writable: false),
+                PdfContentType,
+                legacyPdf.Length);
+        }
+
+        return null;
+    }
+
+    public Task DeleteAsync(Invoice invoice, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+
+        return string.IsNullOrWhiteSpace(invoice.PdfStorageKey)
+            ? Task.CompletedTask
+            : blobStore.DeleteAsync(invoice.PdfStorageKey, cancellationToken);
+    }
+
+    private static string BuildStorageKey(Invoice invoice, Guid? userId)
+    {
+        var ownerSegment = userId.HasValue
+            ? userId.Value.ToString("N")
+            : invoice.CreatedByUserId?.ToString("N") ?? "unassigned";
+
+        return $"users/{ownerSegment}/invoices/{invoice.Id:D}/invoice.pdf";
+    }
+}

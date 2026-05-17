@@ -90,6 +90,57 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     }
 
     [Fact]
+    public async Task SendEmail_WhenInvoicePdfIsBlobBacked_SendsStoredAttachment()
+    {
+        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber = "GLV-SEND-BLOB",
+            clientId = TestData.FoxAndFinchId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description = "Blob-backed email delivery test.",
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
+        var storageKey = $"users/{TestAuthContext.UserId:N}/invoices/{invoiceId:D}/invoice.pdf";
+        var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 blob-backed invoice content");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var blobStore = scope.ServiceProvider.GetRequiredService<IBlobStore>();
+            await blobStore.SaveAsync(new BlobWriteRequest(
+                storageKey,
+                new MemoryStream(pdfBytes),
+                "application/pdf",
+                pdfBytes.Length));
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var invoice = await dbContext.Invoices.SingleAsync(value => value.Id == invoiceId);
+            invoice.PdfStorageKey = storageKey;
+            invoice.PdfFileName = "GLV-SEND-BLOB.pdf";
+            invoice.PdfContentType = "application/pdf";
+            invoice.PdfSizeBytes = pdfBytes.Length;
+            invoice.PdfGeneratedAt = DateTimeOffset.UtcNow;
+            await dbContext.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
+        {
+            message = "Blob-backed PDF attached.",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var message = Assert.Single(_factory.Emails.SentEmails);
+        var attachment = Assert.Single(message.Attachments);
+        Assert.Equal("GLV-SEND-BLOB.pdf", attachment.FileName);
+        Assert.Equal("application/pdf", attachment.ContentType);
+        Assert.Equal(pdfBytes, attachment.Content);
+    }
+
+    [Fact]
     public async Task SendEmail_WhenReceiptInclusionRequested_AttachesReceiptZip()
     {
         var (invoiceId, receiptBytes) = await SeedInvoiceWithReceiptAsync(

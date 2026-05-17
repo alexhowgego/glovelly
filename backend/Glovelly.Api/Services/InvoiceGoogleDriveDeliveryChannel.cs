@@ -8,6 +8,7 @@ internal sealed class InvoiceGoogleDriveDeliveryChannel(
     AppDbContext dbContext,
     IGoogleDriveApiClient googleDriveApiClient,
     IGoogleDriveTokenProtector tokenProtector,
+    IInvoicePdfService invoicePdfService,
     StartupSettings settings) : IInvoiceDeliveryChannel
 {
     public InvoiceDeliveryChannel Channel => InvoiceDeliveryChannel.GoogleDrive;
@@ -24,10 +25,8 @@ internal sealed class InvoiceGoogleDriveDeliveryChannel(
         }
 
         var invoice = request.Invoice;
-        if (invoice.PdfBlob is null || invoice.PdfBlob.Length == 0)
-        {
-            throw new InvalidOperationException("Invoice PDF is missing.");
-        }
+        var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken)
+            ?? throw new InvalidOperationException("Invoice PDF is missing.");
 
         var connection = await dbContext.GoogleDriveConnections
             .SingleOrDefaultAsync(
@@ -47,10 +46,14 @@ internal sealed class InvoiceGoogleDriveDeliveryChannel(
             accessToken = await RefreshAccessTokenAsync(connection, cancellationToken);
         }
 
+        await using var invoicePdfContent = invoicePdf.Content;
+        using var invoicePdfMemory = new MemoryStream();
+        await invoicePdf.Content.CopyToAsync(invoicePdfMemory, cancellationToken);
+
         var upload = await googleDriveApiClient.UploadPdfAsync(
             accessToken,
             request.AttachmentFileName,
-            invoice.PdfBlob,
+            invoicePdfMemory.ToArray(),
             connection.InvoiceUploadFolderId,
             cancellationToken);
 

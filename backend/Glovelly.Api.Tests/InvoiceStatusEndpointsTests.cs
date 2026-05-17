@@ -99,7 +99,15 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(expectedInvoiceDate.AddDays(14).ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("dueDate").GetString());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("firstIssuedUtc").ValueKind);
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("firstIssuedByUserId").GetGuid());
-        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal("application/pdf", updatedInvoice.GetProperty("pdfContentType").GetString());
+        Assert.True(updatedInvoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
+        Assert.Contains(
+            $"users/{TestAuthContext.UserId:N}/",
+            updatedInvoice.GetProperty("pdfStorageKey").GetString());
+        Assert.Contains(
+            $"/invoices/{TestData.RiversideInvoiceId:D}/invoice.pdf",
+            updatedInvoice.GetProperty("pdfStorageKey").GetString());
     }
 
     [Fact]
@@ -173,7 +181,9 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("firstIssuedByUserId").GetGuid());
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("lastReissuedByUserId").GetGuid());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("lastReissuedUtc").ValueKind);
-        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal("application/pdf", updatedInvoice.GetProperty("pdfContentType").GetString());
+        Assert.True(updatedInvoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
         Assert.Single(updatedInvoice.GetProperty("lines").EnumerateArray());
     }
 
@@ -227,7 +237,9 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("firstIssuedByUserId").ValueKind);
         Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("lastReissuedUtc").ValueKind);
         Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("lastReissuedByUserId").ValueKind);
-        Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.Equal("application/pdf", updatedInvoice.GetProperty("pdfContentType").GetString());
+        Assert.True(updatedInvoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
     }
 
     [Fact]

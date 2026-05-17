@@ -27,21 +27,28 @@ public static class InvoiceEndpoints
             return Results.Ok(invoices);
         });
 
-        group.MapGet("/{id:guid}/pdf", async (Guid id, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
+        group.MapGet("/{id:guid}/pdf", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoicePdfService invoicePdfService,
+            CancellationToken cancellationToken) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
                 .WhereVisibleTo(userId)
                 .AsNoTracking()
                 .Include(value => value.Client)
-                .FirstOrDefaultAsync(value => value.Id == id);
+                .FirstOrDefaultAsync(value => value.Id == id, cancellationToken);
 
             if (invoice is null)
             {
                 return Results.NotFound();
             }
 
-            if (invoice.PdfBlob is null || invoice.PdfBlob.Length == 0)
+            var pdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
+            if (pdf is null)
             {
                 return Results.NotFound();
             }
@@ -51,13 +58,13 @@ public static class InvoiceEndpoints
                     .AsNoTracking()
                     .Where(value => value.Id == userId.Value && value.IsActive)
                     .Select(value => value.InvoiceFilenamePattern)
-                    .FirstOrDefaultAsync()
+                    .FirstOrDefaultAsync(cancellationToken)
                 : null;
-            var periodDate = await ResolveInvoicePeriodDateAsync(db, invoice.Id);
+            var periodDate = await ResolveInvoicePeriodDateAsync(db, invoice.Id, cancellationToken);
 
-            return Results.File(
-                invoice.PdfBlob,
-                "application/pdf",
+            return Results.Stream(
+                pdf.Content,
+                pdf.ContentType,
                 InvoicePdfFilenameBuilder.Build(
                     invoice,
                     invoice.Client,
@@ -189,6 +196,14 @@ public static class InvoiceEndpoints
             if (requestedStatus is not InvoiceStatus.Issued)
             {
                 invoice.PdfBlob = request.PdfBlob;
+                if (request.PdfBlob is { Length: > 0 })
+                {
+                    invoice.PdfStorageKey = null;
+                    invoice.PdfFileName = $"{invoice.InvoiceNumber}.pdf";
+                    invoice.PdfContentType = "application/pdf";
+                    invoice.PdfSizeBytes = request.PdfBlob.Length;
+                    invoice.PdfGeneratedAt = DateTimeOffset.UtcNow;
+                }
             }
             EndpointSupport.StampUpdate(invoice, userId);
 
@@ -384,6 +399,7 @@ public static class InvoiceEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceDeliveryService invoiceDeliveryService,
+            IInvoicePdfService invoicePdfService,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
@@ -416,13 +432,15 @@ public static class InvoiceEndpoints
                 });
             }
 
-            if (invoice.PdfBlob is null || invoice.PdfBlob.Length == 0)
+            var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
+            if (invoicePdf is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
                     ["pdf"] = ["Invoice PDF is missing."]
                 });
             }
+            await invoicePdf.Content.DisposeAsync();
 
             var userDefaultFilenamePattern = userId.HasValue
                 ? await db.Users
@@ -511,6 +529,7 @@ public static class InvoiceEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceDeliveryService invoiceDeliveryService,
+            IInvoicePdfService invoicePdfService,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
@@ -535,13 +554,15 @@ public static class InvoiceEndpoints
                 });
             }
 
-            if (invoice.PdfBlob is null || invoice.PdfBlob.Length == 0)
+            var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
+            if (invoicePdf is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
                     ["pdf"] = ["Invoice PDF is missing."]
                 });
             }
+            await invoicePdf.Content.DisposeAsync();
 
             var userDefaultFilenamePattern = userId.HasValue
                 ? await db.Users
@@ -653,6 +674,7 @@ public static class InvoiceEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            IInvoicePdfService invoicePdfService,
             ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
@@ -693,6 +715,8 @@ public static class InvoiceEndpoints
                 invoice.InvoiceNumber,
                 userId,
                 deletedAtUtc);
+
+            await invoicePdfService.DeleteAsync(invoice);
 
             db.Invoices.Remove(invoice);
             await db.SaveChangesAsync();
