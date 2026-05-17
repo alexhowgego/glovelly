@@ -66,8 +66,8 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
     private static string BuildStorageKey(Invoice invoice, Guid? userId)
     {
         var ownerSegment = userId.HasValue
-            ? userId.Value.ToString("D")
-            : invoice.CreatedByUserId?.ToString("D") ?? "unassigned";
+            ? userId.Value.ToString("N")
+            : invoice.CreatedByUserId?.ToString("N") ?? "unassigned";
 
         return $"users/{ownerSegment}/invoices/{invoice.Id:D}/invoice.pdf";
     }

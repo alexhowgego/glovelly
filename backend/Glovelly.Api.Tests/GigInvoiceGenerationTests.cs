@@ -67,6 +67,9 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.False(string.IsNullOrWhiteSpace(invoice.GetProperty("invoiceNumber").GetString()));
         Assert.Equal(JsonValueKind.Null, invoice.GetProperty("pdfBlob").ValueKind);
         Assert.Contains(
+            $"users/{TestAuthContext.UserId:N}/",
+            invoice.GetProperty("pdfStorageKey").GetString());
+        Assert.Contains(
             $"/invoices/{invoice.GetProperty("id").GetGuid():D}/invoice.pdf",
             invoice.GetProperty("pdfStorageKey").GetString());
         Assert.Equal("application/pdf", invoice.GetProperty("pdfContentType").GetString());

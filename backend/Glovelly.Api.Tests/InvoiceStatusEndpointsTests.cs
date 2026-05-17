@@ -103,6 +103,9 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal("application/pdf", updatedInvoice.GetProperty("pdfContentType").GetString());
         Assert.True(updatedInvoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
         Assert.Contains(
+            $"users/{TestAuthContext.UserId:N}/",
+            updatedInvoice.GetProperty("pdfStorageKey").GetString());
+        Assert.Contains(
             $"/invoices/{TestData.RiversideInvoiceId:D}/invoice.pdf",
             updatedInvoice.GetProperty("pdfStorageKey").GetString());
     }

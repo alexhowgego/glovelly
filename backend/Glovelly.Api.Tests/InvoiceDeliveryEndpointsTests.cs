@@ -104,7 +104,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         createInvoiceResponse.EnsureSuccessStatusCode();
         var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         var invoiceId = createdInvoice.GetProperty("id").GetGuid();
-        var storageKey = $"users/{TestAuthContext.UserId:D}/invoices/{invoiceId:D}/invoice.pdf";
+        var storageKey = $"users/{TestAuthContext.UserId:N}/invoices/{invoiceId:D}/invoice.pdf";
         var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 blob-backed invoice content");
 
         using (var scope = _factory.Services.CreateScope())
