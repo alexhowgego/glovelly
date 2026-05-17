@@ -4,8 +4,6 @@ namespace Glovelly.Api.Services;
 
 public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timeProvider) : IInvoicePdfService
 {
-    private const string PdfContentType = "application/pdf";
-
     public async Task SaveGeneratedPdfAsync(
         Invoice invoice,
         Guid? userId,
@@ -15,14 +13,14 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         ArgumentNullException.ThrowIfNull(invoice);
         ArgumentNullException.ThrowIfNull(content);
 
-        var key = BuildStorageKey(invoice, userId);
+        var key = InvoicePdfStorage.BuildStorageKey(invoice, userId);
         await blobStore.SaveAsync(
-            new BlobWriteRequest(key, new MemoryStream(content, writable: false), PdfContentType, content.Length),
+            new BlobWriteRequest(key, new MemoryStream(content, writable: false), InvoicePdfStorage.ContentType, content.Length),
             cancellationToken);
 
         invoice.PdfStorageKey = key;
         invoice.PdfFileName = $"{invoice.InvoiceNumber}.pdf";
-        invoice.PdfContentType = PdfContentType;
+        invoice.PdfContentType = InvoicePdfStorage.ContentType;
         invoice.PdfSizeBytes = content.Length;
         invoice.PdfGeneratedAt = timeProvider.GetUtcNow();
         invoice.PdfBlob = null;
@@ -39,7 +37,7 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
             var blob = await blobStore.OpenReadAsync(invoice.PdfStorageKey, cancellationToken);
             return new InvoicePdfContent(
                 blob.Content,
-                string.IsNullOrWhiteSpace(blob.ContentType) ? PdfContentType : blob.ContentType,
+                string.IsNullOrWhiteSpace(blob.ContentType) ? InvoicePdfStorage.ContentType : blob.ContentType,
                 blob.SizeBytes ?? invoice.PdfSizeBytes ?? 0);
         }
 
@@ -47,7 +45,7 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         {
             return new InvoicePdfContent(
                 new MemoryStream(legacyPdf, writable: false),
-                PdfContentType,
+                InvoicePdfStorage.ContentType,
                 legacyPdf.Length);
         }
 
@@ -61,14 +59,5 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         return string.IsNullOrWhiteSpace(invoice.PdfStorageKey)
             ? Task.CompletedTask
             : blobStore.DeleteAsync(invoice.PdfStorageKey, cancellationToken);
-    }
-
-    private static string BuildStorageKey(Invoice invoice, Guid? userId)
-    {
-        var ownerSegment = userId.HasValue
-            ? userId.Value.ToString("N")
-            : invoice.CreatedByUserId?.ToString("N") ?? "unassigned";
-
-        return $"users/{ownerSegment}/invoices/{invoice.Id:D}/invoice.pdf";
     }
 }
