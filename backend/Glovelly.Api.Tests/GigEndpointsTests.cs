@@ -832,4 +832,78 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(425.00m, savedGig.GetProperty("fee").GetDecimal());
         Assert.Equal("Confirmed", savedGig.GetProperty("status").GetString());
     }
+
+    [Fact]
+    public async Task UpdateGigStatus_UpdatesOnlyStatus()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Issue flow performance",
+            date = "2026-07-12",
+            venue = "Botanical Gardens",
+            fee = 425.00m,
+            travelMiles = 12.00m,
+            notes = "Keep the invoice link",
+            wasDriving = true,
+            status = 1,
+            invoiceId = TestData.FoxInvoiceId,
+            expenses = new[]
+            {
+                new
+                {
+                    sortOrder = 1,
+                    description = "Parking",
+                    amount = 8.50m,
+                },
+            },
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        var response = await _client.PatchAsJsonAsync($"/gigs/{gigId}/status", new
+        {
+            status = "Completed",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var updatedGig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Completed", updatedGig.GetProperty("status").GetString());
+        Assert.Equal(TestData.FoxInvoiceId, updatedGig.GetProperty("invoiceId").GetGuid());
+        Assert.Equal(1, updatedGig.GetProperty("expenses").GetArrayLength());
+        Assert.Equal("Parking", updatedGig.GetProperty("expenses")[0].GetProperty("description").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateGigStatus_WithInvalidStatus_ReturnsValidationProblem()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Invalid status patch target",
+            date = "2026-07-13",
+            venue = "Botanical Gardens",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = 1,
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        var response = await _client.PatchAsJsonAsync($"/gigs/{gigId}/status", new
+        {
+            status = 999,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Status is invalid.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
 }

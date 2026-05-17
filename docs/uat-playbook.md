@@ -231,15 +231,17 @@ Expected result: redraft and re-issue update the PDF, preserve the expected invo
 
 ## Invoice Status And Delivery Journey
 
-1. Open a draft invoice.
+1. Open a draft invoice linked to one or more non-cancelled gigs.
 2. Issue it.
-3. Confirm issue date/due date/PDF update.
-4. Send it by email if a recipient is configured.
-5. Optionally include receipt attachments.
-6. Publish to Google Drive if connected.
-7. Re-issue an issued invoice.
+3. Accept the prompt to mark the linked gig or gigs as completed.
+4. Repeat with another linked draft invoice and decline the gig completion prompt.
+5. Open another draft invoice and send it by email if a recipient is configured.
+6. Optionally include receipt attachments, then accept the prompt to mark the delivered draft as issued.
+7. Accept or decline the follow-up linked gig completion prompt.
+8. Publish a draft invoice to Google Drive if connected, then repeat the delivered-draft issue prompt check.
+9. Re-issue an issued invoice.
 
-Expected result: status transitions are explicit, delivery state is recorded, PDF remains downloadable, and receipt attachments are included only when requested.
+Expected result: status transitions are explicit, delivery state is recorded, delivered drafts can be promoted to issued by choice, issuing an invoice can complete linked gigs by choice, declined prompts leave existing invoice/gig state unchanged, PDF remains downloadable, and receipt attachments are included only when requested.
 
 ## Seller Profile And Defaults Journey
 
