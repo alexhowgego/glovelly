@@ -39,6 +39,40 @@ internal static class GigCrudEndpoints
             return gig is null ? Results.NotFound() : Results.Ok(gig);
         });
 
+        group.MapPatch("/{id:guid}/status", async (
+            Guid id,
+            GigStatusUpdateRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var gig = await db.Gigs
+                .WhereVisibleTo(userId)
+                .Include(value => value.Expenses)
+                    .ThenInclude(expense => expense.Attachments)
+                .FirstOrDefaultAsync(value => value.Id == id);
+
+            if (gig is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (!Enum.IsDefined(request.Status))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Status is invalid."]
+                });
+            }
+
+            gig.Status = request.Status;
+            EndpointSupport.StampUpdate(gig, userId);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(gig);
+        });
+
         group.MapPost("/", async (
             Gig gig,
             AppDbContext db,
@@ -248,6 +282,22 @@ internal static class GigCrudEndpoints
                 return Results.NotFound();
             }
 
+            if (gig.Status != GigStatus.Confirmed)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Only planned gigs can be deleted."]
+                });
+            }
+
+            if (gig.InvoiceId.HasValue)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["invoiceId"] = ["Gigs with linked invoices cannot be deleted."]
+                });
+            }
+
             foreach (var attachment in gig.Expenses.SelectMany(expense => expense.Attachments).ToList())
             {
                 await attachmentStore.DeleteAsync(attachment.StorageKey);
@@ -262,4 +312,6 @@ internal static class GigCrudEndpoints
 
         return group;
     }
+
+    private sealed record GigStatusUpdateRequest(GigStatus Status);
 }

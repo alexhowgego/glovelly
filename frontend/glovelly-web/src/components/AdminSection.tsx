@@ -13,6 +13,7 @@ type AdminSectionProps = {
   filteredAdminUsers: AdminUser[]
   isAdminLoading: boolean
   onCloseEditor: () => void
+  onDeleteUser: () => void
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
   onSelectUser: (userId: string) => void
@@ -34,6 +35,7 @@ export function AdminSection({
   filteredAdminUsers,
   isAdminLoading,
   onCloseEditor,
+  onDeleteUser,
   onResetForm,
   onSearchQueryChange,
   onSelectUser,
@@ -138,6 +140,23 @@ export function AdminSection({
                 disabled={!selectedAdminUser}
               >
                 Edit access
+              </button>
+              <button
+                className="danger-button"
+                onClick={onDeleteUser}
+                type="button"
+                disabled={
+                  isAdminLoading ||
+                  !selectedAdminUser ||
+                  selectedAdminUser.isActive
+                }
+                title={
+                  selectedAdminUser?.isActive
+                    ? 'Only inactive users can be deleted.'
+                    : 'Delete inactive user'
+                }
+              >
+                Delete user
               </button>
             </div>
           </div>

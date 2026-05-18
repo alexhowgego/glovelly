@@ -166,7 +166,7 @@ export function useInvoicesWorkspace({
 
   const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus) => {
     if (invoice.status === status) {
-      return
+      return invoice
     }
 
     setIsInvoiceLoading(true)
@@ -192,8 +192,10 @@ export function useInvoicesWorkspace({
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
       setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
+      return updatedInvoice
     } catch (error) {
       setInvoiceStatus(error instanceof Error ? error.message : 'Unable to update invoice status.')
+      return null
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -305,8 +307,10 @@ export function useInvoicesWorkspace({
       setInvoiceStatus(
         `Invoice ${updatedInvoice.invoiceNumber} sent to ${updatedInvoice.lastDeliveryRecipient}.`
       )
+      return updatedInvoice
     } catch (error) {
       setInvoiceStatus(error instanceof Error ? error.message : 'Unable to send invoice email.')
+      return null
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -360,6 +364,7 @@ export function useInvoicesWorkspace({
       } else {
         setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} published to Google Drive.`)
       }
+      return updatedInvoice
     } catch (error) {
       setGoogleDrivePublishLink(null)
       setInvoiceStatus(
@@ -367,6 +372,7 @@ export function useInvoicesWorkspace({
           ? error.message
           : 'Unable to publish invoice to Google Drive.'
       )
+      return null
     } finally {
       setIsInvoiceLoading(false)
     }

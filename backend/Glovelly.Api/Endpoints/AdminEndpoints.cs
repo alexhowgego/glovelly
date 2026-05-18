@@ -115,6 +115,41 @@ public static class AdminEndpoints
             return Results.Ok(user);
         });
 
+        users.MapDelete("/{id:guid}", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal principal,
+            ICurrentUserAccessor currentUserAccessor) =>
+        {
+            var user = await db.Users.FirstOrDefaultAsync(value => value.Id == id);
+            if (user is null)
+            {
+                return Results.NotFound();
+            }
+
+            var currentUserId = currentUserAccessor.TryGetUserId(principal);
+            if (currentUserId == user.Id)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["id"] = ["You cannot delete your own administrator account."]
+                });
+            }
+
+            if (user.IsActive)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["isActive"] = ["Only inactive users can be deleted."]
+                });
+            }
+
+            db.Users.Remove(user);
+            await db.SaveChangesAsync();
+
+            return Results.NoContent();
+        });
+
         return app;
     }
 

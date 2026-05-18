@@ -44,6 +44,7 @@ import type {
   Client,
   Gig,
   Invoice,
+  InvoiceStatus,
   SellerProfile,
 } from './types'
 import './App.css'
@@ -147,6 +148,7 @@ function App({ appMetadata }: AppProps) {
     adminStatus,
     adminUsers,
     closeAdminEditor,
+    deleteAdminUser,
     filteredAdminUsers,
     handleAdminSubmit,
     isAdminEditorOpen,
@@ -155,8 +157,8 @@ function App({ appMetadata }: AppProps) {
     markAdminLoadFailed,
     resetAdminWorkspace,
     selectedAdminUser,
+    selectAdminUser,
     setAdminSearchQuery,
-    setSelectedAdminUserId,
     startAdminCreate,
     startAdminEdit,
     totalAdmins,
@@ -185,7 +187,7 @@ function App({ appMetadata }: AppProps) {
     resetClientsWorkspace,
     searchQuery,
     selectedClient,
-    setSelectedClientId,
+    selectClient,
     setSearchQuery,
     startCreating,
     startEditing,
@@ -203,6 +205,7 @@ function App({ appMetadata }: AppProps) {
     closeGigEditor,
     closeExpenseStatement,
     completedGigCount,
+    deleteGig,
     deleteExpenseAttachment,
     downloadExpenseAttachment,
     downloadExpenseStatementPdf,
@@ -240,6 +243,7 @@ function App({ appMetadata }: AppProps) {
     selectedGig,
     selectedGigIds,
     selectedGigs,
+    selectGig,
     setGigExpenseAmount,
     setGigExpenseDescription,
     setGigs,
@@ -783,6 +787,134 @@ function App({ appMetadata }: AppProps) {
     await openInvoicePreview(invoice)
   }
 
+  const promptToCompleteLinkedGigs = async (invoice: Invoice) => {
+    const linkedGigs = gigs.filter(
+      (gig) =>
+        gig.invoiceId === invoice.id &&
+        gig.status !== 'Completed' &&
+        gig.status !== 'Cancelled'
+    )
+    if (linkedGigs.length === 0) {
+      return
+    }
+
+    const linkedGigLabel =
+      linkedGigs.length === 1
+        ? `"${linkedGigs[0].title}"`
+        : `${linkedGigs.length} linked gigs`
+    const shouldComplete = window.confirm(
+      `Mark ${linkedGigLabel} as completed now that invoice ${invoice.invoiceNumber} is issued?`
+    )
+    if (!shouldComplete) {
+      setGigStatus('Linked gig status left unchanged.')
+      setInvoiceStatus(`Invoice ${invoice.invoiceNumber} issued; linked gig status left unchanged.`)
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setGigStatus(
+      linkedGigs.length === 1
+        ? `Marking ${linkedGigs[0].title} as completed...`
+        : `Marking ${linkedGigs.length} linked gigs as completed...`
+    )
+
+    try {
+      const completedGigs: Gig[] = []
+      for (const gig of linkedGigs) {
+        const response = await fetchWithSession(buildApiUrl(`/gigs/${gig.id}/status`), {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: 'Completed',
+          }),
+        })
+
+        if (isSessionExpiredResponse(response)) {
+          expireSession('Your session expired. Sign in again to keep managing gigs.')
+          return
+        }
+
+        if (!response.ok) {
+          const problem = await parseProblemDetails(response)
+          const validationMessages = problem?.errors
+            ? Object.values(problem.errors).flat().join(' ')
+            : problem?.detail ?? problem?.title
+          throw new Error(validationMessages || 'Unable to complete linked gig.')
+        }
+
+        completedGigs.push((await response.json()) as Gig)
+      }
+
+      setGigs((current) =>
+        current.map((gig) => completedGigs.find((value) => value.id === gig.id) ?? gig)
+      )
+      setGigStatus(
+        completedGigs.length === 1
+          ? `"${completedGigs[0].title}" marked as completed.`
+          : `${completedGigs.length} linked gigs marked as completed.`
+      )
+      setInvoiceStatus(
+        completedGigs.length === 1
+          ? `Invoice ${invoice.invoiceNumber} issued; linked gig marked as completed.`
+          : `Invoice ${invoice.invoiceNumber} issued; ${completedGigs.length} linked gigs marked as completed.`
+      )
+    } catch (error) {
+      setGigStatus(error instanceof Error ? error.message : 'Unable to complete linked gig.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
+  const handleInvoiceStatusChangeWithGigPrompt = async (
+    invoice: Invoice,
+    status: InvoiceStatus
+  ) => {
+    const updatedInvoice = await handleInvoiceStatusChange(invoice, status)
+    if (updatedInvoice?.status === 'Issued' && invoice.status !== 'Issued') {
+      await promptToCompleteLinkedGigs(updatedInvoice)
+    }
+
+    return updatedInvoice
+  }
+
+  const promptToIssueDeliveredDraft = async (invoice: Invoice) => {
+    if (invoice.status !== 'Draft') {
+      return invoice
+    }
+
+    const shouldIssue = window.confirm(
+      `Mark delivered draft invoice ${invoice.invoiceNumber} as issued?`
+    )
+    if (!shouldIssue) {
+      setInvoiceStatus(`Invoice ${invoice.invoiceNumber} delivered and left as Draft.`)
+      return invoice
+    }
+
+    return (
+      (await handleInvoiceStatusChangeWithGigPrompt(invoice, 'Issued')) ?? invoice
+    )
+  }
+
+  const handleSendInvoiceEmailWithIssuePrompt = async (invoice: Invoice) => {
+    const deliveredInvoice = await handleSendInvoiceEmail(invoice)
+    if (!deliveredInvoice) {
+      return null
+    }
+
+    return promptToIssueDeliveredDraft(deliveredInvoice)
+  }
+
+  const handlePublishInvoiceGoogleDriveWithIssuePrompt = async (invoice: Invoice) => {
+    const deliveredInvoice = await handlePublishInvoiceGoogleDrive(invoice)
+    if (!deliveredInvoice) {
+      return null
+    }
+
+    return promptToIssueDeliveredDraft(deliveredInvoice)
+  }
+
   const handleInvoiceReissueWithPreview = async (invoice: Invoice) => {
     const updatedInvoice = await handleInvoiceReissue(invoice)
     if (updatedInvoice) {
@@ -1125,7 +1257,7 @@ function App({ appMetadata }: AppProps) {
         onOpenClientSettings={openClientSettings}
         onResetForm={startCreating}
         onSearchQueryChange={setSearchQuery}
-        onSelectClient={setSelectedClientId}
+        onSelectClient={selectClient}
         onStartEditing={startEditing}
         onSubmit={handleSubmit}
         onUpdateAddressField={updateAddressField}
@@ -1146,9 +1278,10 @@ function App({ appMetadata }: AppProps) {
         filteredAdminUsers={filteredAdminUsers}
         isAdminLoading={isAdminLoading}
         onCloseEditor={closeAdminEditor}
+        onDeleteUser={deleteAdminUser}
         onResetForm={startAdminCreate}
         onSearchQueryChange={setAdminSearchQuery}
-        onSelectUser={setSelectedAdminUserId}
+        onSelectUser={selectAdminUser}
         onStartEditing={startAdminEdit}
         onSubmit={handleAdminSubmit}
         onUpdateField={updateAdminField}
@@ -1177,6 +1310,7 @@ function App({ appMetadata }: AppProps) {
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateExpenseStatement={openExpenseStatement}
         onGenerateInvoice={handleGenerateInvoice}
+        onDeleteGig={deleteGig}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
         onOpenLinkedInvoice={openSelectedGigInvoice}
         onOpenSellerProfile={openSellerProfile}
@@ -1185,7 +1319,7 @@ function App({ appMetadata }: AppProps) {
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
         onSearchQueryChange={setGigSearchQuery}
-        onSelectGig={setSelectedGigId}
+        onSelectGig={selectGig}
         onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
         onSubmit={handleGigSubmit}
@@ -1223,12 +1357,12 @@ function App({ appMetadata }: AppProps) {
         onCloseEditor={closeInvoiceEditor}
         onDeleteInvoice={handleDeleteInvoice}
         onDownloadPdf={handleDownloadInvoicePdf}
-        onInvoiceStatusChange={handleInvoiceStatusChange}
+        onInvoiceStatusChange={handleInvoiceStatusChangeWithGigPrompt}
         onOpenSellerProfile={openSellerProfile}
         onPreviewPdf={previewInvoicePdf}
-        onPublishGoogleDrive={handlePublishInvoiceGoogleDrive}
+        onPublishGoogleDrive={handlePublishInvoiceGoogleDriveWithIssuePrompt}
         onReissue={handleInvoiceReissueWithPreview}
-        onSendEmail={handleSendInvoiceEmail}
+        onSendEmail={handleSendInvoiceEmailWithIssuePrompt}
         onSearchQueryChange={setInvoiceSearchQuery}
         onSelectInvoice={setSelectedInvoiceId}
         onStartEditing={startInvoiceEdit}

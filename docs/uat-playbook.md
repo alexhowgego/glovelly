@@ -31,6 +31,49 @@ Use a fresh browser session if possible. If you are testing against seeded local
 
 Expected result: navigation, session state, and core reads are healthy.
 
+## Editor Navigation Regression Checks
+
+This guards against issue 121 and nearby editor discard paths.
+
+For Clients:
+
+1. Open Clients, select a client, and click `Edit`.
+2. Change a field without saving.
+3. Select a different client in the list and decline the discard prompt.
+4. Confirm the original client remains selected and the unsaved edit remains visible.
+5. Select the different client again and accept the discard prompt.
+6. Confirm the editor updates to the newly selected client.
+7. Change a field again, click `New client`, and decline the discard prompt.
+8. Click `New client` again and accept the discard prompt.
+
+Expected result: unsaved client edits are never discarded without confirmation. Accepted navigation switches the editor to the selected client or a blank new-client form.
+
+For Gigs:
+
+1. Open Gigs, select a gig, and click `Edit gig`.
+2. Change a field or add an unsaved expense row.
+3. Select a different gig in the list and decline the discard prompt.
+4. Confirm the original gig remains selected and the unsaved edit remains visible.
+5. Select the different gig again and accept the discard prompt.
+6. Confirm the editor updates to the newly selected gig.
+7. Change a field again, click `New gig`, and decline the discard prompt.
+8. Click `New gig` again and accept the discard prompt.
+
+Expected result: unsaved gig edits and unsaved expense draft fields are never discarded without confirmation. Accepted navigation switches the editor to the selected gig or a blank new-gig form.
+
+For Admin:
+
+1. Open Admin as an administrator, select a user, and click `Edit access`.
+2. Change a field without saving.
+3. Select a different user in the list and decline the discard prompt.
+4. Confirm the original user remains selected and the unsaved edit remains visible.
+5. Select the different user again and accept the discard prompt.
+6. Confirm the editor updates to the newly selected user.
+7. Change a field again, click `Add user`, and decline the discard prompt.
+8. Click `Add user` again and accept the discard prompt.
+
+Expected result: unsaved admin access edits are never discarded without confirmation. Accepted navigation switches the editor to the selected user or a blank add-user form.
+
 ## Gig To Invoice Journey
 
 1. Create a client or choose an existing client.
@@ -73,6 +116,26 @@ Expected result: if the linked invoice is a draft, the app asks whether to regen
 4. Save.
 
 Expected result: the app asks whether to cancel the linked invoice. If accepted and the invoice status allows cancellation, the invoice moves to `Cancelled`. If declined, the gig is cancelled but the invoice remains unchanged.
+
+## Deleting A Gig
+
+1. Create or identify an uninvoiced gig with status `Planned`.
+2. Select the gig in Gigs.
+3. Confirm the `Delete gig` button is red and enabled.
+4. Click `Delete gig` and decline the confirmation prompt.
+5. Confirm the gig remains in the list.
+6. Click `Delete gig` again and accept the confirmation prompt.
+
+Expected result: the planned, uninvoiced gig is removed from the list and cannot be reopened.
+
+Negative checks:
+
+1. Select a gig with status `Draft`, `Completed`, or `Cancelled`.
+2. Confirm `Delete gig` is disabled and explains that only planned gigs can be deleted.
+3. Select a planned gig that is linked to an invoice.
+4. Confirm `Delete gig` is disabled and explains that gigs with linked invoices cannot be deleted.
+
+Expected result: only planned gigs with no linked invoice can be deleted. Linked invoice history is never removed by deleting a gig.
 
 ## Combined Invoice Journey
 
@@ -231,15 +294,17 @@ Expected result: redraft and re-issue update the PDF, preserve the expected invo
 
 ## Invoice Status And Delivery Journey
 
-1. Open a draft invoice.
+1. Open a draft invoice linked to one or more non-cancelled gigs.
 2. Issue it.
-3. Confirm issue date/due date/PDF update.
-4. Send it by email if a recipient is configured.
-5. Optionally include receipt attachments.
-6. Publish to Google Drive if connected.
-7. Re-issue an issued invoice.
+3. Accept the prompt to mark the linked gig or gigs as completed.
+4. Repeat with another linked draft invoice and decline the gig completion prompt.
+5. Open another draft invoice and send it by email if a recipient is configured.
+6. Optionally include receipt attachments, then accept the prompt to mark the delivered draft as issued.
+7. Accept or decline the follow-up linked gig completion prompt.
+8. Publish a draft invoice to Google Drive if connected, then repeat the delivered-draft issue prompt check.
+9. Re-issue an issued invoice.
 
-Expected result: status transitions are explicit, delivery state is recorded, PDF remains downloadable, and receipt attachments are included only when requested.
+Expected result: status transitions are explicit, delivery state is recorded, delivered drafts can be promoted to issued by choice, issuing an invoice can complete linked gigs by choice, declined prompts leave existing invoice/gig state unchanged, PDF remains downloadable, and receipt attachments are included only when requested.
 
 ## Seller Profile And Defaults Journey
 
@@ -262,6 +327,18 @@ For admin users:
 5. Confirm the user list updates.
 
 Expected result: admin changes persist and non-admin users cannot access admin workflows.
+
+Then test inactive user deletion:
+
+1. Select an active user.
+2. Confirm the `Delete user` button is red and disabled.
+3. Edit that user, mark the account inactive, and save.
+4. Confirm `Delete user` is enabled.
+5. Click `Delete user` and decline the confirmation prompt.
+6. Confirm the user remains in the list.
+7. Click `Delete user` again and accept the confirmation prompt.
+
+Expected result: only inactive users can be deleted. Active users, including the current administrator account, cannot be deleted.
 
 ## Regression Notes
 
