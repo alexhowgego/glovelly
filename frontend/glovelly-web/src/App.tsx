@@ -202,6 +202,7 @@ function App({ appMetadata }: AppProps) {
   })
   const {
     applyGigs,
+    cloneSelectedGig,
     closeGigEditor,
     closeExpenseStatement,
     completedGigCount,
@@ -1312,6 +1313,7 @@ function App({ appMetadata }: AppProps) {
         onGenerateInvoice={handleGenerateInvoice}
         onDeleteGig={deleteGig}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
+        onCloneGig={cloneSelectedGig}
         onOpenLinkedInvoice={openSelectedGigInvoice}
         onOpenSellerProfile={openSellerProfile}
         onUploadExpenseAttachment={uploadExpenseAttachment}

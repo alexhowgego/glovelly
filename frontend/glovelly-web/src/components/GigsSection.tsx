@@ -33,6 +33,7 @@ type GigsSectionProps = {
   onGenerateInvoice: () => void
   onDeleteGig: () => void
   onDownloadExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
+  onCloneGig: () => void
   onOpenLinkedInvoice: () => void
   onOpenSellerProfile: () => void
   onUploadExpenseAttachment: (index: number, file: File) => void
@@ -88,6 +89,7 @@ export function GigsSection({
   onGenerateInvoice,
   onDeleteGig,
   onDownloadExpenseAttachment,
+  onCloneGig,
   onOpenLinkedInvoice,
   onOpenSellerProfile,
   onUploadExpenseAttachment,
@@ -258,6 +260,14 @@ export function GigsSection({
                 disabled={!selectedGig}
               >
                 Edit gig
+              </button>
+              <button
+                className="ghost-button"
+                onClick={onCloneGig}
+                type="button"
+                disabled={isGigLoading || !selectedGig}
+              >
+                Clone gig
               </button>
               <button
                 className="danger-button"

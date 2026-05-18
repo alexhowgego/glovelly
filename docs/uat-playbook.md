@@ -137,6 +137,29 @@ Negative checks:
 
 Expected result: only planned gigs with no linked invoice can be deleted. Linked invoice history is never removed by deleting a gig.
 
+## Cloning A Gig
+
+1. Create or identify a saved gig with a fee, date, venue, notes, and driving details.
+2. Select the gig in Gigs.
+3. Click `Clone gig`.
+4. If the gig has expenses, decline the expenses prompt.
+5. Confirm a new gig is created and immediately opens in the edit pane.
+6. Confirm the cloned gig has the same core details as the original, has no linked invoice, and has no copied expenses.
+7. Change at least one identifying detail, such as date or title, then save.
+
+Expected result: cloning creates a separate gig record, opens it for editing straight away, and never copies invoice linkage.
+
+Expense copy check:
+
+1. Select a saved gig with at least one expense and, ideally, at least one receipt attachment.
+2. Click `Clone gig`.
+3. Accept the expenses prompt.
+4. Confirm the cloned gig opens in the edit pane with copied expense descriptions and amounts.
+5. Confirm copied expenses have no receipt attachments.
+6. Save the cloned gig, then generate an invoice from it.
+
+Expected result: expenses are copied only when accepted, receipt attachments are not copied, and any invoice generated from the clone is a new invoice linked only to the cloned gig.
+
 ## Combined Invoice Journey
 
 1. Create two uninvoiced gigs for the same client.
