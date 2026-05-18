@@ -22,7 +22,6 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .HasMaxLength(320);
         entity.Property(invoice => invoice.Description)
             .HasMaxLength(4000);
-        entity.Property(invoice => invoice.PdfBlob);
         entity.Property(invoice => invoice.PdfStorageKey)
             .HasMaxLength(600);
         entity.Property(invoice => invoice.PdfFileName)

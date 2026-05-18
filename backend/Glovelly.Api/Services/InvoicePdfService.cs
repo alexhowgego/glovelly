@@ -23,7 +23,6 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         invoice.PdfContentType = InvoicePdfStorage.ContentType;
         invoice.PdfSizeBytes = content.Length;
         invoice.PdfGeneratedAt = timeProvider.GetUtcNow();
-        invoice.PdfBlob = null;
     }
 
     public async Task<InvoicePdfContent?> OpenReadAsync(
@@ -39,14 +38,6 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
                 blob.Content,
                 string.IsNullOrWhiteSpace(blob.ContentType) ? InvoicePdfStorage.ContentType : blob.ContentType,
                 blob.SizeBytes ?? invoice.PdfSizeBytes ?? 0);
-        }
-
-        if (invoice.PdfBlob is { Length: > 0 } legacyPdf)
-        {
-            return new InvoicePdfContent(
-                new MemoryStream(legacyPdf, writable: false),
-                InvoicePdfStorage.ContentType,
-                legacyPdf.Length);
         }
 
         return null;

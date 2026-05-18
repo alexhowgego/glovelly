@@ -25,7 +25,6 @@ public sealed class Invoice
     public DateTimeOffset? LastDeliveredUtc { get; set; }
     public Guid? LastDeliveredByUserId { get; set; }
     public string? Description { get; set; }
-    public byte[]? PdfBlob { get; set; }
     public string? PdfStorageKey { get; set; }
     public string? PdfFileName { get; set; }
     public string? PdfContentType { get; set; }

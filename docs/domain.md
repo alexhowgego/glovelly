@@ -38,7 +38,6 @@
 - pdfContentType?
 - pdfSizeBytes?
 - pdfGeneratedAt?
-- pdfBlob? (legacy fallback during migration)
 - subtotal
 - notes
 
@@ -48,7 +47,7 @@ Generated invoice PDFs are written through the domain-agnostic blob store using 
 users/{userId}/invoices/{invoiceId}/invoice.pdf
 ```
 
-The `{userId}` segment uses the same dashless GUID format as receipt attachment keys. During the migration, download and delivery paths prefer `pdfStorageKey` and fall back to `pdfBlob` for older invoices. The backfill path is to enumerate invoices where `pdfBlob` is present and `pdfStorageKey` is null, save each blob through `IBlobStore` with the same key shape, populate the PDF metadata, verify downloads/delivery, and remove `PdfBlob` in a later cleanup.
+The `{userId}` segment uses the same dashless GUID format as receipt attachment keys. Download and delivery paths read PDFs from blob storage through `pdfStorageKey`.
 
 ## InvoiceLine
 - id

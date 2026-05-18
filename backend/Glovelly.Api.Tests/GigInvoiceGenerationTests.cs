@@ -65,7 +65,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal(TestData.FoxAndFinchId, invoice.GetProperty("clientId").GetGuid());
         Assert.Equal("In respect of One-off corporate booking at King's House on 2026-06-20.", invoice.GetProperty("description").GetString());
         Assert.False(string.IsNullOrWhiteSpace(invoice.GetProperty("invoiceNumber").GetString()));
-        Assert.Equal(JsonValueKind.Null, invoice.GetProperty("pdfBlob").ValueKind);
+        Assert.False(invoice.TryGetProperty("pdfBlob", out _));
         Assert.Contains(
             $"users/{TestAuthContext.UserId:N}/",
             invoice.GetProperty("pdfStorageKey").GetString());
@@ -410,7 +410,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 
         Assert.Equal(HttpStatusCode.OK, redraftResponse.StatusCode);
         var redraftedInvoice = await redraftResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-        Assert.Equal(JsonValueKind.Null, redraftedInvoice.GetProperty("pdfBlob").ValueKind);
+        Assert.False(redraftedInvoice.TryGetProperty("pdfBlob", out _));
         Assert.Equal("application/pdf", redraftedInvoice.GetProperty("pdfContentType").GetString());
         Assert.True(redraftedInvoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
         Assert.Equal(2, redraftedInvoice.GetProperty("lines").GetArrayLength());
