@@ -240,6 +240,16 @@ Then check driving and mileage:
 
 Expected result: mileage lines disappear while driving is disabled and return when driving is re-enabled. Toggling driving must not erase previously saved mileage or passenger values.
 
+Then check app-level mileage defaults:
+
+1. Open user settings and clear both mileage rate fields so the user has no personal mileage or passenger mileage defaults.
+2. Open or create a client and leave both client mileage rate fields blank so they inherit defaults.
+3. Create a gig for that client with `I was driving for this gig` enabled, travel miles greater than zero, and passenger count greater than zero.
+4. Generate an invoice from the gig.
+5. Open the invoice lines and PDF preview.
+
+Expected result: the invoice includes both mileage and passenger mileage lines using the configured app defaults, not blank or omitted lines. The PDF preview/download should show the same mileage lines as the invoice workspace.
+
 ## Expense Statement Journey
 
 1. Create or identify multiple gigs for the same client with expenses.

@@ -205,6 +205,62 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
     }
 
     [Fact]
+    public async Task GenerateInvoice_FromGig_UsesAppMileageDefaultsWhenUserAndClientRatesAreMissing()
+    {
+        var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = (decimal?)null,
+            passengerMileageRate = (decimal?)null,
+            defaultPaymentWindowDays = 14,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+        });
+        updateSettingsResponse.EnsureSuccessStatusCode();
+
+        var createGigResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.RiversideId,
+            title = "Default mileage booking",
+            date = "2026-06-22",
+            venue = "River Room",
+            fee = 200.00m,
+            travelMiles = 8.00m,
+            passengerCount = 1,
+            notes = "Uses app fallback rates",
+            wasDriving = true,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createGigResponse.EnsureSuccessStatusCode();
+
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var generateResponse = await _client.PostAsync(
+            $"/gigs/{createdGig.GetProperty("id").GetGuid()}/generate-invoice",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.Created, generateResponse.StatusCode);
+
+        var invoice = await generateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
+
+        Assert.Equal(3, lines.Length);
+        Assert.Equal("PerformanceFee", lines[0].GetProperty("type").GetString());
+        Assert.Equal(200.00m, lines[0].GetProperty("lineTotal").GetDecimal());
+
+        Assert.Equal("Mileage", lines[1].GetProperty("type").GetString());
+        Assert.Equal(8.00m, lines[1].GetProperty("quantity").GetDecimal());
+        Assert.Equal(0.45m, lines[1].GetProperty("unitPrice").GetDecimal());
+        Assert.Equal(3.60m, lines[1].GetProperty("lineTotal").GetDecimal());
+
+        Assert.Equal("PassengerMileage", lines[2].GetProperty("type").GetString());
+        Assert.Equal(8.00m, lines[2].GetProperty("quantity").GetDecimal());
+        Assert.Equal(0.10m, lines[2].GetProperty("unitPrice").GetDecimal());
+        Assert.Equal(0.80m, lines[2].GetProperty("lineTotal").GetDecimal());
+
+        Assert.Equal(204.40m, invoice.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
     public async Task GenerateInvoice_FromSelectedGigs_CreatesCombinedInvoiceOrderedByDate()
     {
         var firstGigResponse = await _client.PostAsJsonAsync("/gigs", new
