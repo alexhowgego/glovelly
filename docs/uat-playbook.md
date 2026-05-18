@@ -31,6 +31,21 @@ Use a fresh browser session if possible. If you are testing against seeded local
 
 Expected result: navigation, session state, and core reads are healthy.
 
+## Cross-Workspace Navigation Shortcuts
+
+1. Open Gigs and select a gig with a known client.
+2. Click the client name in the gig overview.
+3. Confirm the app opens Clients with that client selected.
+4. Open Invoices and select an invoice with a known client.
+5. Click the client name in the invoice overview.
+6. Confirm the app opens Clients with that client selected.
+7. Open the same invoice line-items pane.
+8. Click a generated line-item title for a performance fee, mileage, passenger mileage, or expense line.
+9. Confirm the app opens Gigs with the corresponding gig selected.
+10. Confirm manual adjustment lines are not shown as gig links.
+
+Expected result: cross-workspace shortcuts preserve the intended target record, clear stale search filters that would hide the target, and leave unrelated records unchanged.
+
 ## Editor Navigation Regression Checks
 
 This guards against issue 121 and nearby editor discard paths.

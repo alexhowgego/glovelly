@@ -28,6 +28,8 @@ type InvoicesSectionProps = {
   onDeleteInvoice: (invoice: Invoice) => Promise<void>
   onDownloadPdf: (invoice: Invoice) => Promise<void>
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<Invoice | null>
+  onOpenClient: (clientId: string) => void
+  onOpenGig: (gigId: string) => void
   onOpenSellerProfile: () => void
   onPreviewPdf: (invoice: Invoice) => Promise<void>
   onPublishGoogleDrive: (invoice: Invoice) => Promise<Invoice | null>
@@ -62,6 +64,8 @@ export function InvoicesSection({
   onDeleteInvoice,
   onDownloadPdf,
   onInvoiceStatusChange,
+  onOpenClient,
+  onOpenGig,
   onOpenSellerProfile,
   onPreviewPdf,
   onPublishGoogleDrive,
@@ -262,7 +266,13 @@ export function InvoicesSection({
               <div className="detail-grid">
                 <article>
                   <p className="detail-label">Client</p>
-                  <strong>{selectedInvoiceClientName}</strong>
+                  <button
+                    className="link-button detail-link"
+                    onClick={() => onOpenClient(selectedInvoice.clientId)}
+                    type="button"
+                  >
+                    {selectedInvoiceClientName}
+                  </button>
                 </article>
                 <article>
                   <p className="detail-label">Status</p>
@@ -410,20 +420,34 @@ export function InvoicesSection({
                   {selectedInvoice.lines
                     .slice()
                     .sort((left, right) => left.sortOrder - right.sortOrder)
-                    .map((line) => (
-                      <div className="invoice-line-item" key={line.id}>
-                        <div>
-                          <strong>{line.description}</strong>
-                          <span>
-                            {line.type} · {line.quantity} x {formatCurrency(line.unitPrice)}
-                          </span>
-                          {line.type === 'ManualAdjustment' ? (
-                            <span>Audit: {formatDateTime(line.createdUtc)}</span>
-                          ) : null}
+                    .map((line) => {
+                      const gigId = line.gigId
+
+                      return (
+                        <div className="invoice-line-item" key={line.id}>
+                          <div>
+                            {gigId ? (
+                              <button
+                                className="link-button invoice-line-link"
+                                onClick={() => onOpenGig(gigId)}
+                                type="button"
+                              >
+                                {line.description}
+                              </button>
+                            ) : (
+                              <strong>{line.description}</strong>
+                            )}
+                            <span>
+                              {line.type} · {line.quantity} x {formatCurrency(line.unitPrice)}
+                            </span>
+                            {line.type === 'ManualAdjustment' ? (
+                              <span>Audit: {formatDateTime(line.createdUtc)}</span>
+                            ) : null}
+                          </div>
+                          <strong>{formatCurrency(line.lineTotal)}</strong>
                         </div>
-                        <strong>{formatCurrency(line.lineTotal)}</strong>
-                      </div>
-                    ))}
+                      )
+                    })}
                 </div>
               </>
             ) : (

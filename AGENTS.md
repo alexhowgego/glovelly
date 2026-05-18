@@ -68,6 +68,7 @@ Use `./verify.sh` before handing over broad code changes. For backend-only chang
 - Seeded test IDs live in `backend/Glovelly.Api.Tests/Infrastructure/TestData.cs`; seeded auth context lives in `TestAuthContext.cs`.
 - Fake email assertions should use `GlovellyApiFactory.Emails`.
 - Frontend has lint/build scripts but no dedicated frontend test runner yet.
+- When a change affects a user journey or cross-workspace navigation, add or update the matching scenario in `docs/uat-playbook.md`.
 
 ## High-Token Files
 
