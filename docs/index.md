@@ -8,6 +8,7 @@ Glovelly is a personal business platform for self-employed music work. The produ
 
 - [UAT and regression testing](uat/index.md): manual tester journeys for checking the product before release.
 - [Domain notes](domain.md): durable business concepts and vocabulary.
+- [Engineering](engineering/index.md): architecture, authentication, deployment, data, email, and ADR notes.
 - [Testing notes](testing.md): automated and manual verification guidance for engineers.
 - [Codebase map](agent-map.md): compact technical orientation for future agent work.
 - [Conventions](conventions.md): repo conventions and maintenance notes.
