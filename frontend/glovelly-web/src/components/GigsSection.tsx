@@ -117,6 +117,7 @@ export function GigsSection({
     (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
   const selectedClientId = selectedGigs[0]?.clientId ?? null
   const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
+  const hasInvoicedSelection = selectedGigs.some((gig) => gig.isInvoiced)
 
   return (
     <section className="section-layout">
@@ -164,7 +165,7 @@ export function GigsSection({
                 Boolean(selectedClientId) &&
                 selectedClientId !== gig.clientId &&
                 !selectedGigIds.includes(gig.id)
-              const isSelectionDisabled = gig.isInvoiced || isDifferentSelectedClient
+              const isSelectionDisabled = isDifferentSelectedClient
 
               return (
                 <button
@@ -230,6 +231,7 @@ export function GigsSection({
                   (selectedGigIds.length === 0 &&
                     (!selectedGig || selectedGig.isInvoiced)) ||
                   hasCrossClientSelection
+                  || hasInvoicedSelection
                 }
               >
                 {selectedGigIds.length > 0
@@ -359,7 +361,9 @@ export function GigsSection({
                   <span>
                     {hasCrossClientSelection
                       ? ' Selected gigs need to belong to the same client before they can be invoiced together.'
-                      : ` ${selectedGigIds.length} gig(s) selected for a combined invoice.`}
+                      : hasInvoicedSelection
+                        ? ` ${selectedGigIds.length} gig(s) selected. Invoiced gigs can be used for expense statements, but not new invoices.`
+                        : ` ${selectedGigIds.length} gig(s) selected for a combined invoice or expense statement.`}
                   </span>
                 )}
                 <button

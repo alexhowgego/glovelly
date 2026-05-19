@@ -334,7 +334,12 @@ export function useClientsWorkspace({
       }
 
       if (!response.ok) {
-        throw new Error('Delete failed.')
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Delete failed.')
       }
 
       let nextSelectedClientId = ''
@@ -350,8 +355,10 @@ export function useClientsWorkspace({
       setForm(emptyForm())
       setStatus('Client deleted.')
       setIsClientEditorOpen(false)
-    } catch {
-      setStatus('Unable to delete right now.')
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Unable to delete right now.'
+      )
     } finally {
       setIsLoading(false)
     }

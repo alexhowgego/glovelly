@@ -4,6 +4,8 @@ import type { Client, ClientForm } from '../types'
 type ClientsSectionProps = {
   filteredClients: Client[]
   form: ClientForm
+  canDeleteSelectedClient: boolean
+  clientDeleteHelperText: string
   isApiConnected: boolean
   isEditorOpen: boolean
   isMonthlyInvoiceReady: boolean
@@ -32,6 +34,8 @@ type ClientsSectionProps = {
 export function ClientsSection({
   filteredClients,
   form,
+  canDeleteSelectedClient,
+  clientDeleteHelperText,
   isApiConnected,
   isEditorOpen,
   isMonthlyInvoiceReady,
@@ -142,7 +146,8 @@ export function ClientsSection({
                 className="danger-button"
                 onClick={onDelete}
                 type="button"
-                disabled={!selectedClient || isLoading}
+                disabled={!canDeleteSelectedClient || isLoading}
+                title={clientDeleteHelperText}
               >
                 Delete
               </button>
@@ -151,6 +156,7 @@ export function ClientsSection({
 
           {selectedClient ? (
             <>
+              <p className="delete-helper">{clientDeleteHelperText}</p>
               <div className="gig-timeline-note">
                 <p className="detail-label">Monthly invoice run</p>
                 <div className="invoice-adjustment-form">

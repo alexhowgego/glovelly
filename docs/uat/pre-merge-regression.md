@@ -73,6 +73,16 @@ These checks guard against unsaved edits being discarded while moving between re
 
 Expected result: unsaved client edits are never discarded without confirmation. Accepted navigation switches the editor to the selected client or a blank new-client form.
 
+### Client Deletion
+
+1. Open Clients and select a client with gigs or invoice history.
+2. Confirm `Delete` is disabled and the helper text explains the blocking records.
+3. Select a client with no gigs and no invoices.
+4. Click `Delete`, decline the confirmation prompt, and confirm the client remains.
+5. Click `Delete` again, accept the confirmation prompt, and confirm the client is removed from the list.
+
+Expected result: clients cannot be deleted silently. Deletion is only available after explicit confirmation and only when the client has no gig or invoice records.
+
 ### Gigs
 
 1. Open Gigs, select a gig, and click `Edit gig`.

@@ -4,6 +4,12 @@
 
 Glovelly is a personal business platform for managing my self-employed music work.
 
+## Public URLs
+
+- Production site: [https://glovelly.net](https://glovelly.net)
+- Staging site: [https://staging.glovelly.net](https://staging.glovelly.net)
+- Docs site: [https://docs.glovelly.net](https://docs.glovelly.net)
+
 ## Handbook
 
 The repo-owned Glovelly Handbook starts at [docs/index.md](docs/index.md). Use the [UAT and regression section](docs/uat/index.md) for manual pre-merge testing journeys.
@@ -15,7 +21,7 @@ dotnet tool restore
 dotnet tool run docfx docs/docfx.json --serve
 ```
 
-Changes pushed to `main` are published to GitHub Pages at `https://alexhowgego.github.io/glovelly/`.
+Changes pushed to `main` are published to GitHub Pages at `https://docs.glovelly.net`.
 
 ## Current Scope (v1)
 - Gig tracking

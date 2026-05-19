@@ -6,6 +6,10 @@
 - email
 - billingAddress
 
+Client deletion is intentionally narrow: the UI and API block deletion while the
+client has any gig or invoice records. When deletion is available, the user must
+confirm the action before the record is removed.
+
 ## Gig
 - id
 - clientId

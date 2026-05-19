@@ -4,6 +4,10 @@
       href: index.md
     - name: Domain notes
       href: domain.md
+    - name: Privacy policy
+      href: privacy.md
+    - name: Application terms
+      href: terms.md
     - name: Roadmap
       href: roadmap.md
 - name: Testing and release

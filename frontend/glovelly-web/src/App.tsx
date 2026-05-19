@@ -581,6 +581,56 @@ function App({ appMetadata }: AppProps) {
     return `${monthlyInvoiceEligibleGigs.length} eligible gig(s) ready to invoice for ${selectedClient.name} in ${monthlyInvoiceMonth}.`
   })()
 
+  const clientDeleteEligibility = useMemo(() => {
+    if (!selectedClient) {
+      return {
+        canDelete: false,
+        helperText: 'Select a client before deleting.',
+      }
+    }
+
+    const relatedGigs = gigs.filter((gig) => gig.clientId === selectedClient.id)
+    if (relatedGigs.length > 0) {
+      return {
+        canDelete: false,
+        helperText: `Delete disabled: ${selectedClient.name} has ${relatedGigs.length} gig record(s).`,
+      }
+    }
+
+    const relatedInvoices = invoices.filter(
+      (invoice) => invoice.clientId === selectedClient.id
+    )
+
+    if (relatedInvoices.length > 0) {
+      return {
+        canDelete: false,
+        helperText: `Delete disabled: ${selectedClient.name} has ${relatedInvoices.length} invoice record(s).`,
+      }
+    }
+
+    return {
+      canDelete: true,
+      helperText: `Delete ${selectedClient.name} after confirmation.`,
+    }
+  }, [gigs, invoices, selectedClient])
+
+  const handleClientDelete = () => {
+    if (!selectedClient) {
+      return
+    }
+
+    if (!clientDeleteEligibility.canDelete) {
+      setStatus(clientDeleteEligibility.helperText)
+      return
+    }
+
+    if (!window.confirm(`Delete ${selectedClient.name}? This cannot be undone.`)) {
+      return
+    }
+
+    void handleDelete()
+  }
+
   const openSelectedGigInvoice = () => {
     if (!selectedGig?.invoiceId) {
       return
@@ -1260,6 +1310,8 @@ function App({ appMetadata }: AppProps) {
       <ClientsSection
         filteredClients={filteredClients}
         form={form}
+        canDeleteSelectedClient={clientDeleteEligibility.canDelete}
+        clientDeleteHelperText={clientDeleteEligibility.helperText}
         isApiConnected={isApiConnected}
         isEditorOpen={isClientEditorOpen}
         isMonthlyInvoiceReady={isMonthlyInvoiceReady}
@@ -1269,7 +1321,7 @@ function App({ appMetadata }: AppProps) {
         monthlyInvoiceMonth={monthlyInvoiceMonth}
         mode={mode}
         onCloseEditor={closeClientEditor}
-        onDelete={handleDelete}
+        onDelete={handleClientDelete}
         onGenerateMonthlyInvoice={handleGenerateMonthlyInvoice}
         onMonthlyInvoiceMonthChange={setMonthlyInvoiceMonth}
         onOpenClientSettings={openClientSettings}

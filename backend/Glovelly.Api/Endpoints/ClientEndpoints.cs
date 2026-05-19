@@ -97,6 +97,26 @@ public static class ClientEndpoints
                 return Results.NotFound();
             }
 
+            if (await db.Gigs.WhereVisibleTo(userId).AnyAsync(gig => gig.ClientId == id))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["client"] = ["Delete the client's gigs before deleting the client."]
+                });
+            }
+
+            var hasInvoices = await db.Invoices
+                .WhereVisibleTo(userId)
+                .AnyAsync(invoice => invoice.ClientId == id);
+
+            if (hasInvoices)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["invoices"] = ["Delete the client's invoices before deleting the client."]
+                });
+            }
+
             db.Clients.Remove(client);
             await db.SaveChangesAsync();
 

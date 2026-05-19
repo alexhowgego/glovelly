@@ -68,7 +68,9 @@ The deployment depends on:
 - Google service accounts for deployment and runtime
 - Google Secret Manager secrets for production runtime values
 - Google Cloud Storage bucket for blob-backed features where configured
-- custom domain mapping for `glovelly.net`, if still applicable
+- custom domain mapping for `glovelly.net`
+- custom domain mapping for `staging.glovelly.net`
+- GitHub Pages custom domain mapping for `docs.glovelly.net`
 
 ## Pull Requests
 
@@ -81,4 +83,4 @@ The Glovelly Handbook is built with DocFX from the Markdown files under `docs/`.
 - `.github/workflows/docs-pr.yml` validates the handbook build on pull requests that touch documentation.
 - `.github/workflows/docs.yml` builds the handbook from `main` and publishes `docs/_site` to GitHub Pages.
 
-The public handbook URL is `https://alexhowgego.github.io/glovelly/`.
+The public handbook URL is `https://docs.glovelly.net`.
