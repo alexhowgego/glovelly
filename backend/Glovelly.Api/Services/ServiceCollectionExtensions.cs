@@ -20,10 +20,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoicePdfRenderer, InvoicePdfRenderer>();
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
-        services.AddScoped<LegacyInvoicePdfBackfillService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceEmailDeliveryChannel>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceGoogleDriveDeliveryChannel>();
+        services.AddOptions<InvoiceRateSettings>()
+            .BindConfiguration(InvoiceRateSettings.SectionName);
         services.AddOptions<BlobStorageSettings>()
             .BindConfiguration(BlobStorageSettings.SectionName)
             .PostConfigure<IOptions<ExpenseAttachmentSettings>>((blobSettings, expenseAttachmentOptions) =>

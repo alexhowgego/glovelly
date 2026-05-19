@@ -202,6 +202,7 @@ function App({ appMetadata }: AppProps) {
   })
   const {
     applyGigs,
+    cloneSelectedGig,
     closeGigEditor,
     closeExpenseStatement,
     completedGigCount,
@@ -587,6 +588,23 @@ function App({ appMetadata }: AppProps) {
 
     setSelectedInvoiceId(selectedGig.invoiceId)
     setActiveSection('invoices')
+  }
+
+  const openInvoiceLineGig = (gigId: string) => {
+    setSelectedGigId(gigId)
+    setSelectedGigIds([])
+    setGigSearchQuery('')
+    closeInvoiceEditor()
+    setActiveSection('gigs')
+  }
+
+  const openClientShortcut = (clientId: string) => {
+    if (!selectClient(clientId)) {
+      return
+    }
+
+    setSearchQuery('')
+    setActiveSection('clients')
   }
 
   useEffect(() => {
@@ -1312,6 +1330,8 @@ function App({ appMetadata }: AppProps) {
         onGenerateInvoice={handleGenerateInvoice}
         onDeleteGig={deleteGig}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
+        onCloneGig={cloneSelectedGig}
+        onOpenClient={openClientShortcut}
         onOpenLinkedInvoice={openSelectedGigInvoice}
         onOpenSellerProfile={openSellerProfile}
         onUploadExpenseAttachment={uploadExpenseAttachment}
@@ -1358,6 +1378,8 @@ function App({ appMetadata }: AppProps) {
         onDeleteInvoice={handleDeleteInvoice}
         onDownloadPdf={handleDownloadInvoicePdf}
         onInvoiceStatusChange={handleInvoiceStatusChangeWithGigPrompt}
+        onOpenClient={openClientShortcut}
+        onOpenGig={openInvoiceLineGig}
         onOpenSellerProfile={openSellerProfile}
         onPreviewPdf={previewInvoicePdf}
         onPublishGoogleDrive={handlePublishInvoiceGoogleDriveWithIssuePrompt}

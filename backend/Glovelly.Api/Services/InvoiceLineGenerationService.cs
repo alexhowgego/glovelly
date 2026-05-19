@@ -1,11 +1,14 @@
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Globalization;
 
 namespace Glovelly.Api.Services;
 
-public sealed class InvoiceLineGenerationService(AppDbContext dbContext) : IInvoiceLineGenerationService
+public sealed class InvoiceLineGenerationService(
+    AppDbContext dbContext,
+    IOptions<InvoiceRateSettings> rateSettings) : IInvoiceLineGenerationService
 {
     public async Task<List<InvoiceLine>> BuildGeneratedInvoiceLinesForGigAsync(
         Gig gig,
@@ -181,9 +184,11 @@ public sealed class InvoiceLineGenerationService(AppDbContext dbContext) : IInvo
             })
             .FirstAsync(cancellationToken);
 
-        if (clientRates.MileageRate.HasValue || clientRates.PassengerMileageRate.HasValue || !userId.HasValue)
+        if (!userId.HasValue)
         {
-            return (clientRates.MileageRate, clientRates.PassengerMileageRate);
+            return (
+                clientRates.MileageRate ?? rateSettings.Value.DefaultMileageRate,
+                clientRates.PassengerMileageRate ?? rateSettings.Value.DefaultPassengerMileageRate);
         }
 
         var userRates = await dbContext.Users
@@ -196,7 +201,9 @@ public sealed class InvoiceLineGenerationService(AppDbContext dbContext) : IInvo
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return (userRates?.MileageRate, userRates?.PassengerMileageRate);
+        return (
+            clientRates.MileageRate ?? userRates?.MileageRate ?? rateSettings.Value.DefaultMileageRate,
+            clientRates.PassengerMileageRate ?? userRates?.PassengerMileageRate ?? rateSettings.Value.DefaultPassengerMileageRate);
     }
 
     private static void StampCreate(InvoiceLine line, Guid? userId)

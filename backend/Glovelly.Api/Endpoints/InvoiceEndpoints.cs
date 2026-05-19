@@ -111,6 +111,11 @@ public static class InvoiceEndpoints
             invoice.InvoiceDate = issuedOn;
             invoice.DueDate = issuedOn.AddDays(paymentWindowDays);
             invoice.Description = invoice.Description?.Trim();
+            invoice.PdfStorageKey = null;
+            invoice.PdfFileName = null;
+            invoice.PdfContentType = null;
+            invoice.PdfSizeBytes = null;
+            invoice.PdfGeneratedAt = null;
             invoice.Client = null;
             invoice.Lines = new List<InvoiceLine>();
             EndpointSupport.StampCreate(invoice, userId);
@@ -192,18 +197,6 @@ public static class InvoiceEndpoints
             {
                 invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
                 invoice.Status = request.Status;
-            }
-            if (requestedStatus is not InvoiceStatus.Issued)
-            {
-                invoice.PdfBlob = request.PdfBlob;
-                if (request.PdfBlob is { Length: > 0 })
-                {
-                    invoice.PdfStorageKey = null;
-                    invoice.PdfFileName = $"{invoice.InvoiceNumber}.pdf";
-                    invoice.PdfContentType = "application/pdf";
-                    invoice.PdfSizeBytes = request.PdfBlob.Length;
-                    invoice.PdfGeneratedAt = DateTimeOffset.UtcNow;
-                }
             }
             EndpointSupport.StampUpdate(invoice, userId);
 

@@ -157,12 +157,12 @@ export function useClientsWorkspace({
 
   const selectClient = (clientId: string) => {
     if (clientId === selectedClient?.id) {
-      return
+      return true
     }
 
     const nextClient = clientsById.get(clientId)
     if (!nextClient) {
-      return
+      return false
     }
 
     if (isClientEditorOpen) {
@@ -170,7 +170,7 @@ export function useClientsWorkspace({
         hasUnsavedClientEditorChanges() &&
         !window.confirm('Discard unsaved client changes and edit the selected client?')
       ) {
-        return
+        return false
       }
 
       setMode('edit')
@@ -178,6 +178,7 @@ export function useClientsWorkspace({
     }
 
     setSelectedClientId(clientId)
+    return true
   }
 
   const closeClientEditor = () => {

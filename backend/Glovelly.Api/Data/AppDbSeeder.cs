@@ -9,12 +9,13 @@ namespace Glovelly.Api.Data;
 public static class AppDbSeeder
 {
     private static readonly DateTimeOffset SeededCreatedUtc = new(2026, 3, 15, 9, 0, 0, TimeSpan.Zero);
-    private static readonly byte[] SeededPdfBlob = "Seeded development invoice PDF placeholder"u8.ToArray();
+    private static readonly byte[] SeededPdfContent = "Seeded development invoice PDF placeholder"u8.ToArray();
 
     public static async Task SeedAsync(
         AppDbContext dbContext,
         IConfiguration configuration,
-        IExpenseAttachmentStore? attachmentStore = null)
+        IExpenseAttachmentStore? attachmentStore = null,
+        IBlobStore? blobStore = null)
     {
         await dbContext.Database.EnsureCreatedAsync();
 
@@ -110,7 +111,6 @@ public static class AppDbSeeder
                 LastDeliveredUtc = new DateTimeOffset(2026, 4, 1, 9, 15, 0, TimeSpan.Zero),
                 LastDeliveredByUserId = seededAdminUserId,
                 Description = "In respect of Spring Product Launch at Albert Hall, Manchester on 2026-04-18.",
-                PdfBlob = SeededPdfBlob,
                 CreatedByUserId = seededAdminUserId,
                 UpdatedByUserId = seededAdminUserId
             },
@@ -123,7 +123,6 @@ public static class AppDbSeeder
                 DueDate = new DateOnly(2026, 4, 22),
                 Status = InvoiceStatus.Draft,
                 Description = "In respect of Community Residency Weekend at Riverside Arts Centre on 2026-05-11.",
-                PdfBlob = SeededPdfBlob,
                 CreatedByUserId = seededAdminUserId,
                 UpdatedByUserId = seededAdminUserId
             },
@@ -393,6 +392,11 @@ public static class AppDbSeeder
 
         dbContext.Clients.AddRange(clients);
         dbContext.Invoices.AddRange(invoices);
+        if (seededAdminUserId.HasValue)
+        {
+            await SeedInvoicePdfAsync(invoices[0], seededAdminUserId.Value, blobStore);
+            await SeedInvoicePdfAsync(invoices[1], seededAdminUserId.Value, blobStore);
+        }
         dbContext.InvoiceLines.AddRange(invoiceLines);
         dbContext.Gigs.AddRange(gigs);
 
@@ -402,6 +406,27 @@ public static class AppDbSeeder
         {
             await SeedExpenseAttachmentBlobsAsync(gigs, attachmentStore);
         }
+    }
+
+    private static async Task SeedInvoicePdfAsync(Invoice invoice, Guid userId, IBlobStore? blobStore)
+    {
+        if (blobStore is null)
+        {
+            return;
+        }
+
+        var key = InvoicePdfStorage.BuildStorageKey(invoice, userId);
+        await blobStore.SaveAsync(new BlobWriteRequest(
+            key,
+            new MemoryStream(SeededPdfContent, writable: false),
+            InvoicePdfStorage.ContentType,
+            SeededPdfContent.Length));
+
+        invoice.PdfStorageKey = key;
+        invoice.PdfFileName = $"{invoice.InvoiceNumber}.pdf";
+        invoice.PdfContentType = InvoicePdfStorage.ContentType;
+        invoice.PdfSizeBytes = SeededPdfContent.Length;
+        invoice.PdfGeneratedAt = invoice.FirstIssuedUtc ?? SeededCreatedUtc;
     }
 
     private static async Task<Guid?> SeedDevelopmentAdminUserAsync(AppDbContext dbContext, IConfiguration configuration)

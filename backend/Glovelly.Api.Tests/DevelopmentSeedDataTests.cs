@@ -4,6 +4,7 @@ using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -122,7 +123,7 @@ public sealed class DevelopmentSeedDataTests
         return new InvoiceWorkflowService(
             dbContext,
             new InvoiceNumberService(dbContext),
-            new InvoiceLineGenerationService(dbContext),
+            new InvoiceLineGenerationService(dbContext, Options.Create(new InvoiceRateSettings())),
             new InvoiceProfileDefaultsService(dbContext),
             new InvoicePdfRenderer(),
             new InvoicePdfService(new InMemoryBlobStore(), TimeProvider.System));

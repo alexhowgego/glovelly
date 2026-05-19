@@ -306,6 +306,94 @@ export function useGigsWorkspace({
     setIsGigEditorOpen(true)
   }
 
+  const cloneSelectedGig = async () => {
+    if (!selectedGig) {
+      setGigStatus('Select a gig before cloning it.')
+      return
+    }
+
+    if (
+      hasUnsavedGigEditorChanges() &&
+      !window.confirm('Discard unsaved gig changes and clone the selected gig?')
+    ) {
+      return
+    }
+
+    const includeExpenses =
+      selectedGig.expenses.length > 0 &&
+      window.confirm('Clone this gig with its expenses? Receipts and invoice links will not be copied.')
+
+    setIsGigLoading(true)
+    setGigStatus('Cloning selected gig...')
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/gigs'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: selectedGig.clientId,
+          title: selectedGig.title,
+          date: selectedGig.date,
+          venue: selectedGig.venue,
+          fee: selectedGig.fee,
+          travelMiles: selectedGig.travelMiles,
+          passengerCount: selectedGig.passengerCount,
+          notes: selectedGig.notes,
+          wasDriving: selectedGig.wasDriving,
+          status: selectedGig.status,
+          invoiceId: null,
+          expenses: includeExpenses
+            ? selectedGig.expenses
+                .slice()
+                .sort((left, right) => left.sortOrder - right.sortOrder)
+                .map((expense, index) => ({
+                  sortOrder: index + 1,
+                  description: expense.description,
+                  amount: expense.amount,
+                }))
+            : [],
+          invoicedAt: null,
+        }),
+      })
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to clone gig.')
+      }
+
+      const savedGig = (await response.json()) as Gig
+      setGigs((current) => [savedGig, ...current])
+      setSelectedGigId(savedGig.id)
+      setSelectedGigIds([])
+      setGigMode('edit')
+      setGigForm(toEditableGigForm(savedGig))
+      setGigExpenseAmount('')
+      setGigExpenseDescription('')
+      setGigStatus('Gig cloned. Update any details before saving.')
+      setIsGigEditorOpen(true)
+    } catch (error) {
+      setGigStatus(error instanceof Error ? error.message : 'Unable to clone gig.')
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
   const selectGig = (gigId: string) => {
     if (gigId === selectedGig?.id) {
       return
@@ -1200,6 +1288,7 @@ export function useGigsWorkspace({
 
   return {
     applyGigs,
+    cloneSelectedGig,
     closeGigEditor,
     completedGigCount: gigs.filter((gig) => gig.status === 'Completed').length,
     deleteGig,

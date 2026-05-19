@@ -269,7 +269,6 @@ export type Invoice = {
   lastDeliveredUtc: string | null
   lastDeliveredByUserId: string | null
   description: string | null
-  pdfBlob: string | null
   pdfStorageKey: string | null
   pdfFileName: string | null
   pdfContentType: string | null

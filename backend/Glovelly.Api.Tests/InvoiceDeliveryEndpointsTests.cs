@@ -43,19 +43,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         updateSettingsResponse.EnsureSuccessStatusCode();
 
         var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 invoice content");
-        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-SEND-001",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Email delivery test.",
-            pdfBlob = Convert.ToBase64String(pdfBytes),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-
-        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdInvoice = await CreateInvoiceWithPdfAsync(
+            _factory,
+            _client,
+            "GLV-SEND-001",
+            TestData.FoxAndFinchId,
+            "Email delivery test.",
+            pdfBytes);
         var invoiceId = createdInvoice.GetProperty("id").GetGuid();
 
         var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
@@ -92,39 +86,15 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     [Fact]
     public async Task SendEmail_WhenInvoicePdfIsBlobBacked_SendsStoredAttachment()
     {
-        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-SEND-BLOB",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Blob-backed email delivery test.",
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
-        var storageKey = $"users/{TestAuthContext.UserId:N}/invoices/{invoiceId:D}/invoice.pdf";
         var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 blob-backed invoice content");
-
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var blobStore = scope.ServiceProvider.GetRequiredService<IBlobStore>();
-            await blobStore.SaveAsync(new BlobWriteRequest(
-                storageKey,
-                new MemoryStream(pdfBytes),
-                "application/pdf",
-                pdfBytes.Length));
-
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var invoice = await dbContext.Invoices.SingleAsync(value => value.Id == invoiceId);
-            invoice.PdfStorageKey = storageKey;
-            invoice.PdfFileName = "GLV-SEND-BLOB.pdf";
-            invoice.PdfContentType = "application/pdf";
-            invoice.PdfSizeBytes = pdfBytes.Length;
-            invoice.PdfGeneratedAt = DateTimeOffset.UtcNow;
-            await dbContext.SaveChangesAsync();
-        }
+        var createdInvoice = await CreateInvoiceWithPdfAsync(
+            _factory,
+            _client,
+            "GLV-SEND-BLOB",
+            TestData.FoxAndFinchId,
+            "Blob-backed email delivery test.",
+            pdfBytes);
+        var invoiceId = createdInvoice.GetProperty("id").GetGuid();
 
         var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
         {
@@ -237,18 +207,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         });
         updateSettingsResponse.EnsureSuccessStatusCode();
 
-        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-SUBJECT-001",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Subject pattern test.",
-            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await CreateInvoiceWithPdfAsync(
+            _factory,
+            _client,
+            "GLV-SUBJECT-001",
+            TestData.FoxAndFinchId,
+            "Subject pattern test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
 
         var response = await _client.PostAsync(
             $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
@@ -293,18 +258,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         });
         updateClientResponse.EnsureSuccessStatusCode();
 
-        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-SUBJECT-002",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Client subject pattern test.",
-            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await CreateInvoiceWithPdfAsync(
+            _factory,
+            _client,
+            "GLV-SUBJECT-002",
+            TestData.FoxAndFinchId,
+            "Client subject pattern test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
 
         var response = await _client.PostAsync(
             $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
@@ -319,19 +279,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     [Fact]
     public async Task SendEmail_WhenBodyOmitted_SendsStandardMessage()
     {
-        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-SEND-OPTIONAL-BODY",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-21",
-            dueDate = "2026-05-05",
-            status = "Issued",
-            description = "Optional body delivery test.",
-            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-
-        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await CreateInvoiceWithPdfAsync(
+            _factory,
+            _client,
+            "GLV-SEND-OPTIONAL-BODY",
+            TestData.FoxAndFinchId,
+            "Optional body delivery test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
 
         var response = await _client.PostAsync(
             $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
@@ -364,18 +318,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         createClientResponse.EnsureSuccessStatusCode();
         var client = await createClientResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
 
-        var createInvoiceResponse = await _client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-SEND-002",
-            clientId = client.GetProperty("id").GetGuid(),
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Missing email delivery test.",
-            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await CreateInvoiceWithPdfAsync(
+            _factory,
+            _client,
+            "GLV-SEND-002",
+            client.GetProperty("id").GetGuid(),
+            "Missing email delivery test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
 
         var response = await _client.PostAsJsonAsync($"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email", new
         {
@@ -436,18 +385,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             await dbContext.SaveChangesAsync();
         }
 
-        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-DRIVE-001",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Drive delivery test.",
-            pdfBlob = Convert.ToBase64String(pdfBytes),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdInvoice = await CreateInvoiceWithPdfAsync(
+            factory,
+            client,
+            "GLV-DRIVE-001",
+            TestData.FoxAndFinchId,
+            "Drive delivery test.",
+            pdfBytes);
         var invoiceId = createdInvoice.GetProperty("id").GetGuid();
 
         var response = await client.PostAsync(
@@ -503,18 +447,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             await dbContext.SaveChangesAsync();
         }
 
-        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-DRIVE-FOLDER",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Drive folder delivery test.",
-            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdInvoice = await CreateInvoiceWithPdfAsync(
+            factory,
+            client,
+            "GLV-DRIVE-FOLDER",
+            TestData.FoxAndFinchId,
+            "Drive folder delivery test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
 
         var response = await client.PostAsync(
             $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
@@ -530,18 +469,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var driveClient = new FakeGoogleDriveApiClient();
         using var factory = CreateFactoryWithGoogleDriveClient(driveClient);
         var client = factory.CreateClient();
-        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-DRIVE-MISSING-CONNECTION",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Drive missing connection test.",
-            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdInvoice = await CreateInvoiceWithPdfAsync(
+            factory,
+            client,
+            "GLV-DRIVE-MISSING-CONNECTION",
+            TestData.FoxAndFinchId,
+            "Drive missing connection test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
 
         var response = await client.PostAsync(
             $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
@@ -585,18 +519,13 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             await dbContext.SaveChangesAsync();
         }
 
-        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
-        {
-            invoiceNumber = "GLV-DRIVE-REFRESH",
-            clientId = TestData.FoxAndFinchId,
-            invoiceDate = "2026-04-20",
-            dueDate = "2026-05-04",
-            status = "Issued",
-            description = "Drive refresh test.",
-            pdfBlob = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4 invoice content")),
-        });
-        createInvoiceResponse.EnsureSuccessStatusCode();
-        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdInvoice = await CreateInvoiceWithPdfAsync(
+            factory,
+            client,
+            "GLV-DRIVE-REFRESH",
+            TestData.FoxAndFinchId,
+            "Drive refresh test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
 
         var response = await client.PostAsync(
             $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
@@ -642,6 +571,37 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         });
     }
 
+    private static async Task<JsonElement> CreateInvoiceWithPdfAsync(
+        WebApplicationFactory<Program> factory,
+        HttpClient client,
+        string invoiceNumber,
+        Guid clientId,
+        string description,
+        byte[] pdfBytes)
+    {
+        var createInvoiceResponse = await client.PostAsJsonAsync("/invoices", new
+        {
+            invoiceNumber,
+            clientId,
+            invoiceDate = "2026-04-20",
+            dueDate = "2026-05-04",
+            status = "Issued",
+            description,
+        });
+        createInvoiceResponse.EnsureSuccessStatusCode();
+        var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoiceId = invoice.GetProperty("id").GetGuid();
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoiceEntity = await dbContext.Invoices.SingleAsync(value => value.Id == invoiceId);
+        var invoicePdfService = scope.ServiceProvider.GetRequiredService<IInvoicePdfService>();
+        await invoicePdfService.SaveGeneratedPdfAsync(invoiceEntity, TestAuthContext.UserId, pdfBytes);
+        await dbContext.SaveChangesAsync();
+
+        return invoice;
+    }
+
     private Task<(Guid InvoiceId, byte[] ReceiptBytes)> SeedInvoiceWithReceiptAsync(
         string invoiceNumber,
         string expenseDescription,
@@ -680,7 +640,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             await attachmentStore.SaveAsync(storageKey, receiptStream, receiptContentType);
         }
 
-        dbContext.Invoices.Add(new Invoice
+        var invoice = new Invoice
         {
             Id = invoiceId,
             InvoiceNumber = invoiceNumber,
@@ -689,10 +649,15 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             DueDate = new DateOnly(2026, 5, 4),
             Status = InvoiceStatus.Issued,
             Description = "Receipt delivery test.",
-            PdfBlob = Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"),
             CreatedByUserId = TestAuthContext.UserId,
             UpdatedByUserId = TestAuthContext.UserId,
-        });
+        };
+        var invoicePdfService = scope.ServiceProvider.GetRequiredService<IInvoicePdfService>();
+        await invoicePdfService.SaveGeneratedPdfAsync(
+            invoice,
+            TestAuthContext.UserId,
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
+        dbContext.Invoices.Add(invoice);
         dbContext.Gigs.Add(new Gig
         {
             Id = gigId,

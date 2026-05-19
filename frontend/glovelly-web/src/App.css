@@ -1197,6 +1197,16 @@
   color: var(--heading);
 }
 
+.invoice-line-link {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.invoice-line-link:hover,
+.invoice-line-link:focus-visible {
+  color: var(--heading);
+}
+
 .invoice-line-item span {
   color: var(--muted);
 }
@@ -1229,6 +1239,20 @@
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.detail-link {
+  width: fit-content;
+  max-width: 100%;
+  color: var(--heading);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.detail-link:hover,
+.detail-link:focus-visible {
+  color: var(--link);
 }
 
 .setting-card {

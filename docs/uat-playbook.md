@@ -31,6 +31,21 @@ Use a fresh browser session if possible. If you are testing against seeded local
 
 Expected result: navigation, session state, and core reads are healthy.
 
+## Cross-Workspace Navigation Shortcuts
+
+1. Open Gigs and select a gig with a known client.
+2. Click the client name in the gig overview.
+3. Confirm the app opens Clients with that client selected.
+4. Open Invoices and select an invoice with a known client.
+5. Click the client name in the invoice overview.
+6. Confirm the app opens Clients with that client selected.
+7. Open the same invoice line-items pane.
+8. Click a generated line-item title for a performance fee, mileage, passenger mileage, or expense line.
+9. Confirm the app opens Gigs with the corresponding gig selected.
+10. Confirm manual adjustment lines are not shown as gig links.
+
+Expected result: cross-workspace shortcuts preserve the intended target record, clear stale search filters that would hide the target, and leave unrelated records unchanged.
+
 ## Editor Navigation Regression Checks
 
 This guards against issue 121 and nearby editor discard paths.
@@ -137,6 +152,29 @@ Negative checks:
 
 Expected result: only planned gigs with no linked invoice can be deleted. Linked invoice history is never removed by deleting a gig.
 
+## Cloning A Gig
+
+1. Create or identify a saved gig with a fee, date, venue, notes, and driving details.
+2. Select the gig in Gigs.
+3. Click `Clone gig`.
+4. If the gig has expenses, decline the expenses prompt.
+5. Confirm a new gig is created and immediately opens in the edit pane.
+6. Confirm the cloned gig has the same core details as the original, has no linked invoice, and has no copied expenses.
+7. Change at least one identifying detail, such as date or title, then save.
+
+Expected result: cloning creates a separate gig record, opens it for editing straight away, and never copies invoice linkage.
+
+Expense copy check:
+
+1. Select a saved gig with at least one expense and, ideally, at least one receipt attachment.
+2. Click `Clone gig`.
+3. Accept the expenses prompt.
+4. Confirm the cloned gig opens in the edit pane with copied expense descriptions and amounts.
+5. Confirm copied expenses have no receipt attachments.
+6. Save the cloned gig, then generate an invoice from it.
+
+Expected result: expenses are copied only when accepted, receipt attachments are not copied, and any invoice generated from the clone is a new invoice linked only to the cloned gig.
+
 ## Combined Invoice Journey
 
 1. Create two uninvoiced gigs for the same client.
@@ -239,6 +277,16 @@ Then check driving and mileage:
 9. Reopen the invoice.
 
 Expected result: mileage lines disappear while driving is disabled and return when driving is re-enabled. Toggling driving must not erase previously saved mileage or passenger values.
+
+Then check app-level mileage defaults:
+
+1. Open user settings and clear both mileage rate fields so the user has no personal mileage or passenger mileage defaults.
+2. Open or create a client and leave both client mileage rate fields blank so they inherit defaults.
+3. Create a gig for that client with `I was driving for this gig` enabled, travel miles greater than zero, and passenger count greater than zero.
+4. Generate an invoice from the gig.
+5. Open the invoice lines and PDF preview.
+
+Expected result: the invoice includes both mileage and passenger mileage lines using the configured app defaults, not blank or omitted lines. The PDF preview/download should show the same mileage lines as the invoice workspace.
 
 ## Expense Statement Journey
 

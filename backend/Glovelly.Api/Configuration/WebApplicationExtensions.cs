@@ -17,15 +17,13 @@ internal static class WebApplicationExtensions
         if (shouldSeedDevelopmentData)
         {
             var attachmentStore = scope.ServiceProvider.GetRequiredService<IExpenseAttachmentStore>();
-            await AppDbSeeder.SeedAsync(dbContext, configuration, attachmentStore);
+            var blobStore = scope.ServiceProvider.GetRequiredService<IBlobStore>();
+            await AppDbSeeder.SeedAsync(dbContext, configuration, attachmentStore, blobStore);
         }
         else
         {
             await dbContext.Database.EnsureCreatedAsync();
         }
-
-        var invoicePdfBackfill = scope.ServiceProvider.GetRequiredService<LegacyInvoicePdfBackfillService>();
-        await invoicePdfBackfill.BackfillAsync();
     }
 
     public static WebApplication UseGlovellyHttpPipeline(this WebApplication app, StartupSettings settings)
