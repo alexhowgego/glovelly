@@ -125,6 +125,33 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
     }
 
     [Fact]
+    public async Task Preview_AllowsInvoicedGigsForExpenseStatements()
+    {
+        var gig = await CreateGigAsync(
+            "Invoiced statement expenses",
+            "2026-07-08",
+            "Arts Centre",
+            [new("Parking", 9.50m)],
+            TestData.FoxInvoiceId);
+
+        var response = await _client.PostAsJsonAsync("/expense-statements/preview", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            gigIds = new[] { gig.GigId },
+            includeReceiptAttachments = true,
+            includeReceiptAppendix = false,
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var statement = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var statementGig = Assert.Single(statement.GetProperty("gigs").EnumerateArray());
+        Assert.Equal(gig.GigId, statementGig.GetProperty("gigId").GetGuid());
+        Assert.True(statementGig.GetProperty("isInvoiced").GetBoolean());
+        Assert.Equal(9.50m, statement.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
     public async Task GenerateInvoice_ExcludesReimbursedExpensesByDefault()
     {
         var gig = await CreateGigAsync(

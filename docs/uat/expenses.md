@@ -75,6 +75,14 @@ Expected result: the expense becomes eligible for generated invoice lines again.
 
 The expense statement modal opens, expenses are grouped by gig, reimbursed or not-claimable expenses are visually distinct, and reimbursed expenses are excluded by default.
 
+### Invoiced Gig Selection
+
+1. Identify a gig that already has a linked invoice and at least one expense.
+2. Select it in the Gigs list with another gig for the same client.
+3. Open the expense statement workflow.
+
+Expected result: invoiced gigs remain selectable for expense statements, the statement opens for the same-client selection, and invoice links are not changed.
+
 ### Preview And Download
 
 1. Select the reimbursed expense in the modal.
