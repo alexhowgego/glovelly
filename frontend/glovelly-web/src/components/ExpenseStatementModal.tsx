@@ -104,45 +104,51 @@ export function ExpenseStatementModal({
           </label>
         </div>
 
-        <div className="expense-statement-gigs">
-          {gigs.map((gig) => (
-            <section className="expense-statement-gig" key={gig.id}>
-              <div className="expense-statement-gig-header">
-                <div>
-                  <strong>{gig.title}</strong>
-                  <span>
-                    {formatDate(gig.date)} · {gig.venue}
-                  </span>
+        <div
+          className={`expense-statement-body ${
+            previewPdfUrl ? 'has-preview' : 'without-preview'
+          }`}
+        >
+          <div className="expense-statement-gigs">
+            {gigs.map((gig) => (
+              <section className="expense-statement-gig" key={gig.id}>
+                <div className="expense-statement-gig-header">
+                  <div>
+                    <strong>{gig.title}</strong>
+                    <span>
+                      {formatDate(gig.date)} · {gig.venue}
+                    </span>
+                  </div>
+                  {gig.isInvoiced && <span className="expense-status-badge">Invoiced</span>}
                 </div>
-                {gig.isInvoiced && <span className="expense-status-badge">Invoiced</span>}
-              </div>
 
-              {gig.expenses.length > 0 ? (
-                <div className="expense-statement-expenses">
-                  {gig.expenses
-                    .slice()
-                    .sort((left, right) => left.sortOrder - right.sortOrder)
-                    .map((expense) => (
-                      <ExpenseStatementExpenseRow
-                        expense={expense}
-                        isSelected={selectedExpenseIdSet.has(expense.id)}
-                        key={expense.id}
-                        onToggleExpense={onToggleExpense}
-                      />
-                    ))}
-                </div>
-              ) : (
-                <p className="attachment-helper">No expenses recorded for this gig.</p>
-              )}
-            </section>
-          ))}
-        </div>
-
-        {previewPdfUrl && (
-          <div className="expense-statement-preview">
-            <iframe src={previewPdfUrl} title="Expense statement PDF preview" />
+                {gig.expenses.length > 0 ? (
+                  <div className="expense-statement-expenses">
+                    {gig.expenses
+                      .slice()
+                      .sort((left, right) => left.sortOrder - right.sortOrder)
+                      .map((expense) => (
+                        <ExpenseStatementExpenseRow
+                          expense={expense}
+                          isSelected={selectedExpenseIdSet.has(expense.id)}
+                          key={expense.id}
+                          onToggleExpense={onToggleExpense}
+                        />
+                      ))}
+                  </div>
+                ) : (
+                  <p className="attachment-helper">No expenses recorded for this gig.</p>
+                )}
+              </section>
+            ))}
           </div>
-        )}
+
+          {previewPdfUrl && (
+            <div className="expense-statement-preview">
+              <iframe src={previewPdfUrl} title="Expense statement PDF preview" />
+            </div>
+          )}
+        </div>
 
         <div className="expense-statement-footer">
           <span className="status-pill">

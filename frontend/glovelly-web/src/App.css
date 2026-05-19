@@ -430,6 +430,10 @@
 .expense-statement-modal {
   display: grid;
   gap: 18px;
+  width: min(100%, 1120px);
+  height: min(100svh - 48px, 860px);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 
 .invoice-generation-preview-modal {
@@ -460,8 +464,8 @@
 .expense-statement-preview iframe {
   display: block;
   width: 100%;
-  height: min(62svh, 720px);
-  min-height: 420px;
+  height: 100%;
+  min-height: 0;
   border: 0;
   background: white;
 }
@@ -498,10 +502,31 @@
 }
 
 .expense-statement-options,
+.expense-statement-body,
 .expense-statement-gigs,
 .expense-statement-expenses {
   display: grid;
   gap: 10px;
+}
+
+.expense-statement-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.expense-statement-body.has-preview {
+  grid-template-columns: minmax(320px, 0.95fr) minmax(420px, 1.05fr);
+  align-items: stretch;
+}
+
+.expense-statement-body.without-preview {
+  grid-template-columns: 1fr;
+}
+
+.expense-statement-gigs {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .expense-statement-gig-header,
@@ -1570,5 +1595,26 @@ button:disabled {
 
   .settings-modal {
     max-height: min(100svh - 28px, 860px);
+  }
+
+  .expense-statement-modal {
+    height: min(100svh - 28px, 860px);
+    overflow: auto;
+  }
+
+  .expense-statement-body,
+  .expense-statement-body.has-preview,
+  .expense-statement-body.without-preview {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .expense-statement-gigs {
+    max-height: 38svh;
+  }
+
+  .expense-statement-preview iframe {
+    height: 55svh;
+    min-height: 320px;
   }
 }

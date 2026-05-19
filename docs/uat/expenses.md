@@ -82,7 +82,7 @@ The expense statement modal opens, expenses are grouped by gig, reimbursed or no
 3. Preview the PDF.
 4. Download the PDF.
 
-Expected result: selected reimbursed expenses appear in the statement, receipt options affect the generated preview/download, the embedded PDF preview loads in the modal, and the downloaded PDF matches the preview.
+Expected result: selected reimbursed expenses appear in the statement, receipt options affect the generated preview/download, the embedded PDF preview loads in the modal without being pushed out of view by long expense lists, and the downloaded PDF matches the preview.
 
 ### Negative Checks
 
