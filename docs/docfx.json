@@ -14,7 +14,8 @@
     "resource": [
       {
         "files": [
-          "assets/**"
+          "assets/**",
+          "CNAME"
         ]
       }
     ],
@@ -38,7 +39,7 @@
       }
     },
     "sitemap": {
-      "baseUrl": "https://alexhowgego.github.io/glovelly/"
+      "baseUrl": "https://docs.glovelly.net/"
     }
   }
 }
