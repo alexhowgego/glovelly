@@ -74,3 +74,11 @@ The deployment depends on:
 
 Pull requests from the same repository can build, push, deploy to the staging service, and receive a staging preview comment. External fork pull requests do not receive the same privileged GCP authentication path.
 
+## Handbook Publishing
+
+The Glovelly Handbook is built with DocFX from the Markdown files under `docs/`.
+
+- `.github/workflows/docs-pr.yml` validates the handbook build on pull requests that touch documentation.
+- `.github/workflows/docs.yml` builds the handbook from `main` and publishes `docs/_site` to GitHub Pages.
+
+The public handbook URL is `https://alexhowgego.github.io/glovelly/`.

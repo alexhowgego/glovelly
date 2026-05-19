@@ -1,0 +1,53 @@
+- name: Handbook
+  items:
+    - name: Home
+      href: index.md
+    - name: Domain notes
+      href: domain.md
+    - name: Roadmap
+      href: roadmap.md
+- name: Testing and release
+  items:
+    - name: UAT and regression testing
+      href: uat/index.md
+    - name: Pre-merge regression checklist
+      href: uat/pre-merge-regression.md
+    - name: Invoice journeys
+      href: uat/invoices.md
+    - name: Expense journeys
+      href: uat/expenses.md
+    - name: Enrolment and access
+      href: uat/enrolment.md
+    - name: Testing notes
+      href: testing.md
+- name: Engineering
+  items:
+    - name: Engineering overview
+      href: engineering/index.md
+    - name: Architecture
+      href: engineering/architecture.md
+    - name: Authentication
+      href: engineering/authentication.md
+    - name: Deployment pipeline
+      href: engineering/deployment-pipeline.md
+    - name: Database
+      href: engineering/database.md
+    - name: Email
+      href: engineering/email.md
+    - name: Architecture decisions
+      href: engineering/decisions/index.md
+      items:
+        - name: ADR 0001 Google subject identifier auth model
+          href: engineering/decisions/0001-google-subject-identifier-auth-model.md
+        - name: ADR 0002 Runtime secrets in Google Secret Manager
+          href: engineering/decisions/0002-runtime-secrets-in-google-secret-manager.md
+        - name: ADR 0003 Email provider abstraction
+          href: engineering/decisions/0003-email-provider-abstraction.md
+- name: Reference
+  items:
+    - name: Codebase map
+      href: agent-map.md
+    - name: Conventions
+      href: conventions.md
+    - name: MCP notes
+      href: mcp.md
