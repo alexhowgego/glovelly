@@ -4,6 +4,10 @@
 
 Glovelly is a personal business platform for managing my self-employed music work.
 
+## Handbook
+
+The repo-owned Glovelly Handbook starts at [docs/index.md](docs/index.md). Use the [UAT and regression section](docs/uat/index.md) for manual pre-merge testing journeys.
+
 ## Current Scope (v1)
 - Gig tracking
 - Invoice generation from gigs
