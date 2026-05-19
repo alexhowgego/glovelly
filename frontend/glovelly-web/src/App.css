@@ -1164,6 +1164,12 @@
   color: var(--muted);
 }
 
+.delete-helper {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .link-button {
   border: 0;
   padding: 0;

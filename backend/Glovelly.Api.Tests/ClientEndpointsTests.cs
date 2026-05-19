@@ -107,4 +107,41 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
             "Invoice email subject pattern cannot be empty or whitespace.",
             problem.GetProperty("errors").GetProperty("invoiceEmailSubjectPattern")[0].GetString());
     }
+
+    [Fact]
+    public async Task DeleteClient_WhenNoRelatedRecords_DeletesClient()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/clients", new
+        {
+            name = "Delete Ready Client",
+            email = "delete-ready@example.com",
+            billingAddress = new
+            {
+                line1 = "1 Clear Lane",
+                city = "Leeds",
+                country = "United Kingdom",
+            },
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var client = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var clientId = client.GetProperty("id").GetGuid();
+
+        var deleteResponse = await _client.DeleteAsync($"/clients/{clientId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync($"/clients/{clientId}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteClient_WhenInvoiceExists_ReturnsValidationProblem()
+    {
+        var response = await _client.DeleteAsync($"/clients/{TestData.FoxAndFinchId}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Delete the client's invoices before deleting the client.",
+            problem.GetProperty("errors").GetProperty("invoices")[0].GetString());
+    }
 }
