@@ -1,0 +1,38 @@
+name: Handbook validation
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - ".github/workflows/docs-pr.yml"
+      - ".github/workflows/docs.yml"
+      - "docs/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: handbook-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      - name: Build handbook
+        run: dotnet tool run docfx docs/docfx.json

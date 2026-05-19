@@ -58,9 +58,9 @@ There is no dedicated frontend unit/e2e test runner configured yet. For frontend
 
 ## Manual UAT
 
-Use `docs/uat-playbook.md` for human regression journeys that cut across gigs, expenses, receipts, invoices, expense statements, delivery, seller profile, and admin workflows.
+Use [docs/uat/index.md](uat/index.md) for human regression journeys that cut across gigs, expenses, receipts, invoices, expense statements, delivery, seller profile, and admin workflows.
 
-The playbook is especially useful before or after changes where frontend state, backend workflow services, and generated documents interact. Keep it scenario-based so the journeys can later be automated as browser tests.
+Start with [docs/uat/pre-merge-regression.md](uat/pre-merge-regression.md) for broad pre-merge checks. Use the focused invoice, expense, and enrolment/access pages when a change touches those areas. Keep the journeys scenario-based so they can later be automated as browser tests.
 
 ## What to Add When Changing Behavior
 

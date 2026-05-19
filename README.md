@@ -4,6 +4,19 @@
 
 Glovelly is a personal business platform for managing my self-employed music work.
 
+## Handbook
+
+The repo-owned Glovelly Handbook starts at [docs/index.md](docs/index.md). Use the [UAT and regression section](docs/uat/index.md) for manual pre-merge testing journeys.
+
+The handbook can also be built as a local DocFX site:
+
+```bash
+dotnet tool restore
+dotnet tool run docfx docs/docfx.json --serve
+```
+
+Changes pushed to `main` are published to GitHub Pages at `https://alexhowgego.github.io/glovelly/`.
+
 ## Current Scope (v1)
 - Gig tracking
 - Invoice generation from gigs
@@ -149,3 +162,8 @@ The workflow:
 The image is published to `europe-west1-docker.pkg.dev/glovelly-dev/glovelly/glovelly`.
 
 You can view workflow runs from the [Actions tab](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml).
+
+The handbook has separate GitHub Actions workflows:
+
+- `Handbook validation` builds the DocFX site for pull requests that touch `docs/**`.
+- `Publish handbook` builds the site from `main` and deploys `docs/_site` to GitHub Pages.

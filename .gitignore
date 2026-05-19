@@ -55,3 +55,6 @@ nunit-*.xml
 
 # Local Glovelly development overrides
 .glovelly.dev.local
+
+# Generated handbook site
+docs/_site/

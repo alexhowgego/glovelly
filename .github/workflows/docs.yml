@@ -1,0 +1,58 @@
+name: Publish handbook
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/docs.yml"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  pages: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      - name: Build handbook
+        run: dotnet tool run docfx docs/docfx.json
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload handbook artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
