@@ -25,12 +25,14 @@ type GigsSectionProps = {
   gigs: Gig[]
   isGigLoading: boolean
   isInvoiceLoading: boolean
+  isMileageEstimating: boolean
   onAddGigExpense: () => void
   onCloseEditor: () => void
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
   onGenerateExpenseStatement: () => void
   onGenerateInvoice: () => void
+  onEstimateMileage: () => void
   onDeleteGig: () => void
   onDownloadExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onCloneGig: () => void
@@ -82,12 +84,14 @@ export function GigsSection({
   gigs,
   isGigLoading,
   isInvoiceLoading,
+  isMileageEstimating,
   onAddGigExpense,
   onCloseEditor,
   onExpenseAmountChange,
   onExpenseDescriptionChange,
   onGenerateExpenseStatement,
   onGenerateInvoice,
+  onEstimateMileage,
   onDeleteGig,
   onDownloadExpenseAttachment,
   onCloneGig,
@@ -490,6 +494,17 @@ export function GigsSection({
                       placeholder="24"
                     />
                   </label>
+
+                  <div className="mileage-estimate-action">
+                    <button
+                      className="ghost-button"
+                      disabled={gigMode !== 'edit' || isMileageEstimating}
+                      onClick={onEstimateMileage}
+                      type="button"
+                    >
+                      {isMileageEstimating ? 'Estimating...' : 'Estimate mileage'}
+                    </button>
+                  </div>
 
                   <label>
                     <span>Passengers</span>

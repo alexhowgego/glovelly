@@ -212,6 +212,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 originPostcode = "M1 1AA",
                 originCountry = "GB",
                 destination = "Arena",
+                destinationPlaceId = "ChIJN1t_tDeuEmsRUsoyG83frY4",
                 roundTrip = false,
             });
 
@@ -219,6 +220,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.NotNull(_factory.MileageEstimation.LastRequest);
         Assert.Equal("M1 1AA, GB", _factory.MileageEstimation.LastRequest!.Origin);
         Assert.Equal("Arena", _factory.MileageEstimation.LastRequest.Destination);
+        Assert.Equal("ChIJN1t_tDeuEmsRUsoyG83frY4", _factory.MileageEstimation.LastRequest.DestinationPlaceId);
         Assert.False(_factory.MileageEstimation.LastRequest.RoundTrip);
     }
 

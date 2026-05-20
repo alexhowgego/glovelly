@@ -70,7 +70,7 @@ export Email__Invoices__FromDisplayName="Glovelly Invoices"
 
 `run-dev.sh` sources this file automatically before starting the backend. The admin user is only seeded when no `ConnectionStrings:Glovelly` value is configured and Glovelly is using the in-memory development database.
 
-Keep secrets such as `Email__Resend__ApiKey` out of `.glovelly.dev.local`. Store those with `dotnet user-secrets` instead.
+Keep secrets such as `Email__Resend__ApiKey` and `Mileage__GoogleRoutes__ApiKey` out of `.glovelly.dev.local`. Store those with `dotnet user-secrets` instead.
 
 #### Finding your Google subject claim locally
 
@@ -101,6 +101,7 @@ dotnet user-secrets set "Authentication:Google:ClientId" "your-client-id"
 dotnet user-secrets set "Authentication:Google:ClientSecret" "your-client-secret"
 dotnet user-secrets set "ConnectionStrings:Glovelly" "your-postgresql-connection-string"
 dotnet user-secrets set "Email:Resend:ApiKey" "your-resend-api-key"
+dotnet user-secrets set "Mileage:GoogleRoutes:ApiKey" "your-google-routes-api-key"
 ```
 
 4. To make outbound email work locally with Resend, also add these non-secret values to `.glovelly.dev.local`:
@@ -118,6 +119,7 @@ export Email__Invoices__FromDisplayName="Glovelly Invoices"
    - `Authentication__Google__ClientSecret`
    - `ConnectionStrings__Glovelly`
    - `Email__Resend__ApiKey`
+   - `Mileage__GoogleRoutes__ApiKey`
    - `Email__Mode`
    - `Email__AccessRequests__FromAddress`
    - `Email__AccessRequests__FromDisplayName`
@@ -125,6 +127,17 @@ export Email__Invoices__FromDisplayName="Glovelly Invoices"
    - `Email__Invoices__FromDisplayName`
 
 The frontend signs users in through `/auth/login`, the backend completes the Google OpenID Connect flow, and the app stores the session in a secure cookie before allowing access to `/clients`, `/gigs`, `/invoices`, and `/invoice-lines`.
+
+### Google Routes mileage estimates
+
+Glovelly can estimate gig mileage from the seller profile postcode to the gig location using Google Routes API. The API key is a secret and should be stored with `dotnet user-secrets` locally:
+
+```bash
+cd backend/Glovelly.Api
+dotnet user-secrets set "Mileage:GoogleRoutes:ApiKey" "your-google-routes-api-key"
+```
+
+Non-secret local defaults are shown in `appsettings.Development.json`. In deployed environments, provide the key through Secret Manager or an equivalent secret-backed environment variable named `Mileage__GoogleRoutes__ApiKey`.
 
 Press `Ctrl+C` to stop both services.
 

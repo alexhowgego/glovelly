@@ -32,6 +32,17 @@ type NormalizedGigExpensePayload = {
   amount: number
 }
 
+type MileageEstimateResponse = {
+  distanceMiles: number
+  distanceMeters: number
+  durationSeconds: number | null
+  roundTrip: boolean
+  originLabel: string
+  destinationLabel: string
+  provider: string
+  calculatedAtUtc: string
+}
+
 function extractDownloadFilename(contentDisposition: string | null) {
   if (!contentDisposition) {
     return null
@@ -113,6 +124,7 @@ export function useGigsWorkspace({
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
   const [gigStatus, setGigStatus] = useState(defaultGigStatus)
   const [isGigLoading, setIsGigLoading] = useState(false)
+  const [isMileageEstimating, setIsMileageEstimating] = useState(false)
   const [gigExpenseAmount, setGigExpenseAmount] = useState('')
   const [gigExpenseDescription, setGigExpenseDescription] = useState('')
   const [isExpenseStatementOpen, setIsExpenseStatementOpen] = useState(false)
@@ -439,6 +451,74 @@ export function useGigsWorkspace({
       ...current,
       [field]: value,
     }))
+  }
+
+  const estimateGigMileage = async () => {
+    if (gigMode !== 'edit' || !selectedGig) {
+      setGigStatus('Save the gig before estimating mileage.')
+      return
+    }
+
+    const destination = gigForm.venue.trim()
+    if (!destination) {
+      setGigStatus('Add a location before estimating mileage.')
+      return
+    }
+
+    setIsMileageEstimating(true)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/mileage-estimate`),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            destination,
+            roundTrip: true,
+          }),
+        }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to estimate mileage.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const validationMessages = problem?.errors
+          ? Object.values(problem.errors).flat().join(' ')
+          : problem?.detail ?? problem?.title
+
+        throw new Error(validationMessages || 'Unable to estimate mileage.')
+      }
+
+      const estimate = (await response.json()) as MileageEstimateResponse
+      setGigForm((current) => ({
+        ...current,
+        wasDriving: true,
+        travelMiles: formatEditableNumber(estimate.distanceMiles),
+      }))
+      setGigStatus(
+        `Estimated ${formatEditableNumber(estimate.distanceMiles)} miles from ${estimate.originLabel} to ${estimate.destinationLabel}.`
+      )
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to estimate mileage right now.'
+      )
+    } finally {
+      setIsMileageEstimating(false)
+    }
   }
 
   const handleAddGigExpense = () => {
@@ -1311,6 +1391,7 @@ export function useGigsWorkspace({
     gigStatus,
     gigs,
     gigsById,
+    estimateGigMileage,
     handleAddGigExpense,
     handleGigSubmit,
     handleToggleGigSelection,
@@ -1318,6 +1399,7 @@ export function useGigsWorkspace({
     isExpenseStatementLoading,
     isExpenseStatementOpen,
     isGigLoading,
+    isMileageEstimating,
     mergeSavedGig,
     openGigReceiptDraft,
     openExpenseStatement,

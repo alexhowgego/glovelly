@@ -116,6 +116,48 @@ Expected result: mileage lines disappear while driving is disabled and return wh
 
 Expected result: the invoice includes both mileage and passenger mileage lines using the configured app defaults, not blank or omitted lines. The PDF preview/download shows the same mileage lines as the invoice workspace.
 
+### Estimated Mileage Happy Path
+
+Preconditions:
+
+- Google Routes mileage estimation is configured in the environment.
+- The seller profile has a postcode and country.
+
+1. Create a gig with a clear venue or location and save it.
+2. Edit the saved gig.
+3. Enable `I was driving for this gig`.
+4. Click `Estimate mileage`.
+5. Confirm the travel miles field is filled with a positive value.
+6. Optionally adjust the estimated value.
+7. Save the gig.
+8. Generate an invoice from the gig.
+9. Open the invoice lines and PDF preview.
+
+Expected result: the estimate fills the editable travel miles field but does not save until the gig is saved. The generated invoice includes a mileage line using the saved travel miles and the applicable mileage rate.
+
+### Estimated Mileage Manual Fallback
+
+1. Use an environment where Google Routes mileage estimation is not configured, or temporarily use a gig location that cannot be routed (i.e. 'The Moon').
+2. Create or edit a saved gig.
+3. Enable `I was driving for this gig`.
+4. Click `Estimate mileage`.
+5. Confirm the app shows a clear error in the gig status area.
+6. Manually type a valid travel miles value.
+7. Save the gig.
+8. Generate an invoice from the gig.
+
+Expected result: failed estimation does not block saving the gig. Manual mileage remains editable and still flows into generated invoice mileage lines.
+
+### Estimated Mileage Origin Requirement
+
+1. Use an environment where Google Routes mileage estimation is configured.
+2. Clear the seller profile postcode or use a test user without a seller profile postcode.
+3. Open a saved gig with a location.
+4. Enable `I was driving for this gig`.
+5. Click `Estimate mileage`.
+
+Expected result: the app explains that a seller profile postcode or request origin is required. The existing travel miles value is not overwritten.
+
 ## Invoice Preview
 
 ### Steps

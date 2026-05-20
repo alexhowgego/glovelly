@@ -1335,6 +1335,15 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.mileage-estimate-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-self: end;
+}
+
 .empty-state {
   padding: 22px;
   border-radius: 20px;

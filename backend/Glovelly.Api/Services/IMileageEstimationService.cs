@@ -10,7 +10,8 @@ public interface IMileageEstimationService
 public sealed record MileageEstimateRequest(
     string Origin,
     string Destination,
-    bool RoundTrip);
+    bool RoundTrip,
+    string? DestinationPlaceId = null);
 
 public sealed record MileageEstimateResult(
     bool IsSuccess,

@@ -55,7 +55,11 @@ internal static class GigMileageEndpoints
             }
 
             var estimate = await mileageEstimationService.EstimateAsync(
-                new MileageEstimateRequest(origin, destination, request.RoundTrip ?? true),
+                new MileageEstimateRequest(
+                    origin,
+                    destination,
+                    request.RoundTrip ?? true,
+                    NormalizeOptionalText(request.DestinationPlaceId)),
                 cancellationToken);
 
             if (!estimate.IsSuccess)
@@ -111,6 +115,11 @@ internal static class GigMileageEndpoints
             : destination;
 
         return value.Trim();
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static string NormalizeLocation(

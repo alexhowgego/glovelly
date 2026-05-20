@@ -114,18 +114,22 @@ Expected result: unsaved admin access edits are never discarded without confirma
 ### Steps
 
 1. Create a client or choose an existing client.
-2. Create a gig with fee, date, venue, status `Planned`, and at least one expense.
-3. Save the gig.
-4. Generate an invoice from that gig.
-5. Open the invoice.
-6. Confirm invoice lines include the performance fee and chargeable expenses.
-7. Download the PDF.
-8. Return to the gig.
-9. Confirm the gig shows as invoiced and links back to the invoice.
+2. Confirm the seller profile has a postcode and country if mileage estimation is configured in this environment.
+3. Create a gig with fee, date, venue, status `Planned`, and at least one expense.
+4. Save the gig.
+5. Edit the saved gig, enable `I was driving for this gig`, and click `Estimate mileage` if Google Routes is configured.
+6. Confirm the travel miles field is filled, or record that mileage estimation was skipped because the environment is not configured.
+7. Save the gig.
+8. Generate an invoice from that gig.
+9. Open the invoice.
+10. Confirm invoice lines include the performance fee, chargeable expenses, and mileage when travel miles were saved.
+11. Download the PDF.
+12. Return to the gig.
+13. Confirm the gig shows as invoiced and links back to the invoice.
 
 ### Expected Results
 
-Generating an invoice links the gig, creates expected lines, and produces a downloadable PDF.
+Generating an invoice links the gig, creates expected lines, includes saved mileage when applicable, and produces a downloadable PDF.
 
 ## Editing An Invoiced Gig
 
