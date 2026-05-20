@@ -38,7 +38,20 @@ export function SignInScreen({
           </button>
         </div>
       </section>
-      <p className="build-meta">{formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}</p>
+      <div className="app-footer">
+        <nav className="legal-links" aria-label="Legal">
+          <a href="https://docs.glovelly.net/about.html" target="_blank" rel="noreferrer">
+            About
+          </a>
+          <a href="https://docs.glovelly.net/privacy.html" target="_blank" rel="noreferrer">
+            Privacy policy
+          </a>
+          <a href="https://docs.glovelly.net/terms.html" target="_blank" rel="noreferrer">
+            Terms of Service
+          </a>
+        </nav>
+        <p className="build-meta">{formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}</p>
+      </div>
     </main>
   )
 }
