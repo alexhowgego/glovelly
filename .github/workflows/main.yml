@@ -144,6 +144,7 @@ jobs:
             Email__Resend__ApiKey=glovelly-resend-api-key:latest
             Email__AccessRequests__FromAddress=glovelly-access-requests-from-address:latest
             Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
+            Mileage__GoogleRoutes__ApiKey=glovelly-routes-api-key:latest
             Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
             Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest
             Mcp__OAuth__Clients__0__RedirectUris__0=${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}:latest

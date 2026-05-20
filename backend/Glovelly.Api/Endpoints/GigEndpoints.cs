@@ -9,6 +9,7 @@ public static class GigEndpoints
             .MapGigCrudEndpoints()
             .MapGigReceiptEndpoints()
             .MapGigExpenseEndpoints()
+            .MapGigMileageEndpoints()
             .MapGigAttachmentEndpoints();
 
         return group;

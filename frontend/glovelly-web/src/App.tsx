@@ -225,6 +225,7 @@ function App({ appMetadata }: AppProps) {
     gigStatus,
     gigs,
     gigsById,
+    estimateGigMileage,
     handleAddGigExpense,
     handleGigSubmit,
     handleToggleGigSelection,
@@ -234,6 +235,7 @@ function App({ appMetadata }: AppProps) {
     isExpenseStatementOpen,
     isGigEditorOpen,
     isGigLoading,
+    isMileageEstimating,
     mergeSavedGig,
     openExpenseStatement,
     openGigReceiptDraft,
@@ -1374,12 +1376,14 @@ function App({ appMetadata }: AppProps) {
         gigs={gigs}
         isGigLoading={isGigLoading}
         isInvoiceLoading={isInvoiceLoading}
+        isMileageEstimating={isMileageEstimating}
         onAddGigExpense={handleAddGigExpense}
         onCloseEditor={closeGigEditor}
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateExpenseStatement={openExpenseStatement}
         onGenerateInvoice={handleGenerateInvoice}
+        onEstimateMileage={estimateGigMileage}
         onDeleteGig={deleteGig}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
         onCloneGig={cloneSelectedGig}
@@ -1527,6 +1531,7 @@ function App({ appMetadata }: AppProps) {
         onConnectGoogleDrive={connectGoogleDrive}
         onSubmit={handleUserSettingsSubmit}
         onUpdateField={updateUserSettingsField}
+        sellerProfilePostcode={sellerProfile.postcode}
         status={userSettingsStatus}
       />
 

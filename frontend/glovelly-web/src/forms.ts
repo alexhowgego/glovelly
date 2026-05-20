@@ -31,6 +31,7 @@ export const emptyAdminForm = (): AdminUserForm => ({
 export const emptyUserSettingsForm = (): UserSettingsForm => ({
   mileageRate: '',
   passengerMileageRate: '',
+  travelOriginPostcode: '',
   defaultPaymentWindowDays: '',
   invoiceFilenamePattern: '',
   invoiceEmailSubjectPattern: '',

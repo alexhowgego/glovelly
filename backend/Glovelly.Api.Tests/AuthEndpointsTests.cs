@@ -40,6 +40,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
+            travelOriginPostcode = "BS1 1AA",
             defaultPaymentWindowDays = 30,
             invoiceFilenamePattern = "{MonthName} {Year} {InvoiceNumber}",
             invoiceEmailSubjectPattern = "{ClientName} invoice {InvoiceNumber}",
@@ -61,6 +62,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "billing@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
+        Assert.Equal("BS1 1AA", payload.GetProperty("travelOriginPostcode").GetString());
         Assert.Equal(30, payload.GetProperty("defaultPaymentWindowDays").GetInt32());
         Assert.False(payload.GetProperty("isGoogleDriveConnected").GetBoolean());
     }
@@ -165,6 +167,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
+            travelOriginPostcode = "  BS2 2BB  ",
             defaultPaymentWindowDays = 21,
             invoiceFilenamePattern = "  {ClientName} {InvoiceNumber}  ",
             invoiceEmailSubjectPattern = "  Invoice {InvoiceNumber} for {ClientName}  ",
@@ -183,6 +186,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(
             "accounts@example.com",
             payload.GetProperty("invoiceReplyToEmail").GetString());
+        Assert.Equal("BS2 2BB", payload.GetProperty("travelOriginPostcode").GetString());
         Assert.Equal(21, payload.GetProperty("defaultPaymentWindowDays").GetInt32());
 
         using var scope = _factory.Services.CreateScope();
@@ -193,7 +197,28 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal("{ClientName} {InvoiceNumber}", savedUser.InvoiceFilenamePattern);
         Assert.Equal("Invoice {InvoiceNumber} for {ClientName}", savedUser.InvoiceEmailSubjectPattern);
         Assert.Equal("accounts@example.com", savedUser.InvoiceReplyToEmail);
+        Assert.Equal("BS2 2BB", savedUser.TravelOriginPostcode);
         Assert.Equal(21, savedUser.DefaultPaymentWindowDays);
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WithTooLongTravelOriginPostcode_ReturnsValidationProblem()
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            travelOriginPostcode = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal(
+            "Travel origin postcode must be 20 characters or fewer.",
+            problem.GetProperty("errors").GetProperty("travelOriginPostcode")[0].GetString());
     }
 
     [Fact]

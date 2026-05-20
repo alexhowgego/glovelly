@@ -15,6 +15,7 @@ type UserSettingsModalProps = {
   onConnectGoogleDrive: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onUpdateField: (field: keyof UserSettingsForm, value: string) => void
+  sellerProfilePostcode: string | null
   status: string
 }
 
@@ -31,25 +32,29 @@ export function UserSettingsModal({
   onConnectGoogleDrive,
   onSubmit,
   onUpdateField,
+  sellerProfilePostcode,
   status,
 }: UserSettingsModalProps) {
   const [focusedField, setFocusedField] = useState<keyof UserSettingsForm | null>(null)
+  const travelOriginPlaceholder = sellerProfilePostcode?.trim() || 'BS1 1AA'
   const settingsNote =
     focusedField === 'mileageRate'
       ? 'Leave blank if you do not want a personal mileage default.'
       : focusedField === 'passengerMileageRate'
         ? 'Leave blank if you do not want a personal passenger mileage default.'
-        : focusedField === 'defaultPaymentWindowDays'
-          ? 'Leave blank to keep the standard 14 day payment window.'
-          : focusedField === 'invoiceFilenamePattern'
-            ? `Available filename tokens: ${invoiceFilenameTokens.join(', ')}.`
-            : focusedField === 'invoiceEmailSubjectPattern'
-              ? `Available subject tokens: ${invoiceFilenameTokens.join(', ')}.`
-              : focusedField === 'invoiceReplyToEmail'
-                ? 'Leave blank if replies should not be directed to a personal mailbox.'
-                : focusedField === 'invoiceUploadFolderId'
-                  ? "Leave blank to use Google Drive's default upload destination."
-                  : 'Choose a setting to see a short note here.'
+        : focusedField === 'travelOriginPostcode'
+          ? 'Used for mileage estimates before falling back to your seller profile postcode.'
+          : focusedField === 'defaultPaymentWindowDays'
+            ? 'Leave blank to keep the standard 14 day payment window.'
+            : focusedField === 'invoiceFilenamePattern'
+              ? `Available filename tokens: ${invoiceFilenameTokens.join(', ')}.`
+              : focusedField === 'invoiceEmailSubjectPattern'
+                ? `Available subject tokens: ${invoiceFilenameTokens.join(', ')}.`
+                : focusedField === 'invoiceReplyToEmail'
+                  ? 'Leave blank if replies should not be directed to a personal mailbox.'
+                  : focusedField === 'invoiceUploadFolderId'
+                    ? "Leave blank to use Google Drive's default upload destination."
+                    : 'Choose a setting to see a short note here.'
   const handleFocus = (field: keyof UserSettingsForm) => {
     setFocusedField(field)
   }
@@ -141,6 +146,20 @@ export function UserSettingsModal({
                 onFocus={() => handleFocus('defaultPaymentWindowDays')}
                 onChange={(event) =>
                   onUpdateField('defaultPaymentWindowDays', event.target.value)
+                }
+              />
+            </label>
+
+            <label>
+              <span>Travel origin postcode</span>
+              <input
+                autoComplete="postal-code"
+                placeholder={travelOriginPlaceholder}
+                type="text"
+                value={form.travelOriginPostcode}
+                onFocus={() => handleFocus('travelOriginPostcode')}
+                onChange={(event) =>
+                  onUpdateField('travelOriginPostcode', event.target.value)
                 }
               />
             </label>

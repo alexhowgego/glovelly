@@ -21,6 +21,17 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
+        services.AddOptions<GoogleRoutesMileageSettings>()
+            .BindConfiguration(GoogleRoutesMileageSettings.SectionName);
+        services.AddHttpClient<GoogleRoutesMileageEstimationService>();
+        services.AddScoped<DisabledMileageEstimationService>();
+        services.AddScoped<IMileageEstimationService>(provider =>
+        {
+            var settings = provider.GetRequiredService<IOptions<GoogleRoutesMileageSettings>>().Value;
+            return settings.IsConfigured
+                ? provider.GetRequiredService<GoogleRoutesMileageEstimationService>()
+                : provider.GetRequiredService<DisabledMileageEstimationService>();
+        });
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceEmailDeliveryChannel>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceGoogleDriveDeliveryChannel>();
         services.AddOptions<InvoiceRateSettings>()

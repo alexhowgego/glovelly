@@ -17,11 +17,13 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
     private readonly string _databaseName = $"glovelly-tests-{Guid.NewGuid()}";
     private readonly object _databaseResetLock = new();
     private readonly FakeEmailSender _fakeEmailSender = new();
+    private readonly FakeMileageEstimationService _fakeMileageEstimationService = new();
     private readonly Dictionary<string, string?> _configuration = new();
     private bool _useRealAuthentication;
     private string _environmentName = "Testing";
 
     internal FakeEmailSender Emails => _fakeEmailSender;
+    internal FakeMileageEstimationService MileageEstimation => _fakeMileageEstimationService;
 
     public GlovellyApiFactory WithConfiguration(Dictionary<string, string?> configuration)
     {
@@ -51,6 +53,7 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IEmailSender>();
+            services.RemoveAll<IMileageEstimationService>();
             services.RemoveAll<IBlobStore>();
             services.RemoveAll<IExpenseAttachmentStore>();
 
@@ -61,6 +64,7 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             }
 
             services.AddSingleton<IEmailSender>(_fakeEmailSender);
+            services.AddSingleton<IMileageEstimationService>(_fakeMileageEstimationService);
             services.AddSingleton<IBlobStore, InMemoryBlobStore>();
             services.AddSingleton<IExpenseAttachmentStore, ExpenseAttachmentStore>();
             services.PostConfigure<EmailSettings>(settings =>
@@ -91,6 +95,7 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             ResetDatabase(scope.ServiceProvider.GetRequiredService<AppDbContext>());
             _fakeEmailSender.SentEmails.Clear();
             _fakeEmailSender.ExceptionToThrow = null;
+            _fakeMileageEstimationService.Reset();
         }
 
         return client;

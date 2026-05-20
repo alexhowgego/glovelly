@@ -7,6 +7,7 @@ Glovelly is a personal business platform for self-employed music work. The produ
 ## Start Here
 
 - [UAT and regression testing](uat/index.md): manual tester journeys for checking the product before release.
+- [About Glovelly](about.md): what Glovelly is, why it exists, and the spirit of the project.
 - [Domain notes](domain.md): durable business concepts and vocabulary.
 - [Privacy policy](privacy.md): public privacy notice for Glovelly.
 - [Application terms](terms.md): public terms of service for Glovelly.

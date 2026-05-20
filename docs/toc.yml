@@ -2,6 +2,8 @@
   items:
     - name: Home
       href: index.md
+    - name: About Glovelly
+      href: about.md
     - name: Domain notes
       href: domain.md
     - name: Privacy policy
@@ -38,6 +40,8 @@
       href: engineering/database.md
     - name: Email
       href: engineering/email.md
+    - name: Mileage and routes
+      href: engineering/mileage-routes.md
     - name: Architecture decisions
       href: engineering/decisions/index.md
       items:

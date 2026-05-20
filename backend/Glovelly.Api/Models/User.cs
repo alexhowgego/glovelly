@@ -11,6 +11,7 @@ public sealed class User
     public string? DisplayName { get; set; }
     public decimal? MileageRate { get; set; }
     public decimal? PassengerMileageRate { get; set; }
+    public string? TravelOriginPostcode { get; set; }
     public int? DefaultPaymentWindowDays { get; set; }
     public string? InvoiceFilenamePattern { get; set; }
     public string? InvoiceEmailSubjectPattern { get; set; }

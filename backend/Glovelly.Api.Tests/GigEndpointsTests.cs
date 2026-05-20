@@ -10,10 +10,12 @@ namespace Glovelly.Api.Tests;
 public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly GlovellyApiFactory _factory;
     private readonly HttpClient _client;
 
     public GigEndpointsTests(GlovellyApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -122,6 +124,217 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         Assert.Equal(JsonValueKind.Object, problem.ValueKind);
         Assert.Equal("Invoice client must match the gig client.", problem.GetProperty("errors").GetProperty("invoiceId")[0].GetString());
+    }
+
+    [Fact]
+    public async Task EstimateMileage_UsesSellerProfileOriginAndGigVenue()
+    {
+        await SaveSellerProfileAsync();
+
+        _factory.MileageEstimation.Result = Glovelly.Api.Services.MileageEstimateResult.Success(
+            distanceMeters: 19955.8656m,
+            durationSeconds: 1840,
+            originLabel: "BS1 1AA, United Kingdom",
+            destinationLabel: "Town Hall",
+            provider: "test-routes",
+            calculatedAtUtc: new DateTimeOffset(2026, 5, 19, 12, 0, 0, TimeSpan.Zero));
+
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Mileage estimate gig",
+            date = "2026-06-05",
+            venue = "Town Hall",
+            fee = 200.00m,
+            travelMiles = 0m,
+            notes = "Use venue fallback",
+            wasDriving = true,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/gigs/{createdGig.GetProperty("id").GetGuid()}/mileage-estimate",
+            new
+            {
+                roundTrip = true,
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var estimate = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        Assert.Equal(12.4m, estimate.GetProperty("distanceMiles").GetDecimal());
+        Assert.Equal(19955.8656m, estimate.GetProperty("distanceMeters").GetDecimal());
+        Assert.Equal(1840, estimate.GetProperty("durationSeconds").GetInt32());
+        Assert.True(estimate.GetProperty("roundTrip").GetBoolean());
+        Assert.Equal("test-routes", estimate.GetProperty("provider").GetString());
+
+        Assert.NotNull(_factory.MileageEstimation.LastRequest);
+        Assert.Equal("BS1 1AA, United Kingdom", _factory.MileageEstimation.LastRequest!.Origin);
+        Assert.Equal("Town Hall", _factory.MileageEstimation.LastRequest.Destination);
+        Assert.True(_factory.MileageEstimation.LastRequest.RoundTrip);
+    }
+
+    [Fact]
+    public async Task EstimateMileage_UsesUserTravelOriginBeforeSellerProfilePostcode()
+    {
+        await SaveSellerProfileAsync();
+
+        var settingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            travelOriginPostcode = "  BS9 9ZZ  ",
+            defaultPaymentWindowDays = 14,
+            invoiceFilenamePattern = "{InvoiceNumber}",
+            invoiceReplyToEmail = (string?)null,
+        });
+        settingsResponse.EnsureSuccessStatusCode();
+
+        _factory.MileageEstimation.Result = Glovelly.Api.Services.MileageEstimateResult.Success(
+            distanceMeters: 16093.44m,
+            durationSeconds: 1200,
+            originLabel: "BS9 9ZZ, United Kingdom",
+            destinationLabel: "Town Hall",
+            provider: "test-routes",
+            calculatedAtUtc: new DateTimeOffset(2026, 5, 19, 12, 0, 0, TimeSpan.Zero));
+
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "User origin estimate gig",
+            date = "2026-06-05",
+            venue = "Town Hall",
+            fee = 200.00m,
+            travelMiles = 0m,
+            notes = "Use user origin",
+            wasDriving = true,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/gigs/{createdGig.GetProperty("id").GetGuid()}/mileage-estimate",
+            new
+            {
+                roundTrip = true,
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(_factory.MileageEstimation.LastRequest);
+        Assert.Equal("BS9 9ZZ, United Kingdom", _factory.MileageEstimation.LastRequest!.Origin);
+    }
+
+    [Fact]
+    public async Task EstimateMileage_WithRequestOriginAndDestination_OverridesDefaults()
+    {
+        _factory.MileageEstimation.Result = Glovelly.Api.Services.MileageEstimateResult.Success(
+            distanceMeters: 32186.88m,
+            durationSeconds: null,
+            originLabel: "M1 1AA, GB",
+            destinationLabel: "Arena",
+            provider: "test-routes",
+            calculatedAtUtc: new DateTimeOffset(2026, 5, 19, 12, 0, 0, TimeSpan.Zero));
+
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Manual destination estimate",
+            date = "2026-06-06",
+            venue = "Town Hall",
+            fee = 200.00m,
+            travelMiles = 0m,
+            notes = "Override destination",
+            wasDriving = true,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/gigs/{createdGig.GetProperty("id").GetGuid()}/mileage-estimate",
+            new
+            {
+                originPostcode = "M1 1AA",
+                originCountry = "GB",
+                destination = "Arena",
+                destinationPlaceId = "ChIJN1t_tDeuEmsRUsoyG83frY4",
+                roundTrip = false,
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(_factory.MileageEstimation.LastRequest);
+        Assert.Equal("M1 1AA, GB", _factory.MileageEstimation.LastRequest!.Origin);
+        Assert.Equal("Arena", _factory.MileageEstimation.LastRequest.Destination);
+        Assert.Equal("ChIJN1t_tDeuEmsRUsoyG83frY4", _factory.MileageEstimation.LastRequest.DestinationPlaceId);
+        Assert.False(_factory.MileageEstimation.LastRequest.RoundTrip);
+    }
+
+    [Fact]
+    public async Task EstimateMileage_WhenProviderFails_ReturnsServiceUnavailable()
+    {
+        _factory.MileageEstimation.Result = Glovelly.Api.Services.MileageEstimateResult.Failure(
+            "quota_exceeded",
+            "Mileage provider quota was exceeded.",
+            "test-routes");
+
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Provider failure estimate",
+            date = "2026-06-07",
+            venue = "Town Hall",
+            fee = 200.00m,
+            travelMiles = 0m,
+            notes = "Provider failure",
+            wasDriving = true,
+            status = 1,
+            invoicedAt = (string?)null,
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/gigs/{createdGig.GetProperty("id").GetGuid()}/mileage-estimate",
+            new
+            {
+                originPostcode = "BS1 1AA",
+                originCountry = "GB",
+            });
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.Equal("Mileage provider quota was exceeded.", problem.GetProperty("detail").GetString());
+        Assert.Equal("quota_exceeded", problem.GetProperty("code").GetString());
+    }
+
+    private async Task SaveSellerProfileAsync()
+    {
+        var response = await _client.PutAsJsonAsync("/seller-profile", new
+        {
+            sellerName = "Test Seller",
+            addressLine1 = "1 Test Street",
+            addressLine2 = (string?)null,
+            city = "Bristol",
+            region = (string?)null,
+            postcode = "BS1 1AA",
+            country = "United Kingdom",
+            email = "seller@glovelly.test",
+            phone = (string?)null,
+            accountName = (string?)null,
+            sortCode = (string?)null,
+            accountNumber = (string?)null,
+            paymentReferenceNote = (string?)null,
+        });
+
+        response.EnsureSuccessStatusCode();
     }
 
     [Fact]
