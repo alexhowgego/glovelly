@@ -121,7 +121,7 @@ Expected result: the invoice includes both mileage and passenger mileage lines u
 Preconditions:
 
 - Google Routes mileage estimation is configured in the environment.
-- The seller profile has a postcode and country.
+- User settings have a travel origin postcode, or the seller profile has a postcode and country.
 
 1. Create a gig with a clear venue or location and save it.
 2. Edit the saved gig.
@@ -133,7 +133,7 @@ Preconditions:
 8. Generate an invoice from the gig.
 9. Open the invoice lines and PDF preview.
 
-Expected result: the estimate fills the editable travel miles field but does not save until the gig is saved. The generated invoice includes a mileage line using the saved travel miles and the applicable mileage rate.
+Expected result: the estimate fills the editable travel miles field but does not save until the gig is saved. Mileage estimation uses the travel origin postcode when set, otherwise the seller profile postcode. The generated invoice includes a mileage line using the saved travel miles and the applicable mileage rate.
 
 ### Estimated Mileage Manual Fallback
 
@@ -151,12 +151,12 @@ Expected result: failed estimation does not block saving the gig. Manual mileage
 ### Estimated Mileage Origin Requirement
 
 1. Use an environment where Google Routes mileage estimation is configured.
-2. Clear the seller profile postcode or use a test user without a seller profile postcode.
+2. Clear the user settings travel origin postcode and seller profile postcode, or use a test user without either value.
 3. Open a saved gig with a location.
 4. Enable `I was driving for this gig`.
 5. Click `Estimate mileage`.
 
-Expected result: the app explains that a seller profile postcode or request origin is required. The existing travel miles value is not overwritten.
+Expected result: the app explains that a travel origin postcode, seller profile postcode, or request origin is required. The existing travel miles value is not overwritten.
 
 ## Invoice Preview
 

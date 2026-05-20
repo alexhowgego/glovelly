@@ -20,6 +20,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasPrecision(18, 2);
         entity.Property(user => user.PassengerMileageRate)
             .HasPrecision(18, 2);
+        entity.Property(user => user.TravelOriginPostcode)
+            .HasMaxLength(20);
         entity.Property(user => user.DefaultPaymentWindowDays);
         entity.Property(user => user.InvoiceFilenamePattern)
             .HasMaxLength(200);

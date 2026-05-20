@@ -40,10 +40,14 @@ internal static class GigMileageEndpoints
             var sellerProfile = await db.SellerProfiles
                 .AsNoTracking()
                 .FirstOrDefaultAsync(value => value.UserId == userId.Value, cancellationToken);
+            var localUser = await db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == userId.Value, cancellationToken);
 
             var origin = NormalizeLocation(
                 request.OriginPostcode,
                 request.OriginCountry,
+                localUser?.TravelOriginPostcode,
                 sellerProfile?.Address.PostalCode,
                 sellerProfile?.Address.Country);
             var destination = NormalizeDestination(request.Destination, gig.Venue);
@@ -97,7 +101,7 @@ internal static class GigMileageEndpoints
 
         if (string.IsNullOrWhiteSpace(origin))
         {
-            errors["originPostcode"] = ["Set a postcode on the seller profile or include a travel origin postcode in the request."];
+            errors["originPostcode"] = ["Set a travel origin postcode in user settings, set a seller profile postcode, or include an origin postcode in the request."];
         }
 
         if (string.IsNullOrWhiteSpace(destination))
@@ -125,12 +129,11 @@ internal static class GigMileageEndpoints
     private static string NormalizeLocation(
         string? requestPostcode,
         string? requestCountry,
+        string? userSettingsPostcode,
         string? fallbackPostcode,
         string? fallbackCountry)
     {
-        var postcode = string.IsNullOrWhiteSpace(requestPostcode)
-            ? fallbackPostcode
-            : requestPostcode;
+        var postcode = FirstNonBlank(requestPostcode, userSettingsPostcode, fallbackPostcode);
         if (string.IsNullOrWhiteSpace(postcode))
         {
             return string.Empty;
@@ -143,6 +146,11 @@ internal static class GigMileageEndpoints
         return string.IsNullOrWhiteSpace(country)
             ? postcode.Trim()
             : $"{postcode.Trim()}, {country.Trim()}";
+    }
+
+    private static string? FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     internal sealed record MileageEstimateEndpointRequest(

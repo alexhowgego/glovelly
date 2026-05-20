@@ -9,7 +9,7 @@ The feature is intentionally a suggestion workflow. Google calculates a route es
 1. The user opens a saved gig and clicks `Estimate mileage`.
 2. The frontend calls `POST /gigs/{id}/mileage-estimate` with the current gig location as `destination` and `roundTrip: true`.
 3. The backend authorises access through the normal gig visibility rules.
-4. The backend uses the seller profile postcode and country as the origin when the request does not provide one.
+4. The backend uses the user's travel origin postcode as the origin when the request does not provide one, with the seller profile postcode and country as the fallback.
 5. `IMileageEstimationService` calculates the estimate.
 6. The frontend writes the returned `distanceMiles` into the existing travel miles field.
 

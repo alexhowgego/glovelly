@@ -12,6 +12,7 @@ import type { AuthUser, UserSettingsForm } from '../types'
 type SavedUserSettings = {
   mileageRate: number | null
   passengerMileageRate: number | null
+  travelOriginPostcode: string | null
   defaultPaymentWindowDays: number | null
   invoiceFilenamePattern: string | null
   invoiceEmailSubjectPattern: string | null
@@ -36,6 +37,7 @@ function toUserSettingsForm(settings: SavedUserSettings): UserSettingsForm {
       settings.passengerMileageRate === null
         ? ''
         : String(settings.passengerMileageRate),
+    travelOriginPostcode: settings.travelOriginPostcode ?? '',
     defaultPaymentWindowDays:
       settings.defaultPaymentWindowDays === null
         ? ''
@@ -82,6 +84,7 @@ export function useUserSettings({
       toUserSettingsForm({
         mileageRate: authUser?.mileageRate ?? null,
         passengerMileageRate: authUser?.passengerMileageRate ?? null,
+        travelOriginPostcode: authUser?.travelOriginPostcode ?? null,
         defaultPaymentWindowDays: authUser?.defaultPaymentWindowDays ?? null,
         invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? null,
         invoiceEmailSubjectPattern: authUser?.invoiceEmailSubjectPattern ?? null,
@@ -121,6 +124,7 @@ export function useUserSettings({
     const passengerMileageRate = parseOptionalDecimal(
       userSettingsForm.passengerMileageRate
     )
+    const travelOriginPostcode = userSettingsForm.travelOriginPostcode.trim()
     const defaultPaymentWindowDaysText = userSettingsForm.defaultPaymentWindowDays.trim()
     const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
     const invoiceEmailSubjectPattern =
@@ -155,6 +159,7 @@ export function useUserSettings({
         body: JSON.stringify({
           mileageRate,
           passengerMileageRate,
+          travelOriginPostcode: travelOriginPostcode || null,
           defaultPaymentWindowDays,
           invoiceFilenamePattern: invoiceFilenamePattern || null,
           invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
@@ -190,6 +195,7 @@ export function useUserSettings({
               ...current,
               mileageRate: savedSettings.mileageRate,
               passengerMileageRate: savedSettings.passengerMileageRate,
+              travelOriginPostcode: savedSettings.travelOriginPostcode,
               defaultPaymentWindowDays: savedSettings.defaultPaymentWindowDays,
               invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
               invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern,

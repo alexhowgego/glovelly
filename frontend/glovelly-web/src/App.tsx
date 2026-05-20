@@ -1531,6 +1531,7 @@ function App({ appMetadata }: AppProps) {
         onConnectGoogleDrive={connectGoogleDrive}
         onSubmit={handleUserSettingsSubmit}
         onUpdateField={updateUserSettingsField}
+        sellerProfilePostcode={sellerProfile.postcode}
         status={userSettingsStatus}
       />
 

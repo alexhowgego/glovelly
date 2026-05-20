@@ -33,6 +33,7 @@ export type AuthUser = {
   profileImageUrl: string
   mileageRate: number | null
   passengerMileageRate: number | null
+  travelOriginPostcode: string | null
   defaultPaymentWindowDays: number | null
   invoiceFilenamePattern: string | null
   invoiceEmailSubjectPattern: string | null
@@ -64,6 +65,7 @@ export type AdminUserForm = {
 export type UserSettingsForm = {
   mileageRate: string
   passengerMileageRate: string
+  travelOriginPostcode: string
   defaultPaymentWindowDays: string
   invoiceFilenamePattern: string
   invoiceEmailSubjectPattern: string
