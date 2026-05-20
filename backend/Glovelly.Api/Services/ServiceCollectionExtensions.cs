@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
+        services.AddScoped<IMileageEstimationService, DisabledMileageEstimationService>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceEmailDeliveryChannel>();
         services.AddScoped<IInvoiceDeliveryChannel, InvoiceGoogleDriveDeliveryChannel>();
         services.AddOptions<InvoiceRateSettings>()
