@@ -16,6 +16,11 @@ internal static class EndpointSupport
         return query.Where(gig => gig.CreatedByUserId == null || gig.CreatedByUserId == userId);
     }
 
+    public static IQueryable<GigImportBatch> WhereVisibleTo(this IQueryable<GigImportBatch> query, Guid? userId)
+    {
+        return query.Where(batch => batch.CreatedByUserId == null || batch.CreatedByUserId == userId);
+    }
+
     public static IQueryable<Invoice> WhereVisibleTo(this IQueryable<Invoice> query, Guid? userId)
     {
         return query.Where(invoice => invoice.CreatedByUserId == null || invoice.CreatedByUserId == userId);
