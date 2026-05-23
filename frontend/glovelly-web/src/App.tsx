@@ -648,7 +648,7 @@ function App({ appMetadata }: AppProps) {
     if (relatedGigs.length > 0) {
       return {
         canDelete: false,
-        helperText: `Delete disabled: ${selectedClient.name} has ${relatedGigs.length} gig record(s).`,
+        helperText: `Cannot delete ${selectedClient.name} while ${relatedGigs.length} gig record(s) are linked.`,
       }
     }
 
@@ -659,7 +659,7 @@ function App({ appMetadata }: AppProps) {
     if (relatedInvoices.length > 0) {
       return {
         canDelete: false,
-        helperText: `Delete disabled: ${selectedClient.name} has ${relatedInvoices.length} invoice record(s).`,
+        helperText: `Cannot delete ${selectedClient.name} while ${relatedInvoices.length} invoice record(s) are linked.`,
       }
     }
 
