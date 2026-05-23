@@ -31,6 +31,7 @@ Glovelly runs as one ASP.NET Core process in deployed form. The Vite frontend is
 - `/admin`: admin user management.
 - `/clients`: client CRUD plus client-level defaults/settings.
 - `/gigs`: gig CRUD, expense handling, receipt attachment upload/download, invoice draft generation from gigs.
+- `/gig-imports`: user review and commit workflow for staged gig imports.
 - `/invoices`: invoice CRUD, status transitions, PDF download, issue/reissue, email delivery, Google Drive delivery, adjustments.
 - `/invoice-lines`: invoice line CRUD.
 - `/seller-profile`: seller profile used for invoice readiness and PDF details.
@@ -53,6 +54,7 @@ Workspace hooks:
 
 - `useClientsWorkspace`: clients list, client CRUD, search, client invoice/mileage settings.
 - `useGigsWorkspace`: gigs list, gig CRUD, expense editing, receipt attachments, multi-select, invoice draft preparation.
+- `useGigImportsWorkspace`: staged gig import loading, autosave edits, accept/reject decisions, notification counts, and commit.
 - `useInvoicesWorkspace`: invoices list, invoice status, adjustments, PDF download, email delivery, Google Drive publish.
 - `useQuickReceipt`: quick receipt upload and candidate matching.
 - `useSellerProfile`: seller profile loading/editing.
@@ -81,15 +83,29 @@ Common flow:
 
 Receipt attachments are modeled under gig expenses. Storage is abstracted through `IExpenseAttachmentStore`; tests use `InMemoryExpenseAttachmentStore`, and production can use Google Cloud Storage. Quick receipt behavior can infer nearby gig candidates, create a draft expense, and later move/update that draft.
 
+## Imported Gig Flow
+
+MCP gig import tools stage AI-extracted candidate gigs into `GigImportBatch` and `GigImportDraft` records. The frontend treats imported gigs as a secondary profile-menu workflow rather than a primary workspace.
+
+Common flow:
+
+1. MCP creates a gig import batch and draft rows for the signed-in user.
+2. The profile avatar/menu show a notification dot when pending or accepted rows exist.
+3. The user opens `Imported gigs`, edits rows inline, and accepts or rejects each draft.
+4. Draft edits autosave. Rejected rows stay in place until decisions are committed.
+5. `Commit decisions` creates real gigs from accepted rows, deletes rejected draft rows, and leaves pending rows for later review.
+6. Created gigs keep source import batch/draft IDs for auditability and duplicate protection.
+
 ## MCP Surface
 
-The MCP endpoint is read-only and user-scoped. It exposes:
+The MCP endpoint is user-scoped. Most tools are read-only. Gig import tools are write-only staging tools and do not create real gigs directly. It exposes:
 
 - contact search
 - invoice listing
 - invoice details
 - receipt/expense listing
 - business summary totals
+- gig import batch/draft staging and import batch lookup
 
 Implementation is split between `McpEndpoints.cs` for protocol/tool handling and `GlovellyMcpQueryService.cs` for EF query projection.
 

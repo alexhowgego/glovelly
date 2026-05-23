@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use this checklist before shipping changes that touch gigs, expenses, receipts, invoices, expense statements, delivery, seller profile, or admin workflows.
+Use this checklist before shipping changes that touch gigs, imported gigs, expenses, receipts, invoices, expense statements, delivery, seller profile, or admin workflows.
 
 This page gives the tester a single path through the product. Some detailed journeys live on separate pages and are linked where they fit.
 
@@ -29,7 +29,8 @@ For local development, engineers usually run:
 3. Open Gigs and confirm existing gigs load.
 4. Open Invoices and confirm existing invoices load.
 5. Open user settings or seller profile and confirm the modal opens and closes.
-6. Refresh the page and confirm the same data returns without session issues.
+6. Open the profile menu and confirm `Imported gigs` is present.
+7. Refresh the page and confirm the same data returns without session issues.
 
 ### Expected Results
 
@@ -236,6 +237,18 @@ One invoice is created, both gigs are linked, invoice lines are ordered sensibly
 
 Expected result: the app blocks generation and explains that selected gigs must belong to the same client.
 
+## Imported Gig Review Smoke Check
+
+Run the focused [Imported gigs](gig-imports.md) journey when the change touches MCP, gigs, or profile-menu workflows. For broad pre-merge smoke, at minimum:
+
+1. Open the profile menu.
+2. Open `Imported gigs`.
+3. If staged imports exist, select a batch and confirm rows load in the modal.
+4. If there are pending rows, edit a harmless field and confirm there is no row-level save button.
+5. Close the modal and reopen it.
+
+Expected result: imported gigs stay in a modal launched from the profile menu, row edits autosave, and the main Clients/Gigs/Invoices navigation is unchanged.
+
 ## Monthly Invoice Journey
 
 ### Steps
@@ -257,6 +270,7 @@ Run the focused pages when the change touches those areas, or when the pre-merge
 
 - [Invoices](invoices.md)
 - [Expenses](expenses.md)
+- [Imported gigs](gig-imports.md)
 - [Enrolment and access](enrolment.md)
 
 ## Regression Notes

@@ -5,6 +5,7 @@ import {
   ClientSettingsModal,
   ClientsSection,
   ExpenseStatementModal,
+  GigImportsModal,
   GigsSection,
   InvoiceGenerationPreviewModal,
   InvoicesSection,
@@ -31,6 +32,7 @@ import {
 import { useAdminWorkspace } from './hooks/useAdminWorkspace'
 import { useClientsWorkspace } from './hooks/useClientsWorkspace'
 import { useGigsWorkspace } from './hooks/useGigsWorkspace'
+import { useGigImportsWorkspace } from './hooks/useGigImportsWorkspace'
 import { useInvoicesWorkspace } from './hooks/useInvoicesWorkspace'
 import { useProfileMenu } from './hooks/useProfileMenu'
 import { useQuickReceipt } from './hooks/useQuickReceipt'
@@ -43,6 +45,7 @@ import type {
   AuthUser,
   Client,
   Gig,
+  GigImportBatchSummary,
   Invoice,
   InvoiceStatus,
   SellerProfile,
@@ -107,6 +110,7 @@ function App({ appMetadata }: AppProps) {
   const [invoicePreviewPdfUrl, setInvoicePreviewPdfUrl] = useState<string | null>(null)
   const [invoicePreviewStatus, setInvoicePreviewStatus] = useState('')
   const [isInvoicePreviewLoading, setIsInvoicePreviewLoading] = useState(false)
+  const [isGigImportsOpen, setIsGigImportsOpen] = useState(false)
 
   const isAdmin = authUser?.role === 'Admin'
   const clearSession = useCallback(() => {
@@ -280,6 +284,27 @@ function App({ appMetadata }: AppProps) {
     onSessionExpired: expireSession,
   })
   const {
+    applyGigImportBatches,
+    batchDetail: gigImportBatchDetail,
+    batches: gigImportBatches,
+    commitGigImportDecisions,
+    gigImportStatus,
+    isGigImportLoading,
+    loadGigImportBatch,
+    loadGigImportBatches,
+    resetGigImportsWorkspace,
+    selectedBatchId: selectedGigImportBatchId,
+    selectGigImportBatch,
+    setGigImportDraftStatus,
+    updateGigImportDraftField,
+  } = useGigImportsWorkspace({
+    onGigsCommitted: (committedGigs, message) => {
+      applyGigs(committedGigs)
+      setStatus(message)
+    },
+    onSessionExpired: expireSession,
+  })
+  const {
     adjustmentAmount,
     adjustmentReason,
     applyInvoices,
@@ -400,6 +425,8 @@ function App({ appMetadata }: AppProps) {
     const resetSignedInState = () => {
       resetClientsWorkspace()
       resetGigsWorkspace()
+      resetGigImportsWorkspace()
+      setIsGigImportsOpen(false)
       setMonthlyInvoiceMonth(getCurrentMonthValue())
       setMonthlyInvoiceStatus('')
       resetInvoicesWorkspace()
@@ -442,9 +469,10 @@ function App({ appMetadata }: AppProps) {
         setAuthUser(user)
         setIsLoading(true)
 
-        const [clientsResponse, gigsResponse, invoicesResponse, sellerProfileResponse] = await Promise.all([
+        const [clientsResponse, gigsResponse, gigImportsResponse, invoicesResponse, sellerProfileResponse] = await Promise.all([
           fetchWithSession(buildApiUrl('/clients')),
           fetchWithSession(buildApiUrl('/gigs')),
+          fetchWithSession(buildApiUrl('/gig-imports')),
           fetchWithSession(buildApiUrl('/invoices')),
           fetchWithSession(buildApiUrl('/seller-profile')),
         ])
@@ -452,6 +480,7 @@ function App({ appMetadata }: AppProps) {
         if (
           isSessionExpiredResponse(clientsResponse) ||
           isSessionExpiredResponse(gigsResponse) ||
+          isSessionExpiredResponse(gigImportsResponse) ||
           isSessionExpiredResponse(invoicesResponse) ||
           isSessionExpiredResponse(sellerProfileResponse)
         ) {
@@ -471,12 +500,17 @@ function App({ appMetadata }: AppProps) {
           throw new Error('Unable to load invoices.')
         }
 
+        if (!gigImportsResponse.ok) {
+          throw new Error('Unable to load gig imports.')
+        }
+
         if (!sellerProfileResponse.ok) {
           throw new Error('Unable to load seller profile.')
         }
 
         const data = (await clientsResponse.json()) as Client[]
         const gigData = (await gigsResponse.json()) as Gig[]
+        const gigImportData = (await gigImportsResponse.json()) as GigImportBatchSummary[]
         const invoiceData = (await invoicesResponse.json()) as Invoice[]
         const sellerProfileData = (await sellerProfileResponse.json()) as SellerProfile
         if (ignore) {
@@ -485,6 +519,10 @@ function App({ appMetadata }: AppProps) {
 
         applyClients(data)
         applyGigs(gigData)
+        applyGigImportBatches(gigImportData)
+        if (gigImportData[0]?.batchId) {
+          await loadGigImportBatch(gigImportData[0].batchId)
+        }
         applyInvoices(invoiceData)
         applySellerProfile(sellerProfileData)
         setIsApiConnected(true)
@@ -531,20 +569,35 @@ function App({ appMetadata }: AppProps) {
     }
   }, [
     applyClients,
+    applyGigImportBatches,
     applyGigs,
     applyInvoices,
     applySellerProfile,
     clearQuickReceiptDialog,
     expireSession,
     loadAdminUsers,
+    loadGigImportBatch,
     markAdminLoadFailed,
     resetClientsWorkspace,
     resetAdminWorkspace,
+    resetGigImportsWorkspace,
     resetGigsWorkspace,
     resetInvoicesWorkspace,
     resetSellerProfile,
     resetUserSettings,
   ])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadGigImportBatches(true)
+    }, 30000)
+
+    return () => window.clearInterval(intervalId)
+  }, [isAuthenticated, loadGigImportBatches])
 
   const monthlyInvoiceEligibleGigs = useMemo(() => {
     if (!selectedClient || !monthlyInvoiceMonth) {
@@ -715,6 +768,10 @@ function App({ appMetadata }: AppProps) {
   ]
 
   const currentSection = navigationItems.find((item) => item.id === activeSection)
+  const pendingGigImportCount = gigImportBatches.reduce(
+    (count, batch) => count + batch.pendingCount + batch.acceptedCount,
+    0
+  )
   const headerMetrics: HeaderMetric[] = [
     {
       value: upcomingGigCount,
@@ -757,6 +814,8 @@ function App({ appMetadata }: AppProps) {
       clearSession()
       resetClientsWorkspace()
       resetGigsWorkspace()
+      resetGigImportsWorkspace()
+      setIsGigImportsOpen(false)
       resetInvoicesWorkspace()
       resetSellerProfile()
       resetAdminWorkspace()
@@ -771,6 +830,18 @@ function App({ appMetadata }: AppProps) {
 
   const openSellerProfile = () => {
     openSellerProfileModal(sellerProfileNotice)
+  }
+
+  const openGigImports = () => {
+    closeProfileMenu()
+    if (selectedGigImportBatchId) {
+      void loadGigImportBatch(selectedGigImportBatchId)
+    }
+    setIsGigImportsOpen(true)
+  }
+
+  const closeGigImports = () => {
+    setIsGigImportsOpen(false)
   }
 
   const openInvoicePreview = async (invoice: Invoice) => {
@@ -1466,6 +1537,8 @@ function App({ appMetadata }: AppProps) {
       isSellerProfileSaving={isSellerProfileSaving}
       isUserSettingsSaving={isUserSettingsSaving}
       navigationItems={navigationItems}
+      pendingGigImportCount={pendingGigImportCount}
+      onOpenGigImports={openGigImports}
       onOpenSellerProfile={openSellerProfile}
       onOpenUserSettings={openUserSettings}
       onProfileMenuToggle={toggleProfileMenu}
@@ -1510,6 +1583,23 @@ function App({ appMetadata }: AppProps) {
         onOpenInvoice={openPreviewedInvoice}
         pdfUrl={invoicePreviewPdfUrl}
         status={invoicePreviewStatus}
+      />
+
+      <GigImportsModal
+        batchDetail={gigImportBatchDetail}
+        batches={gigImportBatches}
+        clients={clients}
+        gigImportStatus={gigImportStatus}
+        isOpen={isGigImportsOpen}
+        isGigImportLoading={isGigImportLoading}
+        onClose={closeGigImports}
+        onCommitDecisions={commitGigImportDecisions}
+        onSelectBatch={selectGigImportBatch}
+        onSetDraftStatus={(draft, draftStatus) => {
+          void setGigImportDraftStatus(draft, draftStatus)
+        }}
+        onUpdateDraftField={updateGigImportDraftField}
+        selectedBatchId={selectedGigImportBatchId}
       />
 
       <UserSettingsModal

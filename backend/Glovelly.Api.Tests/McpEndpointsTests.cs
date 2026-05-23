@@ -574,6 +574,50 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task AddGigImportDrafts_WithInformalDateAndTime_DoesNotRejectWholeToolCall()
+    {
+        var createResult = await CallToolAsync("glovelly_create_gig_import_batch", new
+        {
+            sourceName = "Swing Into Christmas 2026",
+        });
+        var batchId = createResult.GetProperty("batch").GetProperty("batchId").GetGuid();
+
+        var bulkResult = await CallToolAsync("glovelly_add_gig_import_drafts", new
+        {
+            batchId,
+            drafts = new object[]
+            {
+                new
+                {
+                    title = "Aberdeen",
+                    date = "Sat 28 Nov 2026",
+                    showStartTime = "7:30 PM",
+                    venueName = "Music Hall",
+                    confidence = "high",
+                },
+                new
+                {
+                    title = "Dumfries",
+                    date = "probably late November",
+                    showStartTime = "evening",
+                    venueName = "Theatre Royal",
+                    confidence = "low",
+                },
+            },
+        });
+
+        Assert.True(bulkResult.GetProperty("batchFound").GetBoolean());
+        Assert.Equal(2, bulkResult.GetProperty("submittedCount").GetInt32());
+        Assert.Equal(2, bulkResult.GetProperty("createdCount").GetInt32());
+
+        var results = bulkResult.GetProperty("results").EnumerateArray().ToArray();
+        Assert.Equal("2026-11-28", results[0].GetProperty("draft").GetProperty("date").GetString());
+        Assert.Equal("19:30:00", results[0].GetProperty("draft").GetProperty("showStartTime").GetString());
+        Assert.Equal(JsonValueKind.Null, results[1].GetProperty("draft").GetProperty("date").ValueKind);
+        Assert.Equal(JsonValueKind.Null, results[1].GetProperty("draft").GetProperty("showStartTime").ValueKind);
+    }
+
+    [Fact]
     public async Task GigImportBatches_AreScopedToAuthenticatedUser()
     {
         var createResult = await CallToolAsync("glovelly_create_gig_import_batch", new

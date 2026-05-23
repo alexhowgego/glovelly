@@ -14,7 +14,12 @@ public static class McpEndpoints
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+        Converters =
+        {
+            new LenientNullableDateOnlyConverter(),
+            new LenientNullableTimeOnlyConverter(),
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase),
+        },
     };
 
     public static IEndpointRouteBuilder MapMcpEndpoints(this IEndpointRouteBuilder app)
@@ -522,4 +527,138 @@ public static class McpEndpoints
         McpRpcError? Error);
 
     private sealed record McpRpcError(int Code, string Message);
+
+    private sealed class LenientNullableDateOnlyConverter : JsonConverter<DateOnly?>
+    {
+        private static readonly string[] DateFormats =
+        [
+            "yyyy-MM-dd",
+            "yyyy/MM/dd",
+            "dd/MM/yyyy",
+            "d/M/yyyy",
+            "dd-MM-yyyy",
+            "d-M-yyyy",
+            "d MMM yyyy",
+            "dd MMM yyyy",
+            "d MMMM yyyy",
+            "dd MMMM yyyy",
+            "ddd d MMM yyyy",
+            "dddd d MMM yyyy",
+            "ddd dd MMM yyyy",
+            "dddd dd MMM yyyy",
+        ];
+
+        public override DateOnly? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return null;
+            }
+
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                reader.Skip();
+                return null;
+            }
+
+            var value = reader.GetString();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (DateOnly.TryParseExact(
+                    value.Trim(),
+                    DateFormats,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                    out var date))
+            {
+                return date;
+            }
+
+            return DateOnly.TryParse(
+                value.Trim(),
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                out date)
+                ? date
+                : null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, DateOnly? value, JsonSerializerOptions options)
+        {
+            if (value.HasValue)
+            {
+                writer.WriteStringValue(value.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+                return;
+            }
+
+            writer.WriteNullValue();
+        }
+    }
+
+    private sealed class LenientNullableTimeOnlyConverter : JsonConverter<TimeOnly?>
+    {
+        private static readonly string[] TimeFormats =
+        [
+            "HH:mm",
+            "H:mm",
+            "HH:mm:ss",
+            "H:mm:ss",
+            "h:mm tt",
+            "hh:mm tt",
+            "htt",
+            "h tt",
+        ];
+
+        public override TimeOnly? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return null;
+            }
+
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                reader.Skip();
+                return null;
+            }
+
+            var value = reader.GetString();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (TimeOnly.TryParseExact(
+                    value.Trim(),
+                    TimeFormats,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                    out var time))
+            {
+                return time;
+            }
+
+            return TimeOnly.TryParse(
+                value.Trim(),
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                out time)
+                ? time
+                : null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, TimeOnly? value, JsonSerializerOptions options)
+        {
+            if (value.HasValue)
+            {
+                writer.WriteStringValue(value.Value.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
+                return;
+            }
+
+            writer.WriteNullValue();
+        }
+    }
 }

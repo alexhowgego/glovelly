@@ -21,6 +21,7 @@ Use a fresh browser session if possible. If the environment already contains cli
 - [Pre-merge regression](pre-merge-regression.md): the main end-to-end checklist before shipping changes.
 - [Invoices](invoices.md): invoice creation, regeneration, preview, status, and delivery journeys.
 - [Expenses](expenses.md): receipts, quick receipts, reimbursement, and expense statement journeys.
+- [Imported gigs](gig-imports.md): MCP-staged gig imports, review, autosave, accept/reject, notification dots, and commit.
 - [Enrolment and access](enrolment.md): sign-in, seller profile, settings, and admin access checks.
 
 ## Good Testing Notes

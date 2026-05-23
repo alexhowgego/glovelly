@@ -14,6 +14,7 @@
 - Google sign-in and admin user management
 - Access request workflow
 - Read-only MCP tools for contacts, invoices, receipts, and business summaries
+- MCP-staged imported gig review and commit workflow
 
 ## In Scope (Now)
 - Polish invoice workflows and delivery ergonomics

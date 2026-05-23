@@ -9,6 +9,8 @@ public sealed class Gig
     public Guid? InvoiceId { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public Guid? UpdatedByUserId { get; set; }
+    public Guid? SourceImportBatchId { get; set; }
+    public Guid? SourceImportDraftId { get; set; }
     public string Title { get; set; } = string.Empty;
     public DateOnly Date { get; set; }
     public string Venue { get; set; } = string.Empty;
@@ -30,4 +32,8 @@ public sealed class Gig
     public User? CreatedByUser { get; set; }
     [JsonIgnore]
     public User? UpdatedByUser { get; set; }
+    [JsonIgnore]
+    public GigImportBatch? SourceImportBatch { get; set; }
+    [JsonIgnore]
+    public GigImportDraft? SourceImportDraft { get; set; }
 }

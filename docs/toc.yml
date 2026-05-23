@@ -22,6 +22,8 @@
       href: uat/invoices.md
     - name: Expense journeys
       href: uat/expenses.md
+    - name: Imported gig journeys
+      href: uat/gig-imports.md
     - name: Enrolment and access
       href: uat/enrolment.md
     - name: Testing notes

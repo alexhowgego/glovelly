@@ -58,6 +58,7 @@ Use `./verify.sh` before handing over broad code changes. For backend-only chang
 
 - Keep data/workflow state in hooks under `src/hooks`. Components should mostly render state and call hook-provided handlers.
 - Use `fetchWithSession`, `buildApiUrl`, `parseProblemDetails`, and session-expiry helpers from `src/api.ts` for API calls.
+- When adding a new frontend-consumed API route, add the route prefix to `frontend/glovelly-web/vite.config.ts` dev proxy and to the API bypass list in `frontend/glovelly-web/public/sw.js`; otherwise local Vite/service-worker responses can mask seeded backend data.
 - Update `src/types.ts` when backend response shapes change.
 - `App.tsx` coordinates workspaces and cross-cutting state. Avoid adding large new workflow bodies there when a hook can own the behavior.
 - Preserve the existing plain React/CSS style. There is no component library.

@@ -24,6 +24,10 @@ export default defineConfig({
         target: 'http://localhost:5153',
         changeOrigin: true,
       },
+      '/gig-imports': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
       '/expense-statements': {
         target: 'http://localhost:5153',
         changeOrigin: true,

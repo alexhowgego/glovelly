@@ -14,6 +14,8 @@ confirm the action before the record is removed.
 - id
 - clientId
 - invoiceId?
+- sourceImportBatchId?
+- sourceImportDraftId?
 - title
 - date
 - venue
@@ -24,6 +26,30 @@ confirm the action before the record is removed.
 - status
 - invoicedAt?
 - isInvoiced (derived from invoiceId)
+
+## GigImportBatch
+- id
+- sourceName
+- sourceFingerprint?
+- status (`Draft`, `Committed`, `Abandoned`)
+- createdAtUtc
+- createdByUserId?
+- notes?
+
+Gig import batches are staging containers for AI/MCP-extracted candidate gigs. They are user-scoped and intentionally separate extraction from production gig records.
+
+## GigImportDraft
+- id
+- batchId
+- proposedClientId?
+- proposed client/contact/project fields
+- proposed title/date/time/venue/fee/per-diem fields
+- notes/accommodation/travel/source reference
+- confidence (`Low`, `Medium`, `High`)
+- warnings
+- status (`Pending`, `Accepted`, `Rejected`, `Committed`)
+
+Draft rows can be incomplete. The user reviews them in the Imported gigs modal. Edits autosave, accepted rows can be committed into real gigs, and rejected rows are deleted from the import when decisions are committed. Pending rows remain staged for later review. Created gigs keep source import IDs for auditability and duplicate protection.
 
 ## Invoice
 - id
@@ -64,3 +90,5 @@ The `{userId}` segment uses the same dashless GUID format as receipt attachment 
 ## Key Flow
 
 Gig -> Generate Invoice -> InvoiceLines created -> Invoice tracked
+
+MCP extraction -> GigImportBatch/GigImportDraft staging -> user review -> accepted rows commit to Gig records
