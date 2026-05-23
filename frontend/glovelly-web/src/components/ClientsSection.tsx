@@ -156,7 +156,6 @@ export function ClientsSection({
 
           {selectedClient ? (
             <>
-              <p className="delete-helper">{clientDeleteHelperText}</p>
               <div className="gig-timeline-note">
                 <p className="detail-label">Monthly invoice run</p>
                 <div className="invoice-adjustment-form">

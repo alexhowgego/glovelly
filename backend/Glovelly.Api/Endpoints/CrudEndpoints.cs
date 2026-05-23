@@ -16,6 +16,8 @@ public static class CrudEndpoints
             .RequireAuthorization(GlovellyPolicies.GlovellyUser)
             .MapGigEndpoints();
 
+        app.MapGigImportEndpoints();
+
         app.MapGroup("/invoices")
             .WithTags("Invoices")
             .RequireAuthorization(GlovellyPolicies.GlovellyUser)

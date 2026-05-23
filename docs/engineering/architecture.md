@@ -1,6 +1,6 @@
 # Architecture
 
-Glovelly is a compact, cloud-hosted web application for self-employed business administration. It supports authenticated access, clients, gigs, expenses, receipt attachments, invoices, Google Drive publishing, email delivery, admin user management, and a small read-only MCP business data surface.
+Glovelly is a compact, cloud-hosted web application for self-employed business administration. It supports authenticated access, clients, gigs, imported gig review, expenses, receipt attachments, invoices, Google Drive publishing, email delivery, admin user management, and a small MCP business data surface.
 
 The system should stay pragmatic and cost-conscious. Avoid architecture theatre, keep deployment simple, and keep the internal boundaries clean enough that the app can grow without becoming soup.
 
@@ -36,7 +36,7 @@ The browser frontend owns user/admin journeys and calls the API for authenticate
 
 The ASP.NET Core backend is responsible for serving the frontend, Google authentication integration, mapping Google identities to Glovelly users, enforcing application authorisation, running business workflows, persistence through EF Core, and integrations such as email, Google Drive, and storage.
 
-Neon Postgres is the primary system of record for Glovelly users, roles/access metadata, clients, gigs, invoices, expenses, receipts, delivery records when captured, and future domain entities.
+Neon Postgres is the primary system of record for Glovelly users, roles/access metadata, clients, gigs, staged gig imports, invoices, expenses, receipts, delivery records when captured, and future domain entities.
 
 Google OpenID Connect authenticates external identities. Google proves who the user is; Glovelly decides whether that user is allowed in and what they can do.
 
@@ -150,4 +150,3 @@ These areas are expected to evolve:
 - observability and operational dashboards
 - backup/restore posture for Neon data
 - production incident and runbook notes
-

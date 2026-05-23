@@ -4,10 +4,12 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Glovelly.Api.Data;
 using Glovelly.Api.Services;
 using Glovelly.Api.Models;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -16,10 +18,12 @@ namespace Glovelly.Api.Tests;
 public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly GlovellyApiFactory _factory;
     private readonly HttpClient _client;
 
     public McpEndpointsTests(GlovellyApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -275,6 +279,11 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Contains("glovelly_get_invoice", toolNames);
         Assert.Contains("glovelly_list_receipts", toolNames);
         Assert.Contains("glovelly_get_business_summary", toolNames);
+        Assert.Contains("glovelly_create_gig_import_batch", toolNames);
+        Assert.Contains("glovelly_add_gig_import_draft", toolNames);
+        Assert.Contains("glovelly_add_gig_import_drafts", toolNames);
+        Assert.Contains("glovelly_list_gig_import_batches", toolNames);
+        Assert.Contains("glovelly_get_gig_import_batch", toolNames);
     }
 
     [Fact]
@@ -457,6 +466,179 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(1, result.GetProperty("receiptCount").GetInt32());
     }
 
+    [Fact]
+    public async Task GigImportTools_CreateBatchAndDraftWithoutCreatingGig()
+    {
+        var createResult = await CallToolAsync("glovelly_create_gig_import_batch", new
+        {
+            sourceName = "Swing Into Christmas 2026 Tour Bible",
+            notes = "Imported from PDF",
+        });
+
+        Assert.True(createResult.GetProperty("created").GetBoolean());
+        var batchId = createResult.GetProperty("batch").GetProperty("batchId").GetGuid();
+
+        var addResult = await CallToolAsync("glovelly_add_gig_import_draft", new
+        {
+            batchId,
+            title = "Evening show",
+            contactQuery = "bookings@foxandfinch.co.uk",
+            projectName = "Swing Into Christmas",
+            date = "2026-12-03",
+            arrivalTime = "15:30:00",
+            showStartTime = "19:30:00",
+            venueName = "City Hall",
+            venueAddress = "1 Example Street",
+            postcode = "AB1 2CD",
+            fee = 450m,
+            perDiem = 25m,
+            sourceReference = "page 4, row 2",
+            confidence = "high",
+            warnings = new[] { "arrival time inferred" },
+        });
+
+        Assert.True(addResult.GetProperty("created").GetBoolean());
+        Assert.Empty(addResult.GetProperty("validationErrors").EnumerateArray());
+
+        var draft = addResult.GetProperty("draft");
+        Assert.Equal(TestData.FoxAndFinchId, draft.GetProperty("proposedClientId").GetGuid());
+        Assert.Equal("Evening show", draft.GetProperty("title").GetString());
+        Assert.Equal("high", draft.GetProperty("confidence").GetString());
+        Assert.Equal("arrival time inferred", draft.GetProperty("warnings").EnumerateArray().Single().GetString());
+
+        var getResult = await CallToolAsync("glovelly_get_gig_import_batch", new
+        {
+            batchId,
+        });
+
+        Assert.True(getResult.GetProperty("found").GetBoolean());
+        var batch = getResult.GetProperty("batch");
+        Assert.Equal("draft", batch.GetProperty("status").GetString());
+        Assert.Equal(1, batch.GetProperty("draftCount").GetInt32());
+        Assert.Single(batch.GetProperty("drafts").EnumerateArray());
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(0, await db.Gigs.CountAsync());
+    }
+
+    [Fact]
+    public async Task AddGigImportDrafts_ReturnsPerRowValidationAndKeepsValidRows()
+    {
+        var createResult = await CallToolAsync("glovelly_create_gig_import_batch", new
+        {
+            sourceName = "Weekend schedule.xlsx",
+        });
+        var batchId = createResult.GetProperty("batch").GetProperty("batchId").GetGuid();
+
+        var bulkResult = await CallToolAsync("glovelly_add_gig_import_drafts", new
+        {
+            batchId,
+            drafts = new object[]
+            {
+                new
+                {
+                    title = "Matinee",
+                    date = "2026-07-18",
+                    venueName = "Theatre Royal",
+                    confidence = "medium",
+                },
+                new
+                {
+                    title = "Bad fee",
+                    fee = -10m,
+                    contactQuery = "No such contact",
+                },
+            },
+        });
+
+        Assert.True(bulkResult.GetProperty("batchFound").GetBoolean());
+        Assert.Equal(2, bulkResult.GetProperty("submittedCount").GetInt32());
+        Assert.Equal(1, bulkResult.GetProperty("createdCount").GetInt32());
+
+        var results = bulkResult.GetProperty("results").EnumerateArray().ToArray();
+        Assert.True(results[0].GetProperty("created").GetBoolean());
+        Assert.False(results[1].GetProperty("created").GetBoolean());
+        Assert.Contains(
+            results[1].GetProperty("validationErrors").EnumerateArray(),
+            value => value.GetString() == "fee must be zero or greater.");
+        Assert.Contains(
+            results[1].GetProperty("validationErrors").EnumerateArray(),
+            value => value.GetString() == "contactQuery did not match any contacts.");
+
+        var getResult = await CallToolAsync("glovelly_get_gig_import_batch", new
+        {
+            batchId,
+        });
+        Assert.Equal(1, getResult.GetProperty("batch").GetProperty("draftCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task AddGigImportDrafts_WithInformalDateAndTime_DoesNotRejectWholeToolCall()
+    {
+        var createResult = await CallToolAsync("glovelly_create_gig_import_batch", new
+        {
+            sourceName = "Swing Into Christmas 2026",
+        });
+        var batchId = createResult.GetProperty("batch").GetProperty("batchId").GetGuid();
+
+        var bulkResult = await CallToolAsync("glovelly_add_gig_import_drafts", new
+        {
+            batchId,
+            drafts = new object[]
+            {
+                new
+                {
+                    title = "Aberdeen",
+                    date = "Sat 28 Nov 2026",
+                    showStartTime = "7:30 PM",
+                    venueName = "Music Hall",
+                    confidence = "high",
+                },
+                new
+                {
+                    title = "Dumfries",
+                    date = "probably late November",
+                    showStartTime = "evening",
+                    venueName = "Theatre Royal",
+                    confidence = "low",
+                },
+            },
+        });
+
+        Assert.True(bulkResult.GetProperty("batchFound").GetBoolean());
+        Assert.Equal(2, bulkResult.GetProperty("submittedCount").GetInt32());
+        Assert.Equal(2, bulkResult.GetProperty("createdCount").GetInt32());
+
+        var results = bulkResult.GetProperty("results").EnumerateArray().ToArray();
+        Assert.Equal("2026-11-28", results[0].GetProperty("draft").GetProperty("date").GetString());
+        Assert.Equal("19:30:00", results[0].GetProperty("draft").GetProperty("showStartTime").GetString());
+        Assert.Equal(JsonValueKind.Null, results[1].GetProperty("draft").GetProperty("date").ValueKind);
+        Assert.Equal(JsonValueKind.Null, results[1].GetProperty("draft").GetProperty("showStartTime").ValueKind);
+    }
+
+    [Fact]
+    public async Task GigImportBatches_AreScopedToAuthenticatedUser()
+    {
+        var createResult = await CallToolAsync("glovelly_create_gig_import_batch", new
+        {
+            sourceName = "Private import",
+        });
+        var batchId = createResult.GetProperty("batch").GetProperty("batchId").GetGuid();
+
+        var alternateResult = await CallToolAsAlternateUserAsync("glovelly_get_gig_import_batch", new
+        {
+            batchId,
+        });
+
+        Assert.False(alternateResult.GetProperty("found").GetBoolean());
+
+        var alternateList = await CallToolAsAlternateUserAsync("glovelly_list_gig_import_batches", new { });
+        Assert.DoesNotContain(
+            alternateList.GetProperty("batches").EnumerateArray(),
+            batch => batch.GetProperty("batchId").GetGuid() == batchId);
+    }
+
     private async Task<JsonElement> CallToolAsync(string name, object arguments)
     {
         var response = await PostMcpAsync(new
@@ -471,6 +653,35 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
             },
         });
 
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        if (payload.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null)
+        {
+            throw new InvalidOperationException(error.GetRawText());
+        }
+
+        return payload
+            .GetProperty("result")
+            .GetProperty("structuredContent");
+    }
+
+    private async Task<JsonElement> CallToolAsAlternateUserAsync(string name, object arguments)
+    {
+        using var request = CreateMcpRequest(new
+        {
+            jsonrpc = "2.0",
+            id = 1,
+            method = "tools/call",
+            @params = new
+            {
+                name,
+                arguments,
+            },
+        });
+        request.Headers.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
+
+        var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);

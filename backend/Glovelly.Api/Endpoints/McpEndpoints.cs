@@ -14,7 +14,12 @@ public static class McpEndpoints
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+        Converters =
+        {
+            new LenientNullableDateOnlyConverter(),
+            new LenientNullableTimeOnlyConverter(),
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase),
+        },
     };
 
     public static IEndpointRouteBuilder MapMcpEndpoints(this IEndpointRouteBuilder app)
@@ -177,6 +182,22 @@ public static class McpEndpoints
                 userId,
                 ReadArguments<BusinessSummaryRequest>(arguments),
                 cancellationToken),
+            "glovelly_create_gig_import_batch" => await queryService.CreateGigImportBatchAsync(
+                userId,
+                ReadArguments<GigImportBatchCreateRequest>(arguments),
+                cancellationToken),
+            "glovelly_add_gig_import_draft" => await queryService.AddGigImportDraftAsync(
+                userId,
+                ReadArguments<GigImportDraftAddRequest>(arguments),
+                cancellationToken),
+            "glovelly_add_gig_import_drafts" => await queryService.AddGigImportDraftsAsync(
+                userId,
+                ReadArguments<GigImportDraftBulkAddRequest>(arguments),
+                cancellationToken),
+            "glovelly_list_gig_import_batches" => await queryService.ListGigImportBatchesAsync(
+                userId,
+                cancellationToken),
+            "glovelly_get_gig_import_batch" => await GetGigImportBatchAsync(userId, arguments, queryService, cancellationToken),
             _ => null,
         };
 
@@ -206,6 +227,21 @@ public static class McpEndpoints
             found = invoice is not null,
             invoice,
         };
+    }
+
+    private static async Task<object?> GetGigImportBatchAsync(
+        Guid userId,
+        JsonElement arguments,
+        IGlovellyMcpQueryService queryService,
+        CancellationToken cancellationToken)
+    {
+        var batchId = ReadArgument<Guid?>(arguments, "batchId");
+        if (!batchId.HasValue || batchId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await queryService.GetGigImportBatchAsync(userId, batchId.Value, cancellationToken);
     }
 
     private static T ReadArguments<T>(JsonElement arguments)
@@ -365,7 +401,124 @@ public static class McpEndpoints
                 },
             },
         },
+        new
+        {
+            name = "glovelly_create_gig_import_batch",
+            title = "Create Gig Import Batch",
+            description = "Create a staged gig import batch for later human review. This does not create real gigs.",
+            inputSchema = new
+            {
+                type = "object",
+                required = new[] { "sourceName" },
+                properties = new
+                {
+                    sourceName = new { type = "string", maxLength = 300 },
+                    notes = new { type = "string", maxLength = 4000 },
+                    sourceFingerprint = new { type = "string", maxLength = 200 },
+                },
+            },
+        },
+        new
+        {
+            name = "glovelly_add_gig_import_draft",
+            title = "Add Gig Import Draft",
+            description = "Add one draft gig row to a staged import batch. Missing uncertain values are allowed.",
+            inputSchema = GigImportDraftInputSchema(requiredBatchId: true),
+        },
+        new
+        {
+            name = "glovelly_add_gig_import_drafts",
+            title = "Add Gig Import Drafts",
+            description = "Add multiple draft gig rows to a staged import batch, returning per-row validation feedback.",
+            inputSchema = new
+            {
+                type = "object",
+                required = new[] { "batchId", "drafts" },
+                properties = new
+                {
+                    batchId = new { type = "string", format = "uuid" },
+                    drafts = new
+                    {
+                        type = "array",
+                        items = GigImportDraftInputSchema(requiredBatchId: false),
+                    },
+                },
+            },
+        },
+        new
+        {
+            name = "glovelly_list_gig_import_batches",
+            title = "List Gig Import Batches",
+            description = "List staged gig import batches and their statuses.",
+            inputSchema = new
+            {
+                type = "object",
+                properties = new { },
+            },
+        },
+        new
+        {
+            name = "glovelly_get_gig_import_batch",
+            title = "Get Gig Import Batch",
+            description = "Fetch a staged gig import batch and its draft rows.",
+            inputSchema = new
+            {
+                type = "object",
+                required = new[] { "batchId" },
+                properties = new
+                {
+                    batchId = new { type = "string", format = "uuid" },
+                },
+            },
+        },
     ];
+
+    private static object GigImportDraftInputSchema(bool requiredBatchId)
+    {
+        var required = requiredBatchId ? new[] { "batchId" } : [];
+        var properties = new Dictionary<string, object?>
+        {
+            ["title"] = new { type = "string", maxLength = 200 },
+            ["clientName"] = new { type = "string", maxLength = 200 },
+            ["contactQuery"] = new { type = "string" },
+            ["contactName"] = new { type = "string", maxLength = 200 },
+            ["contactEmail"] = new { type = "string", maxLength = 320 },
+            ["projectName"] = new { type = "string", maxLength = 200 },
+            ["date"] = new { type = "string", format = "date" },
+            ["arrivalTime"] = new { type = "string", format = "time" },
+            ["rehearsalStartTime"] = new { type = "string", format = "time" },
+            ["rehearsalEndTime"] = new { type = "string", format = "time" },
+            ["showStartTime"] = new { type = "string", format = "time" },
+            ["showEndTime"] = new { type = "string", format = "time" },
+            ["venueName"] = new { type = "string", maxLength = 200 },
+            ["venueAddress"] = new { type = "string", maxLength = 1000 },
+            ["postcode"] = new { type = "string", maxLength = 20 },
+            ["fee"] = new { type = "number", minimum = 0 },
+            ["perDiem"] = new { type = "number", minimum = 0 },
+            ["notes"] = new { type = "string", maxLength = 4000 },
+            ["accommodationNotes"] = new { type = "string", maxLength = 4000 },
+            ["travelNotes"] = new { type = "string", maxLength = 4000 },
+            ["sourceReference"] = new { type = "string", maxLength = 500 },
+            ["confidence"] = new { type = "string", @enum = new[] { "low", "medium", "high" } },
+            ["warnings"] = new
+            {
+                type = "array",
+                items = new { type = "string" },
+            },
+        };
+
+        if (requiredBatchId)
+        {
+            properties["batchId"] = new { type = "string", format = "uuid" };
+        }
+
+        return new
+        {
+            type = "object",
+            required,
+            properties,
+        };
+    }
 
     private sealed record McpRpcResponse(
         [property: JsonPropertyName("jsonrpc")] string JsonRpc,
@@ -374,4 +527,138 @@ public static class McpEndpoints
         McpRpcError? Error);
 
     private sealed record McpRpcError(int Code, string Message);
+
+    private sealed class LenientNullableDateOnlyConverter : JsonConverter<DateOnly?>
+    {
+        private static readonly string[] DateFormats =
+        [
+            "yyyy-MM-dd",
+            "yyyy/MM/dd",
+            "dd/MM/yyyy",
+            "d/M/yyyy",
+            "dd-MM-yyyy",
+            "d-M-yyyy",
+            "d MMM yyyy",
+            "dd MMM yyyy",
+            "d MMMM yyyy",
+            "dd MMMM yyyy",
+            "ddd d MMM yyyy",
+            "dddd d MMM yyyy",
+            "ddd dd MMM yyyy",
+            "dddd dd MMM yyyy",
+        ];
+
+        public override DateOnly? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return null;
+            }
+
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                reader.Skip();
+                return null;
+            }
+
+            var value = reader.GetString();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (DateOnly.TryParseExact(
+                    value.Trim(),
+                    DateFormats,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                    out var date))
+            {
+                return date;
+            }
+
+            return DateOnly.TryParse(
+                value.Trim(),
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                out date)
+                ? date
+                : null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, DateOnly? value, JsonSerializerOptions options)
+        {
+            if (value.HasValue)
+            {
+                writer.WriteStringValue(value.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+                return;
+            }
+
+            writer.WriteNullValue();
+        }
+    }
+
+    private sealed class LenientNullableTimeOnlyConverter : JsonConverter<TimeOnly?>
+    {
+        private static readonly string[] TimeFormats =
+        [
+            "HH:mm",
+            "H:mm",
+            "HH:mm:ss",
+            "H:mm:ss",
+            "h:mm tt",
+            "hh:mm tt",
+            "htt",
+            "h tt",
+        ];
+
+        public override TimeOnly? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return null;
+            }
+
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                reader.Skip();
+                return null;
+            }
+
+            var value = reader.GetString();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (TimeOnly.TryParseExact(
+                    value.Trim(),
+                    TimeFormats,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                    out var time))
+            {
+                return time;
+            }
+
+            return TimeOnly.TryParse(
+                value.Trim(),
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                out time)
+                ? time
+                : null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, TimeOnly? value, JsonSerializerOptions options)
+        {
+            if (value.HasValue)
+            {
+                writer.WriteStringValue(value.Value.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
+                return;
+            }
+
+            writer.WriteNullValue();
+        }
+    }
 }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Glovelly.Api.Data;
 using Glovelly.Api.Endpoints;
 using Glovelly.Api.Models;
@@ -12,11 +13,17 @@ public interface IGlovellyMcpQueryService
     Task<InvoiceDetail?> GetInvoiceAsync(Guid userId, Guid invoiceId, CancellationToken cancellationToken);
     Task<ReceiptListResult> ListReceiptsAsync(Guid userId, ReceiptListRequest request, CancellationToken cancellationToken);
     Task<BusinessSummaryResult> GetBusinessSummaryAsync(Guid userId, BusinessSummaryRequest request, CancellationToken cancellationToken);
+    Task<GigImportBatchCreateResult> CreateGigImportBatchAsync(Guid userId, GigImportBatchCreateRequest request, CancellationToken cancellationToken);
+    Task<GigImportBatchListResult> ListGigImportBatchesAsync(Guid userId, CancellationToken cancellationToken);
+    Task<GigImportBatchGetResult> GetGigImportBatchAsync(Guid userId, Guid batchId, CancellationToken cancellationToken);
+    Task<GigImportDraftAddResult> AddGigImportDraftAsync(Guid userId, GigImportDraftAddRequest request, CancellationToken cancellationToken);
+    Task<GigImportDraftBulkAddResult> AddGigImportDraftsAsync(Guid userId, GigImportDraftBulkAddRequest request, CancellationToken cancellationToken);
 }
 
 public sealed class GlovellyMcpQueryService(AppDbContext db) : IGlovellyMcpQueryService
 {
     private const string DefaultCurrency = "GBP";
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<ContactSearchResult> SearchContactsAsync(Guid userId, string? query, CancellationToken cancellationToken)
     {
@@ -161,6 +168,150 @@ public sealed class GlovellyMcpQueryService(AppDbContext db) : IGlovellyMcpQuery
             DefaultCurrency);
     }
 
+    public async Task<GigImportBatchCreateResult> CreateGigImportBatchAsync(
+        Guid userId,
+        GigImportBatchCreateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var validationErrors = new List<string>();
+        var sourceName = NormalizeForStorage(request.SourceName);
+        if (string.IsNullOrWhiteSpace(sourceName))
+        {
+            validationErrors.Add("sourceName is required.");
+        }
+
+        if (sourceName?.Length > 300)
+        {
+            validationErrors.Add("sourceName must be 300 characters or fewer.");
+        }
+
+        var notes = NormalizeForStorage(request.Notes);
+        if (notes?.Length > 4000)
+        {
+            validationErrors.Add("notes must be 4000 characters or fewer.");
+        }
+
+        var sourceFingerprint = NormalizeForStorage(request.SourceFingerprint);
+        if (sourceFingerprint?.Length > 200)
+        {
+            validationErrors.Add("sourceFingerprint must be 200 characters or fewer.");
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            return new GigImportBatchCreateResult(false, validationErrors, null);
+        }
+
+        var batch = new GigImportBatch
+        {
+            Id = Guid.NewGuid(),
+            SourceName = sourceName!,
+            SourceFingerprint = sourceFingerprint,
+            Notes = notes,
+            Status = GigImportBatchStatus.Draft,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            CreatedByUserId = userId,
+        };
+
+        db.GigImportBatches.Add(batch);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return new GigImportBatchCreateResult(true, [], ToGigImportBatchSummary(batch, 0));
+    }
+
+    public async Task<GigImportBatchListResult> ListGigImportBatchesAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var batches = await db.GigImportBatches
+            .WhereVisibleTo(userId)
+            .AsNoTracking()
+            .Select(batch => new
+            {
+                Batch = batch,
+                DraftCount = batch.Drafts.Count,
+            })
+            .OrderByDescending(value => value.Batch.CreatedAtUtc)
+            .ThenBy(value => value.Batch.SourceName)
+            .ToListAsync(cancellationToken);
+
+        return new GigImportBatchListResult(
+            batches
+                .Select(value => ToGigImportBatchSummary(value.Batch, value.DraftCount))
+                .ToList());
+    }
+
+    public async Task<GigImportBatchGetResult> GetGigImportBatchAsync(Guid userId, Guid batchId, CancellationToken cancellationToken)
+    {
+        var batch = await db.GigImportBatches
+            .WhereVisibleTo(userId)
+            .AsNoTracking()
+            .Include(value => value.Drafts)
+            .FirstOrDefaultAsync(value => value.Id == batchId, cancellationToken);
+
+        if (batch is null)
+        {
+            return new GigImportBatchGetResult(false, null);
+        }
+
+        return new GigImportBatchGetResult(
+            true,
+            new GigImportBatchDetail(
+                batch.Id,
+                batch.SourceName,
+                batch.SourceFingerprint,
+                batch.Status.ToString().ToLowerInvariant(),
+                batch.CreatedAtUtc,
+                batch.Notes,
+                batch.Drafts.Count,
+                batch.Drafts
+                    .OrderBy(draft => draft.ProposedDate ?? DateOnly.MaxValue)
+                    .ThenBy(draft => draft.ProposedTitle)
+                    .ThenBy(draft => draft.SourceReference)
+                    .Select(ToGigImportDraftDetail)
+                    .ToList()));
+    }
+
+    public async Task<GigImportDraftAddResult> AddGigImportDraftAsync(
+        Guid userId,
+        GigImportDraftAddRequest request,
+        CancellationToken cancellationToken)
+    {
+        return await AddGigImportDraftCoreAsync(userId, request, 0, cancellationToken);
+    }
+
+    public async Task<GigImportDraftBulkAddResult> AddGigImportDraftsAsync(
+        Guid userId,
+        GigImportDraftBulkAddRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.BatchId == Guid.Empty)
+        {
+            return new GigImportDraftBulkAddResult(false, 0, 0, [new GigImportDraftAddResult(false, false, 0, ["batchId is required."], [], null)]);
+        }
+
+        var drafts = request.Drafts ?? [];
+        if (drafts.Count == 0)
+        {
+            var batchFound = await db.GigImportBatches
+                .WhereVisibleTo(userId)
+                .AnyAsync(value => value.Id == request.BatchId, cancellationToken);
+            return new GigImportDraftBulkAddResult(batchFound, 0, 0, []);
+        }
+
+        var results = new List<GigImportDraftAddResult>(drafts.Count);
+
+        for (var index = 0; index < drafts.Count; index++)
+        {
+            var draftRequest = drafts[index] with { BatchId = request.BatchId };
+            results.Add(await AddGigImportDraftCoreAsync(userId, draftRequest, index, cancellationToken));
+        }
+
+        return new GigImportDraftBulkAddResult(
+            results.All(result => result.BatchFound),
+            drafts.Count,
+            results.Count(result => result.Created),
+            results);
+    }
+
     private static IQueryable<Invoice> ApplyInvoiceStatusFilter(IQueryable<Invoice> query, string? status)
     {
         return Normalize(status) switch
@@ -302,9 +453,211 @@ public sealed class GlovellyMcpQueryService(AppDbContext db) : IGlovellyMcpQuery
             expense.Description.Contains("receipt draft", StringComparison.OrdinalIgnoreCase);
     }
 
+    private async Task<GigImportDraftAddResult> AddGigImportDraftCoreAsync(
+        Guid userId,
+        GigImportDraftAddRequest request,
+        int index,
+        CancellationToken cancellationToken)
+    {
+        var validationErrors = new List<string>();
+        var contactMatches = new List<ContactMatch>();
+
+        if (request.BatchId == Guid.Empty)
+        {
+            validationErrors.Add("batchId is required.");
+            return new GigImportDraftAddResult(false, false, index, validationErrors, contactMatches, null);
+        }
+
+        var batch = await db.GigImportBatches
+            .WhereVisibleTo(userId)
+            .FirstOrDefaultAsync(value => value.Id == request.BatchId, cancellationToken);
+
+        if (batch is null)
+        {
+            validationErrors.Add("batch was not found.");
+            return new GigImportDraftAddResult(false, false, index, validationErrors, contactMatches, null);
+        }
+
+        if (batch.Status != GigImportBatchStatus.Draft)
+        {
+            validationErrors.Add("drafts can only be added to draft import batches.");
+        }
+
+        ValidateDraftRequest(request, validationErrors);
+
+        Guid? proposedClientId = null;
+        var proposedClientName = NormalizeForStorage(request.ClientName);
+        var contactQuery = NormalizeForStorage(request.ContactQuery);
+        if (!string.IsNullOrWhiteSpace(contactQuery))
+        {
+            var matches = await SearchContactsAsync(userId, contactQuery, cancellationToken);
+            contactMatches.AddRange(matches.Matches);
+            if (matches.Matches.Count == 1)
+            {
+                proposedClientId = matches.Matches[0].ContactId;
+                proposedClientName ??= matches.Matches[0].Name;
+            }
+            else if (matches.Matches.Count == 0)
+            {
+                validationErrors.Add("contactQuery did not match any contacts.");
+                proposedClientName ??= contactQuery;
+            }
+            else
+            {
+                validationErrors.Add($"contactQuery matched {matches.Matches.Count} contacts.");
+                proposedClientName ??= contactQuery;
+            }
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            return new GigImportDraftAddResult(true, false, index, validationErrors, contactMatches, null);
+        }
+
+        var draft = new GigImportDraft
+        {
+            Id = Guid.NewGuid(),
+            BatchId = request.BatchId,
+            ProposedClientId = proposedClientId,
+            ProposedClientName = proposedClientName,
+            ProposedContactName = NormalizeForStorage(request.ContactName),
+            ProposedContactEmail = NormalizeForStorage(request.ContactEmail),
+            ProposedProjectName = NormalizeForStorage(request.ProjectName),
+            ProposedTitle = NormalizeForStorage(request.Title),
+            ProposedDate = request.Date,
+            ProposedArrivalTime = request.ArrivalTime,
+            ProposedRehearsalStartTime = request.RehearsalStartTime,
+            ProposedRehearsalEndTime = request.RehearsalEndTime,
+            ProposedShowStartTime = request.ShowStartTime,
+            ProposedShowEndTime = request.ShowEndTime,
+            ProposedVenueName = NormalizeForStorage(request.VenueName),
+            ProposedVenueAddress = NormalizeForStorage(request.VenueAddress),
+            ProposedVenuePostcode = NormalizeForStorage(request.Postcode),
+            ProposedFee = request.Fee,
+            ProposedPerDiem = request.PerDiem,
+            ProposedNotes = NormalizeForStorage(request.Notes),
+            AccommodationNotes = NormalizeForStorage(request.AccommodationNotes),
+            TravelNotes = NormalizeForStorage(request.TravelNotes),
+            SourceReference = NormalizeForStorage(request.SourceReference),
+            Confidence = request.Confidence ?? GigImportDraftConfidence.Medium,
+            WarningsJson = JsonSerializer.Serialize(NormalizeWarnings(request.Warnings), JsonOptions),
+            Status = GigImportDraftStatus.Pending,
+        };
+
+        db.GigImportDrafts.Add(draft);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return new GigImportDraftAddResult(true, true, index, [], contactMatches, ToGigImportDraftDetail(draft));
+    }
+
+    private static void ValidateDraftRequest(GigImportDraftAddRequest request, List<string> validationErrors)
+    {
+        ValidateLength(request.ClientName, "clientName", 200, validationErrors);
+        ValidateLength(request.ContactName, "contactName", 200, validationErrors);
+        ValidateLength(request.ContactEmail, "contactEmail", 320, validationErrors);
+        ValidateLength(request.ProjectName, "projectName", 200, validationErrors);
+        ValidateLength(request.Title, "title", 200, validationErrors);
+        ValidateLength(request.VenueName, "venueName", 200, validationErrors);
+        ValidateLength(request.VenueAddress, "venueAddress", 1000, validationErrors);
+        ValidateLength(request.Postcode, "postcode", 20, validationErrors);
+        ValidateLength(request.Notes, "notes", 4000, validationErrors);
+        ValidateLength(request.AccommodationNotes, "accommodationNotes", 4000, validationErrors);
+        ValidateLength(request.TravelNotes, "travelNotes", 4000, validationErrors);
+        ValidateLength(request.SourceReference, "sourceReference", 500, validationErrors);
+
+        if (request.Fee.HasValue && request.Fee.Value < 0)
+        {
+            validationErrors.Add("fee must be zero or greater.");
+        }
+
+        if (request.PerDiem.HasValue && request.PerDiem.Value < 0)
+        {
+            validationErrors.Add("perDiem must be zero or greater.");
+        }
+    }
+
+    private static void ValidateLength(string? value, string fieldName, int maxLength, List<string> validationErrors)
+    {
+        if (NormalizeForStorage(value)?.Length > maxLength)
+        {
+            validationErrors.Add($"{fieldName} must be {maxLength} characters or fewer.");
+        }
+    }
+
+    private static IReadOnlyList<string> NormalizeWarnings(IReadOnlyList<string>? warnings)
+    {
+        return warnings?
+            .Select(NormalizeForStorage)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .Take(25)
+            .ToList() ?? [];
+    }
+
+    private static GigImportBatchSummary ToGigImportBatchSummary(GigImportBatch batch, int draftCount)
+    {
+        return new GigImportBatchSummary(
+            batch.Id,
+            batch.SourceName,
+            batch.SourceFingerprint,
+            batch.Status.ToString().ToLowerInvariant(),
+            batch.CreatedAtUtc,
+            batch.Notes,
+            draftCount);
+    }
+
+    private static GigImportDraftDetail ToGigImportDraftDetail(GigImportDraft draft)
+    {
+        return new GigImportDraftDetail(
+            draft.Id,
+            draft.BatchId,
+            draft.ProposedClientId,
+            draft.ProposedClientName,
+            draft.ProposedContactName,
+            draft.ProposedContactEmail,
+            draft.ProposedProjectName,
+            draft.ProposedTitle,
+            draft.ProposedDate,
+            draft.ProposedArrivalTime,
+            draft.ProposedRehearsalStartTime,
+            draft.ProposedRehearsalEndTime,
+            draft.ProposedShowStartTime,
+            draft.ProposedShowEndTime,
+            draft.ProposedVenueName,
+            draft.ProposedVenueAddress,
+            draft.ProposedVenuePostcode,
+            draft.ProposedFee,
+            draft.ProposedPerDiem,
+            draft.ProposedNotes,
+            draft.AccommodationNotes,
+            draft.TravelNotes,
+            draft.SourceReference,
+            draft.Confidence.ToString().ToLowerInvariant(),
+            ReadWarnings(draft.WarningsJson),
+            draft.Status.ToString().ToLowerInvariant());
+    }
+
+    private static IReadOnlyList<string> ReadWarnings(string warningsJson)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<IReadOnlyList<string>>(warningsJson, JsonOptions) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     private static decimal CalculateOutstandingAmount(Invoice invoice)
     {
         return invoice.Status is InvoiceStatus.Paid or InvoiceStatus.Cancelled ? 0m : invoice.Total;
+    }
+
+    private static string? NormalizeForStorage(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrEmpty(normalized) ? null : normalized;
     }
 
     private static string? Normalize(string? value)
@@ -351,3 +704,64 @@ public static class ReceiptStatusValues
 
 public sealed record BusinessSummaryRequest(DateOnly? FromDate, DateOnly? ToDate);
 public sealed record BusinessSummaryResult(DateOnly? FromDate, DateOnly? ToDate, decimal InvoiceTotal, decimal PaidTotal, decimal OutstandingTotal, decimal ExpenseTotal, int ReceiptCount, int UnmatchedReceiptCount, string Currency);
+public sealed record GigImportBatchCreateRequest(string? SourceName, string? Notes, string? SourceFingerprint);
+public sealed record GigImportBatchCreateResult(bool Created, IReadOnlyList<string> ValidationErrors, GigImportBatchSummary? Batch);
+public sealed record GigImportBatchListResult(IReadOnlyList<GigImportBatchSummary> Batches);
+public sealed record GigImportBatchGetResult(bool Found, GigImportBatchDetail? Batch);
+public sealed record GigImportBatchSummary(Guid BatchId, string SourceName, string? SourceFingerprint, string Status, DateTimeOffset CreatedAtUtc, string? Notes, int DraftCount);
+public sealed record GigImportBatchDetail(Guid BatchId, string SourceName, string? SourceFingerprint, string Status, DateTimeOffset CreatedAtUtc, string? Notes, int DraftCount, IReadOnlyList<GigImportDraftDetail> Drafts);
+public sealed record GigImportDraftBulkAddRequest(Guid BatchId, IReadOnlyList<GigImportDraftAddRequest>? Drafts);
+public sealed record GigImportDraftBulkAddResult(bool BatchFound, int SubmittedCount, int CreatedCount, IReadOnlyList<GigImportDraftAddResult> Results);
+public sealed record GigImportDraftAddRequest(
+    Guid BatchId,
+    string? Title,
+    string? ClientName,
+    string? ContactQuery,
+    string? ContactName,
+    string? ContactEmail,
+    string? ProjectName,
+    DateOnly? Date,
+    TimeOnly? ArrivalTime,
+    TimeOnly? RehearsalStartTime,
+    TimeOnly? RehearsalEndTime,
+    TimeOnly? ShowStartTime,
+    TimeOnly? ShowEndTime,
+    string? VenueName,
+    string? VenueAddress,
+    string? Postcode,
+    decimal? Fee,
+    decimal? PerDiem,
+    string? Notes,
+    string? AccommodationNotes,
+    string? TravelNotes,
+    string? SourceReference,
+    GigImportDraftConfidence? Confidence,
+    IReadOnlyList<string>? Warnings);
+public sealed record GigImportDraftAddResult(bool BatchFound, bool Created, int Index, IReadOnlyList<string> ValidationErrors, IReadOnlyList<ContactMatch> ContactMatches, GigImportDraftDetail? Draft);
+public sealed record GigImportDraftDetail(
+    Guid DraftId,
+    Guid BatchId,
+    Guid? ProposedClientId,
+    string? ClientName,
+    string? ContactName,
+    string? ContactEmail,
+    string? ProjectName,
+    string? Title,
+    DateOnly? Date,
+    TimeOnly? ArrivalTime,
+    TimeOnly? RehearsalStartTime,
+    TimeOnly? RehearsalEndTime,
+    TimeOnly? ShowStartTime,
+    TimeOnly? ShowEndTime,
+    string? VenueName,
+    string? VenueAddress,
+    string? Postcode,
+    decimal? Fee,
+    decimal? PerDiem,
+    string? Notes,
+    string? AccommodationNotes,
+    string? TravelNotes,
+    string? SourceReference,
+    string Confidence,
+    IReadOnlyList<string> Warnings,
+    string Status);

@@ -33,6 +33,8 @@ public sealed class User
     [JsonIgnore]
     public ICollection<Gig> GigsUpdated { get; set; } = new List<Gig>();
     [JsonIgnore]
+    public ICollection<GigImportBatch> GigImportBatchesCreated { get; set; } = new List<GigImportBatch>();
+    [JsonIgnore]
     public ICollection<Invoice> InvoicesCreated { get; set; } = new List<Invoice>();
     [JsonIgnore]
     public ICollection<Invoice> InvoicesUpdated { get; set; } = new List<Invoice>();

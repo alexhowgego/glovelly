@@ -197,6 +197,8 @@ export type Gig = {
   id: string
   clientId: string
   invoiceId: string | null
+  sourceImportBatchId: string | null
+  sourceImportDraftId: string | null
   title: string
   date: string
   venue: string
@@ -209,6 +211,68 @@ export type Gig = {
   invoicedAt: string | null
   isInvoiced: boolean
   expenses: GigExpense[]
+}
+
+export type GigImportDraftConfidence = 'Low' | 'Medium' | 'High'
+export type GigImportDraftStatus = 'Pending' | 'Accepted' | 'Rejected' | 'Committed'
+export type GigImportBatchStatus = 'Draft' | 'Committed' | 'Abandoned'
+
+export type GigImportBatchSummary = {
+  batchId: string
+  sourceName: string
+  sourceFingerprint: string | null
+  status: GigImportBatchStatus
+  createdAtUtc: string
+  notes: string | null
+  draftCount: number
+  pendingCount: number
+  acceptedCount: number
+  rejectedCount: number
+  committedCount: number
+  lowConfidenceCount: number
+  mediumConfidenceCount: number
+  highConfidenceCount: number
+}
+
+export type GigImportDraft = {
+  draftId: string
+  batchId: string
+  proposedClientId: string | null
+  clientName: string | null
+  contactName: string | null
+  contactEmail: string | null
+  projectName: string | null
+  title: string | null
+  date: string | null
+  arrivalTime: string | null
+  rehearsalStartTime: string | null
+  rehearsalEndTime: string | null
+  showStartTime: string | null
+  showEndTime: string | null
+  venueName: string | null
+  venueAddress: string | null
+  postcode: string | null
+  fee: number | null
+  perDiem: number | null
+  notes: string | null
+  accommodationNotes: string | null
+  travelNotes: string | null
+  sourceReference: string | null
+  confidence: GigImportDraftConfidence
+  warnings: string[]
+  status: GigImportDraftStatus
+  missingFields: string[]
+}
+
+export type GigImportBatchDetail = {
+  batch: GigImportBatchSummary
+  drafts: GigImportDraft[]
+}
+
+export type GigImportCommitResult = {
+  createdCount: number
+  gigIds: string[]
+  batch: GigImportBatchDetail
 }
 
 export type QuickReceiptCandidate = Pick<

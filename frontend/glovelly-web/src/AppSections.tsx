@@ -4,6 +4,7 @@ export {
   ClientSettingsModal,
   ClientsSection,
   ExpenseStatementModal,
+  GigImportsModal,
   GigsSection,
   InvoiceGenerationPreviewModal,
   InvoicesSection,

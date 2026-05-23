@@ -40,9 +40,22 @@ internal sealed class GigConfiguration : IEntityTypeConfiguration<Gig>
             .WithMany(invoice => invoice.Gigs)
             .HasForeignKey(gig => gig.InvoiceId)
             .OnDelete(DeleteBehavior.SetNull);
+        entity.HasOne(gig => gig.SourceImportBatch)
+            .WithMany()
+            .HasForeignKey(gig => gig.SourceImportBatchId)
+            .OnDelete(DeleteBehavior.SetNull);
+        entity.HasOne(gig => gig.SourceImportDraft)
+            .WithMany()
+            .HasForeignKey(gig => gig.SourceImportDraftId)
+            .OnDelete(DeleteBehavior.SetNull);
         entity.HasMany(gig => gig.Expenses)
             .WithOne(expense => expense.Gig)
             .HasForeignKey(expense => expense.GigId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        entity.HasIndex(gig => gig.SourceImportBatchId);
+        entity.HasIndex(gig => gig.SourceImportDraftId)
+            .IsUnique()
+            .HasFilter("\"SourceImportDraftId\" IS NOT NULL");
     }
 }

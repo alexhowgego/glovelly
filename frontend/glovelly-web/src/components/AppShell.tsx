@@ -38,6 +38,8 @@ type AppShellProps = {
   isSellerProfileSaving: boolean
   isUserSettingsSaving: boolean
   navigationItems: AppNavigationItem[]
+  pendingGigImportCount: number
+  onOpenGigImports: () => void
   onOpenSellerProfile: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
@@ -67,6 +69,8 @@ export function AppShell({
   isSellerProfileSaving,
   isUserSettingsSaving,
   navigationItems,
+  pendingGigImportCount,
+  onOpenGigImports,
   onOpenSellerProfile,
   onOpenUserSettings,
   onProfileMenuToggle,
@@ -128,6 +132,9 @@ export function AppShell({
                     onClick={onProfileMenuToggle}
                     type="button"
                   >
+                    {pendingGigImportCount > 0 && (
+                      <span className="notification-dot profile-notification-dot" aria-hidden="true" />
+                    )}
                     <span className="profile-avatar" aria-hidden="true">
                       {profileImageUrl ? (
                         <img
@@ -184,6 +191,21 @@ export function AppShell({
                         disabled={isLoading || isAdminLoading || isSellerProfileSaving}
                       >
                         Seller profile
+                      </button>
+                      <button
+                        className="ghost-button profile-settings profile-menu-alert-item"
+                        onClick={onOpenGigImports}
+                        role="menuitem"
+                        type="button"
+                        disabled={isLoading}
+                      >
+                        <span>
+                          Imported gigs
+                          {pendingGigImportCount > 0 ? ` (${pendingGigImportCount})` : ''}
+                        </span>
+                        {pendingGigImportCount > 0 && (
+                          <span className="notification-dot" aria-hidden="true" />
+                        )}
                       </button>
                       <button
                         className="ghost-button profile-settings"

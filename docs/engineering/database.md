@@ -12,6 +12,7 @@ The database stores:
 - roles and access metadata
 - clients and contacts
 - gigs
+- gig import batches and draft rows
 - gig expenses and receipt attachment metadata
 - invoices and invoice lines
 - seller profiles
@@ -21,6 +22,8 @@ The database stores:
 - future domain entities
 
 Generated binary content such as receipt files and invoice PDFs is stored through blob storage abstractions, with database records holding metadata and storage keys.
+
+Gig import batches and drafts are staging records. They can contain incomplete AI-extracted data and are not treated as real gigs until the user commits accepted rows. Rejected draft rows are deleted when import decisions are committed.
 
 ## EF Core
 
@@ -49,4 +52,3 @@ When Postgres is configured, ASP.NET Core data protection keys are persisted thr
 The database connection string is a runtime secret and should be supplied through secure configuration, currently via Cloud Run/Secret Manager binding.
 
 Backup, restore, retention, and operational alerting for Neon data are important follow-up topics for the operations handbook.
-
