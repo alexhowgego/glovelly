@@ -18,6 +18,20 @@ namespace Glovelly.Api.Tests;
 public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly string[] ExpectedMcpToolNames =
+    [
+        "glovelly_search_contacts",
+        "glovelly_list_invoices",
+        "glovelly_get_invoice",
+        "glovelly_list_receipts",
+        "glovelly_get_business_summary",
+        "glovelly_create_gig_import_batch",
+        "glovelly_add_gig_import_draft",
+        "glovelly_add_gig_import_drafts",
+        "glovelly_list_gig_import_batches",
+        "glovelly_get_gig_import_batch",
+    ];
+
     private readonly GlovellyApiFactory _factory;
     private readonly HttpClient _client;
 
@@ -267,23 +281,77 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-        var toolNames = payload
+        var tools = payload
             .GetProperty("result")
             .GetProperty("tools")
             .EnumerateArray()
+            .ToArray();
+        var toolNames = tools
             .Select(tool => tool.GetProperty("name").GetString())
             .ToArray();
 
-        Assert.Contains("glovelly_search_contacts", toolNames);
-        Assert.Contains("glovelly_list_invoices", toolNames);
-        Assert.Contains("glovelly_get_invoice", toolNames);
-        Assert.Contains("glovelly_list_receipts", toolNames);
-        Assert.Contains("glovelly_get_business_summary", toolNames);
-        Assert.Contains("glovelly_create_gig_import_batch", toolNames);
-        Assert.Contains("glovelly_add_gig_import_draft", toolNames);
-        Assert.Contains("glovelly_add_gig_import_drafts", toolNames);
-        Assert.Contains("glovelly_list_gig_import_batches", toolNames);
-        Assert.Contains("glovelly_get_gig_import_batch", toolNames);
+        Assert.Equal(ExpectedMcpToolNames, toolNames);
+
+        var getInvoiceTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_get_invoice");
+        Assert.False(getInvoiceTool.TryGetProperty("safetyLevel", out _));
+        Assert.False(getInvoiceTool.TryGetProperty("requiresExplicitUserIntent", out _));
+        Assert.Equal("Get Invoice", getInvoiceTool.GetProperty("title").GetString());
+
+        var inputSchema = getInvoiceTool.GetProperty("inputSchema");
+        Assert.Equal("object", inputSchema.GetProperty("type").GetString());
+        Assert.Equal("invoiceId", inputSchema.GetProperty("required").EnumerateArray().Single().GetString());
+        Assert.Equal(
+            "uuid",
+            inputSchema.GetProperty("properties").GetProperty("invoiceId").GetProperty("format").GetString());
+
+        var listInvoicesTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_list_invoices");
+        var invoiceSchema = listInvoicesTool
+            .GetProperty("outputSchema")
+            .GetProperty("properties")
+            .GetProperty("invoices")
+            .GetProperty("items")
+            .GetProperty("properties");
+        Assert.Equal("date", invoiceSchema.GetProperty("issueDate").GetProperty("format").GetString());
+        Assert.Equal("date", invoiceSchema.GetProperty("dueDate").GetProperty("format").GetString());
+
+        var listBatchesTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_list_gig_import_batches");
+        var batchSchema = listBatchesTool
+            .GetProperty("outputSchema")
+            .GetProperty("properties")
+            .GetProperty("batches")
+            .GetProperty("items")
+            .GetProperty("properties");
+        Assert.Equal("date-time", batchSchema.GetProperty("createdAtUtc").GetProperty("format").GetString());
+
+        var addDraftTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_add_gig_import_draft");
+        var draftSchema = addDraftTool
+            .GetProperty("outputSchema")
+            .GetProperty("properties")
+            .GetProperty("draft")
+            .GetProperty("properties");
+        Assert.Equal("date", draftSchema.GetProperty("date").GetProperty("format").GetString());
+        Assert.Equal("time", draftSchema.GetProperty("arrivalTime").GetProperty("format").GetString());
+    }
+
+    [Fact]
+    public void McpToolCatalog_DefinesToolContractsWithSafetyMetadata()
+    {
+        Assert.Equal(ExpectedMcpToolNames, GlovellyMcpToolCatalog.Tools.Select(tool => tool.Name).ToArray());
+        Assert.All(GlovellyMcpToolCatalog.Tools, tool => Assert.NotNull(tool.InputSchema));
+
+        var safetyLevels = GlovellyMcpToolCatalog.Tools.ToDictionary(tool => tool.Name, tool => tool.SafetyLevel);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_search_contacts"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_invoices"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_invoice"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_receipts"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_business_summary"]);
+        Assert.Equal(McpToolSafetyLevel.StagedWrite, safetyLevels["glovelly_create_gig_import_batch"]);
+        Assert.Equal(McpToolSafetyLevel.StagedWrite, safetyLevels["glovelly_add_gig_import_draft"]);
+        Assert.Equal(McpToolSafetyLevel.StagedWrite, safetyLevels["glovelly_add_gig_import_drafts"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_gig_import_batches"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_gig_import_batch"]);
+
+        Assert.True(GlovellyMcpToolCatalog.Tools.Single(tool => tool.Name == "glovelly_add_gig_import_drafts").RequiresExplicitUserIntent);
     }
 
     [Fact]
