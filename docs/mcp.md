@@ -12,6 +12,8 @@ The endpoint supports `initialize`, `ping`, `tools/list`, and `tools/call`. It a
 
 ## Tools
 
+The public tool catalog is generated from the typed MCP catalog in [`mcp-tools.md`](mcp-tools.md). A machine-readable capability manifest is checked in at [`mcp-tools.json`](mcp-tools.json).
+
 ### `glovelly_search_contacts`
 
 Search contacts by name or email.

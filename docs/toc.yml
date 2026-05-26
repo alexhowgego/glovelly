@@ -61,3 +61,5 @@
       href: conventions.md
     - name: MCP notes
       href: mcp.md
+    - name: MCP tool catalog
+      href: mcp-tools.md

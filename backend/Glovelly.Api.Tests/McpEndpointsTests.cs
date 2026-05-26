@@ -75,6 +75,25 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public void McpToolCatalog_GeneratesCheckedInPublicDocumentation()
+    {
+        var repoRoot = GetRepoRoot();
+        var markdownPath = Path.Combine(repoRoot, "docs", "mcp-tools.md");
+        var manifestPath = Path.Combine(repoRoot, "docs", "mcp-tools.json");
+        var actualMarkdown = McpToolDocumentationGenerator.GenerateMarkdown();
+        var actualManifest = McpToolDocumentationGenerator.GenerateCapabilityManifestJson();
+
+        if (string.Equals(Environment.GetEnvironmentVariable("UPDATE_MCP_DOCS"), "1", StringComparison.Ordinal))
+        {
+            File.WriteAllText(markdownPath, actualMarkdown);
+            File.WriteAllText(manifestPath, actualManifest);
+        }
+
+        Assert.Equal(File.ReadAllText(markdownPath).Replace("\r\n", "\n", StringComparison.Ordinal), actualMarkdown);
+        Assert.Equal(File.ReadAllText(manifestPath).Replace("\r\n", "\n", StringComparison.Ordinal), actualManifest);
+    }
+
+    [Fact]
     public void McpToolCatalog_FollowsAgentFacingSchemaConventions()
     {
         var tools = GlovellyMcpToolCatalog.Tools;
@@ -468,10 +487,15 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         var json = JsonSerializer.Serialize(snapshot, SnapshotJsonOptions);
         using var document = JsonDocument.Parse(json);
-        return WriteCanonicalJson(document.RootElement) + "\n";
+        return McpToolDocumentationGenerator.ToCanonicalJson(document.RootElement) + "\n";
     }
 
     private static string GetMcpToolSnapshotPath()
+    {
+        return Path.Combine(GetRepoRoot(), "backend", "Glovelly.Api.Tests", "Contracts", "mcp-tools.snapshot.json");
+    }
+
+    private static string GetRepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "glovelly.sln")))
@@ -480,45 +504,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         }
 
         Assert.NotNull(directory);
-        return Path.Combine(directory.FullName, "backend", "Glovelly.Api.Tests", "Contracts", "mcp-tools.snapshot.json");
-    }
-
-    private static string WriteCanonicalJson(JsonElement element)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
-        {
-            WriteCanonicalJsonElement(writer, element);
-        }
-
-        return Encoding.UTF8.GetString(stream.ToArray());
-    }
-
-    private static void WriteCanonicalJsonElement(Utf8JsonWriter writer, JsonElement element)
-    {
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Object:
-                writer.WriteStartObject();
-                foreach (var property in element.EnumerateObject().OrderBy(property => property.Name, StringComparer.Ordinal))
-                {
-                    writer.WritePropertyName(property.Name);
-                    WriteCanonicalJsonElement(writer, property.Value);
-                }
-                writer.WriteEndObject();
-                break;
-            case JsonValueKind.Array:
-                writer.WriteStartArray();
-                foreach (var item in element.EnumerateArray())
-                {
-                    WriteCanonicalJsonElement(writer, item);
-                }
-                writer.WriteEndArray();
-                break;
-            default:
-                element.WriteTo(writer);
-                break;
-        }
+        return directory.FullName;
     }
 
     private static void AssertSchemaConventions(object schema, string path)
