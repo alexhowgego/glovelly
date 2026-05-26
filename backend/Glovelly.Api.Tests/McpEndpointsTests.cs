@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Glovelly.Api.Data;
 using Glovelly.Api.Services;
 using Glovelly.Api.Models;
@@ -18,6 +19,23 @@ namespace Glovelly.Api.Tests;
 public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Converters =
+        {
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase),
+        },
+    };
+
+    private static readonly HashSet<string> EnumPropertyNames =
+    [
+        "status",
+        "dateBasis",
+        "type",
+        "confidence",
+    ];
+
     private static readonly string[] ExpectedMcpToolNames =
     [
         "glovelly_search_contacts",
@@ -39,6 +57,54 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         _factory = factory;
         _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public void McpToolCatalog_MatchesCheckedInContractSnapshot()
+    {
+        var actual = CreateMcpToolSnapshotJson();
+        var snapshotPath = GetMcpToolSnapshotPath();
+
+        if (string.Equals(Environment.GetEnvironmentVariable("UPDATE_MCP_SNAPSHOT"), "1", StringComparison.Ordinal))
+        {
+            File.WriteAllText(snapshotPath, actual);
+        }
+
+        var expected = File.ReadAllText(snapshotPath).Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void McpToolCatalog_FollowsAgentFacingSchemaConventions()
+    {
+        var tools = GlovellyMcpToolCatalog.Tools;
+        Assert.Equal(tools.Count, tools.Select(tool => tool.Name).Distinct(StringComparer.Ordinal).Count());
+
+        foreach (var tool in tools)
+        {
+            Assert.StartsWith("glovelly_", tool.Name, StringComparison.Ordinal);
+            Assert.Equal(tool.Name, tool.Name.ToLowerInvariant());
+            Assert.False(string.IsNullOrWhiteSpace(tool.Title));
+            Assert.False(string.IsNullOrWhiteSpace(tool.Description));
+            Assert.NotNull(tool.InputSchema);
+            Assert.True(Enum.IsDefined(tool.SafetyLevel));
+
+            if (tool.SafetyLevel == McpToolSafetyLevel.StagedWrite)
+            {
+                Assert.True(tool.RequiresExplicitUserIntent, $"{tool.Name} is staged-write and must require explicit user intent.");
+            }
+
+            if (tool.SafetyLevel == McpToolSafetyLevel.ReadOnly)
+            {
+                Assert.False(tool.RequiresExplicitUserIntent, $"{tool.Name} is read-only and should not require write intent.");
+            }
+
+            AssertSchemaConventions(tool.InputSchema, $"{tool.Name}.inputSchema");
+            if (tool.OutputSchema is not null)
+            {
+                AssertSchemaConventions(tool.OutputSchema, $"{tool.Name}.outputSchema");
+            }
+        }
     }
 
     [Fact]
@@ -385,6 +451,113 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_gig_import_batch"]);
 
         Assert.True(GlovellyMcpToolCatalog.Tools.Single(tool => tool.Name == "glovelly_add_gig_import_drafts").RequiresExplicitUserIntent);
+    }
+
+    private static string CreateMcpToolSnapshotJson()
+    {
+        var snapshot = GlovellyMcpToolCatalog.Tools.Select(tool => new
+        {
+            tool.Name,
+            tool.Title,
+            tool.Description,
+            tool.SafetyLevel,
+            tool.RequiresExplicitUserIntent,
+            tool.InputSchema,
+            tool.OutputSchema,
+        });
+
+        var json = JsonSerializer.Serialize(snapshot, SnapshotJsonOptions);
+        using var document = JsonDocument.Parse(json);
+        return WriteCanonicalJson(document.RootElement) + "\n";
+    }
+
+    private static string GetMcpToolSnapshotPath()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "glovelly.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return Path.Combine(directory.FullName, "backend", "Glovelly.Api.Tests", "Contracts", "mcp-tools.snapshot.json");
+    }
+
+    private static string WriteCanonicalJson(JsonElement element)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        {
+            WriteCanonicalJsonElement(writer, element);
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static void WriteCanonicalJsonElement(Utf8JsonWriter writer, JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (var property in element.EnumerateObject().OrderBy(property => property.Name, StringComparer.Ordinal))
+                {
+                    writer.WritePropertyName(property.Name);
+                    WriteCanonicalJsonElement(writer, property.Value);
+                }
+                writer.WriteEndObject();
+                break;
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (var item in element.EnumerateArray())
+                {
+                    WriteCanonicalJsonElement(writer, item);
+                }
+                writer.WriteEndArray();
+                break;
+            default:
+                element.WriteTo(writer);
+                break;
+        }
+    }
+
+    private static void AssertSchemaConventions(object schema, string path)
+    {
+        var element = JsonSerializer.SerializeToElement(schema, JsonOptions);
+        AssertSchemaConventions(element, path, propertyName: null);
+    }
+
+    private static void AssertSchemaConventions(JsonElement element, string path, string? propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        if (element.TryGetProperty("enum", out var enumValues))
+        {
+            Assert.Equal(JsonValueKind.Array, enumValues.ValueKind);
+            Assert.NotEmpty(enumValues.EnumerateArray());
+            Assert.All(enumValues.EnumerateArray(), value => Assert.Equal(JsonValueKind.String, value.ValueKind));
+            Assert.Equal("string", element.GetProperty("type").GetString());
+        }
+        else if (propertyName is not null && EnumPropertyNames.Contains(propertyName))
+        {
+            Assert.Fail($"{path} must expose allowed values with a JSON schema enum.");
+        }
+
+        if (element.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in properties.EnumerateObject())
+            {
+                AssertSchemaConventions(property.Value, $"{path}.properties.{property.Name}", property.Name);
+            }
+        }
+
+        if (element.TryGetProperty("items", out var items))
+        {
+            AssertSchemaConventions(items, $"{path}.items", propertyName: null);
+        }
     }
 
     [Fact]
