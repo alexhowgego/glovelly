@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Glovelly.Api.Data;
 using Glovelly.Api.Services;
 using Glovelly.Api.Models;
@@ -18,6 +19,37 @@ namespace Glovelly.Api.Tests;
 public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Converters =
+        {
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase),
+        },
+    };
+
+    private static readonly HashSet<string> EnumPropertyNames =
+    [
+        "status",
+        "dateBasis",
+        "type",
+        "confidence",
+    ];
+
+    private static readonly string[] ExpectedMcpToolNames =
+    [
+        "glovelly_search_contacts",
+        "glovelly_list_invoices",
+        "glovelly_get_invoice",
+        "glovelly_list_receipts",
+        "glovelly_get_business_summary",
+        "glovelly_create_gig_import_batch",
+        "glovelly_add_gig_import_draft",
+        "glovelly_add_gig_import_drafts",
+        "glovelly_list_gig_import_batches",
+        "glovelly_get_gig_import_batch",
+    ];
+
     private readonly GlovellyApiFactory _factory;
     private readonly HttpClient _client;
 
@@ -25,6 +57,73 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         _factory = factory;
         _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public void McpToolCatalog_MatchesCheckedInContractSnapshot()
+    {
+        var actual = CreateMcpToolSnapshotJson();
+        var snapshotPath = GetMcpToolSnapshotPath();
+
+        if (string.Equals(Environment.GetEnvironmentVariable("UPDATE_MCP_SNAPSHOT"), "1", StringComparison.Ordinal))
+        {
+            File.WriteAllText(snapshotPath, actual);
+        }
+
+        var expected = File.ReadAllText(snapshotPath).Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void McpToolCatalog_GeneratesCheckedInPublicDocumentation()
+    {
+        var repoRoot = GetRepoRoot();
+        var markdownPath = Path.Combine(repoRoot, "docs", "mcp-tools.md");
+        var manifestPath = Path.Combine(repoRoot, "docs", "mcp-tools.json");
+        var actualMarkdown = McpToolDocumentationGenerator.GenerateMarkdown();
+        var actualManifest = McpToolDocumentationGenerator.GenerateCapabilityManifestJson();
+
+        if (string.Equals(Environment.GetEnvironmentVariable("UPDATE_MCP_DOCS"), "1", StringComparison.Ordinal))
+        {
+            File.WriteAllText(markdownPath, actualMarkdown);
+            File.WriteAllText(manifestPath, actualManifest);
+        }
+
+        Assert.Equal(File.ReadAllText(markdownPath).Replace("\r\n", "\n", StringComparison.Ordinal), actualMarkdown);
+        Assert.Equal(File.ReadAllText(manifestPath).Replace("\r\n", "\n", StringComparison.Ordinal), actualManifest);
+    }
+
+    [Fact]
+    public void McpToolCatalog_FollowsAgentFacingSchemaConventions()
+    {
+        var tools = GlovellyMcpToolCatalog.Tools;
+        Assert.Equal(tools.Count, tools.Select(tool => tool.Name).Distinct(StringComparer.Ordinal).Count());
+
+        foreach (var tool in tools)
+        {
+            Assert.StartsWith("glovelly_", tool.Name, StringComparison.Ordinal);
+            Assert.Equal(tool.Name, tool.Name.ToLowerInvariant());
+            Assert.False(string.IsNullOrWhiteSpace(tool.Title));
+            Assert.False(string.IsNullOrWhiteSpace(tool.Description));
+            Assert.NotNull(tool.InputSchema);
+            Assert.True(Enum.IsDefined(tool.SafetyLevel));
+
+            if (tool.SafetyLevel == McpToolSafetyLevel.StagedWrite)
+            {
+                Assert.True(tool.RequiresExplicitUserIntent, $"{tool.Name} is staged-write and must require explicit user intent.");
+            }
+
+            if (tool.SafetyLevel == McpToolSafetyLevel.ReadOnly)
+            {
+                Assert.False(tool.RequiresExplicitUserIntent, $"{tool.Name} is read-only and should not require write intent.");
+            }
+
+            AssertSchemaConventions(tool.InputSchema, $"{tool.Name}.inputSchema");
+            if (tool.OutputSchema is not null)
+            {
+                AssertSchemaConventions(tool.OutputSchema, $"{tool.Name}.outputSchema");
+            }
+        }
     }
 
     [Fact]
@@ -267,23 +366,184 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-        var toolNames = payload
+        var tools = payload
             .GetProperty("result")
             .GetProperty("tools")
             .EnumerateArray()
+            .ToArray();
+        var toolNames = tools
             .Select(tool => tool.GetProperty("name").GetString())
             .ToArray();
 
-        Assert.Contains("glovelly_search_contacts", toolNames);
-        Assert.Contains("glovelly_list_invoices", toolNames);
-        Assert.Contains("glovelly_get_invoice", toolNames);
-        Assert.Contains("glovelly_list_receipts", toolNames);
-        Assert.Contains("glovelly_get_business_summary", toolNames);
-        Assert.Contains("glovelly_create_gig_import_batch", toolNames);
-        Assert.Contains("glovelly_add_gig_import_draft", toolNames);
-        Assert.Contains("glovelly_add_gig_import_drafts", toolNames);
-        Assert.Contains("glovelly_list_gig_import_batches", toolNames);
-        Assert.Contains("glovelly_get_gig_import_batch", toolNames);
+        Assert.Equal(ExpectedMcpToolNames, toolNames);
+
+        var getInvoiceTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_get_invoice");
+        Assert.False(getInvoiceTool.TryGetProperty("safetyLevel", out _));
+        Assert.False(getInvoiceTool.TryGetProperty("requiresExplicitUserIntent", out _));
+        Assert.Equal("Get Invoice", getInvoiceTool.GetProperty("title").GetString());
+
+        var inputSchema = getInvoiceTool.GetProperty("inputSchema");
+        Assert.Equal("object", inputSchema.GetProperty("type").GetString());
+        Assert.Equal("invoiceId", inputSchema.GetProperty("required").EnumerateArray().Single().GetString());
+        Assert.Equal(
+            "uuid",
+            inputSchema.GetProperty("properties").GetProperty("invoiceId").GetProperty("format").GetString());
+
+        var listInvoicesTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_list_invoices");
+        var listInvoicesInput = listInvoicesTool.GetProperty("inputSchema").GetProperty("properties");
+        Assert.Equal(
+            ["all", "outstanding", "issued", "paid", "draft", "overdue", "cancelled"],
+            listInvoicesInput.GetProperty("status").GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
+        Assert.Equal(
+            ["issueDate", "dueDate"],
+            listInvoicesInput.GetProperty("dateBasis").GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
+
+        var invoiceSchema = listInvoicesTool
+            .GetProperty("outputSchema")
+            .GetProperty("properties")
+            .GetProperty("invoices")
+            .GetProperty("items")
+            .GetProperty("properties");
+        Assert.Equal("date", invoiceSchema.GetProperty("issueDate").GetProperty("format").GetString());
+        Assert.Equal("date", invoiceSchema.GetProperty("dueDate").GetProperty("format").GetString());
+
+        var listBatchesTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_list_gig_import_batches");
+        var batchSchema = listBatchesTool
+            .GetProperty("outputSchema")
+            .GetProperty("properties")
+            .GetProperty("batches")
+            .GetProperty("items")
+            .GetProperty("properties");
+        Assert.Equal("date-time", batchSchema.GetProperty("createdAtUtc").GetProperty("format").GetString());
+
+        var addDraftTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_add_gig_import_draft");
+        var draftSchema = addDraftTool
+            .GetProperty("outputSchema")
+            .GetProperty("properties")
+            .GetProperty("draft")
+            .GetProperty("properties");
+        Assert.Equal("date", draftSchema.GetProperty("date").GetProperty("format").GetString());
+        Assert.Equal("time", draftSchema.GetProperty("arrivalTime").GetProperty("format").GetString());
+    }
+
+    [Fact]
+    public void McpSchema_HelpersEmitReusableJsonSchemaConventions()
+    {
+        var schema = JsonSerializer.SerializeToElement(McpSchema.Object(new
+        {
+            id = McpSchema.Uuid("Stable record ID."),
+            date = McpSchema.Date(),
+            time = McpSchema.Time(),
+            status = McpSchema.Enum<InvoiceStatus>("Allowed invoice status."),
+            amount = McpSchema.Money("Amount in GBP.", minimum: 0),
+        }, ["id"]), JsonOptions);
+
+        Assert.Equal("object", schema.GetProperty("type").GetString());
+        Assert.Equal("id", schema.GetProperty("required").EnumerateArray().Single().GetString());
+
+        var properties = schema.GetProperty("properties");
+        Assert.Equal("uuid", properties.GetProperty("id").GetProperty("format").GetString());
+        Assert.Equal("date", properties.GetProperty("date").GetProperty("format").GetString());
+        Assert.Equal("time", properties.GetProperty("time").GetProperty("format").GetString());
+        Assert.Equal(
+            ["draft", "issued", "paid", "overdue", "cancelled"],
+            properties.GetProperty("status").GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
+        Assert.Equal(0, properties.GetProperty("amount").GetProperty("minimum").GetDecimal());
+    }
+
+    [Fact]
+    public void McpToolCatalog_DefinesToolContractsWithSafetyMetadata()
+    {
+        Assert.Equal(ExpectedMcpToolNames, GlovellyMcpToolCatalog.Tools.Select(tool => tool.Name).ToArray());
+        Assert.All(GlovellyMcpToolCatalog.Tools, tool => Assert.NotNull(tool.InputSchema));
+
+        var safetyLevels = GlovellyMcpToolCatalog.Tools.ToDictionary(tool => tool.Name, tool => tool.SafetyLevel);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_search_contacts"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_invoices"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_invoice"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_receipts"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_business_summary"]);
+        Assert.Equal(McpToolSafetyLevel.StagedWrite, safetyLevels["glovelly_create_gig_import_batch"]);
+        Assert.Equal(McpToolSafetyLevel.StagedWrite, safetyLevels["glovelly_add_gig_import_draft"]);
+        Assert.Equal(McpToolSafetyLevel.StagedWrite, safetyLevels["glovelly_add_gig_import_drafts"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_gig_import_batches"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_gig_import_batch"]);
+
+        Assert.True(GlovellyMcpToolCatalog.Tools.Single(tool => tool.Name == "glovelly_add_gig_import_drafts").RequiresExplicitUserIntent);
+    }
+
+    private static string CreateMcpToolSnapshotJson()
+    {
+        var snapshot = GlovellyMcpToolCatalog.Tools.Select(tool => new
+        {
+            tool.Name,
+            tool.Title,
+            tool.Description,
+            tool.SafetyLevel,
+            tool.RequiresExplicitUserIntent,
+            tool.InputSchema,
+            tool.OutputSchema,
+        });
+
+        var json = JsonSerializer.Serialize(snapshot, SnapshotJsonOptions);
+        using var document = JsonDocument.Parse(json);
+        return McpToolDocumentationGenerator.ToCanonicalJson(document.RootElement) + "\n";
+    }
+
+    private static string GetMcpToolSnapshotPath()
+    {
+        return Path.Combine(GetRepoRoot(), "backend", "Glovelly.Api.Tests", "Contracts", "mcp-tools.snapshot.json");
+    }
+
+    private static string GetRepoRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "glovelly.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return directory.FullName;
+    }
+
+    private static void AssertSchemaConventions(object schema, string path)
+    {
+        var element = JsonSerializer.SerializeToElement(schema, JsonOptions);
+        AssertSchemaConventions(element, path, propertyName: null);
+    }
+
+    private static void AssertSchemaConventions(JsonElement element, string path, string? propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        if (element.TryGetProperty("enum", out var enumValues))
+        {
+            Assert.Equal(JsonValueKind.Array, enumValues.ValueKind);
+            Assert.NotEmpty(enumValues.EnumerateArray());
+            Assert.All(enumValues.EnumerateArray(), value => Assert.Equal(JsonValueKind.String, value.ValueKind));
+            Assert.Equal("string", element.GetProperty("type").GetString());
+        }
+        else if (propertyName is not null && EnumPropertyNames.Contains(propertyName))
+        {
+            Assert.Fail($"{path} must expose allowed values with a JSON schema enum.");
+        }
+
+        if (element.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in properties.EnumerateObject())
+            {
+                AssertSchemaConventions(property.Value, $"{path}.properties.{property.Name}", property.Name);
+            }
+        }
+
+        if (element.TryGetProperty("items", out var items))
+        {
+            AssertSchemaConventions(items, $"{path}.items", propertyName: null);
+        }
     }
 
     [Fact]

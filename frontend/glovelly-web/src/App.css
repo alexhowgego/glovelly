@@ -1752,9 +1752,12 @@ button:disabled {
   }
 
   .profile-dropdown {
-    left: 0;
+    /* Center the dropdown on small screens and constrain width so it stays on-screen */
+    left: 50%;
     right: auto;
+    transform: translateX(-90%);
     min-width: min(280px, calc(100vw - 64px));
+    max-width: calc(100vw - 32px);
   }
 
   .settings-overlay {

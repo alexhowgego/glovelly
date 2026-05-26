@@ -23,6 +23,28 @@ dotnet tool run docfx docs/docfx.json --serve
 
 Changes pushed to `main` are published to GitHub Pages at `https://docs.glovelly.net`.
 
+### MCP contract snapshots and generated docs
+
+The MCP tool catalog is treated as a public integration contract. Intentional tool contract changes should update both the test snapshot and generated public docs in the same pull request.
+
+When you intentionally change MCP tool names, descriptions, safety metadata, input schemas, or output schemas, run:
+
+```bash
+UPDATE_MCP_SNAPSHOT=1 UPDATE_MCP_DOCS=1 dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~McpToolCatalog
+```
+
+This refreshes:
+
+- `backend/Glovelly.Api.Tests/Contracts/mcp-tools.snapshot.json`: the checked-in test contract snapshot.
+- `docs/mcp-tools.md`: human-readable MCP tool documentation.
+- `docs/mcp-tools.json`: machine-readable MCP capability manifest.
+
+After regenerating, review the diff carefully. These files should only change when the MCP public contract has intentionally changed. Then run the MCP-focused tests:
+
+```bash
+dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~Mcp
+```
+
 ## Current Scope (v1)
 - Gig tracking
 - Invoice generation from gigs

@@ -1,101 +1,86 @@
 # Glovelly Agent Guide
 
-This file is the first stop for coding agents. Keep it compact and update it when repo shape or core workflows change.
+Compact, repo-specific context for future OpenCode sessions. Keep only facts an agent would otherwise likely miss.
 
-## Purpose
+## Shape
 
-Glovelly is a personal business platform for self-employed music work. The current product covers authenticated access, clients, gigs, gig expenses and receipt attachments, invoice generation, invoice issue/reissue/delivery, seller profile setup, Google Drive invoice publishing, email delivery, admin user management, and a small MCP read-only business data surface.
+- Glovelly is a personal business platform for authenticated music-work admin: clients, gigs, expenses/receipts, invoices, seller profile, Google Drive/email delivery, admin users, and a small MCP surface.
+- Backend: ASP.NET Core minimal API on .NET 10, EF Core, PostgreSQL when `ConnectionStrings:Glovelly` exists, EF in-memory otherwise. Shared package versions live in `Directory.Packages.props`; target framework/nullable/implicit usings live in `Directory.Build.props`.
+- Frontend: React 19 + TypeScript + Vite in `frontend/glovelly-web`. `npm run build` is `tsc -b && vite build`.
+- Deployment builds one Docker image: Vite `dist` is copied into ASP.NET Core `wwwroot`, then the API serves the SPA and API from one process. CI deploys same-repo PRs to shared Cloud Run staging and `main` to production.
 
-## Stack
+## Commands
 
-- Backend: ASP.NET Core minimal API, .NET 10, Entity Framework Core, PostgreSQL in production, in-memory database for local development and tests when no connection string is configured.
-- Frontend: React 19, TypeScript, Vite.
-- Tests: xUnit integration-style API tests using `WebApplicationFactory` and EF in-memory.
-- Deployment: one Docker image containing the Vite build copied into ASP.NET Core `wwwroot`, deployed by GitHub Actions to Cloud Run.
-
-## Fast Commands
-
-Run from the repo root unless noted.
+Run from repo root unless noted.
 
 ```bash
-dotnet test glovelly.sln -m:1
+./run-dev.sh                                    # backend :5153 + Vite :5173; sources .glovelly.dev.local
+dotnet test glovelly.sln -m:1                  # backend suite; keep -m:1 for shared in-memory/factory state
+dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~GigEndpointsTests
 npm --prefix frontend/glovelly-web run lint
 npm --prefix frontend/glovelly-web run build
-./verify.sh
-./run-dev.sh
+./verify.sh                                    # dotnet test, frontend lint, frontend build
+dotnet tool restore && dotnet tool run docfx docs/docfx.json
+dotnet tool run docfx docs/docfx.json --serve  # local handbook
 ```
 
-Use `./verify.sh` before handing over broad code changes. For backend-only changes, `dotnet test glovelly.sln -m:1` is usually the best first check.
+- Use `./verify.sh` before handing over broad changes. For backend-only changes, `dotnet test glovelly.sln -m:1` is the best first check.
+- Frontend has lint/build checks only; no unit/e2e runner is configured.
 
-## Repo Map
+## Backend Map
 
-- `backend/Glovelly.Api/Program.cs`: service setup, HTTP pipeline, endpoint registration.
-- `backend/Glovelly.Api/Configuration/`: startup, auth, infrastructure, database initialization, Swagger/static file pipeline.
-- `backend/Glovelly.Api/Auth/`: current user access, app policies, Google OIDC claim handling, development MCP auth handler.
-- `backend/Glovelly.Api/Data/`: EF `AppDbContext` and development seeding.
-- `backend/Glovelly.Api/Models/`: EF/domain models used directly by minimal APIs.
-- `backend/Glovelly.Api/Endpoints/`: minimal API route groups and request validation helpers.
-- `backend/Glovelly.Api/Services/`: workflow services, delivery channels, email, Google Drive, storage, MCP query service.
-- `backend/Glovelly.Api.Tests/`: API tests. `Infrastructure/GlovellyApiFactory.cs` configures test auth, seeded data, fake email, and in-memory storage.
-- `frontend/glovelly-web/src/App.tsx`: top-level app orchestration, session state, data loading, cross-workspace coordination.
-- `frontend/glovelly-web/src/hooks/`: stateful workspace logic for clients, gigs, invoices, admin, user settings, seller profile, quick receipts.
-- `frontend/glovelly-web/src/components/`: presentational sections and modals.
-- `frontend/glovelly-web/src/api.ts`: fetch helpers, session expiry, problem details parsing.
-- `frontend/glovelly-web/src/types.ts`: frontend API/domain types.
-- `docs/`: handbook landing page, UAT journeys, domain, roadmap, and agent-oriented architecture/convention/testing notes.
+- `backend/Glovelly.Api/Program.cs` is the real entrypoint: startup settings, infrastructure/auth registration, DB init, HTTP pipeline, endpoint mapping, SPA fallback.
+- `Configuration/StartupSettings.cs` chooses PostgreSQL vs in-memory by presence of `ConnectionStrings:Glovelly`; development seed data only runs for non-Postgres, non-testing startup.
+- `Endpoints/CrudEndpoints.cs` maps protected `/clients`, `/gigs`, `/gig-imports`, `/invoices`, `/invoice-lines`, and `/seller-profile` groups. Auth/access/Google Drive/MCP/admin/expense statements are mapped separately in `Program.cs`.
+- `Endpoints/EndpointSupport.cs` owns high-risk shared behavior: `WhereVisibleTo`, create/update stamping, gig validation, invoice status transition rules, filename/subject validation, and gig expense normalization.
+- `Services/InvoiceWorkflowService.cs` and related invoice services own invoice creation, generated lines, PDFs, issue/reissue, delivery, and gig linkage. Do not duplicate that flow inside endpoints.
+- `Services/GlovellyMcpQueryService.cs` performs user-scoped MCP EF projections; MCP tools should remain scoped by authenticated user visibility.
 
-## Backend Conventions
+## Frontend Map
 
-- Endpoints are grouped in extension methods. `Program.cs` maps auth/access/MCP/admin and CRUD groups.
-- CRUD groups are registered via `MapCrudEndpoints`, then delegated to files such as `GigEndpoints.cs` and `InvoiceEndpoints.cs`.
-- Use `EndpointSupport` for shared visibility filters, validation helpers, stamping helpers, invoice status transition rules, and gig expense normalization.
-- Most user-owned data must be filtered with `WhereVisibleTo(userId)` or equivalent owner checks.
-- Prefer workflow services for multi-step business behavior. Invoice creation, line generation, PDF generation, issue/reissue behavior, and delivery coordination live in `InvoiceWorkflowService` and related delivery services.
-- Keep request validation close to endpoint behavior unless a reusable validation helper already exists in `EndpointSupport`.
-- When adding endpoints, add focused tests in the matching `*EndpointsTests.cs` file or create a new test file for a new route group.
+- `src/App.tsx` coordinates session, active section, initial data loads, modals, and cross-workspace actions. Avoid adding large workflow bodies there when a hook can own them.
+- `src/hooks/` owns stateful workspace logic for clients, gigs, gig imports, invoices, admin, user settings, seller profile, and quick receipts.
+- `src/components/` is presentational sections/modals. Preserve the current plain React/CSS approach; there is no component library.
+- Use `buildApiUrl`, `fetchWithSession`, `parseProblemDetails`, and session-expiry helpers from `src/api.ts`; avoid raw `fetch` for authenticated API calls.
+- Update `src/types.ts` whenever backend JSON shapes change.
+- When adding a frontend-consumed API prefix, update both `frontend/glovelly-web/vite.config.ts` proxy and `frontend/glovelly-web/public/sw.js` API bypass list, or local Vite/service-worker responses can hide backend data.
 
-## Frontend Conventions
+## Tests And Fixtures
 
-- Keep data/workflow state in hooks under `src/hooks`. Components should mostly render state and call hook-provided handlers.
-- Use `fetchWithSession`, `buildApiUrl`, `parseProblemDetails`, and session-expiry helpers from `src/api.ts` for API calls.
-- When adding a new frontend-consumed API route, add the route prefix to `frontend/glovelly-web/vite.config.ts` dev proxy and to the API bypass list in `frontend/glovelly-web/public/sw.js`; otherwise local Vite/service-worker responses can mask seeded backend data.
-- Update `src/types.ts` when backend response shapes change.
-- `App.tsx` coordinates workspaces and cross-cutting state. Avoid adding large new workflow bodies there when a hook can own the behavior.
-- Preserve the existing plain React/CSS style. There is no component library.
+- Backend tests are integration-style xUnit tests in `backend/Glovelly.Api.Tests` using `WebApplicationFactory` and EF in-memory.
+- `Infrastructure/GlovellyApiFactory.cs` resets DB data on each `CreateClient()`, replaces auth by default, injects fake email, fake mileage estimation, and in-memory attachment/blob storage.
+- Use `GlovellyApiFactory.WithConfiguration(...)` for auth/development-style tests that need real auth wiring.
+- Seed IDs live in `Infrastructure/TestData.cs`; default authenticated user claims live in `Infrastructure/TestAuthContext.cs`; email assertions should use `factory.Emails`.
+- When changing a user journey or cross-workspace navigation, update the matching scenario under `docs/uat/`.
 
-## Testing Notes
+## Local And Secrets
 
-- Backend tests use fake authorization by default. `GlovellyApiFactory.WithConfiguration(...)` enables real auth/development-style configuration for auth-specific tests.
-- Seeded test IDs live in `backend/Glovelly.Api.Tests/Infrastructure/TestData.cs`; seeded auth context lives in `TestAuthContext.cs`.
-- Fake email assertions should use `GlovellyApiFactory.Emails`.
-- Frontend has lint/build scripts but no dedicated frontend test runner yet.
-- When a change affects a user journey or cross-workspace navigation, add or update the matching scenario under `docs/uat/`.
+- `.glovelly.dev.local` is git-ignored and sourced by `run-dev.sh`; do not read or edit it unless explicitly asked.
+- Store local secrets such as Google OIDC, Resend, Routes API key, and PostgreSQL connection string with `dotnet user-secrets` under `backend/Glovelly.Api`, not in repo files.
+- Local admin seeding requires `DevelopmentSeeding__AdminGoogleSubject` and only applies when using the in-memory development DB.
 
 ## High-Token Files
 
-Read these selectively and search within them before opening large chunks:
+Search within these before opening large chunks:
 
 - `frontend/glovelly-web/src/App.tsx`
 - `backend/Glovelly.Api/Services/InvoiceWorkflowService.cs`
-- `backend/Glovelly.Api/Endpoints/GigEndpoints.cs`
 - `backend/Glovelly.Api/Endpoints/InvoiceEndpoints.cs`
+- `backend/Glovelly.Api/Endpoints/GigCrudEndpoints.cs`
 - `frontend/glovelly-web/src/hooks/useGigsWorkspace.ts`
 - `frontend/glovelly-web/src/hooks/useInvoicesWorkspace.ts`
 
-## Useful Search Patterns
+## Useful Searches
 
 ```bash
-rg "Map.*Endpoints" backend/Glovelly.Api/Endpoints
-rg "WhereVisibleTo|StampCreate|Validate" backend/Glovelly.Api/Endpoints
-rg "fetchWithSession|parseProblemDetails" frontend/glovelly-web/src
-rg "InvoiceWorkflowService|IInvoiceWorkflowService" backend/Glovelly.Api
-rg "TestData\\.|TestAuthContext" backend/Glovelly.Api.Tests
+rg "Map.*Endpoints|MapCrudEndpoints" backend/Glovelly.Api/Endpoints backend/Glovelly.Api/Program.cs
+rg "WhereVisibleTo|StampCreate|Validate|NormalizeGigExpenses" backend/Glovelly.Api
+rg "fetchWithSession|parseProblemDetails|buildApiUrl" frontend/glovelly-web/src
+rg "TestData\\.|TestAuthContext|factory\.Emails" backend/Glovelly.Api.Tests
 ```
 
 ## Avoid
 
-- Do not commit secrets or edit `.glovelly.dev.local`.
-- Do not bypass owner visibility checks for user data.
-- Do not add frontend API calls using raw `fetch` unless there is a specific reason.
-- Do not run destructive git commands unless the user explicitly asks.
-- Do not refactor large files just to tidy them while solving a narrow task.
+- Do not bypass owner visibility checks for user-owned data; null creator IDs may be intentional for shared/dev seed visibility.
+- Do not add package versions to individual `.csproj` files; use central package management in `Directory.Packages.props`.
+- Do not refactor large coordination files just to tidy them while solving a narrow task.
