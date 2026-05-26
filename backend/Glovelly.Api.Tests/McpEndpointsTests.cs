@@ -305,6 +305,14 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
             inputSchema.GetProperty("properties").GetProperty("invoiceId").GetProperty("format").GetString());
 
         var listInvoicesTool = tools.Single(tool => tool.GetProperty("name").GetString() == "glovelly_list_invoices");
+        var listInvoicesInput = listInvoicesTool.GetProperty("inputSchema").GetProperty("properties");
+        Assert.Equal(
+            ["all", "outstanding", "issued", "paid", "draft", "overdue", "cancelled"],
+            listInvoicesInput.GetProperty("status").GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
+        Assert.Equal(
+            ["issueDate", "dueDate"],
+            listInvoicesInput.GetProperty("dateBasis").GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
+
         var invoiceSchema = listInvoicesTool
             .GetProperty("outputSchema")
             .GetProperty("properties")
@@ -331,6 +339,31 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
             .GetProperty("properties");
         Assert.Equal("date", draftSchema.GetProperty("date").GetProperty("format").GetString());
         Assert.Equal("time", draftSchema.GetProperty("arrivalTime").GetProperty("format").GetString());
+    }
+
+    [Fact]
+    public void McpSchema_HelpersEmitReusableJsonSchemaConventions()
+    {
+        var schema = JsonSerializer.SerializeToElement(McpSchema.Object(new
+        {
+            id = McpSchema.Uuid("Stable record ID."),
+            date = McpSchema.Date(),
+            time = McpSchema.Time(),
+            status = McpSchema.Enum<InvoiceStatus>("Allowed invoice status."),
+            amount = McpSchema.Money("Amount in GBP.", minimum: 0),
+        }, ["id"]), JsonOptions);
+
+        Assert.Equal("object", schema.GetProperty("type").GetString());
+        Assert.Equal("id", schema.GetProperty("required").EnumerateArray().Single().GetString());
+
+        var properties = schema.GetProperty("properties");
+        Assert.Equal("uuid", properties.GetProperty("id").GetProperty("format").GetString());
+        Assert.Equal("date", properties.GetProperty("date").GetProperty("format").GetString());
+        Assert.Equal("time", properties.GetProperty("time").GetProperty("format").GetString());
+        Assert.Equal(
+            ["draft", "issued", "paid", "overdue", "cancelled"],
+            properties.GetProperty("status").GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
+        Assert.Equal(0, properties.GetProperty("amount").GetProperty("minimum").GetDecimal());
     }
 
     [Fact]

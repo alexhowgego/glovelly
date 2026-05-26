@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Glovelly.Api.Models;
 
 namespace Glovelly.Api.Services;
 
@@ -27,96 +28,69 @@ public static class GlovellyMcpToolCatalog
             "glovelly_search_contacts",
             "Search Contacts",
             "Search Glovelly contacts by name or email. Returns possible matches without guessing.",
-            new
+            McpSchema.Object(new
             {
-                type = "object",
-                properties = new
-                {
-                    query = new { type = "string" },
-                },
-            },
+                query = McpSchema.String("Name or email text to search for. Leave blank to list recent contacts."),
+            }),
             McpToolSafetyLevel.ReadOnly,
             OutputSchema: ContactSearchOutputSchema()),
         new(
             "glovelly_list_invoices",
             "List Invoices",
             "List invoices by optional contact, status, date range, and date basis.",
-            new
-            {
-                type = "object",
-                properties = new
+            McpSchema.Object(MergeProperties(
+                GlovellyMcpSchemaFragments.ContactSelector,
+                GlovellyMcpSchemaFragments.DateRange,
+                new Dictionary<string, object>
                 {
-                    contactId = new { type = "string", format = "uuid" },
-                    contactQuery = new { type = "string" },
-                    status = new { type = "string", description = "all, outstanding, issued, paid, draft, overdue, or cancelled" },
-                    fromDate = new { type = "string", format = "date" },
-                    toDate = new { type = "string", format = "date" },
-                    dateBasis = new { type = "string", @enum = new[] { "issueDate", "dueDate" } },
-                },
-            },
+                    ["status"] = McpSchema.Enum(
+                        ["all", "outstanding", "issued", "paid", "draft", "overdue", "cancelled"],
+                        "Invoice status filter. Use outstanding for issued or overdue invoices with a balance."),
+                    ["dateBasis"] = McpSchema.Enum<InvoiceDateBasis>("Whether fromDate/toDate apply to issueDate or dueDate."),
+                })),
             McpToolSafetyLevel.ReadOnly,
             OutputSchema: InvoiceListOutputSchema()),
         new(
             "glovelly_get_invoice",
             "Get Invoice",
             "Fetch read-only invoice details for a single invoice.",
-            new
+            McpSchema.Object(new
             {
-                type = "object",
-                required = new[] { "invoiceId" },
-                properties = new
-                {
-                    invoiceId = new { type = "string", format = "uuid" },
-                },
-            },
+                invoiceId = McpSchema.Uuid("Invoice ID returned by glovelly_list_invoices."),
+            }, ["invoiceId"]),
             McpToolSafetyLevel.ReadOnly,
             OutputSchema: InvoiceGetOutputSchema()),
         new(
             "glovelly_list_receipts",
             "List Receipts",
             "List read-only receipt and expense records by date range and optional status.",
-            new
-            {
-                type = "object",
-                properties = new
+            McpSchema.Object(MergeProperties(
+                GlovellyMcpSchemaFragments.DateRange,
+                new Dictionary<string, object>
                 {
-                    fromDate = new { type = "string", format = "date" },
-                    toDate = new { type = "string", format = "date" },
-                    status = new { type = "string", description = "all, matched, or unmatched" },
-                },
-            },
+                    ["status"] = McpSchema.Enum(
+                        ["all", ReceiptStatusValues.Matched, ReceiptStatusValues.Unmatched],
+                        "Receipt matching status filter."),
+                })),
             McpToolSafetyLevel.ReadOnly,
             OutputSchema: ReceiptListOutputSchema()),
         new(
             "glovelly_get_business_summary",
             "Get Business Summary",
             "Summarise invoice totals, paid totals, outstanding totals, expenses, and receipt counts for a period.",
-            new
-            {
-                type = "object",
-                properties = new
-                {
-                    fromDate = new { type = "string", format = "date" },
-                    toDate = new { type = "string", format = "date" },
-                },
-            },
+            McpSchema.Object(GlovellyMcpSchemaFragments.DateRange),
             McpToolSafetyLevel.ReadOnly,
             OutputSchema: BusinessSummaryOutputSchema()),
         new(
             "glovelly_create_gig_import_batch",
             "Create Gig Import Batch",
             "Create a staged gig import batch for later human review. This does not create real gigs.",
-            new
+            McpSchema.Object(new
             {
-                type = "object",
-                required = new[] { "sourceName" },
-                properties = new
-                {
-                    sourceName = new { type = "string", maxLength = 300 },
-                    notes = new { type = "string", maxLength = 4000 },
-                    sourceFingerprint = new { type = "string", maxLength = 200 },
-                },
-            },
+                sourceName = McpSchema.String("Human-readable source being imported, such as an email subject or document name.", maxLength: 300),
+                notes = McpSchema.String("Optional notes about the source or import assumptions.", maxLength: 4000),
+                sourceFingerprint = McpSchema.String("Optional stable source identifier to help detect duplicate imports.", maxLength: 200),
+            }, ["sourceName"]),
             McpToolSafetyLevel.StagedWrite,
             RequiresExplicitUserIntent: true,
             OutputSchema: GigImportBatchCreateOutputSchema()),
@@ -132,20 +106,11 @@ public static class GlovellyMcpToolCatalog
             "glovelly_add_gig_import_drafts",
             "Add Gig Import Drafts",
             "Add multiple draft gig rows to a staged import batch, returning per-row validation feedback.",
-            new
+            McpSchema.Object(new
             {
-                type = "object",
-                required = new[] { "batchId", "drafts" },
-                properties = new
-                {
-                    batchId = new { type = "string", format = "uuid" },
-                    drafts = new
-                    {
-                        type = "array",
-                        items = GigImportDraftInputSchema(requiredBatchId: false),
-                    },
-                },
-            },
+                batchId = McpSchema.Uuid("Staged gig import batch ID returned by glovelly_create_gig_import_batch."),
+                drafts = McpSchema.Array(GigImportDraftInputSchema(requiredBatchId: false), "Draft gig rows to add to the staged import batch."),
+            }, ["batchId", "drafts"]),
             McpToolSafetyLevel.StagedWrite,
             RequiresExplicitUserIntent: true,
             OutputSchema: GigImportDraftBulkAddOutputSchema()),
@@ -153,26 +118,17 @@ public static class GlovellyMcpToolCatalog
             "glovelly_list_gig_import_batches",
             "List Gig Import Batches",
             "List staged gig import batches and their statuses.",
-            new
-            {
-                type = "object",
-                properties = new { },
-            },
+            McpSchema.Object(new { }),
             McpToolSafetyLevel.ReadOnly,
             OutputSchema: GigImportBatchListOutputSchema()),
         new(
             "glovelly_get_gig_import_batch",
             "Get Gig Import Batch",
             "Fetch a staged gig import batch and its draft rows.",
-            new
+            McpSchema.Object(new
             {
-                type = "object",
-                required = new[] { "batchId" },
-                properties = new
-                {
-                    batchId = new { type = "string", format = "uuid" },
-                },
-            },
+                batchId = McpSchema.Uuid("Staged gig import batch ID returned by glovelly_list_gig_import_batches."),
+            }, ["batchId"]),
             McpToolSafetyLevel.ReadOnly,
             OutputSchema: GigImportBatchGetOutputSchema()),
     ];
@@ -208,7 +164,7 @@ public static class GlovellyMcpToolCatalog
                 type = "array",
                 items = InvoiceSummarySchema(),
             },
-            totalOutstanding = new { type = "number" },
+            totalOutstanding = McpSchema.Money("Total outstanding amount across returned invoices."),
             currency = new { type = "string" },
         },
     };
@@ -235,7 +191,7 @@ public static class GlovellyMcpToolCatalog
             },
             receiptCount = new { type = "integer" },
             unmatchedReceiptCount = new { type = "integer" },
-            totalAmount = new { type = "number" },
+            totalAmount = McpSchema.Money("Total receipt and expense amount across returned records."),
             currency = new { type = "string" },
         },
     };
@@ -247,10 +203,10 @@ public static class GlovellyMcpToolCatalog
         {
             fromDate = DateSchema(),
             toDate = DateSchema(),
-            invoiceTotal = new { type = "number" },
-            paidTotal = new { type = "number" },
-            outstandingTotal = new { type = "number" },
-            expenseTotal = new { type = "number" },
+            invoiceTotal = McpSchema.Money("Invoice total for the period."),
+            paidTotal = McpSchema.Money("Paid invoice total for the period."),
+            outstandingTotal = McpSchema.Money("Outstanding invoice total for the period."),
+            expenseTotal = McpSchema.Money("Expense total for the period."),
             receiptCount = new { type = "integer" },
             unmatchedReceiptCount = new { type = "integer" },
             currency = new { type = "string" },
@@ -335,9 +291,9 @@ public static class GlovellyMcpToolCatalog
             contactName = new { type = "string" },
             issueDate = DateSchema(),
             dueDate = DateSchema(),
-            status = new { type = "string" },
-            total = new { type = "number" },
-            outstandingAmount = new { type = "number" },
+            status = McpSchema.Enum<InvoiceStatus>("Invoice lifecycle status."),
+            total = McpSchema.Money("Invoice total amount."),
+            outstandingAmount = McpSchema.Money("Amount still outstanding on this invoice."),
             currency = new { type = "string" },
         },
     };
@@ -353,10 +309,10 @@ public static class GlovellyMcpToolCatalog
             contactName = new { type = "string" },
             issueDate = DateSchema(),
             dueDate = DateSchema(),
-            status = new { type = "string" },
+            status = McpSchema.Enum<InvoiceStatus>("Invoice lifecycle status."),
             description = new { type = "string" },
-            total = new { type = "number" },
-            outstandingAmount = new { type = "number" },
+            total = McpSchema.Money("Invoice total amount."),
+            outstandingAmount = McpSchema.Money("Amount still outstanding on this invoice."),
             currency = new { type = "string" },
             lines = new
             {
@@ -369,9 +325,9 @@ public static class GlovellyMcpToolCatalog
                         invoiceLineId = UuidSchema(),
                         description = new { type = "string" },
                         quantity = new { type = "number" },
-                        unitPrice = new { type = "number" },
-                        lineTotal = new { type = "number" },
-                        type = new { type = "string" },
+                        unitPrice = McpSchema.Money("Unit price for this invoice line."),
+                        lineTotal = McpSchema.Money("Total amount for this invoice line."),
+                        type = McpSchema.Enum<InvoiceLineType>("Invoice line type."),
                         gigId = UuidSchema(),
                     },
                 },
@@ -391,8 +347,8 @@ public static class GlovellyMcpToolCatalog
             contactId = UuidSchema(),
             contactName = new { type = "string" },
             description = new { type = "string" },
-            amount = new { type = "number" },
-            status = new { type = "string" },
+            amount = McpSchema.Money("Receipt or expense amount."),
+            status = McpSchema.Enum([ReceiptStatusValues.Matched, ReceiptStatusValues.Unmatched], "Receipt matching status."),
             attachmentCount = new { type = "integer" },
             attachmentFileNames = StringArraySchema(),
             currency = new { type = "string" },
@@ -407,7 +363,7 @@ public static class GlovellyMcpToolCatalog
             batchId = UuidSchema(),
             sourceName = new { type = "string" },
             sourceFingerprint = new { type = "string" },
-            status = new { type = "string" },
+            status = McpSchema.Enum<GigImportBatchStatus>("Staged import batch status."),
             createdAtUtc = DateTimeSchema(),
             notes = new { type = "string" },
             draftCount = new { type = "integer" },
@@ -422,7 +378,7 @@ public static class GlovellyMcpToolCatalog
             batchId = UuidSchema(),
             sourceName = new { type = "string" },
             sourceFingerprint = new { type = "string" },
-            status = new { type = "string" },
+            status = McpSchema.Enum<GigImportBatchStatus>("Staged import batch status."),
             createdAtUtc = DateTimeSchema(),
             notes = new { type = "string" },
             draftCount = new { type = "integer" },
@@ -456,15 +412,15 @@ public static class GlovellyMcpToolCatalog
             venueName = new { type = "string" },
             venueAddress = new { type = "string" },
             postcode = new { type = "string" },
-            fee = new { type = "number" },
-            perDiem = new { type = "number" },
+            fee = McpSchema.Money("Proposed gig fee."),
+            perDiem = McpSchema.Money("Proposed per diem amount."),
             notes = new { type = "string" },
             accommodationNotes = new { type = "string" },
             travelNotes = new { type = "string" },
             sourceReference = new { type = "string" },
-            confidence = new { type = "string" },
+            confidence = GlovellyMcpSchemaFragments.Confidence,
             warnings = StringArraySchema(),
-            status = new { type = "string" },
+            status = McpSchema.Enum<GigImportDraftStatus>("Draft review status."),
         },
     };
 
@@ -482,79 +438,70 @@ public static class GlovellyMcpToolCatalog
         draft = GigImportDraftDetailSchema(),
     };
 
-    private static object StringArraySchema() => new
-    {
-        type = "array",
-        items = new { type = "string" },
-    };
+    private static object StringArraySchema() => McpSchema.Array(McpSchema.String());
 
-    private static object UuidSchema() => new { type = "string", format = "uuid" };
+    private static object UuidSchema() => McpSchema.Uuid();
 
-    private static object DateSchema() => new
-    {
-        type = "string",
-        format = "date",
-        description = "ISO 8601 calendar date in YYYY-MM-DD format.",
-    };
+    private static object DateSchema() => McpSchema.Date();
 
-    private static object TimeSchema() => new
-    {
-        type = "string",
-        format = "time",
-        description = "Local time in HH:mm format.",
-    };
+    private static object TimeSchema() => McpSchema.Time();
 
-    private static object DateTimeSchema() => new
+    private static object DateTimeSchema() => McpSchema.DateTime();
+
+    private static Dictionary<string, object> MergeProperties(params object[] fragments)
     {
-        type = "string",
-        format = "date-time",
-        description = "ISO 8601 UTC timestamp.",
-    };
+        var merged = new Dictionary<string, object>();
+        foreach (var fragment in fragments)
+        {
+            if (fragment is not IReadOnlyDictionary<string, object> properties)
+            {
+                throw new ArgumentException("MCP schema property fragments must be dictionaries.", nameof(fragments));
+            }
+
+            foreach (var property in properties)
+            {
+                merged[property.Key] = property.Value;
+            }
+        }
+
+        return merged;
+    }
 
     private static object GigImportDraftInputSchema(bool requiredBatchId)
     {
         var required = requiredBatchId ? new[] { "batchId" } : [];
         var properties = new Dictionary<string, object?>
         {
-            ["title"] = new { type = "string", maxLength = 200 },
-            ["clientName"] = new { type = "string", maxLength = 200 },
-            ["contactQuery"] = new { type = "string" },
-            ["contactName"] = new { type = "string", maxLength = 200 },
-            ["contactEmail"] = new { type = "string", maxLength = 320 },
-            ["projectName"] = new { type = "string", maxLength = 200 },
-            ["date"] = new { type = "string", format = "date" },
-            ["arrivalTime"] = new { type = "string", format = "time" },
-            ["rehearsalStartTime"] = new { type = "string", format = "time" },
-            ["rehearsalEndTime"] = new { type = "string", format = "time" },
-            ["showStartTime"] = new { type = "string", format = "time" },
-            ["showEndTime"] = new { type = "string", format = "time" },
-            ["venueName"] = new { type = "string", maxLength = 200 },
-            ["venueAddress"] = new { type = "string", maxLength = 1000 },
-            ["postcode"] = new { type = "string", maxLength = 20 },
-            ["fee"] = new { type = "number", minimum = 0 },
-            ["perDiem"] = new { type = "number", minimum = 0 },
-            ["notes"] = new { type = "string", maxLength = 4000 },
-            ["accommodationNotes"] = new { type = "string", maxLength = 4000 },
-            ["travelNotes"] = new { type = "string", maxLength = 4000 },
-            ["sourceReference"] = new { type = "string", maxLength = 500 },
-            ["confidence"] = new { type = "string", @enum = new[] { "low", "medium", "high" } },
-            ["warnings"] = new
-            {
-                type = "array",
-                items = new { type = "string" },
-            },
+            ["title"] = McpSchema.String("Gig title or role summary.", maxLength: 200),
+            ["clientName"] = McpSchema.String("Client or booker name as found in the source.", maxLength: 200),
+            ["contactQuery"] = McpSchema.String("Name or email text to resolve the gig client/contact."),
+            ["contactName"] = McpSchema.String("Contact person name as found in the source.", maxLength: 200),
+            ["contactEmail"] = McpSchema.String("Contact email address as found in the source.", maxLength: 320),
+            ["projectName"] = McpSchema.String("Project, production, tour, or engagement name.", maxLength: 200),
+            ["date"] = McpSchema.Date(),
+            ["arrivalTime"] = McpSchema.Time(),
+            ["rehearsalStartTime"] = McpSchema.Time(),
+            ["rehearsalEndTime"] = McpSchema.Time(),
+            ["showStartTime"] = McpSchema.Time(),
+            ["showEndTime"] = McpSchema.Time(),
+            ["venueName"] = McpSchema.String("Venue name.", maxLength: 200),
+            ["venueAddress"] = McpSchema.String("Venue address.", maxLength: 1000),
+            ["postcode"] = McpSchema.String("Venue postcode.", maxLength: 20),
+            ["fee"] = McpSchema.Money("Proposed gig fee.", minimum: 0),
+            ["perDiem"] = McpSchema.Money("Proposed per diem amount.", minimum: 0),
+            ["notes"] = McpSchema.String("General notes from the source.", maxLength: 4000),
+            ["accommodationNotes"] = McpSchema.String("Accommodation details or uncertainty.", maxLength: 4000),
+            ["travelNotes"] = McpSchema.String("Travel details or uncertainty.", maxLength: 4000),
+            ["sourceReference"] = McpSchema.String("Optional reference to the source row, page, message, or attachment.", maxLength: 500),
+            ["confidence"] = GlovellyMcpSchemaFragments.Confidence,
+            ["warnings"] = StringArraySchema(),
         };
 
         if (requiredBatchId)
         {
-            properties["batchId"] = new { type = "string", format = "uuid" };
+            properties["batchId"] = McpSchema.Uuid("Staged gig import batch ID returned by glovelly_create_gig_import_batch.");
         }
 
-        return new
-        {
-            type = "object",
-            required,
-            properties,
-        };
+        return McpSchema.Object(properties, required);
     }
 }
