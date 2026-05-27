@@ -123,6 +123,15 @@ public abstract class UatTestBase : IAsyncLifetime
         return $"UAT-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{shortSha}";
     }
 
+    protected static HttpClient CreateHttpClient()
+    {
+        return new HttpClient
+        {
+            BaseAddress = new Uri(BaseUrl(), UriKind.Absolute),
+            Timeout = TimeSpan.FromSeconds(15),
+        };
+    }
+
     private async Task CaptureFailureDiagnosticsAsync(string testName)
     {
         var artifactDirectory = ArtifactDirectory();

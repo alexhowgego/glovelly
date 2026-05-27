@@ -24,10 +24,20 @@ If PowerShell is not installed, install it first or run the generated `playwrigh
 
 `GLOVELLY_UAT_BASE_URL` is required and should point at the deployment under test. `GLOVELLY_UAT_SECRET` is required for tests that use staging-only test authentication. `GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL` is required for invoice delivery tests and should point at a controlled inbox because the core invoice regression sends through the configured email provider.
 
-For branch UAT, first run the `Glovelly CI/CD` workflow manually on the branch with `target_environment` set to `staging`. After that staging deployment completes, run the `Glovelly UAT` workflow manually against the same staging URL.
+The `Glovelly CI/CD` workflow deploys staging and calls the reusable `Glovelly UAT` workflow before production deployment is allowed to continue. Production smoke tests call the same reusable workflow after deployment with the `Suite=Smoke` filter and do not use staging-only authentication.
+
+For branch UAT, run the `Glovelly CI/CD` workflow manually on the branch with `target_environment` set to `staging`. The workflow deploys staging and then runs the full Playwright UAT suite against it.
 
 ```bash
 GLOVELLY_UAT_BASE_URL=https://staging.glovelly.net dotnet test tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
+```
+
+To run only the production-safe smoke suite locally:
+
+```bash
+GLOVELLY_UAT_BASE_URL=https://glovelly.net \
+dotnet test tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj \
+  --filter "Suite=Smoke"
 ```
 
 To mirror CI diagnostics locally:
