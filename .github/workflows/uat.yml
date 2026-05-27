@@ -104,6 +104,32 @@ jobs:
           --logger "html;LogFileName=uat-test-report.html"
           --results-directory "$GLOVELLY_UAT_ARTIFACT_DIR/test-results"
 
+      - name: Publish UAT test results
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: Playwright UAT Results
+          path: ${{ env.GLOVELLY_UAT_ARTIFACT_DIR }}/test-results/*.trx
+          reporter: dotnet-trx
+          fail-on-error: false
+
+      - name: Summarize UAT diagnostics
+        if: always()
+        run: |
+          {
+            echo "### Playwright UAT Diagnostics"
+            echo ""
+            echo "GitHub-native test results are published in the \`Playwright UAT Results\` check when a TRX file is available."
+            echo ""
+            echo "Full diagnostics are uploaded in the \`glovelly-uat-diagnostics\` artifact:"
+            echo ""
+            echo "- HTML report: \`TestResults/uat/test-results/uat-test-report.html\`"
+            echo "- Screenshots: \`TestResults/uat/screenshots\`"
+            echo "- Playwright traces: \`TestResults/uat/playwright-traces\`"
+            echo ""
+            echo "Open a trace locally with: \`npx playwright show-trace <trace.zip>\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload UAT diagnostics
         if: always()
         uses: actions/upload-artifact@v4
