@@ -13,6 +13,8 @@ Use these journeys when a change may affect gig expenses, receipt attachments, q
 
 ## Expense Receipt Journey
 
+> **Automation:** Manual
+
 ### Steps
 
 1. Open a saved gig with an expense.
@@ -28,6 +30,8 @@ Receipt metadata, storage, download, and deletion all work without changing the 
 
 ## Quick Receipt Journey
 
+> **Automation:** Manual
+
 ### Steps
 
 1. Use quick receipt capture to upload a receipt.
@@ -41,6 +45,8 @@ Receipt metadata, storage, download, and deletion all work without changing the 
 The draft becomes a normal gig expense with its receipt attached. Existing expenses and attachments remain intact.
 
 ## Expense Reimbursement Journey
+
+> **Automation:** Manual
 
 ### Steps
 
@@ -62,6 +68,8 @@ Reimbursed expenses are visually distinct and excluded from newly generated invo
 Expected result: the expense becomes eligible for generated invoice lines again.
 
 ## Expense Statement Journey
+
+> **Automation:** Automated: `Glovelly.Uat.Tests.ExpenseStatementTests.CanGenerateExpenseStatementPreviewAndDownload`
 
 ### Steps
 

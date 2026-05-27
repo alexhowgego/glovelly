@@ -164,6 +164,7 @@ export function ClientsSection({
                   <label>
                     Month
                     <input
+                      data-testid="monthly-invoice-month-input"
                       type="month"
                       value={monthlyInvoiceMonth}
                       onChange={(event) =>
@@ -174,6 +175,7 @@ export function ClientsSection({
                   </label>
                   <button
                     className="primary-button"
+                    data-testid="generate-monthly-invoice-button"
                     onClick={onGenerateMonthlyInvoice}
                     type="button"
                     disabled={isInvoiceLoading || !isMonthlyInvoiceReady}
@@ -181,7 +183,7 @@ export function ClientsSection({
                     Generate monthly invoice
                   </button>
                 </div>
-                <span>{monthlyInvoiceHelperText}</span>
+                <span data-testid="monthly-invoice-helper">{monthlyInvoiceHelperText}</span>
               </div>
 
               <div className="detail-grid">

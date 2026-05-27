@@ -13,6 +13,8 @@ Use these journeys when a change may affect invoice creation, generated invoice 
 
 ## Gig To Invoice
 
+> **Automation:** Automated: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`
+
 ### Steps
 
 1. Create a client or choose an existing client.
@@ -30,6 +32,8 @@ Use these journeys when a change may affect invoice creation, generated invoice 
 Generating an invoice links the gig, creates expected lines, and produces a downloadable PDF.
 
 ## Combined Invoice
+
+> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
 
 ### Steps
 
@@ -51,6 +55,8 @@ One invoice is created, both gigs are linked, invoice lines are ordered sensibly
 Expected result: the app blocks generation and explains that selected gigs must belong to the same client.
 
 ## Monthly Invoice
+
+> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
 
 ### Steps
 

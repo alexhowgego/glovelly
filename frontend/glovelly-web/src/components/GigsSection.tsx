@@ -249,6 +249,7 @@ export function GigsSection({
               </button>
               <button
                 className="ghost-button"
+                data-testid="expense-statement-button"
                 onClick={onGenerateExpenseStatement}
                 type="button"
                 disabled={
@@ -549,6 +550,7 @@ export function GigsSection({
               <label>
                 Amount
                 <input
+                  data-testid="gig-expense-amount-input"
                   inputMode="decimal"
                   value={gigExpenseAmount}
                   onChange={(event) => onExpenseAmountChange(event.target.value)}
@@ -559,6 +561,7 @@ export function GigsSection({
               <label>
                 Description
                 <input
+                  data-testid="gig-expense-description-input"
                   value={gigExpenseDescription}
                   onChange={(event) => onExpenseDescriptionChange(event.target.value)}
                   placeholder="Parking, hotel, equipment hire..."
@@ -567,6 +570,7 @@ export function GigsSection({
               </label>
               <button
                 className="ghost-button"
+                data-testid="add-gig-expense-button"
                 onClick={onAddGigExpense}
                 type="button"
                 disabled={isGigLoading}
@@ -584,6 +588,7 @@ export function GigsSection({
                   return (
                   <div
                     className={`gig-expense-item ${isReimbursed ? 'is-reimbursed' : ''}`}
+                    data-testid="gig-expense-item"
                     key={`${expense.id || 'new'}-${index}`}
                   >
                     <div className="expense-reimbursement-state">

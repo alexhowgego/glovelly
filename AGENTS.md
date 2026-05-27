@@ -84,3 +84,4 @@ rg "TestData\\.|TestAuthContext|factory\.Emails" backend/Glovelly.Api.Tests
 - Do not bypass owner visibility checks for user-owned data; null creator IDs may be intentional for shared/dev seed visibility.
 - Do not add package versions to individual `.csproj` files; use central package management in `Directory.Packages.props`.
 - Do not refactor large coordination files just to tidy them while solving a narrow task.
+- Do not create git commits, amend commits, push commits, or otherwise mutate git history unless the user explicitly asks for that git action.

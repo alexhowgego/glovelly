@@ -56,6 +56,7 @@ export function ExpenseStatementModal({
       <section
         aria-modal="true"
         className="settings-modal expense-statement-modal panel"
+        data-testid="expense-statement-modal"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >
@@ -79,7 +80,7 @@ export function ExpenseStatementModal({
             <p>{selectedExpenseCount === 1 ? 'expense' : 'expenses'}</p>
           </article>
           <article>
-            <span>{formatCurrency(total)}</span>
+            <span data-testid="expense-statement-total">{formatCurrency(total)}</span>
             <p>selected total</p>
           </article>
         </div>
@@ -145,19 +146,20 @@ export function ExpenseStatementModal({
 
           {previewPdfUrl && (
             <div className="expense-statement-preview">
-              <iframe src={previewPdfUrl} title="Expense statement PDF preview" />
+              <iframe data-testid="expense-statement-preview-frame" src={previewPdfUrl} title="Expense statement PDF preview" />
             </div>
           )}
         </div>
 
         <div className="expense-statement-footer">
-          <span className="status-pill">
+          <span className="status-pill" data-testid="expense-statement-status">
             {status ||
               `${receiptCount} receipt${receiptCount === 1 ? '' : 's'} available for selected expenses.`}
           </span>
           <div className="actions">
             <button
               className="ghost-button"
+              data-testid="expense-statement-preview-button"
               disabled={isSaving || selectedExpenseCount === 0}
               onClick={onPreview}
               type="button"
@@ -166,6 +168,7 @@ export function ExpenseStatementModal({
             </button>
             <button
               className="primary-button"
+              data-testid="expense-statement-download-button"
               disabled={isSaving || selectedExpenseCount === 0}
               onClick={onDownload}
               type="button"
@@ -196,6 +199,7 @@ function ExpenseStatementExpenseRow({
       className={`expense-statement-expense ${
         isReimbursed || isNotClaimable ? 'is-muted' : ''
       }`}
+      data-testid="expense-statement-expense-row"
     >
       <input
         checked={isSelected}

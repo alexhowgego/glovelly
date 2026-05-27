@@ -22,6 +22,8 @@ For local development, engineers usually run:
 
 ## Core Smoke Journey
 
+> **Automation:** Partially automated: `Glovelly.Uat.Tests.SmokeTests`
+
 ### Steps
 
 1. Sign in.
@@ -111,6 +113,8 @@ Expected result: unsaved gig edits and unsaved expense draft fields are never di
 Expected result: unsaved admin access edits are never discarded without confirmation. Accepted navigation switches the editor to the selected user or a blank add-user form.
 
 ## Gig To Invoice Journey
+
+> **Automation:** Automated: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`
 
 ### Steps
 
@@ -218,6 +222,8 @@ Expected result: expenses are copied only when accepted, receipt attachments are
 
 ## Combined Invoice Journey
 
+> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
+
 ### Steps
 
 1. Create two uninvoiced gigs for the same client.
@@ -250,6 +256,8 @@ Run the focused [Imported gigs](gig-imports.md) journey when the change touches 
 Expected result: imported gigs stay in a modal launched from the profile menu, row edits autosave, and the main Clients/Gigs/Invoices navigation is unchanged.
 
 ## Monthly Invoice Journey
+
+> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
 
 ### Steps
 
@@ -284,3 +292,5 @@ Pay special attention to workflows that cross boundaries:
 - Expense statements are projections and should not create invoices or mutate gig invoice links.
 
 When a manual journey reveals a bug, record the exact steps and tell the engineer or release owner. The fix should usually include an automated backend test for the server-side rule, and the frontend flow may later become an automated browser test.
+
+Keep these manual journeys aligned with automated coverage by updating the nearest **Automation** line whenever a Playwright UAT test is added, removed, or meaningfully changes scope.

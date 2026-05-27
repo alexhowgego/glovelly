@@ -1,6 +1,7 @@
 # Glovelly
 
-[![Build and Push Container](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml/badge.svg)](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml)
+[![Glovelly CI/CD](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml/badge.svg)](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml)
+[![Glovelly UAT](https://github.com/alexhowgego/glovelly/actions/workflows/uat.yml/badge.svg)](https://github.com/alexhowgego/glovelly/actions/workflows/uat.yml)
 
 Glovelly is a personal business platform for managing my self-employed music work.
 
