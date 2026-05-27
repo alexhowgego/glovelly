@@ -13,6 +13,8 @@ Use these journeys when a change may affect invoice creation, generated invoice 
 
 ## Gig To Invoice
 
+> **Automation:** Automated: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`
+
 ### Steps
 
 1. Create a client or choose an existing client.
