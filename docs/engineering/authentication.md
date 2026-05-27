@@ -54,3 +54,10 @@ User mapping and first-login subject binding happen during Google token validati
 
 Current-user access and policy names live under `backend/Glovelly.Api/Auth/`.
 
+## Staging UAT Authentication
+
+Staging registers `POST /test-auth/login` so browser-based UAT tests can authenticate deterministically without exercising Google on every regression run.
+
+The endpoint is intentionally not registered outside staging. In staging it requires the `X-Glovelly-Uat-Secret` header to match `GLOVELLY_UAT_SECRET` and signs in the seeded `regression@glovelly.net` test-only user with the normal Glovelly auth cookie.
+
+Do not enable this endpoint in production. It exists only to make Playwright regression tests stable; Google authentication should still be covered separately by manual or focused checks.

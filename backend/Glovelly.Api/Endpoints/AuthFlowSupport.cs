@@ -55,7 +55,8 @@ internal static class AuthFlowSupport
                path.StartsWithSegments("/invoices") ||
                path.StartsWithSegments("/invoice-lines") ||
                path.StartsWithSegments("/mcp") ||
-               path.StartsWithSegments("/seller-profile");
+               path.StartsWithSegments("/seller-profile") ||
+               path.StartsWithSegments("/test-auth");
     }
 
     public static string GetAuthenticationFailureCode(Exception? exception)

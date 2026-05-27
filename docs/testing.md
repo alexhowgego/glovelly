@@ -62,6 +62,12 @@ Use [docs/uat/index.md](uat/index.md) for human regression journeys that cut acr
 
 Start with [docs/uat/pre-merge-regression.md](uat/pre-merge-regression.md) for broad pre-merge checks. Use the focused invoice, expense, and enrolment/access pages when a change touches those areas. Keep the journeys scenario-based so they can later be automated as browser tests.
 
+## Browser UAT
+
+Staging seeds a test-only regression user, baseline client, and seller profile for browser automation. Playwright can authenticate by posting to `POST /test-auth/login` with `X-Glovelly-Uat-Secret`; the secret should come from `GLOVELLY_UAT_SECRET` in staging and GitHub Actions.
+
+Tests should create run-specific records using a run ID such as `UAT-<timestamp>-<short-sha>` rather than mutating shared baseline data.
+
 ## What to Add When Changing Behavior
 
 - New backend route: add endpoint tests for success, validation failure, authorization/session behavior when relevant, and user visibility boundaries.

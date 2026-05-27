@@ -11,8 +11,10 @@ internal sealed record StartupSettings(
     string? BuildTimestamp,
     bool UsePostgres,
     bool IsDevelopment,
+    bool IsStaging,
     bool IsTesting,
-    bool ShouldSeedDevelopmentData)
+    bool ShouldSeedDevelopmentData,
+    bool ShouldSeedUatData)
 {
     public static StartupSettings From(IConfiguration configuration, IWebHostEnvironment environment)
     {
@@ -28,6 +30,8 @@ internal sealed record StartupSettings(
         var buildTimestamp = configuration["App:BuildTimestamp"];
         var usePostgres = !string.IsNullOrWhiteSpace(glovellyConnectionString);
         var isDevelopment = environment.IsDevelopment();
+        var isStaging = environment.IsStaging() ||
+                        string.Equals(deploymentName?.Trim(), "Staging", StringComparison.OrdinalIgnoreCase);
         var isTesting = environment.IsEnvironment("Testing");
 
         return new StartupSettings(
@@ -41,7 +45,9 @@ internal sealed record StartupSettings(
             buildTimestamp,
             usePostgres,
             isDevelopment,
+            isStaging,
             isTesting,
-            ShouldSeedDevelopmentData: !usePostgres && !isTesting);
+            ShouldSeedDevelopmentData: !usePostgres && !isTesting,
+            ShouldSeedUatData: isStaging);
     }
 }
