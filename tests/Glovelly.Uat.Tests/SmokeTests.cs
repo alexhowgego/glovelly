@@ -9,11 +9,12 @@ public sealed class SmokeTests : IAsyncLifetime
     private IBrowser? browser;
     private IBrowserContext? context;
     private IPage? page;
+    private bool tracingActive;
 
     private IPage Page => page ?? throw new InvalidOperationException("The Playwright page has not been initialized.");
 
     [Fact]
-    public async Task HomePageLoadsSuccessfully()
+    public Task HomePageLoadsSuccessfully() => RunWithDiagnosticsAsync(nameof(HomePageLoadsSuccessfully), async () =>
     {
         var response = await Page.GotoAsync("/", new PageGotoOptions
         {
@@ -23,10 +24,10 @@ public sealed class SmokeTests : IAsyncLifetime
         Assert.NotNull(response);
         Assert.True(response.Ok, $"Expected the home page to return a successful response, but received HTTP {response.Status}.");
         await Page.GetByRole(AriaRole.Heading, new() { NameRegex = GlovellyHeadingRegex() }).WaitForAsync();
-    }
+    });
 
     [Fact]
-    public async Task SignInEntryPointIsVisible()
+    public Task SignInEntryPointIsVisible() => RunWithDiagnosticsAsync(nameof(SignInEntryPointIsVisible), async () =>
     {
         await Page.GotoAsync("/", new PageGotoOptions
         {
@@ -40,7 +41,7 @@ public sealed class SmokeTests : IAsyncLifetime
             State = WaitForSelectorState.Visible,
         });
         Assert.True(await signInButton.IsEnabledAsync(), "Expected the Google sign-in entry point to be enabled.");
-    }
+    });
 
     public async Task InitializeAsync()
     {
@@ -53,6 +54,13 @@ public sealed class SmokeTests : IAsyncLifetime
         {
             BaseURL = BaseUrl(),
         });
+        await context.Tracing.StartAsync(new TracingStartOptions
+        {
+            Screenshots = true,
+            Snapshots = true,
+            Sources = true,
+        });
+        tracingActive = true;
         page = await context.NewPageAsync();
     }
 
@@ -60,6 +68,12 @@ public sealed class SmokeTests : IAsyncLifetime
     {
         if (context is not null)
         {
+            if (tracingActive)
+            {
+                await context.Tracing.StopAsync();
+                tracingActive = false;
+            }
+
             await context.DisposeAsync();
         }
 
@@ -69,6 +83,47 @@ public sealed class SmokeTests : IAsyncLifetime
         }
 
         playwright?.Dispose();
+    }
+
+    private async Task RunWithDiagnosticsAsync(string testName, Func<Task> testBody)
+    {
+        try
+        {
+            await testBody();
+        }
+        catch
+        {
+            await CaptureFailureDiagnosticsAsync(testName);
+            throw;
+        }
+    }
+
+    private async Task CaptureFailureDiagnosticsAsync(string testName)
+    {
+        var artifactDirectory = ArtifactDirectory();
+        var safeTestName = SafeArtifactName(testName);
+
+        if (page is not null)
+        {
+            var screenshotDirectory = Path.Combine(artifactDirectory, "screenshots");
+            Directory.CreateDirectory(screenshotDirectory);
+            await page.ScreenshotAsync(new PageScreenshotOptions
+            {
+                Path = Path.Combine(screenshotDirectory, $"{safeTestName}.png"),
+                FullPage = true,
+            });
+        }
+
+        if (context is not null && tracingActive)
+        {
+            var traceDirectory = Path.Combine(artifactDirectory, "playwright-traces");
+            Directory.CreateDirectory(traceDirectory);
+            await context.Tracing.StopAsync(new TracingStopOptions
+            {
+                Path = Path.Combine(traceDirectory, $"{safeTestName}.zip"),
+            });
+            tracingActive = false;
+        }
     }
 
     private static string BaseUrl()
@@ -93,6 +148,23 @@ public sealed class SmokeTests : IAsyncLifetime
         var value = Environment.GetEnvironmentVariable("GLOVELLY_UAT_HEADLESS");
 
         return !bool.TryParse(value, out var headless) || headless;
+    }
+
+    private static string ArtifactDirectory()
+    {
+        var directory = Environment.GetEnvironmentVariable("GLOVELLY_UAT_ARTIFACT_DIR")?.Trim();
+
+        return string.IsNullOrWhiteSpace(directory)
+            ? Path.Combine("TestResults", "uat")
+            : directory;
+    }
+
+    private static string SafeArtifactName(string value)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var chars = value.Select(valueChar => invalidChars.Contains(valueChar) ? '-' : valueChar).ToArray();
+
+        return new string(chars);
     }
 
     private static System.Text.RegularExpressions.Regex GlovellyHeadingRegex()

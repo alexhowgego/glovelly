@@ -118,9 +118,45 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to Cloud Run
-        if: ${{ (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
-        id: deploy
+      - name: Deploy to Cloud Run staging
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        id: deploy_staging
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          region: ${{ env.GCP_REGION }}
+          image: ${{ env.IMAGE_URI }}:sha-${{ github.sha }}
+          env_vars: |-
+            App__DeploymentName=${{ vars.DEPLOYMENT_NAME }}
+            BlobStorage__BucketName=${{ vars.GCP_BUCKET_NAME }}
+            Email__Mode=Resend
+            Email__AccessRequests__FromDisplayName=Glovelly
+            Email__Invoices__FromDisplayName=Glovelly
+            ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
+            Mcp__OAuth__Issuer=${{ vars.DEPLOYMENT_URL }}
+            Mcp__OAuth__Resource=${{ vars.DEPLOYMENT_URL }}/mcp
+            Mcp__OAuth__Clients__0__DisplayName=ChatGPT
+            Mcp__OAuth__Clients__0__Scopes__0=mcp:read
+          secrets: |-
+            Authentication__Google__ClientId=google-client-id:latest
+            Authentication__Google__ClientSecret=google-client-secret:latest
+            ConnectionStrings__Glovelly=${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}:latest
+            Email__Resend__ApiKey=glovelly-resend-api-key:latest
+            Email__AccessRequests__FromAddress=glovelly-access-requests-from-address:latest
+            Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
+            Mileage__GoogleRoutes__ApiKey=glovelly-routes-api-key:latest
+            Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
+            Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest
+            Mcp__OAuth__Clients__0__RedirectUris__0=${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}:latest
+            GLOVELLY_UAT_SECRET=${{ vars.GCP_UAT_SECRET_ID }}:latest
+          secrets_update_strategy: merge
+          flags: >-
+            --allow-unauthenticated
+            --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+
+      - name: Deploy to Cloud Run production
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        id: deploy_production
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
@@ -153,15 +189,19 @@ jobs:
             --allow-unauthenticated
             --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
-      - name: Show deployed URL
-        if: ${{ (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
-        run: echo "Deployed to ${{ steps.deploy.outputs.url }}"
+      - name: Show staging URL
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: echo "Deployed staging to ${{ steps.deploy_staging.outputs.url }}"
+
+      - name: Show production URL
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: echo "Deployed production to ${{ steps.deploy_production.outputs.url }}"
 
       - name: Comment staging URL on PR
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         env:
-          STAGING_URL: ${{ steps.deploy.outputs.url }}
+          STAGING_URL: ${{ steps.deploy_staging.outputs.url }}
         with:
           script: |
             const marker = "<!-- glovelly-staging-preview -->";

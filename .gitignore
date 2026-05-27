@@ -48,6 +48,9 @@ CodeCoverage/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 
+# Playwright UAT artifacts
+TestResults/uat/
+
 # NUnit
 *.VisualState.xml
 TestResult.xml
