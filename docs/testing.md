@@ -66,6 +66,8 @@ Start with [docs/uat/pre-merge-regression.md](uat/pre-merge-regression.md) for b
 
 Staging seeds a test-only regression user, baseline client, and seller profile for browser automation. Playwright can authenticate by posting to `POST /test-auth/login` with `X-Glovelly-Uat-Secret`; the secret should come from `GLOVELLY_UAT_SECRET` in staging and GitHub Actions.
 
+The core invoice browser regression creates a run-specific client using `GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL` and sends the invoice through the configured email provider. Configure that value as a controlled staging/GitHub environment variable so UAT delivery goes to an approved inbox rather than seeded or personal client data.
+
 Tests should create run-specific records using a run ID such as `UAT-<timestamp>-<short-sha>` rather than mutating shared baseline data.
 
 ## What to Add When Changing Behavior

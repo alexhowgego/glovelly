@@ -132,15 +132,16 @@ export function GigsSection({
               <p className="section-label">Bookings</p>
               <h2>Gigs</h2>
             </div>
-            <button className="ghost-button" onClick={onResetForm} type="button">
+            <button className="ghost-button" data-testid="new-gig-button" onClick={onResetForm} type="button">
               New gig
             </button>
           </div>
 
           <label className="search-field">
             <span>Search</span>
-            <input
-              type="search"
+              <input
+                data-testid="gig-search-input"
+                type="search"
               placeholder="Client, title, venue..."
               value={gigSearchQuery}
               onChange={(event) => onSearchQueryChange(event.target.value)}
@@ -175,6 +176,7 @@ export function GigsSection({
                 <button
                   key={gig.id}
                   className={`client-card ${selectedGig?.id === gig.id ? 'selected' : ''}`}
+                  data-testid="gig-card"
                   onClick={() => onSelectGig(gig.id)}
                   type="button"
                 >
@@ -228,6 +230,7 @@ export function GigsSection({
             <div className="actions">
               <button
                 className="primary-button"
+                data-testid="generate-invoice-button"
                 onClick={onGenerateInvoice}
                 type="button"
                 disabled={
@@ -391,6 +394,7 @@ export function GigsSection({
           <form
             aria-hidden={!isEditorOpen}
             className="editor-panel panel"
+            data-testid="gig-form"
             onSubmit={onSubmit}
           >
             <div className="panel-heading">
@@ -405,6 +409,7 @@ export function GigsSection({
               <label>
                 <span>Client</span>
                 <select
+                  data-testid="gig-client-select"
                   required
                   value={gigForm.clientId}
                   onChange={(event) => onUpdateGigField('clientId', event.target.value)}
@@ -421,6 +426,7 @@ export function GigsSection({
               <label>
                 <span>Date</span>
                 <input
+                  data-testid="gig-date-input"
                   required
                   type="date"
                   value={gigForm.date}
@@ -431,6 +437,7 @@ export function GigsSection({
               <label className="full-width">
                 <span>Title / description</span>
                 <input
+                  data-testid="gig-title-input"
                   required
                   value={gigForm.title}
                   onChange={(event) => onUpdateGigField('title', event.target.value)}
@@ -441,6 +448,7 @@ export function GigsSection({
               <label className="full-width">
                 <span>Location / venue</span>
                 <input
+                  data-testid="gig-venue-input"
                   required
                   value={gigForm.venue}
                   onChange={(event) => onUpdateGigField('venue', event.target.value)}
@@ -451,6 +459,7 @@ export function GigsSection({
               <label>
                 <span>Fee</span>
                 <input
+                  data-testid="gig-fee-input"
                   required
                   inputMode="decimal"
                   value={gigForm.fee}
@@ -702,6 +711,7 @@ export function GigsSection({
               <button
                 className="primary-button"
                 data-close-after-save="true"
+                data-testid="gig-save-close-button"
                 type="submit"
                 disabled={isGigLoading || clients.length === 0}
               >

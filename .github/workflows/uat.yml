@@ -36,6 +36,7 @@ jobs:
     env:
       GLOVELLY_UAT_BASE_URL: ${{ vars.DEPLOYMENT_URL }}
       GLOVELLY_UAT_ARTIFACT_DIR: ${{ github.workspace }}/TestResults/uat
+      GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL: ${{ vars.GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL }}
 
     steps:
       - name: Check out repository
@@ -86,6 +87,10 @@ jobs:
           fi
           if [ -z "$GLOVELLY_UAT_SECRET" ]; then
             echo "GLOVELLY_UAT_SECRET is not configured. Create the Secret Manager secret configured by GCP_UAT_SECRET_ID."
+            exit 1
+          fi
+          if [ -z "$GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL" ]; then
+            echo "GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL is not configured. Add it as a controlled staging environment variable."
             exit 1
           fi
 

@@ -257,6 +257,7 @@ export function AppShell({
                 <button
                   key={item.id}
                   className={`charm-item ${activeSection === item.id ? 'selected' : ''}`}
+                  data-testid={`nav-${item.id}`}
                   onClick={() => onSectionChange(item.id)}
                   type="button"
                   disabled={item.disabled}
