@@ -58,12 +58,15 @@ public sealed class ExpenseStatementTests : UatTestBase
         await Page.GetByTestId("gig-expense-amount-input").FillAsync("62.50");
         await Page.GetByTestId("gig-expense-description-input").FillAsync(expenseDescription);
         await Page.GetByTestId("add-gig-expense-button").ClickAsync();
-        await Page.GetByTestId("gig-expense-item").Filter(new LocatorFilterOptions
-        {
-            HasText = expenseDescription,
-        }).WaitForAsync(new LocatorWaitForOptions
+        await Page.GetByTestId("gig-expense-item").WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
+        });
+        await Assertions.Expect(Page.GetByTestId("gig-expense-item").Locator("input").First).ToHaveValueAsync(
+            expenseDescription,
+            new LocatorAssertionsToHaveValueOptions
+        {
+            Timeout = 30_000,
         });
 
         await Page.GetByTestId("gig-save-close-button").ClickAsync();
