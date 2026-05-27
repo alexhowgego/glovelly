@@ -68,6 +68,8 @@ Staging seeds a test-only regression user, baseline client, and seller profile f
 
 The core invoice browser regression creates a run-specific client using `GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL` and sends the invoice through the configured email provider. Configure that value as a controlled staging/GitHub environment variable so UAT delivery goes to an approved inbox rather than seeded or personal client data.
 
+For branch UAT, first manually run the `Glovelly CI/CD` workflow for the branch with `target_environment` set to `staging`. The `Glovelly UAT` workflow does not deploy the application; it only runs Playwright against `GLOVELLY_UAT_BASE_URL`, so run it after the staging deployment has completed.
+
 Tests should create run-specific records using a run ID such as `UAT-<timestamp>-<short-sha>` rather than mutating shared baseline data.
 
 ## What to Add When Changing Behavior

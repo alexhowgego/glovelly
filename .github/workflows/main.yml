@@ -24,6 +24,15 @@ on:
       - "frontend/**"
       - "glovelly.sln"
   workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Deployment target
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
 
 permissions:
   contents: read
@@ -49,7 +58,7 @@ env:
 jobs:
   container:
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'pull_request' && 'staging' || 'production' }}
+    environment: ${{ github.event_name == 'pull_request' && 'staging' || (github.event_name == 'workflow_dispatch' && inputs.target_environment || 'production') }}
 
     steps:
       - name: Check out repository
@@ -119,7 +128,9 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Deploy to Cloud Run staging
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        if: >-
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+          (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'staging')
         id: deploy_staging
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -155,7 +166,9 @@ jobs:
             --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
       - name: Deploy to Cloud Run production
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'production' && github.ref == 'refs/heads/main')
         id: deploy_production
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -190,11 +203,15 @@ jobs:
             --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
       - name: Show staging URL
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        if: >-
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+          (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'staging')
         run: echo "Deployed staging to ${{ steps.deploy_staging.outputs.url }}"
 
       - name: Show production URL
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'production' && github.ref == 'refs/heads/main')
         run: echo "Deployed production to ${{ steps.deploy_production.outputs.url }}"
 
       - name: Comment staging URL on PR
