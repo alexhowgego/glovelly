@@ -32,6 +32,14 @@ internal static class AppMetadataEndpoints
             });
         });
 
+        app.MapGet("/health", () => Results.Ok(new
+        {
+            status = "ok",
+            deploymentName = string.IsNullOrWhiteSpace(settings.DeploymentName)
+                ? null
+                : settings.DeploymentName.Trim(),
+        })).AllowAnonymous();
+
         return app;
     }
 }

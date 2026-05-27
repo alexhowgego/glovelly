@@ -1,18 +1,12 @@
 using Microsoft.Playwright;
+using System.Net.Http.Json;
 using Xunit;
 
 namespace Glovelly.Uat.Tests;
 
-public sealed class SmokeTests : IAsyncLifetime
+[Trait("Suite", "Smoke")]
+public sealed class SmokeTests : UatTestBase
 {
-    private IPlaywright? playwright;
-    private IBrowser? browser;
-    private IBrowserContext? context;
-    private IPage? page;
-    private bool tracingActive;
-
-    private IPage Page => page ?? throw new InvalidOperationException("The Playwright page has not been initialized.");
-
     [Fact]
     public Task HomePageLoadsSuccessfully() => RunWithDiagnosticsAsync(nameof(HomePageLoadsSuccessfully), async () =>
     {
@@ -43,132 +37,49 @@ public sealed class SmokeTests : IAsyncLifetime
         Assert.True(await signInButton.IsEnabledAsync(), "Expected the Google sign-in entry point to be enabled.");
     });
 
-    public async Task InitializeAsync()
+    [Fact]
+    public async Task HealthEndpointRespondsSuccessfully()
     {
-        playwright = await Playwright.CreateAsync();
-        browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-        {
-            Headless = Headless(),
-        });
-        context = await browser.NewContextAsync(new BrowserNewContextOptions
-        {
-            BaseURL = BaseUrl(),
-        });
-        await context.Tracing.StartAsync(new TracingStartOptions
-        {
-            Screenshots = true,
-            Snapshots = true,
-            Sources = true,
-        });
-        tracingActive = true;
-        page = await context.NewPageAsync();
+        using var httpClient = CreateHttpClient();
+        using var response = await httpClient.GetAsync("/health");
+
+        Assert.True(response.IsSuccessStatusCode, $"Expected /health to return a successful response, but received HTTP {(int)response.StatusCode}.");
+
+        var payload = await response.Content.ReadFromJsonAsync<HealthPayload>();
+        Assert.Equal("ok", payload?.Status);
     }
 
-    public async Task DisposeAsync()
+    [Fact]
+    public async Task AppMetadataEndpointRespondsSuccessfully()
     {
-        if (context is not null)
-        {
-            if (tracingActive)
-            {
-                await context.Tracing.StopAsync();
-                tracingActive = false;
-            }
+        using var httpClient = CreateHttpClient();
+        using var response = await httpClient.GetAsync("/app/metadata");
 
-            await context.DisposeAsync();
-        }
+        Assert.True(response.IsSuccessStatusCode, $"Expected /app/metadata to return a successful response, but received HTTP {(int)response.StatusCode}.");
 
-        if (browser is not null)
-        {
-            await browser.DisposeAsync();
-        }
-
-        playwright?.Dispose();
+        var payload = await response.Content.ReadFromJsonAsync<AppMetadataPayload>();
+        Assert.Contains("Glovelly", payload?.Title ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
-    private async Task RunWithDiagnosticsAsync(string testName, Func<Task> testBody)
+    [Theory]
+    [InlineData("/manifest.webmanifest")]
+    [InlineData("/gordon-192.png")]
+    public async Task KeyStaticAssetLoadsSuccessfully(string path)
     {
-        try
-        {
-            await testBody();
-        }
-        catch
-        {
-            await CaptureFailureDiagnosticsAsync(testName);
-            throw;
-        }
-    }
+        using var httpClient = CreateHttpClient();
+        using var response = await httpClient.GetAsync(path);
 
-    private async Task CaptureFailureDiagnosticsAsync(string testName)
-    {
-        var artifactDirectory = ArtifactDirectory();
-        var safeTestName = SafeArtifactName(testName);
-
-        if (page is not null)
-        {
-            var screenshotDirectory = Path.Combine(artifactDirectory, "screenshots");
-            Directory.CreateDirectory(screenshotDirectory);
-            await page.ScreenshotAsync(new PageScreenshotOptions
-            {
-                Path = Path.Combine(screenshotDirectory, $"{safeTestName}.png"),
-                FullPage = true,
-            });
-        }
-
-        if (context is not null && tracingActive)
-        {
-            var traceDirectory = Path.Combine(artifactDirectory, "playwright-traces");
-            Directory.CreateDirectory(traceDirectory);
-            await context.Tracing.StopAsync(new TracingStopOptions
-            {
-                Path = Path.Combine(traceDirectory, $"{safeTestName}.zip"),
-            });
-            tracingActive = false;
-        }
-    }
-
-    private static string BaseUrl()
-    {
-        var baseUrl = Environment.GetEnvironmentVariable("GLOVELLY_UAT_BASE_URL")?.Trim();
-
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            throw new InvalidOperationException("Set GLOVELLY_UAT_BASE_URL to the Glovelly deployment under test, for example https://staging.glovelly.net.");
-        }
-
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
-        {
-            throw new InvalidOperationException("GLOVELLY_UAT_BASE_URL must be an absolute HTTP or HTTPS URL.");
-        }
-
-        return uri.ToString().TrimEnd('/');
-    }
-
-    private static bool Headless()
-    {
-        var value = Environment.GetEnvironmentVariable("GLOVELLY_UAT_HEADLESS");
-
-        return !bool.TryParse(value, out var headless) || headless;
-    }
-
-    private static string ArtifactDirectory()
-    {
-        var directory = Environment.GetEnvironmentVariable("GLOVELLY_UAT_ARTIFACT_DIR")?.Trim();
-
-        return string.IsNullOrWhiteSpace(directory)
-            ? Path.Combine("TestResults", "uat")
-            : directory;
-    }
-
-    private static string SafeArtifactName(string value)
-    {
-        var invalidChars = Path.GetInvalidFileNameChars();
-        var chars = value.Select(valueChar => invalidChars.Contains(valueChar) ? '-' : valueChar).ToArray();
-
-        return new string(chars);
+        Assert.True(response.IsSuccessStatusCode, $"Expected {path} to return a successful response, but received HTTP {(int)response.StatusCode}.");
+        var content = await response.Content.ReadAsByteArrayAsync();
+        Assert.NotEmpty(content);
     }
 
     private static System.Text.RegularExpressions.Regex GlovellyHeadingRegex()
     {
         return new System.Text.RegularExpressions.Regex("Glovelly", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
+
+    private sealed record HealthPayload(string Status);
+
+    private sealed record AppMetadataPayload(string Title);
 }

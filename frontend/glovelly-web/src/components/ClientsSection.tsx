@@ -69,7 +69,7 @@ export function ClientsSection({
               <p className="section-label">Directory</p>
               <h2>Clients</h2>
             </div>
-            <button className="ghost-button" onClick={onResetForm} type="button">
+            <button className="ghost-button" data-testid="new-client-button" onClick={onResetForm} type="button">
               New client
             </button>
           </div>
@@ -77,6 +77,7 @@ export function ClientsSection({
           <label className="search-field">
             <span>Search</span>
             <input
+              data-testid="client-search-input"
               type="search"
               placeholder="Name, email, city..."
               value={searchQuery}
@@ -89,6 +90,7 @@ export function ClientsSection({
               <button
                 key={client.id}
                 className={`client-card ${selectedClient?.id === client.id ? 'selected' : ''}`}
+                data-testid="client-card"
                 onClick={() => onSelectClient(client.id)}
                 type="button"
               >
@@ -222,6 +224,7 @@ export function ClientsSection({
           <form
             aria-hidden={!isEditorOpen}
             className="editor-panel panel"
+            data-testid="client-form"
             onSubmit={onSubmit}
           >
             <div className="panel-heading">
@@ -236,6 +239,7 @@ export function ClientsSection({
               <label>
                 <span>Client name</span>
                 <input
+                  data-testid="client-name-input"
                   required
                   value={form.name}
                   onChange={(event) => onUpdateField('name', event.target.value)}
@@ -246,6 +250,7 @@ export function ClientsSection({
               <label>
                 <span>Email</span>
                 <input
+                  data-testid="client-email-input"
                   required
                   type="email"
                   value={form.email}
@@ -257,6 +262,7 @@ export function ClientsSection({
               <label className="full-width">
                 <span>Address line 1</span>
                 <input
+                  data-testid="client-address-line1-input"
                   required
                   value={form.billingAddress.line1}
                   onChange={(event) => onUpdateAddressField('line1', event.target.value)}
@@ -276,6 +282,7 @@ export function ClientsSection({
               <label>
                 <span>City</span>
                 <input
+                  data-testid="client-city-input"
                   required
                   value={form.billingAddress.city}
                   onChange={(event) => onUpdateAddressField('city', event.target.value)}
@@ -297,6 +304,7 @@ export function ClientsSection({
               <label>
                 <span>Postal code</span>
                 <input
+                  data-testid="client-postal-code-input"
                   value={form.billingAddress.postalCode ?? ''}
                   onChange={(event) => onUpdateAddressField('postalCode', event.target.value)}
                   placeholder="M3 5JZ"
@@ -306,6 +314,7 @@ export function ClientsSection({
               <label>
                 <span>Country</span>
                 <input
+                  data-testid="client-country-input"
                   value={form.billingAddress.country ?? ''}
                   onChange={(event) => onUpdateAddressField('country', event.target.value)}
                   placeholder="United Kingdom"
@@ -317,6 +326,7 @@ export function ClientsSection({
               <button
                 className="primary-button"
                 data-close-after-save="true"
+                data-testid="client-save-close-button"
                 type="submit"
                 disabled={isLoading}
               >

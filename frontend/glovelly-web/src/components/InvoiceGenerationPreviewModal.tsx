@@ -30,6 +30,7 @@ export function InvoiceGenerationPreviewModal({
       <section
         aria-modal="true"
         className="settings-modal invoice-generation-preview-modal panel"
+        data-testid="invoice-preview-modal"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >
@@ -45,7 +46,7 @@ export function InvoiceGenerationPreviewModal({
 
         <div className="invoice-generation-preview-frame">
           {pdfUrl ? (
-            <iframe src={pdfUrl} title={`Invoice ${invoice.invoiceNumber} PDF preview`} />
+            <iframe data-testid="invoice-preview-frame" src={pdfUrl} title={`Invoice ${invoice.invoiceNumber} PDF preview`} />
           ) : (
             <div className="empty-state roomy">
               <strong>{isLoading ? 'Preparing invoice preview...' : 'Preview unavailable.'}</strong>
@@ -55,7 +56,7 @@ export function InvoiceGenerationPreviewModal({
         </div>
 
         <div className="expense-statement-footer">
-          <span className="status-pill">{status || 'Invoice generated.'}</span>
+          <span className="status-pill" data-testid="invoice-preview-status">{status || 'Invoice generated.'}</span>
           <div className="actions">
             <button
               className="ghost-button"
@@ -65,7 +66,7 @@ export function InvoiceGenerationPreviewModal({
             >
               Download PDF
             </button>
-            <button className="primary-button" onClick={onOpenInvoice} type="button">
+            <button className="primary-button" data-testid="open-invoice-button" onClick={onOpenInvoice} type="button">
               Open invoice
             </button>
           </div>

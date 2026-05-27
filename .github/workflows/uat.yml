@@ -1,12 +1,62 @@
 name: Glovelly UAT
 
 on:
-  workflow_run:
-    workflows:
-      - Glovelly CI/CD
-    types:
-      - completed
+  workflow_call:
+    inputs:
+      environment_name:
+        description: GitHub environment containing deployment variables
+        required: true
+        type: string
+      test_filter:
+        description: Optional dotnet test filter
+        required: false
+        type: string
+        default: ""
+      require_uat_secret:
+        description: Load staging-only UAT authentication secret
+        required: false
+        type: boolean
+        default: true
+      require_invoice_recipient:
+        description: Require configured invoice recipient email
+        required: false
+        type: boolean
+        default: true
+      artifact_name:
+        description: Diagnostics artifact name
+        required: false
+        type: string
+        default: glovelly-uat-diagnostics
   workflow_dispatch:
+    inputs:
+      environment_name:
+        description: GitHub environment containing deployment variables
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      test_filter:
+        description: Optional dotnet test filter, for example Suite=Smoke
+        required: false
+        default: ""
+        type: string
+      require_uat_secret:
+        description: Load staging-only UAT authentication secret
+        required: true
+        default: true
+        type: boolean
+      require_invoice_recipient:
+        description: Require configured invoice recipient email
+        required: true
+        default: true
+        type: boolean
+      artifact_name:
+        description: Diagnostics artifact name
+        required: true
+        default: glovelly-uat-diagnostics
+        type: string
 
 permissions:
   contents: read
@@ -19,38 +69,38 @@ env:
   GLOVELLY_UAT_SECRET_ID: ${{ vars.GCP_UAT_SECRET_ID }}
 
 concurrency:
-  group: glovelly-uat-staging
+  group: glovelly-uat-${{ inputs.environment_name || 'staging' }}
   cancel-in-progress: true
 
 jobs:
   playwright:
-    name: Playwright UAT against staging
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'pull_request' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+    name: Playwright against ${{ inputs.environment_name || 'staging' }}
     runs-on: ubuntu-latest
-    environment: staging
+    environment: ${{ inputs.environment_name || 'staging' }}
 
     env:
       GLOVELLY_UAT_BASE_URL: ${{ vars.DEPLOYMENT_URL }}
       GLOVELLY_UAT_ARTIFACT_DIR: ${{ github.workspace }}/TestResults/uat
+      GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL: ${{ vars.GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL }}
+      GLOVELLY_UAT_TEST_FILTER: ${{ inputs.test_filter }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Authenticate to Google Cloud
+        if: inputs.require_uat_secret != false
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up gcloud
+        if: inputs.require_uat_secret != false
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Load UAT secret from Secret Manager
+        if: inputs.require_uat_secret != false
         run: |
           secret_value="$(gcloud secrets versions access latest --secret="$GLOVELLY_UAT_SECRET_ID" --project="$GCP_PROJECT_ID")"
           if [ -z "$secret_value" ]; then
@@ -81,29 +131,65 @@ jobs:
       - name: Verify UAT configuration
         run: |
           if [ -z "$GLOVELLY_UAT_BASE_URL" ]; then
-            echo "GLOVELLY_UAT_BASE_URL is not configured. Add it as a staging environment variable."
+            echo "GLOVELLY_UAT_BASE_URL is not configured. Add DEPLOYMENT_URL as an environment variable."
             exit 1
           fi
-          if [ -z "$GLOVELLY_UAT_SECRET" ]; then
+          if [ "${{ inputs.require_uat_secret }}" = "true" ] && [ -z "$GLOVELLY_UAT_SECRET" ]; then
             echo "GLOVELLY_UAT_SECRET is not configured. Create the Secret Manager secret configured by GCP_UAT_SECRET_ID."
+            exit 1
+          fi
+          if [ "${{ inputs.require_invoice_recipient }}" = "true" ] && [ -z "$GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL" ]; then
+            echo "GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL is not configured. Add it as a controlled staging environment variable."
             exit 1
           fi
 
       - name: Run Playwright UAT suite
-        run: >-
-          dotnet test tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
-          --no-build
-          --configuration Release
-          --logger "console;verbosity=normal"
-          --logger "trx;LogFileName=uat-test-results.trx"
-          --logger "html;LogFileName=uat-test-report.html"
-          --results-directory "$GLOVELLY_UAT_ARTIFACT_DIR/test-results"
+        run: |
+          test_args=(
+            tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
+            --no-build
+            --configuration Release
+            --logger "console;verbosity=normal"
+            --logger "trx;LogFileName=uat-test-results.trx"
+            --logger "html;LogFileName=uat-test-report.html"
+            --results-directory "$GLOVELLY_UAT_ARTIFACT_DIR/test-results"
+          )
+          if [ -n "$GLOVELLY_UAT_TEST_FILTER" ]; then
+            test_args+=(--filter "$GLOVELLY_UAT_TEST_FILTER")
+          fi
+          dotnet test "${test_args[@]}"
+
+      - name: Publish UAT test results
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: Playwright UAT Results
+          path: ${{ env.GLOVELLY_UAT_ARTIFACT_DIR }}/test-results/*.trx
+          reporter: dotnet-trx
+          fail-on-error: false
+
+      - name: Summarize UAT diagnostics
+        if: always()
+        run: |
+          {
+            echo "### Playwright UAT Diagnostics"
+            echo ""
+            echo "GitHub-native test results are published in the \`Playwright UAT Results\` check when a TRX file is available."
+            echo ""
+            echo "Full diagnostics are uploaded in the \`${{ inputs.artifact_name }}\` artifact:"
+            echo ""
+            echo "- HTML report: \`TestResults/uat/test-results/uat-test-report.html\`"
+            echo "- Screenshots: \`TestResults/uat/screenshots\`"
+            echo "- Playwright traces: \`TestResults/uat/playwright-traces\`"
+            echo ""
+            echo "Open a trace locally with: \`npx playwright show-trace <trace.zip>\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload UAT diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: glovelly-uat-diagnostics
+          name: ${{ inputs.artifact_name }}
           path: |
             TestResults/uat
           if-no-files-found: warn

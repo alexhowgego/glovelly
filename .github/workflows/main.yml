@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - ".github/workflows/main.yml"
+      - ".github/workflows/uat.yml"
       - ".dockerignore"
       - "Dockerfile"
       - "backend/**"
       - "frontend/**"
+      - "tests/**"
       - "glovelly.sln"
   pull_request:
     types:
@@ -18,12 +20,23 @@ on:
       - reopened
     paths:
       - ".github/workflows/main.yml"
+      - ".github/workflows/uat.yml"
       - ".dockerignore"
       - "Dockerfile"
       - "backend/**"
       - "frontend/**"
+      - "tests/**"
       - "glovelly.sln"
   workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Deployment target
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
 
 permissions:
   contents: read
@@ -47,9 +60,13 @@ env:
   IMAGE_URI: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/glovelly/glovelly
 
 jobs:
-  container:
+  build:
+    name: Build and test image
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'pull_request' && 'staging' || 'production' }}
+    environment: staging
+
+    outputs:
+      image_uri: ${{ steps.image.outputs.uri }}
 
     steps:
       - name: Check out repository
@@ -103,6 +120,10 @@ jobs:
             type=sha,prefix=sha-,format=long
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Capture deployable image URI
+        id: image
+        run: echo "uri=${IMAGE_URI}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
       - name: Build and optionally push container image
         id: build
         uses: docker/build-push-action@v6
@@ -118,14 +139,39 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deploy_staging:
+    name: Deploy staging
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'staging') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'production' && github.ref == 'refs/heads/main')
+
+    outputs:
+      url: ${{ steps.deploy_staging.outputs.url }}
+
+    steps:
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Deploy to Cloud Run staging
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         id: deploy_staging
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
           region: ${{ env.GCP_REGION }}
-          image: ${{ env.IMAGE_URI }}:sha-${{ github.sha }}
+          image: ${{ needs.build.outputs.image_uri }}
           env_vars: |-
             App__DeploymentName=${{ vars.DEPLOYMENT_NAME }}
             BlobStorage__BucketName=${{ vars.GCP_BUCKET_NAME }}
@@ -154,48 +200,8 @@ jobs:
             --allow-unauthenticated
             --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
-      - name: Deploy to Cloud Run production
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        id: deploy_production
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
-          region: ${{ env.GCP_REGION }}
-          image: ${{ env.IMAGE_URI }}:sha-${{ github.sha }}
-          env_vars: |-
-            App__DeploymentName=${{ vars.DEPLOYMENT_NAME }}
-            BlobStorage__BucketName=${{ vars.GCP_BUCKET_NAME }}
-            Email__Mode=Resend
-            Email__AccessRequests__FromDisplayName=Glovelly
-            Email__Invoices__FromDisplayName=Glovelly
-            ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
-            Mcp__OAuth__Issuer=${{ vars.DEPLOYMENT_URL }}
-            Mcp__OAuth__Resource=${{ vars.DEPLOYMENT_URL }}/mcp
-            Mcp__OAuth__Clients__0__DisplayName=ChatGPT
-            Mcp__OAuth__Clients__0__Scopes__0=mcp:read
-          secrets: |-
-            Authentication__Google__ClientId=google-client-id:latest
-            Authentication__Google__ClientSecret=google-client-secret:latest
-            ConnectionStrings__Glovelly=${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}:latest
-            Email__Resend__ApiKey=glovelly-resend-api-key:latest
-            Email__AccessRequests__FromAddress=glovelly-access-requests-from-address:latest
-            Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
-            Mileage__GoogleRoutes__ApiKey=glovelly-routes-api-key:latest
-            Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
-            Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest
-            Mcp__OAuth__Clients__0__RedirectUris__0=${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}:latest
-          secrets_update_strategy: merge
-          flags: >-
-            --allow-unauthenticated
-            --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
-
       - name: Show staging URL
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: echo "Deployed staging to ${{ steps.deploy_staging.outputs.url }}"
-
-      - name: Show production URL
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        run: echo "Deployed production to ${{ steps.deploy_production.outputs.url }}"
 
       - name: Comment staging URL on PR
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -231,3 +237,90 @@ jobs:
                 body,
               });
             }
+
+  staging_uat:
+    name: Run staging UAT
+    needs: deploy_staging
+    uses: ./.github/workflows/uat.yml
+    with:
+      environment_name: staging
+      require_uat_secret: true
+      require_invoice_recipient: true
+      artifact_name: glovelly-staging-uat-diagnostics
+
+  deploy_production:
+    name: Deploy production
+    needs:
+      - build
+      - staging_uat
+    runs-on: ubuntu-latest
+    environment: production
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'production' && github.ref == 'refs/heads/main')
+
+    outputs:
+      url: ${{ steps.deploy_production.outputs.url }}
+
+    steps:
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run production
+        id: deploy_production
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          region: ${{ env.GCP_REGION }}
+          image: ${{ needs.build.outputs.image_uri }}
+          env_vars: |-
+            App__DeploymentName=${{ vars.DEPLOYMENT_NAME }}
+            BlobStorage__BucketName=${{ vars.GCP_BUCKET_NAME }}
+            Email__Mode=Resend
+            Email__AccessRequests__FromDisplayName=Glovelly
+            Email__Invoices__FromDisplayName=Glovelly
+            ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
+            Mcp__OAuth__Issuer=${{ vars.DEPLOYMENT_URL }}
+            Mcp__OAuth__Resource=${{ vars.DEPLOYMENT_URL }}/mcp
+            Mcp__OAuth__Clients__0__DisplayName=ChatGPT
+            Mcp__OAuth__Clients__0__Scopes__0=mcp:read
+          secrets: |-
+            Authentication__Google__ClientId=google-client-id:latest
+            Authentication__Google__ClientSecret=google-client-secret:latest
+            ConnectionStrings__Glovelly=${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}:latest
+            Email__Resend__ApiKey=glovelly-resend-api-key:latest
+            Email__AccessRequests__FromAddress=glovelly-access-requests-from-address:latest
+            Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
+            Mileage__GoogleRoutes__ApiKey=glovelly-routes-api-key:latest
+            Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
+            Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest
+            Mcp__OAuth__Clients__0__RedirectUris__0=${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}:latest
+          secrets_update_strategy: merge
+          flags: >-
+            --allow-unauthenticated
+            --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+
+      - name: Show production URL
+        run: echo "Deployed production to ${{ steps.deploy_production.outputs.url }}"
+
+  production_smoke:
+    name: Run production smoke tests
+    needs: deploy_production
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'production' && github.ref == 'refs/heads/main')
+    uses: ./.github/workflows/uat.yml
+    with:
+      environment_name: production
+      test_filter: Suite=Smoke
+      require_uat_secret: false
+      require_invoice_recipient: false
+      artifact_name: glovelly-production-smoke-diagnostics

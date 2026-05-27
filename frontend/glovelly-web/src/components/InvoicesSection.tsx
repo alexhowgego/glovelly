@@ -90,7 +90,7 @@ export function InvoicesSection({
               <p className="section-label">Billing</p>
               <h2>Invoices</h2>
             </div>
-            <span className="status-pill">
+            <span className="status-pill" data-testid="invoice-status">
               <span>{invoiceStatus}</span>
               {googleDrivePublishLink ? (
                 <a
@@ -112,6 +112,7 @@ export function InvoicesSection({
           <label className="search-field">
             <span>Search</span>
             <input
+              data-testid="invoice-search-input"
               type="search"
               placeholder="Invoice number, client or description..."
               value={invoiceSearchQuery}
@@ -142,6 +143,7 @@ export function InvoicesSection({
                 <button
                   key={invoice.id}
                   className={`client-card ${selectedInvoice?.id === invoice.id ? 'selected' : ''}`}
+                  data-testid="invoice-card"
                   onClick={() => onSelectInvoice(invoice.id)}
                   type="button"
                 >
@@ -196,6 +198,7 @@ export function InvoicesSection({
               </button>
               <button
                 className="ghost-button"
+                data-testid="invoice-preview-button"
                 onClick={() => selectedInvoice && void onPreviewPdf(selectedInvoice)}
                 type="button"
                 disabled={!selectedInvoice || isInvoiceLoading}
@@ -217,6 +220,7 @@ export function InvoicesSection({
               </button>
               <button
                 className="ghost-button"
+                data-testid="invoice-send-button"
                 onClick={() => selectedInvoice && void onSendEmail(selectedInvoice)}
                 type="button"
                 disabled={!selectedInvoice || isInvoiceLoading}
