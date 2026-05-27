@@ -9,11 +9,15 @@ builder.Services.AddGlovellyAuthentication(startupSettings);
 
 var app = builder.Build();
 
-await app.InitializeDatabaseAsync(builder.Configuration, startupSettings.ShouldSeedDevelopmentData);
+await app.InitializeDatabaseAsync(
+    builder.Configuration,
+    startupSettings.ShouldSeedDevelopmentData,
+    startupSettings.ShouldSeedUatData);
 
 app.UseGlovellyHttpPipeline(startupSettings);
 app.MapAppMetadataEndpoints(startupSettings);
 app.MapAuthEndpoints(startupSettings);
+app.MapTestAuthEndpoints(startupSettings);
 app.MapAccessEndpoints(startupSettings);
 app.MapGoogleDriveIntegrationEndpoints(startupSettings);
 app.MapMcpOAuthEndpoints();

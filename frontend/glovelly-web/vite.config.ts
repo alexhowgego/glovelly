@@ -16,6 +16,10 @@ export default defineConfig({
         target: 'http://localhost:5153',
         changeOrigin: true,
       },
+      '/test-auth': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
       '/clients': {
         target: 'http://localhost:5153',
         changeOrigin: true,

@@ -9,7 +9,8 @@ internal static class WebApplicationExtensions
     public static async Task InitializeDatabaseAsync(
         this WebApplication app,
         IConfiguration configuration,
-        bool shouldSeedDevelopmentData)
+        bool shouldSeedDevelopmentData,
+        bool shouldSeedUatData)
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -23,6 +24,11 @@ internal static class WebApplicationExtensions
         else
         {
             await dbContext.Database.EnsureCreatedAsync();
+        }
+
+        if (shouldSeedUatData)
+        {
+            await AppDbSeeder.SeedUatRegressionDataAsync(dbContext);
         }
     }
 

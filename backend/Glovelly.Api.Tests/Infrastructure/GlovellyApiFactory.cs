@@ -38,6 +38,12 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
         return factory;
     }
 
+    public GlovellyApiFactory WithEnvironment(string environmentName)
+    {
+        _environmentName = environmentName;
+        return this;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environmentName);

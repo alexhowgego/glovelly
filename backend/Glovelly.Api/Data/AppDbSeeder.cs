@@ -8,8 +8,102 @@ namespace Glovelly.Api.Data;
 
 public static class AppDbSeeder
 {
+    public static readonly Guid UatRegressionUserId = Guid.Parse("a1111111-1111-4111-8111-111111111111");
+    public static readonly Guid UatRegressionClientId = Guid.Parse("a2222222-2222-4222-8222-222222222222");
+    public static readonly Guid UatRegressionSellerProfileId = Guid.Parse("a3333333-3333-4333-8333-333333333333");
+    public const string UatRegressionGoogleSubject = "glovelly-uat-regression-user";
+    public const string UatRegressionEmail = "regression@glovelly.net";
+    public const string UatRegressionDisplayName = "Glovelly UAT Regression User";
     private static readonly DateTimeOffset SeededCreatedUtc = new(2026, 3, 15, 9, 0, 0, TimeSpan.Zero);
     private static readonly byte[] SeededPdfContent = "Seeded development invoice PDF placeholder"u8.ToArray();
+
+    public static async Task SeedUatRegressionDataAsync(AppDbContext dbContext)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(value => value.Id == UatRegressionUserId);
+        if (user is null)
+        {
+            user = new User
+            {
+                Id = UatRegressionUserId,
+                CreatedUtc = SeededCreatedUtc.UtcDateTime,
+            };
+            dbContext.Users.Add(user);
+        }
+
+        user.GoogleSubject = UatRegressionGoogleSubject;
+        user.Email = UatRegressionEmail;
+        user.DisplayName = UatRegressionDisplayName;
+        user.MileageRate = 0.45m;
+        user.PassengerMileageRate = 0.10m;
+        user.TravelOriginPostcode = "BS1 5AA";
+        user.DefaultPaymentWindowDays = 14;
+        user.InvoiceFilenamePattern = "{invoiceNumber}-{clientName}-{periodDate}";
+        user.InvoiceEmailSubjectPattern = "Invoice {invoiceNumber} for {clientName}";
+        user.InvoiceReplyToEmail = UatRegressionEmail;
+        user.Role = UserRole.User;
+        user.IsActive = true;
+
+        var client = await dbContext.Clients.FirstOrDefaultAsync(value => value.Id == UatRegressionClientId);
+        if (client is null)
+        {
+            client = new Client
+            {
+                Id = UatRegressionClientId,
+                CreatedByUserId = UatRegressionUserId,
+            };
+            dbContext.Clients.Add(client);
+        }
+
+        client.Name = "UAT Regression Client";
+        client.Email = "accounts+uat@glovelly.net";
+        client.MileageRate = 0.45m;
+        client.PassengerMileageRate = 0.10m;
+        client.InvoiceFilenamePattern = "{invoiceNumber}-{clientName}";
+        client.InvoiceEmailSubjectPattern = "UAT invoice {invoiceNumber}";
+        client.UpdatedByUserId = UatRegressionUserId;
+        client.BillingAddress = new Address
+        {
+            Line1 = "1 Regression Yard",
+            City = "Bristol",
+            StateOrCounty = "Bristol",
+            PostalCode = "BS1 5AA",
+            Country = "United Kingdom"
+        };
+
+        var sellerProfile = await dbContext.SellerProfiles
+            .FirstOrDefaultAsync(value => value.UserId == UatRegressionUserId);
+        if (sellerProfile is null)
+        {
+            sellerProfile = new SellerProfile
+            {
+                Id = UatRegressionSellerProfileId,
+                UserId = UatRegressionUserId,
+                CreatedUtc = SeededCreatedUtc,
+                CreatedByUserId = UatRegressionUserId,
+            };
+            dbContext.SellerProfiles.Add(sellerProfile);
+        }
+
+        sellerProfile.SellerName = "Glovelly UAT Music";
+        sellerProfile.Email = UatRegressionEmail;
+        sellerProfile.Phone = "07123 000000";
+        sellerProfile.AccountName = "Glovelly UAT Music";
+        sellerProfile.SortCode = "00-00-00";
+        sellerProfile.AccountNumber = "00000000";
+        sellerProfile.PaymentReferenceNote = "UAT-only invoice payment reference.";
+        sellerProfile.Address = new Address
+        {
+            Line1 = "1 Regression Yard",
+            City = "Bristol",
+            StateOrCounty = "Bristol",
+            PostalCode = "BS1 5AA",
+            Country = "United Kingdom"
+        };
+        sellerProfile.UpdatedUtc = SeededCreatedUtc;
+        sellerProfile.UpdatedByUserId = UatRegressionUserId;
+
+        await dbContext.SaveChangesAsync();
+    }
 
     public static async Task SeedAsync(
         AppDbContext dbContext,

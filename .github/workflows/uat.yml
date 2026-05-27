@@ -1,0 +1,110 @@
+name: Glovelly UAT
+
+on:
+  workflow_run:
+    workflows:
+      - Glovelly CI/CD
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+  GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+  GLOVELLY_UAT_SECRET_ID: ${{ vars.GCP_UAT_SECRET_ID }}
+
+concurrency:
+  group: glovelly-uat-staging
+  cancel-in-progress: true
+
+jobs:
+  playwright:
+    name: Playwright UAT against staging
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    environment: staging
+
+    env:
+      GLOVELLY_UAT_BASE_URL: ${{ vars.DEPLOYMENT_URL }}
+      GLOVELLY_UAT_ARTIFACT_DIR: ${{ github.workspace }}/TestResults/uat
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Load UAT secret from Secret Manager
+        run: |
+          secret_value="$(gcloud secrets versions access latest --secret="$GLOVELLY_UAT_SECRET_ID" --project="$GCP_PROJECT_ID")"
+          if [ -z "$secret_value" ]; then
+            echo "Secret Manager secret '$GLOVELLY_UAT_SECRET_ID' is empty or unavailable."
+            exit 1
+          fi
+          echo "::add-mask::$secret_value"
+          {
+            echo "GLOVELLY_UAT_SECRET<<EOF"
+            echo "$secret_value"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore UAT dependencies
+        run: dotnet restore tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
+
+      - name: Build UAT project
+        run: dotnet build tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj --no-restore --configuration Release
+
+      - name: Install Playwright Chromium
+        run: pwsh tests/Glovelly.Uat.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Verify UAT configuration
+        run: |
+          if [ -z "$GLOVELLY_UAT_BASE_URL" ]; then
+            echo "GLOVELLY_UAT_BASE_URL is not configured. Add it as a staging environment variable."
+            exit 1
+          fi
+          if [ -z "$GLOVELLY_UAT_SECRET" ]; then
+            echo "GLOVELLY_UAT_SECRET is not configured. Create the Secret Manager secret configured by GCP_UAT_SECRET_ID."
+            exit 1
+          fi
+
+      - name: Run Playwright UAT suite
+        run: >-
+          dotnet test tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
+          --no-build
+          --configuration Release
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=uat-test-results.trx"
+          --logger "html;LogFileName=uat-test-report.html"
+          --results-directory "$GLOVELLY_UAT_ARTIFACT_DIR/test-results"
+
+      - name: Upload UAT diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glovelly-uat-diagnostics
+          path: |
+            TestResults/uat
+          if-no-files-found: warn
+          retention-days: 14
