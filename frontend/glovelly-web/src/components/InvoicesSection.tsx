@@ -177,6 +177,7 @@ export function InvoicesSection({
             <div className="actions">
               <button
                 className="ghost-button"
+                data-testid="invoice-line-items-button"
                 onClick={onStartEditing}
                 type="button"
                 disabled={!selectedInvoice}
@@ -428,7 +429,7 @@ export function InvoicesSection({
                       const gigId = line.gigId
 
                       return (
-                        <div className="invoice-line-item" key={line.id}>
+                        <div className="invoice-line-item" data-testid="invoice-line-item" key={line.id}>
                           <div>
                             {gigId ? (
                               <button

@@ -33,6 +33,8 @@ Generating an invoice links the gig, creates expected lines, and produces a down
 
 ## Combined Invoice
 
+> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
+
 ### Steps
 
 1. Create two uninvoiced gigs for the same client.
@@ -53,6 +55,8 @@ One invoice is created, both gigs are linked, invoice lines are ordered sensibly
 Expected result: the app blocks generation and explains that selected gigs must belong to the same client.
 
 ## Monthly Invoice
+
+> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
 
 ### Steps
 

@@ -222,6 +222,8 @@ Expected result: expenses are copied only when accepted, receipt attachments are
 
 ## Combined Invoice Journey
 
+> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
+
 ### Steps
 
 1. Create two uninvoiced gigs for the same client.
@@ -254,6 +256,8 @@ Run the focused [Imported gigs](gig-imports.md) journey when the change touches 
 Expected result: imported gigs stay in a modal launched from the profile menu, row edits autosave, and the main Clients/Gigs/Invoices navigation is unchanged.
 
 ## Monthly Invoice Journey
+
+> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
 
 ### Steps
 
