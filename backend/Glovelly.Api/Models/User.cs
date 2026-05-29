@@ -52,4 +52,6 @@ public sealed class User
     public GoogleCalendarIntegrationSettings? GoogleCalendarIntegrationSettings { get; set; }
     [JsonIgnore]
     public ICollection<GigCalendarSyncState> GigCalendarSyncStates { get; set; } = new List<GigCalendarSyncState>();
+    [JsonIgnore]
+    public ICollection<CalendarSyncWorkItem> CalendarSyncWorkItems { get; set; } = new List<CalendarSyncWorkItem>();
 }

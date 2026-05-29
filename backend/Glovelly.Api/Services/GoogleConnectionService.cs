@@ -52,7 +52,7 @@ internal sealed class GoogleConnectionService(
         }
 
         connection.AccessTokenExpiresAtUtc = now.AddSeconds(tokenResponse.ExpiresIn);
-        connection.GrantedScopes = tokenResponse.Scope;
+        connection.GrantedScopes = MergeScopes(connection.GrantedScopes, tokenResponse.Scope);
         connection.TokenType = string.IsNullOrWhiteSpace(tokenResponse.TokenType)
             ? "Bearer"
             : tokenResponse.TokenType;
@@ -204,5 +204,15 @@ internal sealed class GoogleConnectionService(
         {
             return (null, null);
         }
+    }
+
+    private static string MergeScopes(string existingScopes, string newScopes)
+    {
+        return string.Join(
+            ' ',
+            existingScopes
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Concat(newScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .Distinct(StringComparer.Ordinal));
     }
 }

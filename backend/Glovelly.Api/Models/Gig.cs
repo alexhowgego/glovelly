@@ -36,6 +36,4 @@ public sealed class Gig
     public GigImportBatch? SourceImportBatch { get; set; }
     [JsonIgnore]
     public GigImportDraft? SourceImportDraft { get; set; }
-    [JsonIgnore]
-    public ICollection<GigCalendarSyncState> CalendarSyncStates { get; set; } = new List<GigCalendarSyncState>();
 }

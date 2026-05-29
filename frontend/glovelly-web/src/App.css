@@ -709,6 +709,85 @@
   gap: 18px;
 }
 
+.settings-section {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--surface-subtle) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 82%, transparent);
+}
+
+.settings-section-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-section-heading h3 {
+  margin: 0;
+  color: var(--heading);
+  font-size: 1rem;
+}
+
+.connected-services-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.connected-service-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--surface-panel);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+}
+
+.connected-service-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.connected-service-summary > div,
+.compact-service-field {
+  display: grid;
+  gap: 6px;
+}
+
+.connected-service-summary strong {
+  color: var(--heading);
+}
+
+.connected-service-summary span,
+.compact-service-field span,
+.connected-service-error {
+  color: var(--muted-strong);
+  font-size: 0.86rem;
+}
+
+.connected-service-error {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, #a65f27 14%, transparent);
+}
+
+.service-connection-indicator {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #a65f27;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #a65f27 18%, transparent);
+}
+
+.service-connection-indicator.connected {
+  background: #2b8c67;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #2b8c67 18%, transparent);
+}
+
 .seller-profile-layout {
   display: grid;
   gap: 20px;

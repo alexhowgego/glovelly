@@ -44,7 +44,8 @@ internal static class GigCrudEndpoints
             GigStatusUpdateRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor) =>
+            ICurrentUserAccessor currentUserAccessor,
+            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -69,6 +70,15 @@ internal static class GigCrudEndpoints
             gig.Status = request.Status;
             EndpointSupport.StampUpdate(gig, userId);
             await db.SaveChangesAsync();
+            if (userId.HasValue)
+            {
+                await calendarSyncWorkQueue.EnqueueGigAsync(
+                    userId.Value,
+                    gig.Id,
+                    request.Status == GigStatus.Cancelled
+                        ? CalendarSyncWorkItemReason.GigCancelled
+                        : CalendarSyncWorkItemReason.GigUpdated);
+            }
 
             return Results.Ok(gig);
         });
@@ -78,7 +88,8 @@ internal static class GigCrudEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
-            IInvoiceWorkflowService invoiceWorkflowService) =>
+            IInvoiceWorkflowService invoiceWorkflowService,
+            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gigValidation = EndpointSupport.ValidateGigRequest(gig);
@@ -134,6 +145,13 @@ internal static class GigCrudEndpoints
             db.Gigs.Add(gig);
             await invoiceWorkflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, userId);
             await db.SaveChangesAsync();
+            if (userId.HasValue)
+            {
+                await calendarSyncWorkQueue.EnqueueGigAsync(
+                    userId.Value,
+                    gig.Id,
+                    CalendarSyncWorkItemReason.GigCreated);
+            }
 
             return Results.Created($"/gigs/{gig.Id}", gig);
         });
@@ -145,7 +163,8 @@ internal static class GigCrudEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IExpenseAttachmentStore attachmentStore,
-            IInvoiceWorkflowService invoiceWorkflowService) =>
+            IInvoiceWorkflowService invoiceWorkflowService,
+            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -259,6 +278,15 @@ internal static class GigCrudEndpoints
                 .Include(value => value.Expenses)
                     .ThenInclude(expense => expense.Attachments)
                 .FirstAsync(value => value.Id == id);
+            if (userId.HasValue)
+            {
+                await calendarSyncWorkQueue.EnqueueGigAsync(
+                    userId.Value,
+                    gig.Id,
+                    gig.Status == GigStatus.Cancelled
+                        ? CalendarSyncWorkItemReason.GigCancelled
+                        : CalendarSyncWorkItemReason.GigUpdated);
+            }
 
             return Results.Ok(gig);
         });
@@ -269,7 +297,8 @@ internal static class GigCrudEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IExpenseAttachmentStore attachmentStore,
-            IInvoiceWorkflowService invoiceWorkflowService) =>
+            IInvoiceWorkflowService invoiceWorkflowService,
+            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -306,6 +335,13 @@ internal static class GigCrudEndpoints
             _ = await invoiceWorkflowService.RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id);
             db.Gigs.Remove(gig);
             await db.SaveChangesAsync();
+            if (userId.HasValue)
+            {
+                await calendarSyncWorkQueue.EnqueueGigAsync(
+                    userId.Value,
+                    id,
+                    CalendarSyncWorkItemReason.GigDeleted);
+            }
 
             return Results.NoContent();
         });

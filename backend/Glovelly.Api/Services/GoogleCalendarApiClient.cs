@@ -8,6 +8,7 @@ namespace Glovelly.Api.Services;
 public sealed class GoogleCalendarApiClient(HttpClient httpClient) : IGoogleCalendarApiClient
 {
     private const string CalendarEndpoint = "https://www.googleapis.com/calendar/v3/calendars";
+    private const string EventsEndpoint = "https://www.googleapis.com/calendar/v3/calendars/{0}/events";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<GoogleCalendarCreateResult> CreateCalendarAsync(
@@ -39,6 +40,116 @@ public sealed class GoogleCalendarApiClient(HttpClient httpClient) : IGoogleCale
         return new GoogleCalendarCreateResult(createResponse.Id, createResponse.Summary ?? summary);
     }
 
+    public async Task<GoogleCalendarEventResult> CreateEventAsync(
+        string accessToken,
+        string calendarId,
+        string eventId,
+        CalendarEventPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = string.Format(EventsEndpoint, Uri.EscapeDataString(calendarId));
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Content = BuildEventContent(eventId, payload);
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            return await UpdateEventAsync(accessToken, calendarId, eventId, payload, cancellationToken);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Google Calendar event creation failed with HTTP {(int)response.StatusCode}. {responseBody}".Trim());
+        }
+
+        return ParseEventResponse(responseBody, eventId);
+    }
+
+    public async Task<GoogleCalendarEventResult> UpdateEventAsync(
+        string accessToken,
+        string calendarId,
+        string eventId,
+        CalendarEventPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = $"{string.Format(EventsEndpoint, Uri.EscapeDataString(calendarId))}/{Uri.EscapeDataString(eventId)}";
+        using var request = new HttpRequestMessage(HttpMethod.Put, endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Content = BuildEventContent(eventId, payload);
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Google Calendar event update failed with HTTP {(int)response.StatusCode}. {responseBody}".Trim());
+        }
+
+        return ParseEventResponse(responseBody, eventId);
+    }
+
+    public async Task DeleteEventAsync(
+        string accessToken,
+        string calendarId,
+        string eventId,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = $"{string.Format(EventsEndpoint, Uri.EscapeDataString(calendarId))}/{Uri.EscapeDataString(eventId)}";
+        using var request = new HttpRequestMessage(HttpMethod.Delete, endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound ||
+            response.StatusCode == System.Net.HttpStatusCode.Gone)
+        {
+            return;
+        }
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Google Calendar event deletion failed with HTTP {(int)response.StatusCode}. {responseBody}".Trim());
+        }
+    }
+
+    public static string BuildDeterministicEventId(Guid gigId)
+    {
+        return $"glv{gigId:N}";
+    }
+
+    private static StringContent BuildEventContent(string eventId, CalendarEventPayload payload)
+    {
+        var value = new
+        {
+            id = eventId,
+            summary = payload.Summary,
+            location = payload.Location,
+            description = payload.Description,
+            start = new { date = payload.StartDate.ToString("O") },
+            end = new { date = payload.EndDate.ToString("O") },
+            extendedProperties = new
+            {
+                @private = new Dictionary<string, string>
+                {
+                    ["glovellyGigId"] = payload.SourceGigId.ToString(),
+                }
+            }
+        };
+
+        return new StringContent(JsonSerializer.Serialize(value, JsonOptions), Encoding.UTF8, "application/json");
+    }
+
+    private static GoogleCalendarEventResult ParseEventResponse(string responseBody, string fallbackId)
+    {
+        var eventResponse = JsonSerializer.Deserialize<GoogleCalendarEventResponse>(responseBody, JsonOptions);
+        return new GoogleCalendarEventResult(
+            string.IsNullOrWhiteSpace(eventResponse?.Id) ? fallbackId : eventResponse.Id);
+    }
+
     private sealed class GoogleCalendarCreateResponse
     {
         [JsonPropertyName("id")]
@@ -46,5 +157,11 @@ public sealed class GoogleCalendarApiClient(HttpClient httpClient) : IGoogleCale
 
         [JsonPropertyName("summary")]
         public string? Summary { get; set; }
+    }
+
+    private sealed class GoogleCalendarEventResponse
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
     }
 }

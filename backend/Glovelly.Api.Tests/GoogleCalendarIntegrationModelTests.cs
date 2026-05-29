@@ -273,6 +273,119 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         Assert.False(calendarClient.CreateWasCalled);
     }
 
+    [Fact]
+    public async Task CalendarSyncWorkQueue_EnqueuesPendingGigWork()
+    {
+        _ = _factory.CreateClient();
+        using var scope = _factory.Services.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<ICalendarSyncWorkQueue>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await queue.EnqueueGigAsync(
+            TestAuthContext.UserId,
+            Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            CalendarSyncWorkItemReason.GigUpdated);
+
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
+        Assert.Equal(CalendarSyncWorkItemReason.GigUpdated, workItem.Reason);
+        Assert.Equal(CalendarProvider.GoogleCalendar, workItem.Provider);
+    }
+
+    [Fact]
+    public async Task SyncProcessor_CreatesEventAndStoresSyncState()
+    {
+        var calendarClient = new FakeGoogleCalendarApiClient();
+        using var factory = CreateFactory(calendarClient);
+        _ = factory.CreateClient();
+        var connectionId = await SeedCalendarConnectionAsync(factory);
+        var gig = CreateGig(GigStatus.Confirmed);
+
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            var dbContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.GoogleCalendarIntegrationSettings.Add(new GoogleCalendarIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                IsEnabled = true,
+                GoogleCalendarId = "calendar-id",
+                CalendarName = "Glovelly Gigs",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            dbContext.Gigs.Add(gig);
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var processor = scope.ServiceProvider.GetRequiredService<IGoogleCalendarSyncProcessor>();
+        await processor.ProcessAsync(new CalendarSyncWorkItem
+        {
+            Id = Guid.NewGuid(),
+            UserId = TestAuthContext.UserId,
+            GigId = gig.Id,
+            Reason = CalendarSyncWorkItemReason.GigCreated,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        }, CancellationToken.None);
+
+        var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync();
+        Assert.Equal("calendar-id", calendarClient.EventCalendarId);
+        Assert.Equal(GoogleCalendarApiClient.BuildDeterministicEventId(gig.Id), calendarClient.EventId);
+        Assert.Equal(calendarClient.EventId, syncState.ProviderEventId);
+        Assert.False(string.IsNullOrWhiteSpace(syncState.LastSyncHash));
+        Assert.Null(syncState.LastSyncError);
+    }
+
+    [Fact]
+    public async Task SyncProcessor_DeletesEventWhenGigNoLongerShouldSync()
+    {
+        var calendarClient = new FakeGoogleCalendarApiClient();
+        using var factory = CreateFactory(calendarClient);
+        _ = factory.CreateClient();
+        var connectionId = await SeedCalendarConnectionAsync(factory);
+        var gig = CreateGig(GigStatus.Cancelled);
+
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            var dbContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.GoogleCalendarIntegrationSettings.Add(new GoogleCalendarIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                IsEnabled = true,
+                GoogleCalendarId = "calendar-id",
+                CalendarName = "Glovelly Gigs",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            dbContext.Gigs.Add(gig);
+            dbContext.GigCalendarSyncStates.Add(CreateSyncState(gig.Id, "old-hash", "event-id"));
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var processor = scope.ServiceProvider.GetRequiredService<IGoogleCalendarSyncProcessor>();
+        await processor.ProcessAsync(new CalendarSyncWorkItem
+        {
+            Id = Guid.NewGuid(),
+            UserId = TestAuthContext.UserId,
+            GigId = gig.Id,
+            Reason = CalendarSyncWorkItemReason.GigCancelled,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        }, CancellationToken.None);
+
+        var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync();
+        Assert.Equal("event-id", calendarClient.DeletedEventId);
+        Assert.NotNull(syncState.DeletedAtUtc);
+    }
+
     private static IGigCalendarSyncPlanner CreatePlanner()
     {
         return new GigCalendarSyncPlanner(new GigCalendarEventMapper(), new CalendarEventPayloadHasher());
@@ -381,6 +494,9 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         public bool CreateWasCalled { get; private set; }
         public string? AccessToken { get; private set; }
         public string? Summary { get; private set; }
+        public string? EventCalendarId { get; private set; }
+        public string? EventId { get; private set; }
+        public string? DeletedEventId { get; private set; }
 
         public Task<GoogleCalendarCreateResult> CreateCalendarAsync(
             string accessToken,
@@ -392,6 +508,44 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             Summary = summary;
 
             return Task.FromResult(new GoogleCalendarCreateResult("google-calendar-id", summary));
+        }
+
+        public Task<GoogleCalendarEventResult> CreateEventAsync(
+            string accessToken,
+            string calendarId,
+            string eventId,
+            CalendarEventPayload payload,
+            CancellationToken cancellationToken)
+        {
+            AccessToken = accessToken;
+            EventCalendarId = calendarId;
+            EventId = eventId;
+            return Task.FromResult(new GoogleCalendarEventResult(eventId));
+        }
+
+        public Task<GoogleCalendarEventResult> UpdateEventAsync(
+            string accessToken,
+            string calendarId,
+            string eventId,
+            CalendarEventPayload payload,
+            CancellationToken cancellationToken)
+        {
+            AccessToken = accessToken;
+            EventCalendarId = calendarId;
+            EventId = eventId;
+            return Task.FromResult(new GoogleCalendarEventResult(eventId));
+        }
+
+        public Task DeleteEventAsync(
+            string accessToken,
+            string calendarId,
+            string eventId,
+            CancellationToken cancellationToken)
+        {
+            AccessToken = accessToken;
+            EventCalendarId = calendarId;
+            DeletedEventId = eventId;
+            return Task.CompletedTask;
         }
     }
 }

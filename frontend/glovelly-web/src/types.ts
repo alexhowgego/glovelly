@@ -42,6 +42,18 @@ export type AuthUser = {
   isGoogleDriveConnected: boolean
 }
 
+export type GoogleCalendarStatus = {
+  isConnected: boolean
+  isEnabled: boolean
+  hasRequiredScope: boolean
+  calendarId: string | null
+  calendarName: string | null
+  lastSuccessfulSyncAtUtc: string | null
+  pendingWorkCount: number
+  failedWorkCount: number
+  lastError: string | null
+}
+
 export type AdminUser = {
   id: string
   email: string

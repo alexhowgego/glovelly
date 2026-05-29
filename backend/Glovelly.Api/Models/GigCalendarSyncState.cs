@@ -19,8 +19,5 @@ public sealed class GigCalendarSyncState
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
     [JsonIgnore]
-    public Gig? Gig { get; set; }
-
-    [JsonIgnore]
     public User? User { get; set; }
 }

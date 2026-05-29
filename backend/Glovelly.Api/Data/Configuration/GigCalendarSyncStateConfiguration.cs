@@ -29,10 +29,6 @@ internal sealed class GigCalendarSyncStateConfiguration : IEntityTypeConfigurati
             .HasFilter("\"GigId\" IS NOT NULL");
         entity.HasIndex(state => new { state.UserId, state.Provider });
         entity.HasIndex(state => new { state.ProviderCalendarId, state.ProviderEventId });
-        entity.HasOne(state => state.Gig)
-            .WithMany(gig => gig.CalendarSyncStates)
-            .HasForeignKey(state => state.GigId)
-            .OnDelete(DeleteBehavior.SetNull);
         entity.HasOne(state => state.User)
             .WithMany(user => user.GigCalendarSyncStates)
             .HasForeignKey(state => state.UserId)

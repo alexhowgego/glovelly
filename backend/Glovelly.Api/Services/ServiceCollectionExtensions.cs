@@ -26,6 +26,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGigCalendarEventMapper, GigCalendarEventMapper>();
         services.AddScoped<IGigCalendarSyncPlanner, GigCalendarSyncPlanner>();
         services.AddScoped<IGoogleCalendarIntegrationService, GoogleCalendarIntegrationService>();
+        services.AddScoped<ICalendarSyncWorkQueue, CalendarSyncWorkQueue>();
+        services.AddScoped<IGoogleCalendarSyncProcessor, GoogleCalendarSyncProcessor>();
         services.AddOptions<GoogleRoutesMileageSettings>()
             .BindConfiguration(GoogleRoutesMileageSettings.SectionName);
         services.AddHttpClient<GoogleRoutesMileageEstimationService>();
@@ -80,6 +82,7 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<ResendClient>();
         services.AddHttpClient<IGoogleDriveApiClient, GoogleDriveApiClient>();
         services.AddHttpClient<IGoogleCalendarApiClient, GoogleCalendarApiClient>();
+        services.AddHostedService<GoogleCalendarSyncWorker>();
         services.AddScoped<IResend, ResendClient>();
         services.AddScoped<IEmailSender>(provider =>
         {

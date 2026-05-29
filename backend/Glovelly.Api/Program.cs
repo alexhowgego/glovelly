@@ -20,6 +20,7 @@ app.MapAuthEndpoints(startupSettings);
 app.MapTestAuthEndpoints(startupSettings);
 app.MapAccessEndpoints(startupSettings);
 app.MapGoogleDriveIntegrationEndpoints(startupSettings);
+app.MapGoogleCalendarIntegrationEndpoints(startupSettings);
 app.MapMcpOAuthEndpoints();
 app.MapMcpEndpoints();
 app.MapCrudEndpoints();
