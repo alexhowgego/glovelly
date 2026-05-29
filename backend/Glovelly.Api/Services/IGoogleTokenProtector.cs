@@ -1,6 +1,6 @@
 namespace Glovelly.Api.Services;
 
-public interface IGoogleDriveTokenProtector
+public interface IGoogleTokenProtector
 {
     string Protect(string token);
     string Unprotect(string encryptedToken);

@@ -18,7 +18,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<SellerProfile> SellerProfiles => Set<SellerProfile>();
-    public DbSet<GoogleDriveConnection> GoogleDriveConnections => Set<GoogleDriveConnection>();
+    public DbSet<GoogleConnection> GoogleConnections => Set<GoogleConnection>();
+    public DbSet<GoogleDriveIntegrationSettings> GoogleDriveIntegrationSettings => Set<GoogleDriveIntegrationSettings>();
     public DbSet<McpOAuthAuthorizationCode> McpOAuthAuthorizationCodes => Set<McpOAuthAuthorizationCode>();
     public DbSet<McpOAuthAccessToken> McpOAuthAccessTokens => Set<McpOAuthAccessToken>();
     public DbSet<McpOAuthRefreshToken> McpOAuthRefreshTokens => Set<McpOAuthRefreshToken>();

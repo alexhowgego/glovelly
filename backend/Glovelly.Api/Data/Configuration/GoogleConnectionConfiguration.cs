@@ -4,21 +4,23 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Glovelly.Api.Data.Configuration;
 
-internal sealed class GoogleDriveConnectionConfiguration : IEntityTypeConfiguration<GoogleDriveConnection>
+internal sealed class GoogleConnectionConfiguration : IEntityTypeConfiguration<GoogleConnection>
 {
-    public void Configure(EntityTypeBuilder<GoogleDriveConnection> entity)
+    public void Configure(EntityTypeBuilder<GoogleConnection> entity)
     {
         entity.HasKey(connection => connection.Id);
+        entity.Property(connection => connection.GoogleSubject)
+            .HasMaxLength(200);
+        entity.Property(connection => connection.GoogleEmail)
+            .HasMaxLength(320);
         entity.Property(connection => connection.EncryptedAccessToken)
             .IsRequired();
         entity.Property(connection => connection.EncryptedRefreshToken)
             .IsRequired();
-        entity.Property(connection => connection.Scope)
-            .HasMaxLength(500);
+        entity.Property(connection => connection.GrantedScopes)
+            .HasMaxLength(1000);
         entity.Property(connection => connection.TokenType)
             .HasMaxLength(50);
-        entity.Property(connection => connection.InvoiceUploadFolderId)
-            .HasMaxLength(200);
         entity.Property(connection => connection.ConnectedAtUtc)
             .IsRequired();
         entity.Property(connection => connection.UpdatedAtUtc)
@@ -26,8 +28,8 @@ internal sealed class GoogleDriveConnectionConfiguration : IEntityTypeConfigurat
         entity.HasIndex(connection => connection.UserId)
             .IsUnique();
         entity.HasOne(connection => connection.User)
-            .WithOne(user => user.GoogleDriveConnection)
-            .HasForeignKey<GoogleDriveConnection>(connection => connection.UserId)
+            .WithOne(user => user.GoogleConnection)
+            .HasForeignKey<GoogleConnection>(connection => connection.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

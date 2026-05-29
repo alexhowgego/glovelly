@@ -45,5 +45,7 @@ public sealed class User
     [JsonIgnore]
     public SellerProfile? SellerProfile { get; set; }
     [JsonIgnore]
-    public GoogleDriveConnection? GoogleDriveConnection { get; set; }
+    public GoogleConnection? GoogleConnection { get; set; }
+    [JsonIgnore]
+    public GoogleDriveIntegrationSettings? GoogleDriveIntegrationSettings { get; set; }
 }

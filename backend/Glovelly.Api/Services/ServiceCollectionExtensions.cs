@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
+        services.AddScoped<IGoogleConnectionService, GoogleConnectionService>();
         services.AddOptions<GoogleRoutesMileageSettings>()
             .BindConfiguration(GoogleRoutesMileageSettings.SectionName);
         services.AddHttpClient<GoogleRoutesMileageEstimationService>();

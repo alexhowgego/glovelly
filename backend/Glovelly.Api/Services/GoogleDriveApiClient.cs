@@ -7,51 +7,9 @@ namespace Glovelly.Api.Services;
 
 public sealed class GoogleDriveApiClient(HttpClient httpClient) : IGoogleDriveApiClient
 {
-    private const string GoogleTokenEndpoint = "https://oauth2.googleapis.com/token";
     private const string GoogleDriveUploadEndpoint =
         "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    public async Task<GoogleDriveAccessTokenRefreshResult> RefreshAccessTokenAsync(
-        string refreshToken,
-        string clientId,
-        string clientSecret,
-        CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, GoogleTokenEndpoint)
-        {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["client_id"] = clientId,
-                ["client_secret"] = clientSecret,
-                ["refresh_token"] = refreshToken,
-                ["grant_type"] = "refresh_token",
-            }),
-        };
-
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-        GoogleDriveOAuthTokenResponse? tokenResponse = null;
-        if (response.IsSuccessStatusCode)
-        {
-            try
-            {
-                tokenResponse = JsonSerializer.Deserialize<GoogleDriveOAuthTokenResponse>(
-                    responseBody,
-                    JsonOptions);
-            }
-            catch (JsonException)
-            {
-                tokenResponse = null;
-            }
-        }
-
-        return new GoogleDriveAccessTokenRefreshResult(
-            response.IsSuccessStatusCode,
-            (int)response.StatusCode,
-            responseBody,
-            tokenResponse);
-    }
 
     public async Task<GoogleDriveUploadResult> UploadPdfAsync(
         string accessToken,

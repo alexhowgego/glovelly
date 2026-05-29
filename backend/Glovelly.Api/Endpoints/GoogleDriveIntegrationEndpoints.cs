@@ -14,7 +14,6 @@ namespace Glovelly.Api.Endpoints;
 internal static class GoogleDriveIntegrationEndpoints
 {
     private const string GoogleAuthorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
-    private const string GoogleDriveFileScope = "https://www.googleapis.com/auth/drive.file";
     private const string StateProtectionPurpose = "Glovelly.GoogleDriveOAuthState";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -58,7 +57,11 @@ internal static class GoogleDriveIntegrationEndpoints
                     ["client_id"] = settings.GoogleClientId,
                     ["redirect_uri"] = BuildCallbackUri(httpContext),
                     ["response_type"] = "code",
-                    ["scope"] = GoogleDriveFileScope,
+                    ["scope"] = GoogleScopes.Join(
+                        GoogleScopes.OpenId,
+                        GoogleScopes.Email,
+                        GoogleScopes.Profile,
+                        GoogleScopes.DriveFile),
                     ["access_type"] = "offline",
                     ["prompt"] = "consent",
                     ["state"] = state,
@@ -77,8 +80,8 @@ internal static class GoogleDriveIntegrationEndpoints
             ICurrentUserAccessor currentUserAccessor,
             AppDbContext dbContext,
             IDataProtectionProvider dataProtectionProvider,
-            IGoogleDriveOAuthTokenExchanger tokenExchanger,
-            IGoogleDriveTokenProtector tokenProtector,
+            IGoogleOAuthTokenClient tokenClient,
+            IGoogleConnectionService googleConnectionService,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
@@ -124,7 +127,7 @@ internal static class GoogleDriveIntegrationEndpoints
                     statusCode: StatusCodes.Status500InternalServerError);
             }
 
-            var tokenResponse = await tokenExchanger.ExchangeCodeAsync(
+            var tokenResponse = await tokenClient.ExchangeCodeAsync(
                 code!,
                 BuildCallbackUri(httpContext),
                 settings.GoogleClientId,
@@ -158,14 +161,64 @@ internal static class GoogleDriveIntegrationEndpoints
                     statusCode: StatusCodes.Status502BadGateway);
             }
 
-            await SaveGoogleDriveConnectionAsync(
-                dbContext,
+            if (!GoogleScopes.Contains(tokenResponse.TokenResponse.Scope, GoogleScopes.DriveFile))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["scope"] = ["Google Drive authorization did not grant the required Drive scope."]
+                });
+            }
+
+            var connection = await googleConnectionService.SaveConnectionAsync(
                 currentUserId.Value,
                 tokenResponse.TokenResponse,
-                tokenProtector,
+                cancellationToken);
+            await EnsureGoogleDriveIntegrationSettingsAsync(
+                dbContext,
+                currentUserId.Value,
+                connection.Id,
                 cancellationToken);
 
             return Results.Redirect(BuildIntegrationStatusRedirectUri(settings));
+        });
+
+        googleDrive.MapPost("/disconnect", async (
+            ClaimsPrincipal principal,
+            ICurrentUserAccessor currentUserAccessor,
+            AppDbContext dbContext,
+            CancellationToken cancellationToken) =>
+        {
+            var currentUserId = await GetActiveCurrentUserIdAsync(
+                principal,
+                currentUserAccessor,
+                dbContext);
+            if (!currentUserId.HasValue)
+            {
+                return Results.Unauthorized();
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var connection = await dbContext.GoogleConnections
+                .FirstOrDefaultAsync(value => value.UserId == currentUserId.Value, cancellationToken);
+            if (connection is not null)
+            {
+                connection.RevokedAtUtc = now;
+                connection.EncryptedAccessToken = string.Empty;
+                connection.EncryptedRefreshToken = string.Empty;
+                connection.UpdatedAtUtc = now;
+            }
+
+            var driveSettings = await dbContext.GoogleDriveIntegrationSettings
+                .FirstOrDefaultAsync(value => value.UserId == currentUserId.Value, cancellationToken);
+            if (driveSettings is not null)
+            {
+                driveSettings.InvoiceUploadFolderId = null;
+                driveSettings.UpdatedAtUtc = now;
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Results.NoContent();
         });
 
         return app;
@@ -211,46 +264,33 @@ internal static class GoogleDriveIntegrationEndpoints
         return $"{frontendOrigin.TrimEnd('/')}{integrationStatusPath}";
     }
 
-    private static async Task SaveGoogleDriveConnectionAsync(
+    private static async Task EnsureGoogleDriveIntegrationSettingsAsync(
         AppDbContext dbContext,
         Guid userId,
-        GoogleDriveOAuthTokenResponse tokenResponse,
-        IGoogleDriveTokenProtector tokenProtector,
+        Guid googleConnectionId,
         CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
-        var connection = await dbContext.GoogleDriveConnections
+        var driveSettings = await dbContext.GoogleDriveIntegrationSettings
             .SingleOrDefaultAsync(value => value.UserId == userId, cancellationToken);
-
-        if (connection is null)
+        if (driveSettings is null)
         {
-            connection = new GoogleDriveConnection
+            driveSettings = new GoogleDriveIntegrationSettings
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,
-                ConnectedAtUtc = now,
+                GoogleConnectionId = googleConnectionId,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
             };
 
-            dbContext.GoogleDriveConnections.Add(connection);
+            dbContext.GoogleDriveIntegrationSettings.Add(driveSettings);
         }
-
-        connection.EncryptedAccessToken = tokenProtector.Protect(tokenResponse.AccessToken);
-
-        if (!string.IsNullOrWhiteSpace(tokenResponse.RefreshToken))
+        else
         {
-            connection.EncryptedRefreshToken = tokenProtector.Protect(tokenResponse.RefreshToken);
-            connection.RefreshTokenExpiresAtUtc = tokenResponse.RefreshTokenExpiresIn is { } refreshSeconds
-                ? now.AddSeconds(refreshSeconds)
-                : null;
+            driveSettings.GoogleConnectionId = googleConnectionId;
+            driveSettings.UpdatedAtUtc = now;
         }
-
-        connection.AccessTokenExpiresAtUtc = now.AddSeconds(tokenResponse.ExpiresIn);
-        connection.Scope = tokenResponse.Scope;
-        connection.TokenType = string.IsNullOrWhiteSpace(tokenResponse.TokenType)
-            ? "Bearer"
-            : tokenResponse.TokenType;
-        connection.UpdatedAtUtc = now;
-        connection.RevokedAtUtc = null;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
