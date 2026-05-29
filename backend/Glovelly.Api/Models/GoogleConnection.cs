@@ -23,4 +23,7 @@ public sealed class GoogleConnection
 
     [JsonIgnore]
     public GoogleDriveIntegrationSettings? DriveSettings { get; set; }
+
+    [JsonIgnore]
+    public GoogleCalendarIntegrationSettings? CalendarSettings { get; set; }
 }

@@ -20,6 +20,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<SellerProfile> SellerProfiles => Set<SellerProfile>();
     public DbSet<GoogleConnection> GoogleConnections => Set<GoogleConnection>();
     public DbSet<GoogleDriveIntegrationSettings> GoogleDriveIntegrationSettings => Set<GoogleDriveIntegrationSettings>();
+    public DbSet<GoogleCalendarIntegrationSettings> GoogleCalendarIntegrationSettings => Set<GoogleCalendarIntegrationSettings>();
+    public DbSet<GigCalendarSyncState> GigCalendarSyncStates => Set<GigCalendarSyncState>();
     public DbSet<McpOAuthAuthorizationCode> McpOAuthAuthorizationCodes => Set<McpOAuthAuthorizationCode>();
     public DbSet<McpOAuthAccessToken> McpOAuthAccessTokens => Set<McpOAuthAccessToken>();
     public DbSet<McpOAuthRefreshToken> McpOAuthRefreshTokens => Set<McpOAuthRefreshToken>();

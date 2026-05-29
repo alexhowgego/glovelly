@@ -112,7 +112,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
                 EncryptedRefreshToken = "encrypted-refresh-token",
                 AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
                 RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
-                GrantedScopes = GoogleScopes.CalendarEvents,
+                GrantedScopes = GoogleScopes.CalendarAppCreated,
                 TokenType = "Bearer",
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,

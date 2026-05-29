@@ -7,6 +7,7 @@ public static class GoogleScopes
     public const string Profile = "profile";
     public const string DriveFile = "https://www.googleapis.com/auth/drive.file";
     public const string CalendarEvents = "https://www.googleapis.com/auth/calendar.events";
+    public const string CalendarAppCreated = "https://www.googleapis.com/auth/calendar.app.created";
 
     public static string Join(params string[] scopes)
     {
