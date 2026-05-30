@@ -5,4 +5,5 @@ public sealed record CalendarSyncDrainResult(
     int Succeeded,
     int Retried,
     int Failed,
-    int Skipped);
+    int Skipped,
+    int Recovered);

@@ -18,8 +18,14 @@ internal sealed class CalendarSyncWorkItemConfiguration : IEntityTypeConfigurati
         entity.Property(item => item.Status)
             .HasConversion<string>()
             .HasMaxLength(50);
+        entity.Property(item => item.ProcessingOwnerId)
+            .HasMaxLength(200);
         entity.Property(item => item.LastError)
             .HasMaxLength(2000);
+        entity.Property(item => item.LastErrorType)
+            .HasMaxLength(300);
+        entity.Property(item => item.LastErrorDetail)
+            .HasMaxLength(4000);
         entity.Property(item => item.NextAttemptAtUtc)
             .IsRequired();
         entity.Property(item => item.CreatedAtUtc)
@@ -27,6 +33,8 @@ internal sealed class CalendarSyncWorkItemConfiguration : IEntityTypeConfigurati
         entity.Property(item => item.UpdatedAtUtc)
             .IsRequired();
         entity.HasIndex(item => new { item.Status, item.NextAttemptAtUtc });
+        entity.HasIndex(item => new { item.Status, item.ProcessingStartedAtUtc });
+        entity.HasIndex(item => item.ProcessingOwnerId);
         entity.HasIndex(item => new { item.UserId, item.Provider });
         entity.HasIndex(item => new { item.GigId, item.Provider });
         entity.HasOne(item => item.User)

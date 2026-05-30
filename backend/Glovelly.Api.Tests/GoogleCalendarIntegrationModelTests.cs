@@ -398,13 +398,18 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
         var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
 
-        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0), result);
+        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 0), result);
         Assert.Equal(workItemId, processor.ProcessedWorkItemIds.Single());
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
         Assert.Equal(CalendarSyncWorkItemStatus.Succeeded, workItem.Status);
+        Assert.Null(workItem.ProcessingOwnerId);
+        Assert.Null(workItem.ProcessingStartedAtUtc);
+        Assert.NotNull(workItem.LastAttemptedAtUtc);
         Assert.Null(workItem.LastError);
+        Assert.Null(workItem.LastErrorType);
+        Assert.Null(workItem.LastErrorDetail);
     }
 
     [Fact]
@@ -420,15 +425,20 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
-        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5, OwnerId: "test-owner"));
 
-        Assert.Equal(new CalendarSyncDrainResult(1, 0, 1, 0, 0), result);
+        Assert.Equal(new CalendarSyncDrainResult(1, 0, 1, 0, 0, 0), result);
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
         Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
         Assert.Equal(1, workItem.AttemptCount);
+        Assert.Null(workItem.ProcessingOwnerId);
+        Assert.Null(workItem.ProcessingStartedAtUtc);
+        Assert.NotNull(workItem.LastAttemptedAtUtc);
         Assert.Equal("temporary failure", workItem.LastError);
+        Assert.Equal(typeof(InvalidOperationException).FullName, workItem.LastErrorType);
+        Assert.Contains("temporary failure", workItem.LastErrorDetail);
         Assert.True(workItem.NextAttemptAtUtc > DateTimeOffset.UtcNow);
     }
 
@@ -447,13 +457,17 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
         var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
 
-        Assert.Equal(new CalendarSyncDrainResult(1, 0, 0, 1, 0), result);
+        Assert.Equal(new CalendarSyncDrainResult(1, 0, 0, 1, 0, 0), result);
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
         Assert.Equal(CalendarSyncWorkItemStatus.Failed, workItem.Status);
         Assert.Equal(5, workItem.AttemptCount);
+        Assert.Null(workItem.ProcessingOwnerId);
+        Assert.Null(workItem.ProcessingStartedAtUtc);
         Assert.Equal("permanent failure", workItem.LastError);
+        Assert.Equal(typeof(InvalidOperationException).FullName, workItem.LastErrorType);
+        Assert.Contains("permanent failure", workItem.LastErrorDetail);
     }
 
     [Fact]
@@ -469,7 +483,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
         var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 1));
 
-        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0), result);
+        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 0), result);
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Equal(1, await dbContext.CalendarSyncWorkItems.CountAsync(item => item.Status == CalendarSyncWorkItemStatus.Succeeded));
@@ -491,8 +505,95 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
         var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
 
-        Assert.Equal(new CalendarSyncDrainResult(0, 0, 0, 0, 0), result);
+        Assert.Equal(new CalendarSyncDrainResult(0, 0, 0, 0, 0, 0), result);
         Assert.Empty(processor.ProcessedWorkItemIds);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_RecoversStaleProcessingWorkAndProcessesIt()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        var workItemId = await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.ManualSync,
+            status: CalendarSyncWorkItemStatus.Processing,
+            processingOwnerId: "abandoned-owner",
+            processingStartedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-20));
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(
+            MaxItems: 5,
+            OwnerId: "new-owner",
+            ProcessingTimeout: TimeSpan.FromMinutes(10)));
+
+        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 1), result);
+        Assert.Equal(workItemId, processor.ProcessedWorkItemIds.Single());
+
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        Assert.Equal(CalendarSyncWorkItemStatus.Succeeded, workItem.Status);
+        Assert.Null(workItem.ProcessingOwnerId);
+        Assert.Null(workItem.ProcessingStartedAtUtc);
+        Assert.Null(workItem.LastError);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_DoesNotRecoverNonStaleProcessingWork()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.ManualSync,
+            status: CalendarSyncWorkItemStatus.Processing,
+            processingOwnerId: "active-owner",
+            processingStartedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-2));
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(
+            MaxItems: 5,
+            ProcessingTimeout: TimeSpan.FromMinutes(10)));
+
+        Assert.Equal(new CalendarSyncDrainResult(0, 0, 0, 0, 0, 0), result);
+        Assert.Empty(processor.ProcessedWorkItemIds);
+
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        Assert.Equal(CalendarSyncWorkItemStatus.Processing, workItem.Status);
+        Assert.Equal("active-owner", workItem.ProcessingOwnerId);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_ProcessorSeesClaimedOwnerDuringProcessing()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor
+        {
+            OnProcessAsync = async (serviceProvider, workItemId) =>
+            {
+                using var scope = serviceProvider.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var claimedItem = await dbContext.CalendarSyncWorkItems.SingleAsync(value => value.Id == workItemId);
+                Assert.Equal(CalendarSyncWorkItemStatus.Processing, claimedItem.Status);
+                Assert.Equal("claim-owner", claimedItem.ProcessingOwnerId);
+                Assert.NotNull(claimedItem.ProcessingStartedAtUtc);
+                Assert.NotNull(claimedItem.LastAttemptedAtUtc);
+            }
+        };
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        processor.ServiceProvider = factory.Services;
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync);
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5, OwnerId: "claim-owner"));
+
+        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 0), result);
     }
 
     private static IGigCalendarSyncPlanner CreatePlanner()
@@ -591,7 +692,10 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         CalendarSyncWorkItemReason reason,
         Guid? gigId = null,
         int attemptCount = 0,
-        DateTimeOffset? nextAttemptAtUtc = null)
+        DateTimeOffset? nextAttemptAtUtc = null,
+        CalendarSyncWorkItemStatus status = CalendarSyncWorkItemStatus.Pending,
+        string? processingOwnerId = null,
+        DateTimeOffset? processingStartedAtUtc = null)
     {
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -604,9 +708,11 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             GigId = gigId,
             Provider = CalendarProvider.GoogleCalendar,
             Reason = reason,
-            Status = CalendarSyncWorkItemStatus.Pending,
+            Status = status,
             AttemptCount = attemptCount,
             NextAttemptAtUtc = nextAttemptAtUtc ?? now,
+            ProcessingOwnerId = processingOwnerId,
+            ProcessingStartedAtUtc = processingStartedAtUtc,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         });
@@ -703,16 +809,21 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
     {
         public List<Guid> ProcessedWorkItemIds { get; } = [];
         public Exception? ExceptionToThrow { get; set; }
+        public IServiceProvider? ServiceProvider { get; set; }
+        public Func<IServiceProvider, Guid, Task>? OnProcessAsync { get; set; }
 
-        public Task ProcessAsync(CalendarSyncWorkItem workItem, CancellationToken cancellationToken)
+        public async Task ProcessAsync(CalendarSyncWorkItem workItem, CancellationToken cancellationToken)
         {
             ProcessedWorkItemIds.Add(workItem.Id);
+            if (OnProcessAsync is not null && ServiceProvider is not null)
+            {
+                await OnProcessAsync(ServiceProvider, workItem.Id);
+            }
+
             if (ExceptionToThrow is not null)
             {
                 throw ExceptionToThrow;
             }
-
-            return Task.CompletedTask;
         }
     }
 }
