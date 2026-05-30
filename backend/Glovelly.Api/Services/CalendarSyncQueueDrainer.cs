@@ -1,53 +1,59 @@
-using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Glovelly.Api.Services;
 
-internal sealed class GoogleCalendarSyncWorker(
-    IServiceScopeFactory scopeFactory,
-    StartupSettings startupSettings,
-    ILogger<GoogleCalendarSyncWorker> logger) : BackgroundService
+public sealed class CalendarSyncQueueDrainer(
+    AppDbContext dbContext,
+    IGoogleCalendarSyncProcessor processor,
+    ILogger<CalendarSyncQueueDrainer> logger) : ICalendarSyncQueueDrainer
 {
     private const int MaxAttempts = 5;
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public async Task<CalendarSyncDrainResult> DrainAsync(
+        CalendarSyncDrainOptions options,
+        CancellationToken cancellationToken = default)
     {
-        if (startupSettings.IsTesting)
+        var maxItems = Math.Max(1, options.MaxItems);
+        var stopAt = options.MaxDuration is { } maxDuration
+            ? DateTimeOffset.UtcNow.Add(maxDuration)
+            : (DateTimeOffset?)null;
+        var processed = 0;
+        var succeeded = 0;
+        var retried = 0;
+        var failed = 0;
+
+        while (processed < maxItems &&
+               (!stopAt.HasValue || DateTimeOffset.UtcNow < stopAt.Value))
         {
-            return;
+            var outcome = await ProcessNextAsync(cancellationToken);
+            if (outcome == CalendarSyncDrainItemOutcome.None)
+            {
+                break;
+            }
+
+            processed += 1;
+            switch (outcome)
+            {
+                case CalendarSyncDrainItemOutcome.Succeeded:
+                    succeeded += 1;
+                    break;
+                case CalendarSyncDrainItemOutcome.Retried:
+                    retried += 1;
+                    break;
+                case CalendarSyncDrainItemOutcome.Failed:
+                    failed += 1;
+                    break;
+            }
         }
 
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                var processed = await ProcessNextAsync(stoppingToken);
-                if (!processed)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Google Calendar sync worker failed while processing queue.");
-                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
-            }
-        }
+        return new CalendarSyncDrainResult(processed, succeeded, retried, failed, Skipped: 0);
     }
 
-    private async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
+    private async Task<CalendarSyncDrainItemOutcome> ProcessNextAsync(CancellationToken cancellationToken)
     {
-        using var scope = scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var processor = scope.ServiceProvider.GetRequiredService<IGoogleCalendarSyncProcessor>();
         var now = DateTimeOffset.UtcNow;
-
         var workItem = await dbContext.CalendarSyncWorkItems
             .OrderBy(item => item.NextAttemptAtUtc)
             .ThenBy(item => item.CreatedAtUtc)
@@ -57,7 +63,7 @@ internal sealed class GoogleCalendarSyncWorker(
                 cancellationToken);
         if (workItem is null)
         {
-            return false;
+            return CalendarSyncDrainItemOutcome.None;
         }
 
         workItem.Status = CalendarSyncWorkItemStatus.Processing;
@@ -70,6 +76,9 @@ internal sealed class GoogleCalendarSyncWorker(
             workItem.Status = CalendarSyncWorkItemStatus.Succeeded;
             workItem.LastError = null;
             workItem.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return CalendarSyncDrainItemOutcome.Succeeded;
         }
         catch (Exception ex)
         {
@@ -80,15 +89,18 @@ internal sealed class GoogleCalendarSyncWorker(
                 : CalendarSyncWorkItemStatus.Pending;
             workItem.NextAttemptAtUtc = DateTimeOffset.UtcNow.Add(GetRetryDelay(workItem.AttemptCount));
             workItem.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
+
             logger.LogWarning(
                 ex,
                 "Google Calendar sync work item {WorkItemId} failed on attempt {AttemptCount}.",
                 workItem.Id,
                 workItem.AttemptCount);
-        }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return true;
+            return workItem.Status == CalendarSyncWorkItemStatus.Failed
+                ? CalendarSyncDrainItemOutcome.Failed
+                : CalendarSyncDrainItemOutcome.Retried;
+        }
     }
 
     private static TimeSpan GetRetryDelay(int attemptCount)
@@ -100,5 +112,13 @@ internal sealed class GoogleCalendarSyncWorker(
             3 => TimeSpan.FromMinutes(15),
             _ => TimeSpan.FromHours(1),
         };
+    }
+
+    private enum CalendarSyncDrainItemOutcome
+    {
+        None,
+        Succeeded,
+        Retried,
+        Failed
     }
 }

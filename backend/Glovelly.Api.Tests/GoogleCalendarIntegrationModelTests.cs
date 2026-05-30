@@ -386,6 +386,115 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         Assert.NotNull(syncState.DeletedAtUtc);
     }
 
+    [Fact]
+    public async Task QueueDrainer_WhenWorkSucceeds_MarksItemSucceededAndReturnsCounts()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        var workItemId = await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync);
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
+
+        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0), result);
+        Assert.Equal(workItemId, processor.ProcessedWorkItemIds.Single());
+
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        Assert.Equal(CalendarSyncWorkItemStatus.Succeeded, workItem.Status);
+        Assert.Null(workItem.LastError);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_WhenWorkFailsBeforeMaxAttempts_SchedulesRetryAndReturnsCounts()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor
+        {
+            ExceptionToThrow = new InvalidOperationException("temporary failure")
+        };
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync);
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
+
+        Assert.Equal(new CalendarSyncDrainResult(1, 0, 1, 0, 0), result);
+
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
+        Assert.Equal(1, workItem.AttemptCount);
+        Assert.Equal("temporary failure", workItem.LastError);
+        Assert.True(workItem.NextAttemptAtUtc > DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_WhenWorkFailsAtMaxAttempts_MarksItemFailedAndReturnsCounts()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor
+        {
+            ExceptionToThrow = new InvalidOperationException("permanent failure")
+        };
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync, attemptCount: 4);
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
+
+        Assert.Equal(new CalendarSyncDrainResult(1, 0, 0, 1, 0), result);
+
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        Assert.Equal(CalendarSyncWorkItemStatus.Failed, workItem.Status);
+        Assert.Equal(5, workItem.AttemptCount);
+        Assert.Equal("permanent failure", workItem.LastError);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_RespectsMaxItems()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync);
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.GigUpdated, Guid.NewGuid());
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 1));
+
+        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0), result);
+
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await dbContext.CalendarSyncWorkItems.CountAsync(item => item.Status == CalendarSyncWorkItemStatus.Succeeded));
+        Assert.Equal(1, await dbContext.CalendarSyncWorkItems.CountAsync(item => item.Status == CalendarSyncWorkItemStatus.Pending));
+    }
+
+    [Fact]
+    public async Task QueueDrainer_WhenNoDueWork_ReturnsZeroCounts()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.ManualSync,
+            nextAttemptAtUtc: DateTimeOffset.UtcNow.AddMinutes(10));
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
+
+        Assert.Equal(new CalendarSyncDrainResult(0, 0, 0, 0, 0), result);
+        Assert.Empty(processor.ProcessedWorkItemIds);
+    }
+
     private static IGigCalendarSyncPlanner CreatePlanner()
     {
         return new GigCalendarSyncPlanner(new GigCalendarEventMapper(), new CalendarEventPayloadHasher());
@@ -463,6 +572,47 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
                 services.AddSingleton<IGoogleCalendarApiClient>(calendarClient);
             });
         });
+    }
+
+    private WebApplicationFactory<Program> CreateFactory(FakeGoogleCalendarSyncProcessor processor)
+    {
+        return _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IGoogleCalendarSyncProcessor>();
+                services.AddSingleton<IGoogleCalendarSyncProcessor>(processor);
+            });
+        });
+    }
+
+    private static async Task<Guid> SeedWorkItemAsync(
+        WebApplicationFactory<Program> factory,
+        CalendarSyncWorkItemReason reason,
+        Guid? gigId = null,
+        int attemptCount = 0,
+        DateTimeOffset? nextAttemptAtUtc = null)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var workItemId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        dbContext.CalendarSyncWorkItems.Add(new CalendarSyncWorkItem
+        {
+            Id = workItemId,
+            UserId = TestAuthContext.UserId,
+            GigId = gigId,
+            Provider = CalendarProvider.GoogleCalendar,
+            Reason = reason,
+            Status = CalendarSyncWorkItemStatus.Pending,
+            AttemptCount = attemptCount,
+            NextAttemptAtUtc = nextAttemptAtUtc ?? now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        return workItemId;
     }
 
     private static async Task<Guid> SeedCalendarConnectionAsync(WebApplicationFactory<Program> factory)
@@ -545,6 +695,23 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             AccessToken = accessToken;
             EventCalendarId = calendarId;
             DeletedEventId = eventId;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeGoogleCalendarSyncProcessor : IGoogleCalendarSyncProcessor
+    {
+        public List<Guid> ProcessedWorkItemIds { get; } = [];
+        public Exception? ExceptionToThrow { get; set; }
+
+        public Task ProcessAsync(CalendarSyncWorkItem workItem, CancellationToken cancellationToken)
+        {
+            ProcessedWorkItemIds.Add(workItem.Id);
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
             return Task.CompletedTask;
         }
     }
