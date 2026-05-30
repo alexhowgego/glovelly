@@ -14,12 +14,14 @@ COPY glovelly.sln ./
 COPY Directory.Build.props Directory.Packages.props ./
 COPY backend/Glovelly.Api/Glovelly.Api.csproj backend/Glovelly.Api/
 COPY backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj backend/Glovelly.Api.Tests/
+COPY backend/Glovelly.Worker/Glovelly.Worker.csproj backend/Glovelly.Worker/
 RUN dotnet restore glovelly.sln
 
 COPY backend/ ./backend/
-RUN dotnet publish backend/Glovelly.Api/Glovelly.Api.csproj --configuration Release --output /app/publish
+RUN dotnet publish backend/Glovelly.Api/Glovelly.Api.csproj --configuration Release --output /app/api
+RUN dotnet publish backend/Glovelly.Worker/Glovelly.Worker.csproj --configuration Release --output /app/worker
 
-COPY --from=frontend-build /src/frontend/glovelly-web/dist/ /app/publish/wwwroot/
+COPY --from=frontend-build /src/frontend/glovelly-web/dist/ /app/api/wwwroot/
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
@@ -32,6 +34,7 @@ ENV App__BuildCommitId=${BUILD_COMMIT_ID}
 ENV App__BuildTimestamp=${BUILD_TIMESTAMP}
 EXPOSE 8080
 
-COPY --from=backend-build /app/publish ./
+COPY --from=backend-build /app/api ./
+COPY --from=backend-build /app/worker ./worker/
 
 ENTRYPOINT ["sh", "-c", "exec dotnet Glovelly.Api.dll --urls http://+:${PORT:-8080}"]

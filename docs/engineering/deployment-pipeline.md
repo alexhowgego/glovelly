@@ -7,11 +7,35 @@ Glovelly deploys as a single container image to Google Cloud Run. GitHub Actions
 The root `Dockerfile` uses a multi-stage build:
 
 1. Build the Vite frontend with Node.
-2. Restore and publish the ASP.NET Core backend with the .NET SDK.
+2. Restore and publish the ASP.NET Core backend and worker with the .NET SDK.
 3. Copy the frontend `dist` output into the backend publish output under `wwwroot`.
 4. Run the final image on the ASP.NET Core runtime image.
 
-The final image exposes port `8080` and starts `Glovelly.Api.dll`, respecting Cloud Run's `PORT` environment variable.
+The final image exposes port `8080` and starts `Glovelly.Api.dll`, respecting Cloud Run's `PORT` environment variable. It also includes `Glovelly.Worker.dll` under `/app/worker` so Cloud Run Jobs can run non-interactive commands from the same image.
+
+## Worker Commands
+
+Local Calendar sync queue draining can be run with:
+
+```bash
+dotnet run --project backend/Glovelly.Worker -- calendar-sync drain
+```
+
+Useful options are:
+
+```bash
+dotnet run --project backend/Glovelly.Worker -- calendar-sync drain --max-items 100 --max-duration-seconds 55
+```
+
+The deployed container can run the same command via the published worker DLL:
+
+```bash
+dotnet worker/Glovelly.Worker.dll calendar-sync drain
+```
+
+The CI deployment creates or updates a Cloud Run Job for this command and a Cloud Scheduler HTTP trigger that invokes the job. The job uses the same image, runtime service account, environment variables, and Secret Manager bindings as the Cloud Run service.
+
+The default job name is `<cloud-run-service>-calendar-sync`; the default scheduler name is `<job-name>-schedule`; the default schedule is every five minutes. These can be overridden per GitHub Environment with `GCP_CALENDAR_SYNC_JOB_NAME`, `GCP_CALENDAR_SYNC_SCHEDULER_NAME`, `CALENDAR_SYNC_SCHEDULE`, and `GCP_SCHEDULER_LOCATION` variables.
 
 ## GitHub Actions
 
@@ -28,7 +52,8 @@ It currently:
 7. builds and optionally pushes the image
 8. pushes images to Artifact Registry
 9. deploys eligible builds to Cloud Run
-10. comments a staging preview URL on same-repository pull requests
+10. deploys the Calendar sync Cloud Run Job and Scheduler trigger
+11. comments a staging preview URL on same-repository pull requests
 
 Workload Identity Federation is preferred because it avoids storing long-lived Google service account JSON keys in GitHub.
 
@@ -63,6 +88,8 @@ Do not commit secret values, OAuth client secrets, Resend API keys, database con
 The deployment depends on:
 
 - Cloud Run service hosting the app
+- Cloud Run Job that drains the Calendar sync queue
+- Cloud Scheduler trigger that invokes the Calendar sync job
 - Artifact Registry repository for the container image
 - Workload Identity Federation pool/provider for GitHub Actions
 - Google service accounts for deployment and runtime

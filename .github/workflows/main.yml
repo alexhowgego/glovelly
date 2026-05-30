@@ -154,6 +154,9 @@ jobs:
       url: ${{ steps.deploy_staging.outputs.url }}
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Authenticate to Google Cloud
         id: auth
         uses: google-github-actions/auth@v3
@@ -202,6 +205,22 @@ jobs:
 
       - name: Show staging URL
         run: echo "Deployed staging to ${{ steps.deploy_staging.outputs.url }}"
+
+      - name: Deploy Calendar sync job staging
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
+          DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+          GCP_BUCKET_NAME: ${{ vars.GCP_BUCKET_NAME }}
+          GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          GCP_CONNECTION_STRING_SECRET_ID: ${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}
+          GCP_CHATGPT_REDIRECT_SECRET_ID: ${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}
+          GCP_UAT_SECRET_ID: ${{ vars.GCP_UAT_SECRET_ID }}
+          CALENDAR_SYNC_JOB_NAME: ${{ vars.GCP_CALENDAR_SYNC_JOB_NAME }}
+          CALENDAR_SYNC_SCHEDULER_NAME: ${{ vars.GCP_CALENDAR_SYNC_SCHEDULER_NAME }}
+          CALENDAR_SYNC_SCHEDULE: ${{ vars.CALENDAR_SYNC_SCHEDULE }}
+          GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
+        run: bash .github/scripts/deploy-calendar-sync-job.sh
 
       - name: Comment staging URL on PR
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -263,6 +282,9 @@ jobs:
       url: ${{ steps.deploy_production.outputs.url }}
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Authenticate to Google Cloud
         id: auth
         uses: google-github-actions/auth@v3
@@ -310,6 +332,21 @@ jobs:
 
       - name: Show production URL
         run: echo "Deployed production to ${{ steps.deploy_production.outputs.url }}"
+
+      - name: Deploy Calendar sync job production
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
+          DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+          GCP_BUCKET_NAME: ${{ vars.GCP_BUCKET_NAME }}
+          GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          GCP_CONNECTION_STRING_SECRET_ID: ${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}
+          GCP_CHATGPT_REDIRECT_SECRET_ID: ${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}
+          CALENDAR_SYNC_JOB_NAME: ${{ vars.GCP_CALENDAR_SYNC_JOB_NAME }}
+          CALENDAR_SYNC_SCHEDULER_NAME: ${{ vars.GCP_CALENDAR_SYNC_SCHEDULER_NAME }}
+          CALENDAR_SYNC_SCHEDULE: ${{ vars.CALENDAR_SYNC_SCHEDULE }}
+          GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
+        run: bash .github/scripts/deploy-calendar-sync-job.sh
 
   production_smoke:
     name: Run production smoke tests
