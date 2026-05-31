@@ -352,14 +352,43 @@ public sealed class GoogleCalendarSyncProcessor(
         GoogleCalendarIntegrationSettings settings,
         CancellationToken cancellationToken)
     {
+        var oldCalendarId = settings.GoogleCalendarId;
         logger.LogWarning(
             "Google Calendar {CalendarId} was not found for user {UserId}; recreating the integration calendar.",
-            settings.GoogleCalendarId,
+            oldCalendarId,
             userId);
 
         settings.GoogleCalendarId = null;
         settings.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         _ = await calendarIntegrationService.EnsureCalendarAsync(userId, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(oldCalendarId))
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var statesToInvalidate = await dbContext.GigCalendarSyncStates
+            .Where(state =>
+                state.UserId == userId &&
+                state.Provider == CalendarProvider.GoogleCalendar)
+            .ToListAsync(cancellationToken);
+
+        foreach (var state in statesToInvalidate)
+        {
+            state.ProviderCalendarId = null;
+            state.ProviderEventId = null;
+            state.LastSyncHash = null;
+            state.DeletedAtUtc = null;
+            state.UpdatedAtUtc = now;
+        }
+
+        if (statesToInvalidate.Count > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        await workQueue.EnqueueFullSyncAsync(userId, CalendarSyncWorkItemReason.CalendarRecreated, cancellationToken);
     }
 }

@@ -8,5 +8,6 @@ public enum CalendarSyncWorkItemReason
     GigDeleted,
     SettingsChanged,
     ConnectionChanged,
-    ManualSync
+    ManualSync,
+    CalendarRecreated
 }

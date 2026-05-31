@@ -319,11 +319,11 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.ConnectionChanged);
-        await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.ManualSync);
+        await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.CalendarRecreated);
 
         var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
         Assert.Null(workItem.GigId);
-        Assert.Equal(CalendarSyncWorkItemReason.ManualSync, workItem.Reason);
+        Assert.Equal(CalendarSyncWorkItemReason.CalendarRecreated, workItem.Reason);
         Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
     }
 
@@ -387,6 +387,8 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         _ = factory.CreateClient();
         var connectionId = await SeedCalendarConnectionAsync(factory);
         var gig = CreateGig(GigStatus.Confirmed);
+        var historicalGigId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        var olderHistoricalGigId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
         using (var seedScope = factory.Services.CreateScope())
         {
@@ -403,6 +405,16 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
             dbContext.Gigs.Add(gig);
+            dbContext.GigCalendarSyncStates.Add(CreateSyncState(
+                historicalGigId,
+                "historical-hash",
+                "historical-event-id",
+                providerCalendarId: "deleted-calendar-id"));
+            dbContext.GigCalendarSyncStates.Add(CreateSyncState(
+                olderHistoricalGigId,
+                "older-historical-hash",
+                "older-historical-event-id",
+                providerCalendarId: "older-deleted-calendar-id"));
             await dbContext.SaveChangesAsync();
         }
 
@@ -420,9 +432,20 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
         var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var settings = await assertionDbContext.GoogleCalendarIntegrationSettings.SingleAsync();
-        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync();
+        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == gig.Id);
+        var historicalSyncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == historicalGigId);
+        var olderHistoricalSyncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == olderHistoricalGigId);
+        var fullSyncWorkItem = await assertionDbContext.CalendarSyncWorkItems.SingleAsync();
         Assert.Equal("replacement-calendar-id", settings.GoogleCalendarId);
         Assert.Equal("replacement-calendar-id", syncState.ProviderCalendarId);
+        Assert.Null(historicalSyncState.ProviderCalendarId);
+        Assert.Null(historicalSyncState.ProviderEventId);
+        Assert.Null(historicalSyncState.LastSyncHash);
+        Assert.Null(olderHistoricalSyncState.ProviderCalendarId);
+        Assert.Null(olderHistoricalSyncState.ProviderEventId);
+        Assert.Null(olderHistoricalSyncState.LastSyncHash);
+        Assert.Null(fullSyncWorkItem.GigId);
+        Assert.Equal(CalendarSyncWorkItemReason.CalendarRecreated, fullSyncWorkItem.Reason);
         Assert.Equal(["deleted-calendar-id", "replacement-calendar-id"], calendarClient.CreateEventCalendarIds);
     }
 
@@ -478,7 +501,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var processor = new FakeGoogleCalendarSyncProcessor();
         using var factory = CreateFactory(processor);
         _ = factory.CreateClient();
-        var workItemId = await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync);
+        var workItemId = await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ConnectionChanged);
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
@@ -507,7 +530,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         };
         using var factory = CreateFactory(processor);
         _ = factory.CreateClient();
-        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync);
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ConnectionChanged);
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
@@ -537,7 +560,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         };
         using var factory = CreateFactory(processor);
         _ = factory.CreateClient();
-        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync, attemptCount: 4);
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ConnectionChanged, attemptCount: 4);
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
@@ -562,7 +585,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var processor = new FakeGoogleCalendarSyncProcessor();
         using var factory = CreateFactory(processor);
         _ = factory.CreateClient();
-        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync);
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ConnectionChanged);
         await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.GigUpdated, Guid.NewGuid());
 
         using var scope = factory.Services.CreateScope();
@@ -584,7 +607,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         _ = factory.CreateClient();
         await SeedWorkItemAsync(
             factory,
-            CalendarSyncWorkItemReason.ManualSync,
+            CalendarSyncWorkItemReason.ConnectionChanged,
             nextAttemptAtUtc: DateTimeOffset.UtcNow.AddMinutes(10));
 
         using var scope = factory.Services.CreateScope();
@@ -603,7 +626,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         _ = factory.CreateClient();
         var workItemId = await SeedWorkItemAsync(
             factory,
-            CalendarSyncWorkItemReason.ManualSync,
+            CalendarSyncWorkItemReason.ConnectionChanged,
             status: CalendarSyncWorkItemStatus.Processing,
             processingOwnerId: "abandoned-owner",
             processingStartedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-20));
@@ -634,7 +657,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         _ = factory.CreateClient();
         await SeedWorkItemAsync(
             factory,
-            CalendarSyncWorkItemReason.ManualSync,
+            CalendarSyncWorkItemReason.ConnectionChanged,
             status: CalendarSyncWorkItemStatus.Processing,
             processingOwnerId: "active-owner",
             processingStartedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-2));
@@ -673,7 +696,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         using var factory = CreateFactory(processor);
         _ = factory.CreateClient();
         processor.ServiceProvider = factory.Services;
-        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ManualSync);
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ConnectionChanged);
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
@@ -730,7 +753,11 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         };
     }
 
-    private static GigCalendarSyncState CreateSyncState(Guid gigId, string lastSyncHash, string providerEventId)
+    private static GigCalendarSyncState CreateSyncState(
+        Guid gigId,
+        string lastSyncHash,
+        string providerEventId,
+        string providerCalendarId = "calendar-id")
     {
         return new GigCalendarSyncState
         {
@@ -738,7 +765,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             GigId = gigId,
             UserId = TestAuthContext.UserId,
             Provider = CalendarProvider.GoogleCalendar,
-            ProviderCalendarId = "calendar-id",
+            ProviderCalendarId = providerCalendarId,
             ProviderEventId = providerEventId,
             LastSyncHash = lastSyncHash,
             CreatedAtUtc = DateTimeOffset.UtcNow,
