@@ -15,6 +15,7 @@
       {
         "files": [
           "assets/**",
+          "mcp-tools.json",
           "CNAME"
         ]
       }

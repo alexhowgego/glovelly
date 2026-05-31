@@ -16,7 +16,8 @@ The database stores:
 - gig expenses and receipt attachment metadata
 - invoices and invoice lines
 - seller profiles
-- Google Drive connection metadata
+- reusable Google connection metadata plus Drive and Calendar integration settings
+- Google Calendar sync state and durable Calendar sync queue work items
 - MCP OAuth state/tokens
 - ASP.NET Core data protection keys in Postgres-backed deployments
 - future domain entities
@@ -31,7 +32,7 @@ Gig import batches and drafts are staging records. They can contain incomplete A
 
 Production uses Npgsql when `ConnectionStrings:Glovelly` is configured. Without that connection string, the app uses an in-memory database and seeds development data outside the testing environment.
 
-Schema evolution should use EF Core migrations. Migrations should describe deliberate product/data changes rather than incidental local experiments.
+Schema evolution is currently applied with manually reviewed PostgreSQL SQL rather than checked-in EF Core migrations. SQL changes should be deliberate, idempotent where practical, and reviewed against both current staging state and fresh production creation needs.
 
 ## Ownership And Access
 

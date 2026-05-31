@@ -24,6 +24,8 @@
       href: uat/expenses.md
     - name: Imported gig journeys
       href: uat/gig-imports.md
+    - name: Google Calendar journeys
+      href: uat/calendar.md
     - name: Enrolment and access
       href: uat/enrolment.md
     - name: Testing notes
@@ -53,6 +55,10 @@
           href: engineering/decisions/0002-runtime-secrets-in-google-secret-manager.md
         - name: ADR 0003 Email provider abstraction
           href: engineering/decisions/0003-email-provider-abstraction.md
+        - name: ADR 0004 Google Calendar sync architecture
+          href: engineering/decisions/0004-google-calendar-sync-architecture.md
+        - name: ADR 0005 Cloud Run Jobs for background workers
+          href: engineering/decisions/0005-cloud-run-jobs-for-background-workers.md
 - name: Reference
   items:
     - name: Codebase map

@@ -1,6 +1,6 @@
 # Application Terms of Service
 
-Last updated: 19 May 2026
+Last updated: 31 May 2026
 
 These terms apply to use of the Glovelly application at `https://glovelly.net`.
 
@@ -22,7 +22,7 @@ Glovelly is intended for business use by authorised users.
 
 ## What Glovelly Is
 
-Glovelly is a small business administration tool, currently focused on self-employed music work. It helps users manage clients, gigs, expenses, receipt attachments, invoice generation, invoice issue and reissue, invoice delivery, seller profile settings, Google Drive invoice publishing, user access, and related business records.
+Glovelly is a small business administration tool, currently focused on self-employed music work. It helps users manage clients, gigs, expenses, receipt attachments, invoice generation, invoice issue and reissue, invoice delivery, seller profile settings, Google Drive invoice publishing, Google Calendar gig sync, user access, and related business records.
 
 Glovelly is not accounting, tax, financial, legal, or professional advice. You are responsible for checking that records, invoices, tax treatment, and business decisions are accurate and suitable for your circumstances.
 
@@ -56,7 +56,7 @@ You remain responsible for the business records, files, text, receipt attachment
 
 You confirm that you have the rights and permissions needed to upload and process that content in Glovelly.
 
-You give us permission to host, process, copy, generate, transform, transmit, and display your content as needed to provide Glovelly. This includes generating invoice PDFs, storing receipt attachments, sending transactional emails, and publishing files to Google Drive where you configure that integration.
+You give us permission to host, process, copy, generate, transform, transmit, and display your content as needed to provide Glovelly. This includes generating invoice PDFs, storing receipt attachments, sending transactional emails, publishing files to Google Drive, and syncing gigs to Google Calendar where you configure those integrations.
 
 ## Accuracy of Business Records
 
@@ -76,9 +76,17 @@ You are responsible for ensuring that any selected Google Drive destination is a
 
 Google Drive integration depends on Google's services, permissions, scopes, and availability. If Google Drive access expires, is revoked, or otherwise stops working, publishing to Google Drive may fail until the connection is restored.
 
+## Google Calendar Integration
+
+If you connect Google Calendar, you authorise Glovelly to create and manage a dedicated `Glovelly Gigs` calendar and to sync eligible gigs into that calendar.
+
+Calendar sync is one-way from Glovelly to Google Calendar. Glovelly remains the source of truth for gig records. Changes made directly in Google Calendar may be overwritten, ignored, or removed by later Glovelly sync activity.
+
+You are responsible for checking that synced calendar entries are suitable for your own planning and operational use. Calendar sync depends on Google's services, permissions, scopes, and availability. If Google Calendar access expires, is revoked, or otherwise stops working, sync may fail until the connection is restored.
+
 ## Third-Party Services
 
-Glovelly may integrate with third-party services, including Google sign-in, Google Drive, email delivery providers, GitHub Pages, hosting, storage, logging, and other infrastructure services.
+Glovelly may integrate with third-party services, including Google sign-in, Google Drive, Google Calendar, email delivery providers, GitHub Pages, hosting, storage, logging, and other infrastructure services.
 
 Third-party services may have their own terms, privacy notices, availability, limits, and security practices. We are not responsible for third-party services outside our reasonable control.
 

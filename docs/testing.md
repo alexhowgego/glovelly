@@ -38,6 +38,18 @@ dotnet test glovelly.sln -m:1
 
 Use `-m:1` because the test setup uses shared web application factory patterns and in-memory state; serial execution avoids noisy cross-test behavior.
 
+Focused Calendar sync checks can be run with:
+
+```bash
+dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~GoogleCalendarIntegrationModelTests
+```
+
+Worker smoke checks can be run locally with:
+
+```bash
+dotnet run --project backend/Glovelly.Worker -- calendar-sync drain --max-items 1
+```
+
 ## Frontend Checks
 
 Frontend code lives in `frontend/glovelly-web`.
@@ -78,4 +90,6 @@ Tests should create run-specific records using a run ID such as `UAT-<timestamp>
 - New invoice behavior: add tests around generated lines, status transitions, issue/reissue metadata, delivery side effects, and gig linkage.
 - New email behavior: assert fake email count, recipient, subject, and meaningful body/attachment details.
 - New Google Drive behavior: prefer interface-backed tests or endpoint tests with test doubles; avoid real network calls.
+- New Google Calendar behavior: prefer service/endpoint tests with fake Google Calendar clients; avoid real network calls. Cover queueing, eligibility, retry/recovery, and deletion behavior where relevant.
+- New worker behavior: test the reusable service layer directly where possible, then smoke-test the worker command if command parsing or DI registration changed.
 - New frontend API shape: update `src/types.ts`, affected hooks, and run lint/build.

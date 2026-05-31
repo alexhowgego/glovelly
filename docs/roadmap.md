@@ -10,6 +10,7 @@
 - Download invoice PDFs
 - Send invoices by email
 - Publish invoices to Google Drive
+- Sync confirmed and completed gigs to Google Calendar
 - Seller profile and invoice readiness
 - Google sign-in and admin user management
 - Access request workflow
@@ -23,7 +24,6 @@
 - Continue tightening agent-facing docs and conventions
 
 ## Later
-- Calendar integration
 - Set lists
 - Richer financial reporting
 - More automation around tax prep

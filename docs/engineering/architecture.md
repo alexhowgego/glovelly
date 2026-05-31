@@ -1,6 +1,6 @@
 # Architecture
 
-Glovelly is a compact, cloud-hosted web application for self-employed business administration. It supports authenticated access, clients, gigs, imported gig review, expenses, receipt attachments, invoices, Google Drive publishing, email delivery, admin user management, and a small MCP business data surface.
+Glovelly is a compact, cloud-hosted web application for self-employed business administration. It supports authenticated access, clients, gigs, imported gig review, expenses, receipt attachments, invoices, Google Drive publishing, Google Calendar sync, email delivery, admin user management, and a small MCP business data surface.
 
 The system should stay pragmatic and cost-conscious. Avoid architecture theatre, keep deployment simple, and keep the internal boundaries clean enough that the app can grow without becoming soup.
 
@@ -20,21 +20,24 @@ flowchart LR
     GitHub --> Registry[Artifact Registry]
     Registry --> CloudRun[Cloud Run]
     CloudRun --> App
+    CloudScheduler[Cloud Scheduler] --> CloudRunJob[Cloud Run Job]
+    CloudRunJob --> AppWorker[Glovelly.Worker]
+    AppWorker --> DB
 ```
 
 ## Runtime Shape
 
-The preferred runtime shape is one deployable web application container unless there is a clear reason to split services.
+The preferred runtime shape is one deployable application container unless there is a clear reason to split services.
 
 That gives Glovelly one image, one Cloud Run service, one release unit, no separate frontend hosting tier, fewer CORS and distributed deployment problems, and a simpler cost and operations profile.
 
-Frontend and backend are separate concerns at build time. The Vite frontend is built first, copied into the ASP.NET Core publish output under `wwwroot`, and served by the backend at runtime.
+Frontend, backend, and worker are separate concerns at build time. The Vite frontend is built first, copied into the ASP.NET Core publish output under `wwwroot`, and served by the backend at runtime. The same image also includes `Glovelly.Worker` so Cloud Run Jobs can run non-interactive commands without a separate image.
 
 ## Logical System View
 
 The browser frontend owns user/admin journeys and calls the API for authenticated application workflows.
 
-The ASP.NET Core backend is responsible for serving the frontend, Google authentication integration, mapping Google identities to Glovelly users, enforcing application authorisation, running business workflows, persistence through EF Core, and integrations such as email, Google Drive, and storage.
+The ASP.NET Core backend is responsible for serving the frontend, Google authentication integration, mapping Google identities to Glovelly users, enforcing application authorisation, running business workflows, persistence through EF Core, and integrations such as email, Google Drive, Google Calendar, and storage.
 
 Neon Postgres is the primary system of record for Glovelly users, roles/access metadata, clients, gigs, staged gig imports, invoices, expenses, receipts, delivery records when captured, and future domain entities.
 
@@ -42,7 +45,7 @@ Google OpenID Connect authenticates external identities. Google proves who the u
 
 Resend provides outbound transactional email. It is an infrastructure integration, not core domain logic.
 
-Cloud Run hosts the deployed container, Artifact Registry stores images, Secret Manager stores runtime secrets where appropriate, and GitHub Actions builds and deploys the image through Workload Identity Federation.
+Cloud Run hosts the deployed container, Artifact Registry stores images, Secret Manager stores runtime secrets where appropriate, Cloud Scheduler triggers non-interactive Cloud Run Jobs, and GitHub Actions builds and deploys the image through Workload Identity Federation.
 
 ## Internal Boundaries
 
@@ -52,7 +55,7 @@ Even while the deployed application remains a single process, code should preser
 - Application authorisation and current-user context
 - Domain models and business workflows
 - Persistence and EF Core configuration
-- Integrations such as Resend, Google Drive, and blob storage
+- Integrations such as Resend, Google Drive, Google Calendar, and blob storage
 - Presentation/UI/admin journeys
 - Deployment and configuration concerns
 
@@ -94,9 +97,15 @@ Glovelly responsibility: compose and send appropriate messages, store internal d
 
 ### Google Cloud Run
 
-Purpose: managed runtime hosting for the containerised app.
+Purpose: managed runtime hosting for the containerised app and job execution.
 
-Glovelly responsibility: container health, runtime configuration, logs, and service deployment.
+Glovelly responsibility: container health, runtime configuration, logs, service deployment, and Cloud Run Job deployment for scheduled worker commands.
+
+### Google Calendar
+
+Purpose: one-way gig visibility in a dedicated user calendar.
+
+Glovelly responsibility: treat Glovelly gigs as the source of truth, create and manage a `Glovelly Gigs` calendar with least-privilege app-created scope, sync confirmed/completed gigs, delete cancelled synced gigs, and recover by rebuilding local sync state if the provider calendar is deleted.
 
 ### Google Artifact Registry
 
@@ -143,7 +152,7 @@ The application should log enough to diagnose access and enrolment issues, but m
 These areas are expected to evolve:
 
 - richer admin portal flows for enrolment
-- user-facing documentation for invoice, email, receipt, and Google Drive workflows
+- user-facing documentation for invoice, email, receipt, Google Drive, and Google Calendar workflows
 - email delivery status, bounce handling, and Resend webhooks
 - a more formal role/permission model
 - future account/tenant model if Glovelly grows beyond personal/small-circle use

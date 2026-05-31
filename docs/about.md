@@ -48,6 +48,7 @@ That means it cares about things like:
 - seller profile information
 - invoice delivery
 - Google Drive publishing
+- Google Calendar gig visibility
 - keeping enough records around to make tax and accounting less grim
 
 The goal is not to make admin exciting. That would be suspicious.
@@ -65,7 +66,7 @@ That means:
 - role-based administration
 - privacy and terms documentation
 - secure handling of external integrations
-- Google OAuth for Drive publishing
+- Google OAuth for Drive publishing and Calendar sync
 - transactional email
 - careful treatment of invoices and business records
 
