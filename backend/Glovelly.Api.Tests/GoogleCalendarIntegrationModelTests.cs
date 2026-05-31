@@ -341,6 +341,57 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
     }
 
     [Fact]
+    public async Task SyncProcessor_WhenStoredCalendarIsMissing_RecreatesCalendarAndRetriesCreate()
+    {
+        var calendarClient = new FakeGoogleCalendarApiClient
+        {
+            ThrowNotFoundOnNextCreateEvent = true,
+            CreatedCalendarId = "replacement-calendar-id",
+        };
+        using var factory = CreateFactory(calendarClient);
+        _ = factory.CreateClient();
+        var connectionId = await SeedCalendarConnectionAsync(factory);
+        var gig = CreateGig(GigStatus.Confirmed);
+
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            var dbContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.GoogleCalendarIntegrationSettings.Add(new GoogleCalendarIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                IsEnabled = true,
+                GoogleCalendarId = "deleted-calendar-id",
+                CalendarName = "Glovelly Gigs",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            dbContext.Gigs.Add(gig);
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var processor = scope.ServiceProvider.GetRequiredService<IGoogleCalendarSyncProcessor>();
+        await processor.ProcessAsync(new CalendarSyncWorkItem
+        {
+            Id = Guid.NewGuid(),
+            UserId = TestAuthContext.UserId,
+            GigId = gig.Id,
+            Reason = CalendarSyncWorkItemReason.GigCreated,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        }, CancellationToken.None);
+
+        var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var settings = await assertionDbContext.GoogleCalendarIntegrationSettings.SingleAsync();
+        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync();
+        Assert.Equal("replacement-calendar-id", settings.GoogleCalendarId);
+        Assert.Equal("replacement-calendar-id", syncState.ProviderCalendarId);
+        Assert.Equal(["deleted-calendar-id", "replacement-calendar-id"], calendarClient.CreateEventCalendarIds);
+    }
+
+    [Fact]
     public async Task SyncProcessor_DeletesEventWhenGigNoLongerShouldSync()
     {
         var calendarClient = new FakeGoogleCalendarApiClient();
@@ -748,11 +799,14 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
     private sealed class FakeGoogleCalendarApiClient : IGoogleCalendarApiClient
     {
         public bool CreateWasCalled { get; private set; }
+        public bool ThrowNotFoundOnNextCreateEvent { get; set; }
+        public string CreatedCalendarId { get; set; } = "google-calendar-id";
         public string? AccessToken { get; private set; }
         public string? Summary { get; private set; }
         public string? EventCalendarId { get; private set; }
         public string? EventId { get; private set; }
         public string? DeletedEventId { get; private set; }
+        public List<string> CreateEventCalendarIds { get; } = [];
 
         public Task<GoogleCalendarCreateResult> CreateCalendarAsync(
             string accessToken,
@@ -763,7 +817,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             AccessToken = accessToken;
             Summary = summary;
 
-            return Task.FromResult(new GoogleCalendarCreateResult("google-calendar-id", summary));
+            return Task.FromResult(new GoogleCalendarCreateResult(CreatedCalendarId, summary));
         }
 
         public Task<GoogleCalendarEventResult> CreateEventAsync(
@@ -776,6 +830,16 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             AccessToken = accessToken;
             EventCalendarId = calendarId;
             EventId = eventId;
+            CreateEventCalendarIds.Add(calendarId);
+            if (ThrowNotFoundOnNextCreateEvent)
+            {
+                ThrowNotFoundOnNextCreateEvent = false;
+                throw new GoogleCalendarApiException(
+                    "Google Calendar event creation failed with HTTP 404. Not Found",
+                    System.Net.HttpStatusCode.NotFound,
+                    "Not Found");
+            }
+
             return Task.FromResult(new GoogleCalendarEventResult(eventId));
         }
 

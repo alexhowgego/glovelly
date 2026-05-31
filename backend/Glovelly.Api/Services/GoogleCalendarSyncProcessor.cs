@@ -10,7 +10,8 @@ public sealed class GoogleCalendarSyncProcessor(
     IGoogleConnectionService googleConnectionService,
     IGoogleCalendarApiClient calendarApiClient,
     IGigCalendarSyncPlanner syncPlanner,
-    ICalendarSyncWorkQueue workQueue) : IGoogleCalendarSyncProcessor
+    ICalendarSyncWorkQueue workQueue,
+    ILogger<GoogleCalendarSyncProcessor> logger) : IGoogleCalendarSyncProcessor
 {
     public async Task ProcessAsync(CalendarSyncWorkItem workItem, CancellationToken cancellationToken)
     {
@@ -174,9 +175,10 @@ public sealed class GoogleCalendarSyncProcessor(
         var payloadHash = plan.PayloadHash ?? throw new InvalidOperationException("Calendar create hash is missing.");
         var eventId = GoogleCalendarApiClient.BuildDeterministicEventId(gigId);
         var accessToken = await GetAccessTokenAsync(userId, cancellationToken);
-        var createdEvent = await calendarApiClient.CreateEventAsync(
+        var createdEvent = await CreateEventWithCalendarRecoveryAsync(
+            userId,
+            settings,
             accessToken,
-            settings.GoogleCalendarId!,
             eventId,
             payload,
             cancellationToken);
@@ -212,9 +214,10 @@ public sealed class GoogleCalendarSyncProcessor(
             ? GoogleCalendarApiClient.BuildDeterministicEventId(gigId)
             : syncState.ProviderEventId;
         var accessToken = await GetAccessTokenAsync(userId, cancellationToken);
-        var updatedEvent = await calendarApiClient.UpdateEventAsync(
+        var updatedEvent = await UpdateEventWithCalendarRecoveryAsync(
+            userId,
+            settings,
             accessToken,
-            settings.GoogleCalendarId!,
             eventId,
             payload,
             cancellationToken);
@@ -270,5 +273,93 @@ public sealed class GoogleCalendarSyncProcessor(
         syncState.UpdatedAtUtc = now;
         settings.LastSuccessfulSyncAtUtc = now;
         settings.UpdatedAtUtc = now;
+    }
+
+    private async Task<GoogleCalendarEventResult> CreateEventWithCalendarRecoveryAsync(
+        Guid userId,
+        GoogleCalendarIntegrationSettings settings,
+        string accessToken,
+        string eventId,
+        CalendarEventPayload payload,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await calendarApiClient.CreateEventAsync(
+                accessToken,
+                settings.GoogleCalendarId!,
+                eventId,
+                payload,
+                cancellationToken);
+        }
+        catch (GoogleCalendarApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            await RecreateMissingCalendarAsync(userId, settings, cancellationToken);
+            accessToken = await GetAccessTokenAsync(userId, cancellationToken);
+            return await calendarApiClient.CreateEventAsync(
+                accessToken,
+                settings.GoogleCalendarId!,
+                eventId,
+                payload,
+                cancellationToken);
+        }
+    }
+
+    private async Task<GoogleCalendarEventResult> UpdateEventWithCalendarRecoveryAsync(
+        Guid userId,
+        GoogleCalendarIntegrationSettings settings,
+        string accessToken,
+        string eventId,
+        CalendarEventPayload payload,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await calendarApiClient.UpdateEventAsync(
+                accessToken,
+                settings.GoogleCalendarId!,
+                eventId,
+                payload,
+                cancellationToken);
+        }
+        catch (GoogleCalendarApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            try
+            {
+                return await calendarApiClient.CreateEventAsync(
+                    accessToken,
+                    settings.GoogleCalendarId!,
+                    eventId,
+                    payload,
+                    cancellationToken);
+            }
+            catch (GoogleCalendarApiException createException) when (createException.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                await RecreateMissingCalendarAsync(userId, settings, cancellationToken);
+                accessToken = await GetAccessTokenAsync(userId, cancellationToken);
+                return await calendarApiClient.CreateEventAsync(
+                    accessToken,
+                    settings.GoogleCalendarId!,
+                    eventId,
+                    payload,
+                    cancellationToken);
+            }
+        }
+    }
+
+    private async Task RecreateMissingCalendarAsync(
+        Guid userId,
+        GoogleCalendarIntegrationSettings settings,
+        CancellationToken cancellationToken)
+    {
+        logger.LogWarning(
+            "Google Calendar {CalendarId} was not found for user {UserId}; recreating the integration calendar.",
+            settings.GoogleCalendarId,
+            userId);
+
+        settings.GoogleCalendarId = null;
+        settings.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        _ = await calendarIntegrationService.EnsureCalendarAsync(userId, cancellationToken);
     }
 }

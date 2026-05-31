@@ -27,8 +27,7 @@ public sealed class GoogleCalendarApiClient(HttpClient httpClient) : IGoogleCale
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(
-                $"Google Calendar creation failed with HTTP {(int)response.StatusCode}. {responseBody}".Trim());
+            throw BuildException("Google Calendar creation", response.StatusCode, responseBody);
         }
 
         var createResponse = JsonSerializer.Deserialize<GoogleCalendarCreateResponse>(responseBody, JsonOptions);
@@ -61,8 +60,7 @@ public sealed class GoogleCalendarApiClient(HttpClient httpClient) : IGoogleCale
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(
-                $"Google Calendar event creation failed with HTTP {(int)response.StatusCode}. {responseBody}".Trim());
+            throw BuildException("Google Calendar event creation", response.StatusCode, responseBody);
         }
 
         return ParseEventResponse(responseBody, eventId);
@@ -84,8 +82,7 @@ public sealed class GoogleCalendarApiClient(HttpClient httpClient) : IGoogleCale
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(
-                $"Google Calendar event update failed with HTTP {(int)response.StatusCode}. {responseBody}".Trim());
+            throw BuildException("Google Calendar event update", response.StatusCode, responseBody);
         }
 
         return ParseEventResponse(responseBody, eventId);
@@ -111,8 +108,7 @@ public sealed class GoogleCalendarApiClient(HttpClient httpClient) : IGoogleCale
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(
-                $"Google Calendar event deletion failed with HTTP {(int)response.StatusCode}. {responseBody}".Trim());
+            throw BuildException("Google Calendar event deletion", response.StatusCode, responseBody);
         }
     }
 
@@ -148,6 +144,17 @@ public sealed class GoogleCalendarApiClient(HttpClient httpClient) : IGoogleCale
         var eventResponse = JsonSerializer.Deserialize<GoogleCalendarEventResponse>(responseBody, JsonOptions);
         return new GoogleCalendarEventResult(
             string.IsNullOrWhiteSpace(eventResponse?.Id) ? fallbackId : eventResponse.Id);
+    }
+
+    private static GoogleCalendarApiException BuildException(
+        string operation,
+        System.Net.HttpStatusCode statusCode,
+        string responseBody)
+    {
+        return new GoogleCalendarApiException(
+            $"{operation} failed with HTTP {(int)statusCode}. {responseBody}".Trim(),
+            statusCode,
+            responseBody);
     }
 
     private sealed class GoogleCalendarCreateResponse
