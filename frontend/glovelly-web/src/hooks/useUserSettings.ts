@@ -144,38 +144,6 @@ export function useUserSettings({
     window.location.assign(buildApiUrl('/integrations/google-calendar/connect'))
   }
 
-  const syncGoogleCalendarNow = async () => {
-    setIsGoogleCalendarBusy(true)
-    setUserSettingsStatus('Calendar sync queued.')
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl('/integrations/google-calendar/sync-now'),
-        { method: 'POST' }
-      )
-      if (
-        handleSessionExpired(
-          response,
-          onSessionExpired,
-          'Your session expired. Sign in again to sync Google Calendar.'
-        )
-      ) {
-        setIsUserSettingsOpen(false)
-        return
-      }
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        throw new Error(problem?.detail ?? problem?.title ?? 'Unable to queue Calendar sync.')
-      }
-      await loadGoogleCalendarStatus()
-    } catch (error) {
-      setUserSettingsStatus(
-        error instanceof Error ? error.message : 'Unable to queue Calendar sync.'
-      )
-    } finally {
-      setIsGoogleCalendarBusy(false)
-    }
-  }
-
   const disconnectGoogleCalendar = async () => {
     setIsGoogleCalendarBusy(true)
     try {
@@ -330,7 +298,6 @@ export function useUserSettings({
     isUserSettingsSaving,
     openUserSettings,
     resetUserSettings,
-    syncGoogleCalendarNow,
     updateUserSettingsField,
     userSettingsForm,
     userSettingsStatus,

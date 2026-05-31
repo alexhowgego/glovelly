@@ -129,9 +129,9 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
     [Theory]
     [InlineData(GigStatus.Confirmed, true)]
     [InlineData(GigStatus.Draft, false)]
-    [InlineData(GigStatus.Completed, false)]
+    [InlineData(GigStatus.Completed, true)]
     [InlineData(GigStatus.Cancelled, false)]
-    public void Mapper_SyncsOnlyConfirmedGigsByDefault(GigStatus status, bool expectedShouldExist)
+    public void Mapper_SyncsConfirmedAndCompletedGigsByDefault(GigStatus status, bool expectedShouldExist)
     {
         var mapper = new GigCalendarEventMapper();
         var gig = CreateGig(status);
@@ -290,6 +290,41 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
         Assert.Equal(CalendarSyncWorkItemReason.GigUpdated, workItem.Reason);
         Assert.Equal(CalendarProvider.GoogleCalendar, workItem.Provider);
+    }
+
+    [Fact]
+    public async Task CalendarSyncWorkQueue_DeduplicatesPendingGigWork()
+    {
+        _ = _factory.CreateClient();
+        using var scope = _factory.Services.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<ICalendarSyncWorkQueue>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var gigId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+        await queue.EnqueueGigAsync(TestAuthContext.UserId, gigId, CalendarSyncWorkItemReason.GigCreated);
+        await queue.EnqueueGigAsync(TestAuthContext.UserId, gigId, CalendarSyncWorkItemReason.GigUpdated);
+
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        Assert.Equal(gigId, workItem.GigId);
+        Assert.Equal(CalendarSyncWorkItemReason.GigUpdated, workItem.Reason);
+        Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
+    }
+
+    [Fact]
+    public async Task CalendarSyncWorkQueue_DeduplicatesPendingFullSyncWork()
+    {
+        _ = _factory.CreateClient();
+        using var scope = _factory.Services.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<ICalendarSyncWorkQueue>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.ConnectionChanged);
+        await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.ManualSync);
+
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        Assert.Null(workItem.GigId);
+        Assert.Equal(CalendarSyncWorkItemReason.ManualSync, workItem.Reason);
+        Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
     }
 
     [Fact]
@@ -689,7 +724,6 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             IsEnabled = true,
             GoogleCalendarId = "calendar-id",
             CalendarName = "Glovelly Gigs",
-            SyncAcceptedGigsOnly = true,
             IncludeLocation = true,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,

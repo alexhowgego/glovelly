@@ -18,7 +18,6 @@ type UserSettingsModalProps = {
   onConnectGoogleDrive: () => void
   onDisconnectGoogleCalendar: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
-  onSyncGoogleCalendarNow: () => void
   onUpdateField: (field: keyof UserSettingsForm, value: string) => void
   sellerProfilePostcode: string | null
   status: string
@@ -40,7 +39,6 @@ export function UserSettingsModal({
   onConnectGoogleDrive,
   onDisconnectGoogleCalendar,
   onSubmit,
-  onSyncGoogleCalendarNow,
   onUpdateField,
   sellerProfilePostcode,
   status,
@@ -166,7 +164,7 @@ export function UserSettingsModal({
                         ? `Last synced ${new Date(
                             googleCalendarStatus.lastSuccessfulSyncAtUtc
                           ).toLocaleString()}`
-                        : 'Sync accepted gigs to a dedicated Glovelly Gigs calendar.'}
+                        : 'Confirmed and completed gigs sync to a dedicated Glovelly Gigs calendar.'}
                     </span>
                   </div>
                   <span
@@ -183,6 +181,10 @@ export function UserSettingsModal({
                   </span>
                 ) : null}
 
+                <span className="connected-service-note">
+                  Draft and cancelled gigs are skipped. Changes may take a few minutes to appear.
+                </span>
+
                 <div className="form-actions compact-actions">
                   <button
                     className="ghost-button"
@@ -191,14 +193,6 @@ export function UserSettingsModal({
                     type="button"
                   >
                     {calendarConnected ? 'Reconnect Calendar' : 'Connect Calendar'}
-                  </button>
-                  <button
-                    className="ghost-button"
-                    disabled={!calendarConnected || isGoogleCalendarBusy}
-                    onClick={onSyncGoogleCalendarNow}
-                    type="button"
-                  >
-                    Sync now
                   </button>
                   <button
                     className="ghost-button"

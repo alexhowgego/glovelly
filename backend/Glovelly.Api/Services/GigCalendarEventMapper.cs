@@ -12,9 +12,7 @@ public sealed class GigCalendarEventMapper : IGigCalendarEventMapper
             return false;
         }
 
-        return settings.SyncAcceptedGigsOnly
-            ? gig.Status == GigStatus.Confirmed
-            : gig.Status != GigStatus.Draft && gig.Status != GigStatus.Cancelled;
+        return gig.Status is GigStatus.Confirmed or GigStatus.Completed;
     }
 
     public CalendarEventPayload Map(

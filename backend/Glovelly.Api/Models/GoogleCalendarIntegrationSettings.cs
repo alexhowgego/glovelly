@@ -11,7 +11,6 @@ public sealed class GoogleCalendarIntegrationSettings
     public string? GoogleCalendarId { get; set; }
     public string CalendarName { get; set; } = "Glovelly Gigs";
     public DateTimeOffset? LastSuccessfulSyncAtUtc { get; set; }
-    public bool SyncAcceptedGigsOnly { get; set; } = true;
     public bool IncludeLocation { get; set; } = true;
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }

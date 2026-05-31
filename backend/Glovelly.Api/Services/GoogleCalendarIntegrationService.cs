@@ -33,7 +33,6 @@ public sealed class GoogleCalendarIntegrationService(
                 GoogleConnectionId = connection.Id,
                 CalendarName = DefaultCalendarName,
                 IsEnabled = true,
-                SyncAcceptedGigsOnly = true,
                 IncludeLocation = true,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,

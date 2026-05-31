@@ -391,7 +391,6 @@ function App({ appMetadata }: AppProps) {
     isUserSettingsSaving,
     openUserSettings,
     resetUserSettings,
-    syncGoogleCalendarNow,
     updateUserSettingsField,
     userSettingsForm,
     userSettingsStatus,
@@ -1629,7 +1628,6 @@ function App({ appMetadata }: AppProps) {
         onConnectGoogleDrive={connectGoogleDrive}
         onDisconnectGoogleCalendar={disconnectGoogleCalendar}
         onSubmit={handleUserSettingsSubmit}
-        onSyncGoogleCalendarNow={syncGoogleCalendarNow}
         onUpdateField={updateUserSettingsField}
         sellerProfilePostcode={sellerProfile.postcode}
         status={userSettingsStatus}

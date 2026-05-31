@@ -762,6 +762,7 @@
 
 .connected-service-summary span,
 .compact-service-field span,
+.connected-service-note,
 .connected-service-error {
   color: var(--muted-strong);
   font-size: 0.86rem;

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use this checklist before shipping changes that touch gigs, imported gigs, expenses, receipts, invoices, expense statements, delivery, seller profile, or admin workflows.
+Use this checklist before shipping changes that touch gigs, imported gigs, expenses, receipts, invoices, expense statements, delivery, seller profile, connected services, or admin workflows.
 
 This page gives the tester a single path through the product. Some detailed journeys live on separate pages and are linked where they fit.
 
@@ -37,6 +37,10 @@ For local development, engineers usually run:
 ### Expected Results
 
 Navigation, session state, and core reads are healthy.
+
+## Connected Services
+
+When changes touch Google Calendar, run the focused [Google Calendar](calendar.md) journey.
 
 ## Cross-Workspace Navigation Shortcuts
 
