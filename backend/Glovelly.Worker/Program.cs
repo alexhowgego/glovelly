@@ -3,40 +3,79 @@ using Glovelly.Api.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.CommandLine;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddGlovellyWorkerInfrastructure(builder.Configuration, builder.Environment);
 
 using var host = builder.Build();
-return await RunAsync(args, host.Services);
+var rootCommand = BuildRootCommand(host.Services);
+return await rootCommand.Parse(args).InvokeAsync();
 
-static async Task<int> RunAsync(string[] args, IServiceProvider services)
+static RootCommand BuildRootCommand(IServiceProvider services)
 {
-    if (args is ["calendar-sync", "drain", .. var remainingArgs])
+    var maxItemsOption = new Option<int>("--max-items")
     {
-        return await RunCalendarSyncDrainAsync(remainingArgs, services);
-    }
+        Description = "Maximum number of queued calendar sync items to process.",
+        DefaultValueFactory = _ => 100
+    };
+    AddRequiredPositiveIntegerValidator(maxItemsOption);
 
-    PrintUsage();
-    return 2;
+    var maxDurationSecondsOption = new Option<int?>("--max-duration-seconds")
+    {
+        Description = "Maximum drain duration in seconds."
+    };
+    AddOptionalPositiveIntegerValidator(maxDurationSecondsOption);
+
+    var ownerIdOption = new Option<string?>("--owner-id")
+    {
+        Description = "Processing owner ID to stamp on claimed work items."
+    };
+
+    var processingTimeoutSecondsOption = new Option<int?>("--processing-timeout-seconds")
+    {
+        Description = "Seconds before in-flight work is considered stale and recovered."
+    };
+    AddOptionalPositiveIntegerValidator(processingTimeoutSecondsOption);
+
+    var drainCommand = new Command("drain", "Drain queued Google Calendar sync work items.");
+    drainCommand.Options.Add(maxItemsOption);
+    drainCommand.Options.Add(maxDurationSecondsOption);
+    drainCommand.Options.Add(ownerIdOption);
+    drainCommand.Options.Add(processingTimeoutSecondsOption);
+    drainCommand.SetAction(async (parseResult, cancellationToken) =>
+    {
+        var maxDurationSeconds = parseResult.GetValue(maxDurationSecondsOption);
+        var processingTimeoutSeconds = parseResult.GetValue(processingTimeoutSecondsOption);
+        var options = new CalendarSyncDrainOptions(
+            parseResult.GetValue(maxItemsOption),
+            maxDurationSeconds is { } maxDuration ? TimeSpan.FromSeconds(maxDuration) : null,
+            parseResult.GetValue(ownerIdOption),
+            processingTimeoutSeconds is { } processingTimeout ? TimeSpan.FromSeconds(processingTimeout) : null);
+
+        return await RunCalendarSyncDrainAsync(options, services, cancellationToken);
+    });
+
+    var calendarSyncCommand = new Command("calendar-sync", "Manage Google Calendar sync background work.");
+    calendarSyncCommand.Subcommands.Add(drainCommand);
+
+    var rootCommand = new RootCommand("Glovelly background worker commands.");
+    rootCommand.Subcommands.Add(calendarSyncCommand);
+    return rootCommand;
 }
 
-static async Task<int> RunCalendarSyncDrainAsync(string[] args, IServiceProvider services)
+static async Task<int> RunCalendarSyncDrainAsync(
+    CalendarSyncDrainOptions options,
+    IServiceProvider services,
+    CancellationToken cancellationToken)
 {
-    if (!TryParseDrainOptions(args, out var options, out var error))
-    {
-        Console.Error.WriteLine(error);
-        PrintUsage();
-        return 2;
-    }
-
     using var scope = services.CreateScope();
     var logger = scope.ServiceProvider
         .GetRequiredService<ILoggerFactory>()
         .CreateLogger("Glovelly.Worker.CalendarSync");
     var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
 
-    var result = await drainer.DrainAsync(options);
+    var result = await drainer.DrainAsync(options, cancellationToken);
     logger.LogInformation(
         "Calendar sync drain complete: {Processed} processed, {Succeeded} succeeded, {Retried} retried, {Failed} failed, {Skipped} skipped, {Recovered} recovered.",
         result.Processed,
@@ -49,104 +88,24 @@ static async Task<int> RunCalendarSyncDrainAsync(string[] args, IServiceProvider
     return 0;
 }
 
-static bool TryParseDrainOptions(
-    string[] args,
-    out CalendarSyncDrainOptions options,
-    out string? error)
+static void AddRequiredPositiveIntegerValidator(Option<int> option)
 {
-    var maxItems = 100;
-    TimeSpan? maxDuration = null;
-    string? ownerId = null;
-    TimeSpan? processingTimeout = null;
-
-    for (var index = 0; index < args.Length; index++)
+    option.Validators.Add(result =>
     {
-        var arg = args[index];
-        switch (arg)
+        if (result.GetValueOrDefault<int>() <= 0)
         {
-            case "--max-items":
-                if (!TryReadInt(args, ref index, out maxItems, out error) || maxItems <= 0)
-                {
-                    error ??= "--max-items must be a positive integer.";
-                    options = default!;
-                    return false;
-                }
-
-                break;
-            case "--max-duration-seconds":
-                if (!TryReadInt(args, ref index, out var maxDurationSeconds, out error) || maxDurationSeconds <= 0)
-                {
-                    error ??= "--max-duration-seconds must be a positive integer.";
-                    options = default!;
-                    return false;
-                }
-
-                maxDuration = TimeSpan.FromSeconds(maxDurationSeconds);
-                break;
-            case "--owner-id":
-                if (!TryReadString(args, ref index, out ownerId, out error))
-                {
-                    options = default!;
-                    return false;
-                }
-
-                break;
-            case "--processing-timeout-seconds":
-                if (!TryReadInt(args, ref index, out var processingTimeoutSeconds, out error) || processingTimeoutSeconds <= 0)
-                {
-                    error ??= "--processing-timeout-seconds must be a positive integer.";
-                    options = default!;
-                    return false;
-                }
-
-                processingTimeout = TimeSpan.FromSeconds(processingTimeoutSeconds);
-                break;
-            default:
-                error = $"Unknown argument: {arg}";
-                options = default!;
-                return false;
+            result.AddError($"{option.Name} must be a positive integer.");
         }
-    }
-
-    options = new CalendarSyncDrainOptions(maxItems, maxDuration, ownerId, processingTimeout);
-    error = null;
-    return true;
+    });
 }
 
-static bool TryReadInt(string[] args, ref int index, out int value, out string? error)
+static void AddOptionalPositiveIntegerValidator(Option<int?> option)
 {
-    if (!TryReadString(args, ref index, out var text, out error))
+    option.Validators.Add(result =>
     {
-        value = default;
-        return false;
-    }
-
-    if (int.TryParse(text, out value))
-    {
-        return true;
-    }
-
-    error = $"Expected integer value after {args[index - 1]}.";
-    return false;
-}
-
-static bool TryReadString(string[] args, ref int index, out string value, out string? error)
-{
-    if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
-    {
-        value = string.Empty;
-        error = $"Expected value after {args[index]}.";
-        return false;
-    }
-
-    index += 1;
-    value = args[index];
-    error = null;
-    return true;
-}
-
-static void PrintUsage()
-{
-    Console.Error.WriteLine("Usage:");
-    Console.Error.WriteLine("  Glovelly.Worker calendar-sync drain [--max-items N] [--max-duration-seconds N] [--owner-id VALUE] [--processing-timeout-seconds N]");
+        if (result.GetValueOrDefault<int?>() is { } value && value <= 0)
+        {
+            result.AddError($"{option.Name} must be a positive integer.");
+        }
+    });
 }
