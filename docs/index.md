@@ -2,7 +2,7 @@
 
 The Glovelly Handbook is the repo-owned guide for running, testing, and evolving Glovelly.
 
-Glovelly is a personal business platform for self-employed music work. The product covers authenticated access, clients, gigs, gig expenses and receipt attachments, invoice generation, invoice issue/reissue/delivery, seller profile setup, Google Drive invoice publishing, email delivery, admin user management, MCP business data tools, and staged imported-gig review.
+Glovelly is a personal business platform for self-employed music work. The product covers authenticated access, clients, gigs, gig expenses and receipt attachments, invoice generation, invoice issue/reissue/delivery, seller profile setup, Google Drive invoice publishing, Google Calendar gig sync, email delivery, admin user management, MCP business data tools, and staged imported-gig review.
 
 ## Start Here
 

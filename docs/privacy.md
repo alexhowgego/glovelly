@@ -1,13 +1,13 @@
 # Privacy Policy
 
-Last updated: 19 May 2026
+Last updated: 31 May 2026
 
 This privacy policy explains how Glovelly handles personal information when you use:
 
 - the production service at `https://glovelly.net`
 - the documentation site at `https://docs.glovelly.net`
 
-Glovelly is a small business administration tool, currently focused on self-employed music work. It is used to manage clients, gigs, expenses, receipts, invoices, seller profile details, invoice delivery, Google Drive invoice publishing, access administration, and related operational records.
+Glovelly is a small business administration tool, currently focused on self-employed music work. It is used to manage clients, gigs, expenses, receipts, invoices, seller profile details, invoice delivery, Google Drive invoice publishing, Google Calendar gig sync, access administration, and related operational records.
 
 Glovelly is intended for business administration. It is not intended for children or consumer social use.
 
@@ -63,6 +63,20 @@ When Google Drive integration is enabled, Glovelly may store:
 
 Google Drive access can be revoked through your Google Account permissions. If access is revoked, expires, or otherwise stops working, Google Drive publishing will stop until the connection is restored.
 
+### Google Calendar Integration Data
+
+If you connect Google Calendar, Glovelly requests permission to create and manage calendars and events that it creates. Glovelly uses this permission to create and maintain a dedicated `Glovelly Gigs` calendar for confirmed and completed gigs.
+
+When Google Calendar integration is enabled, Glovelly may store:
+
+- Google OAuth connection information, including protected access and refresh tokens.
+- Token expiry and reconnection status.
+- Google Calendar identifiers for the dedicated Glovelly calendar.
+- Google Calendar event identifiers linked to Glovelly gigs.
+- Calendar sync status, retry, queue, and diagnostic metadata.
+
+Google Calendar access can be revoked through your Google Account permissions. If access is revoked, expires, or otherwise stops working, Calendar sync will stop until the connection is restored.
+
 ### Technical and Security Data
 
 Glovelly and its service providers may process technical and diagnostic information needed to operate, secure, debug, and maintain the service. This may include:
@@ -90,6 +104,7 @@ Glovelly uses personal information to:
 - manage clients, gigs, expenses, receipts, invoices, and seller profile settings
 - generate, issue, reissue, publish, and deliver invoices
 - publish invoice files to Google Drive where that integration is configured
+- sync confirmed and completed gigs to Google Calendar where that integration is configured
 - send transactional emails, such as access request and invoice delivery messages
 - maintain invoice, accounting, tax, and business administration records
 - secure the service and detect misuse
@@ -110,13 +125,14 @@ Depending on the context, Glovelly relies on the following lawful bases under UK
 | Creating and retaining invoices and accounting records | Legal obligation and legitimate interests |
 | Sending transactional emails and invoice delivery messages | Contract or legitimate interests |
 | Publishing invoices to Google Drive at the user's request | Contract or legitimate interests |
+| Syncing gigs to Google Calendar at the user's request | Contract or legitimate interests |
 | Administering access requests and user permissions | Legitimate interests |
 | Security, abuse prevention, diagnostics, and service maintenance | Legitimate interests |
 | Responding to legal requests or regulatory obligations | Legal obligation |
 
 Where Glovelly relies on legitimate interests, those interests are the operation, administration, security, and improvement of a small business administration service, balanced against the rights and expectations of the people whose information is processed.
 
-Where a user connects an external service such as Google Drive, Glovelly processes the related connection information in order to provide the requested integration.
+Where a user connects an external service such as Google Drive or Google Calendar, Glovelly processes the related connection information in order to provide the requested integration.
 
 ## Special Category Data
 
@@ -132,6 +148,7 @@ Glovelly may share or make personal information available to service providers t
 - database, storage, backup, logging, and monitoring providers
 - authentication providers, including Google sign-in
 - Google Drive, where Drive publishing is configured
+- Google Calendar, where Calendar sync is configured
 - email delivery providers
 - GitHub, for source control, GitHub Actions, and GitHub Pages documentation hosting
 - professional advisers, accountants, tax authorities, regulators, or legal bodies where required
@@ -141,7 +158,7 @@ Service providers are expected to process personal information only as needed to
 Current expected subprocessors include:
 
 - Google Cloud Platform, for hosting, infrastructure, managed secrets, and related cloud services
-- Google, for sign-in and Google Drive integration
+- Google, for sign-in, Google Drive integration, and Google Calendar integration
 - Neon, for database hosting
 - Resend or another configured email delivery provider, for transactional email
 - GitHub, for source control, GitHub Actions, and documentation hosting
@@ -161,7 +178,8 @@ Glovelly keeps personal information only for as long as needed for the purposes 
 Typical retention expectations are:
 
 - account and access records: for the life of the account, then for a reasonable audit and security period after closure
-- Google Drive OAuth tokens and connection data: until the integration is disconnected, expires, is revoked, or the account is deleted, unless limited records are needed for audit or security purposes
+- Google OAuth tokens and connection data for Drive or Calendar: until the integration is disconnected, expires, is revoked, or the account is deleted, unless limited records are needed for audit or security purposes
+- Google Calendar sync state and queue metadata: for as long as needed to operate, retry, diagnose, or rebuild the Calendar integration, unless earlier cleanup is appropriate
 - client, gig, expense, receipt, and invoice records: for as long as needed for business, tax, accounting, and dispute purposes
 - invoice, expense, receipt, and accounting records: normally at least 6 years after the relevant tax year or accounting period, where required for UK tax or accounting records
 - access request records: normally up to 12 months after handling, unless needed for security, audit, or dispute purposes
@@ -175,7 +193,7 @@ Some information may be retained for longer where required by law, tax rules, ac
 
 Glovelly uses technical and organisational measures intended to protect personal information, including authenticated access, role-based controls, secure cookies, owner visibility checks for user-owned data, managed secrets, provider-backed storage, and encryption or token protection where configured.
 
-Google OAuth tokens used for Drive integration are protected before storage where token persistence is enabled.
+Google OAuth tokens used for Drive and Calendar integrations are protected before storage where token persistence is enabled.
 
 No online service can guarantee absolute security. Users should keep their Google account secure, use appropriate access controls, and only upload business records that are appropriate for Glovelly to process.
 

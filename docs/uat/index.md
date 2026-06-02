@@ -35,6 +35,7 @@ When adding or changing Playwright UAT coverage, update the matching UAT page in
 - [Invoices](invoices.md): invoice creation, regeneration, preview, status, and delivery journeys.
 - [Expenses](expenses.md): receipts, quick receipts, reimbursement, and expense statement journeys.
 - [Imported gigs](gig-imports.md): MCP-staged gig imports, review, autosave, accept/reject, notification dots, and commit.
+- [Google Calendar](calendar.md): Calendar connection, eligible gig statuses, and asynchronous sync expectations.
 - [Enrolment and access](enrolment.md): sign-in, seller profile, settings, and admin access checks.
 
 > **Automation:** Partially automated: `Glovelly.Uat.Tests.SmokeTests` covers public smoke endpoints and sign-in entry point visibility; journey-specific automation is noted on each page.

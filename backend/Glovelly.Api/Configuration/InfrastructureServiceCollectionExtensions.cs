@@ -33,8 +33,8 @@ internal static class InfrastructureServiceCollectionExtensions
         services.AddOptions<McpOAuthOptions>()
             .Bind(configuration.GetSection(McpOAuthOptions.SectionName));
         services.AddGlovellyApplicationServices();
-        services.AddScoped<IGoogleDriveTokenProtector, GoogleDriveTokenProtector>();
-        services.AddHttpClient<IGoogleDriveOAuthTokenExchanger, GoogleDriveOAuthTokenExchanger>();
+        services.AddScoped<IGoogleTokenProtector, GoogleTokenProtector>();
+        services.AddHttpClient<IGoogleOAuthTokenClient, GoogleOAuthTokenClient>();
         if (settings.UsePostgres)
         {
             services.AddDataProtection()

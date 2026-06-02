@@ -4,7 +4,7 @@ This document is a compact orientation map for future agent work. It intentional
 
 ## Runtime Shape
 
-Glovelly runs as one ASP.NET Core process in deployed form. The Vite frontend is built first, copied into the backend `wwwroot`, and served by the API application. In local development, `./run-dev.sh` starts the backend on `http://localhost:5153` and Vite on `http://localhost:5173`.
+Glovelly deploys one container image. The default entrypoint runs the ASP.NET Core API/SPA process; Cloud Run Jobs can override the command to run `Glovelly.Worker` for background work. The Vite frontend is built first, copied into the backend `wwwroot`, and served by the API application. In local development, `./run-dev.sh` starts the backend on `http://localhost:5153` and Vite on `http://localhost:5173`.
 
 `Program.cs` is the backend entry point:
 
@@ -12,7 +12,7 @@ Glovelly runs as one ASP.NET Core process in deployed form. The Vite frontend is
 2. Register infrastructure and authentication.
 3. Initialize the database.
 4. Configure the HTTP pipeline.
-5. Map metadata, auth, access, Google Drive, MCP, CRUD, and admin endpoints.
+5. Map metadata, auth, access, Google Drive, Google Calendar, MCP, CRUD, and admin endpoints.
 6. Fall back to `index.html` for the SPA.
 
 ## Backend Areas
@@ -22,7 +22,7 @@ Glovelly runs as one ASP.NET Core process in deployed form. The Vite frontend is
 - Data: `AppDbContext` owns EF mappings, indexes, precision, delete behavior, data protection keys, and model relationships.
 - Models: mutable EF/domain entities are serialized directly by many endpoints, with navigation properties mostly hidden by `JsonIgnore`.
 - Endpoints: minimal API route groups. Each file maps routes for one area and typically handles validation, authorization context, database calls, and simple response shaping.
-- Services: cross-cutting or multi-step behavior. Use these for workflows that touch email, Google Drive, invoice PDFs, delivery, token protection, storage, or MCP query projection.
+- Services: cross-cutting or multi-step behavior. Use these for workflows that touch email, Google Drive, Google Calendar sync, invoice PDFs, delivery, token protection, storage, or MCP query projection.
 
 ## Main Backend Route Groups
 
@@ -35,7 +35,8 @@ Glovelly runs as one ASP.NET Core process in deployed form. The Vite frontend is
 - `/invoices`: invoice CRUD, status transitions, PDF download, issue/reissue, email delivery, Google Drive delivery, adjustments.
 - `/invoice-lines`: invoice line CRUD.
 - `/seller-profile`: seller profile used for invoice readiness and PDF details.
-- `/google-drive`: Google Drive OAuth/connect/disconnect/configuration flow.
+- `/integrations/google-drive`: Google Drive OAuth/connect/disconnect/configuration flow.
+- `/integrations/google-calendar`: Google Calendar OAuth/status/disconnect and sync management flow.
 - `/mcp`: JSON-RPC style MCP endpoint exposing read-only business tools.
 - `/app/metadata`: app/deployment metadata consumed by the frontend.
 
@@ -79,6 +80,12 @@ Common flow:
 5. Invoice can be downloaded, emailed, or uploaded to Google Drive.
 6. Gig records are linked back to the invoice and carry derived `isInvoiced` behavior via `InvoiceId`.
 
+## Calendar Sync Flow
+
+Google Calendar sync is one-way from Glovelly to a dedicated `Glovelly Gigs` calendar. Gig create/update/cancel/delete actions enqueue `CalendarSyncWorkItem` rows. `Glovelly.Worker` drains the queue through `CalendarSyncQueueDrainer`, which claims work with processing ownership, recovers stale processing rows, records retry diagnostics, and calls `GoogleCalendarSyncProcessor`.
+
+Confirmed and completed gigs are projected as all-day events. Draft gigs are skipped. Cancelled synced gigs are deleted from the provider calendar. If the Google-side calendar is deleted, sync recreates it, invalidates the user's Google Calendar sync state, and queues a full rebuild.
+
 ## Receipt Flow
 
 Receipt attachments are modeled under gig expenses. Storage is abstracted through `IExpenseAttachmentStore`; tests use `InMemoryExpenseAttachmentStore`, and production can use Google Cloud Storage. Quick receipt behavior can infer nearby gig candidates, create a draft expense, and later move/update that draft.
@@ -111,4 +118,4 @@ Implementation is split between `McpEndpoints.cs` for protocol/tool handling and
 
 ## CI and Deploy
 
-GitHub Actions restores .NET dependencies, runs backend tests, builds the Docker image, and deploys internal builds to Cloud Run. Pull requests from the same repository can deploy to the shared staging service and receive a preview URL comment.
+GitHub Actions restores .NET dependencies, runs backend tests, builds the Docker image, and deploys internal builds to Cloud Run. Pull requests from the same repository can deploy to the shared staging service and receive a preview URL comment. Eligible deployments also update the Calendar sync Cloud Run Job and Cloud Scheduler trigger.

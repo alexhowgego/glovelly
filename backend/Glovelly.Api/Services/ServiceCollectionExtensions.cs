@@ -21,6 +21,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
+        services.AddScoped<IGoogleConnectionService, GoogleConnectionService>();
+        services.AddSingleton<ICalendarEventPayloadHasher, CalendarEventPayloadHasher>();
+        services.AddScoped<IGigCalendarEventMapper, GigCalendarEventMapper>();
+        services.AddScoped<IGigCalendarSyncPlanner, GigCalendarSyncPlanner>();
+        services.AddScoped<IGoogleCalendarIntegrationService, GoogleCalendarIntegrationService>();
+        services.AddScoped<ICalendarSyncWorkQueue, CalendarSyncWorkQueue>();
+        services.AddScoped<IGoogleCalendarSyncProcessor, GoogleCalendarSyncProcessor>();
+        services.AddScoped<ICalendarSyncQueueDrainer, CalendarSyncQueueDrainer>();
         services.AddOptions<GoogleRoutesMileageSettings>()
             .BindConfiguration(GoogleRoutesMileageSettings.SectionName);
         services.AddHttpClient<GoogleRoutesMileageEstimationService>();
@@ -74,6 +82,7 @@ public static class ServiceCollectionExtensions
             });
         services.AddHttpClient<ResendClient>();
         services.AddHttpClient<IGoogleDriveApiClient, GoogleDriveApiClient>();
+        services.AddHttpClient<IGoogleCalendarApiClient, GoogleCalendarApiClient>();
         services.AddScoped<IResend, ResendClient>();
         services.AddScoped<IEmailSender>(provider =>
         {

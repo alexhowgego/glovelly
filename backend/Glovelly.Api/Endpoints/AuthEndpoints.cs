@@ -1,6 +1,8 @@
 using Glovelly.Api.Auth;
 using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
+using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -60,14 +62,20 @@ internal static class AuthEndpoints
             }
 
             var now = DateTimeOffset.UtcNow;
-            var googleDriveConnection = await dbContext.GoogleDriveConnections
+            var googleConnection = await dbContext.GoogleConnections
                 .AsNoTracking()
                 .FirstOrDefaultAsync(connection =>
                     connection.UserId == userId.Value &&
                     connection.RevokedAtUtc == null &&
                     (connection.RefreshTokenExpiresAtUtc == null ||
                      connection.RefreshTokenExpiresAtUtc > now));
-            var isGoogleDriveConnected = googleDriveConnection is not null;
+            var isGoogleDriveConnected = googleConnection is not null &&
+                GoogleScopes.Contains(googleConnection.GrantedScopes, GoogleScopes.DriveFile);
+            var googleDriveSettings = isGoogleDriveConnected
+                ? await dbContext.GoogleDriveIntegrationSettings
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(settings => settings.UserId == userId.Value)
+                : null;
 
             return Results.Ok(new
             {
@@ -83,7 +91,7 @@ internal static class AuthEndpoints
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceEmailSubjectPattern = localUser.InvoiceEmailSubjectPattern,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
-                invoiceUploadFolderId = googleDriveConnection?.InvoiceUploadFolderId,
+                invoiceUploadFolderId = googleDriveSettings?.InvoiceUploadFolderId,
                 isGoogleDriveConnected,
             });
         });
@@ -127,13 +135,15 @@ internal static class AuthEndpoints
             }
 
             var now = DateTimeOffset.UtcNow;
-            var googleDriveConnection = await dbContext.GoogleDriveConnections
+            var googleConnection = await dbContext.GoogleConnections
                 .FirstOrDefaultAsync(connection =>
                     connection.UserId == userId.Value &&
                     connection.RevokedAtUtc == null &&
                     (connection.RefreshTokenExpiresAtUtc == null ||
                      connection.RefreshTokenExpiresAtUtc > now));
-            if (invoiceUploadFolderId is not null && googleDriveConnection is null)
+            var isGoogleDriveConnected = googleConnection is not null &&
+                GoogleScopes.Contains(googleConnection.GrantedScopes, GoogleScopes.DriveFile);
+            if (invoiceUploadFolderId is not null && !isGoogleDriveConnected)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -141,10 +151,26 @@ internal static class AuthEndpoints
                 });
             }
 
-            if (googleDriveConnection is not null)
+            GoogleDriveIntegrationSettings? googleDriveSettings = null;
+            if (isGoogleDriveConnected && googleConnection is not null)
             {
-                googleDriveConnection.InvoiceUploadFolderId = invoiceUploadFolderId;
-                googleDriveConnection.UpdatedAtUtc = now;
+                googleDriveSettings = await dbContext.GoogleDriveIntegrationSettings
+                    .FirstOrDefaultAsync(settings => settings.UserId == userId.Value);
+                if (googleDriveSettings is null)
+                {
+                    googleDriveSettings = new GoogleDriveIntegrationSettings
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = userId.Value,
+                        GoogleConnectionId = googleConnection.Id,
+                        CreatedAtUtc = now,
+                    };
+                    dbContext.GoogleDriveIntegrationSettings.Add(googleDriveSettings);
+                }
+
+                googleDriveSettings.GoogleConnectionId = googleConnection.Id;
+                googleDriveSettings.InvoiceUploadFolderId = invoiceUploadFolderId;
+                googleDriveSettings.UpdatedAtUtc = now;
             }
 
             await dbContext.SaveChangesAsync();
@@ -158,7 +184,7 @@ internal static class AuthEndpoints
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceEmailSubjectPattern = localUser.InvoiceEmailSubjectPattern,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
-                invoiceUploadFolderId = googleDriveConnection?.InvoiceUploadFolderId,
+                invoiceUploadFolderId = googleDriveSettings?.InvoiceUploadFolderId,
             });
         });
 

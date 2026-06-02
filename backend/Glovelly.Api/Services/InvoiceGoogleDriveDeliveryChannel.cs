@@ -1,4 +1,3 @@
-using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,9 +6,8 @@ namespace Glovelly.Api.Services;
 internal sealed class InvoiceGoogleDriveDeliveryChannel(
     AppDbContext dbContext,
     IGoogleDriveApiClient googleDriveApiClient,
-    IGoogleDriveTokenProtector tokenProtector,
-    IInvoicePdfService invoicePdfService,
-    StartupSettings settings) : IInvoiceDeliveryChannel
+    IGoogleConnectionService googleConnectionService,
+    IInvoicePdfService invoicePdfService) : IInvoiceDeliveryChannel
 {
     public InvoiceDeliveryChannel Channel => InvoiceDeliveryChannel.GoogleDrive;
 
@@ -28,33 +26,28 @@ internal sealed class InvoiceGoogleDriveDeliveryChannel(
         var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken)
             ?? throw new InvalidOperationException("Invoice PDF is missing.");
 
-        var connection = await dbContext.GoogleDriveConnections
-            .SingleOrDefaultAsync(
-                value => value.UserId == request.UserId.Value && value.RevokedAtUtc == null,
-                cancellationToken)
+        var connection = await googleConnectionService.GetActiveConnectionAsync(
+            request.UserId.Value,
+            [GoogleScopes.DriveFile],
+            cancellationToken)
             ?? throw new InvalidOperationException("Google Drive is not connected.");
-
-        if (connection.RefreshTokenExpiresAtUtc is not null &&
-            connection.RefreshTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
-        {
-            throw new InvalidOperationException("Google Drive connection has expired. Reconnect Google Drive.");
-        }
-
-        var accessToken = tokenProtector.Unprotect(connection.EncryptedAccessToken);
-        if (connection.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow.AddMinutes(1))
-        {
-            accessToken = await RefreshAccessTokenAsync(connection, cancellationToken);
-        }
+        var driveSettings = await dbContext.GoogleDriveIntegrationSettings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(value => value.UserId == request.UserId.Value, cancellationToken);
+        var accessToken = await googleConnectionService.GetAccessTokenAsync(
+            connection,
+            [GoogleScopes.DriveFile],
+            cancellationToken);
 
         await using var invoicePdfContent = invoicePdf.Content;
         using var invoicePdfMemory = new MemoryStream();
         await invoicePdf.Content.CopyToAsync(invoicePdfMemory, cancellationToken);
 
         var upload = await googleDriveApiClient.UploadPdfAsync(
-            accessToken,
+            accessToken.AccessToken,
             request.AttachmentFileName,
             invoicePdfMemory.ToArray(),
-            connection.InvoiceUploadFolderId,
+            driveSettings?.InvoiceUploadFolderId,
             cancellationToken);
 
         var webViewLink = string.IsNullOrWhiteSpace(upload.WebViewLink)
@@ -68,50 +61,4 @@ internal sealed class InvoiceGoogleDriveDeliveryChannel(
             webViewLink);
     }
 
-    private async Task<string> RefreshAccessTokenAsync(
-        Models.GoogleDriveConnection connection,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(settings.GoogleClientId) ||
-            string.IsNullOrWhiteSpace(settings.GoogleClientSecret))
-        {
-            throw new InvalidOperationException("Google OAuth is not configured.");
-        }
-
-        if (string.IsNullOrWhiteSpace(connection.EncryptedRefreshToken))
-        {
-            throw new InvalidOperationException("Google Drive refresh token is missing. Reconnect Google Drive.");
-        }
-
-        var refreshToken = tokenProtector.Unprotect(connection.EncryptedRefreshToken);
-        var refreshResult = await googleDriveApiClient.RefreshAccessTokenAsync(
-            refreshToken,
-            settings.GoogleClientId,
-            settings.GoogleClientSecret,
-            cancellationToken);
-        if (!refreshResult.IsSuccess ||
-            refreshResult.TokenResponse is null ||
-            string.IsNullOrWhiteSpace(refreshResult.TokenResponse.AccessToken))
-        {
-            connection.RevokedAtUtc = DateTimeOffset.UtcNow;
-            await dbContext.SaveChangesAsync(cancellationToken);
-            throw new InvalidOperationException("Google Drive connection could not be refreshed. Reconnect Google Drive.");
-        }
-
-        var tokenResponse = refreshResult.TokenResponse;
-        var now = DateTimeOffset.UtcNow;
-        connection.EncryptedAccessToken = tokenProtector.Protect(tokenResponse.AccessToken);
-        connection.AccessTokenExpiresAtUtc = now.AddSeconds(tokenResponse.ExpiresIn);
-        connection.Scope = string.IsNullOrWhiteSpace(tokenResponse.Scope)
-            ? connection.Scope
-            : tokenResponse.Scope;
-        connection.TokenType = string.IsNullOrWhiteSpace(tokenResponse.TokenType)
-            ? connection.TokenType
-            : tokenResponse.TokenType;
-        connection.UpdatedAtUtc = now;
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return tokenResponse.AccessToken;
-    }
 }

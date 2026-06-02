@@ -45,5 +45,13 @@ public sealed class User
     [JsonIgnore]
     public SellerProfile? SellerProfile { get; set; }
     [JsonIgnore]
-    public GoogleDriveConnection? GoogleDriveConnection { get; set; }
+    public GoogleConnection? GoogleConnection { get; set; }
+    [JsonIgnore]
+    public GoogleDriveIntegrationSettings? GoogleDriveIntegrationSettings { get; set; }
+    [JsonIgnore]
+    public GoogleCalendarIntegrationSettings? GoogleCalendarIntegrationSettings { get; set; }
+    [JsonIgnore]
+    public ICollection<GigCalendarSyncState> GigCalendarSyncStates { get; set; } = new List<GigCalendarSyncState>();
+    [JsonIgnore]
+    public ICollection<CalendarSyncWorkItem> CalendarSyncWorkItems { get; set; } = new List<CalendarSyncWorkItem>();
 }

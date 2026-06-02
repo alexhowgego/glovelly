@@ -7,7 +7,7 @@ import {
   parseProblemDetails,
 } from '../api'
 import { emptyUserSettingsForm } from '../forms'
-import type { AuthUser, UserSettingsForm } from '../types'
+import type { AuthUser, GoogleCalendarStatus, UserSettingsForm } from '../types'
 
 type SavedUserSettings = {
   mileageRate: number | null
@@ -71,13 +71,45 @@ export function useUserSettings({
   const [userSettingsStatus, setUserSettingsStatus] =
     useState(defaultUserSettingsStatus)
   const [isUserSettingsSaving, setIsUserSettingsSaving] = useState(false)
+  const [googleCalendarStatus, setGoogleCalendarStatus] =
+    useState<GoogleCalendarStatus | null>(null)
+  const [isGoogleCalendarBusy, setIsGoogleCalendarBusy] = useState(false)
 
   const resetUserSettings = useCallback(() => {
     setIsUserSettingsOpen(false)
     setUserSettingsForm(emptyUserSettingsForm())
     setUserSettingsStatus(defaultUserSettingsStatus)
     setIsUserSettingsSaving(false)
+    setGoogleCalendarStatus(null)
+    setIsGoogleCalendarBusy(false)
   }, [])
+
+  const loadGoogleCalendarStatus = useCallback(async () => {
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl('/integrations/google-calendar/status')
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to manage Google Calendar.'
+        )
+      ) {
+        setIsUserSettingsOpen(false)
+        return
+      }
+
+      if (!response.ok) {
+        return
+      }
+
+      setGoogleCalendarStatus((await response.json()) as GoogleCalendarStatus)
+    } catch {
+      setGoogleCalendarStatus(null)
+    }
+  }, [onSessionExpired])
 
   const openUserSettings = () => {
     setUserSettingsForm(
@@ -97,6 +129,7 @@ export function useUserSettings({
     )
     onCloseProfileMenu()
     setIsUserSettingsOpen(true)
+    void loadGoogleCalendarStatus()
   }
 
   const closeUserSettings = () => {
@@ -105,6 +138,42 @@ export function useUserSettings({
 
   const connectGoogleDrive = () => {
     window.location.assign(buildApiUrl('/integrations/google-drive/connect'))
+  }
+
+  const connectGoogleCalendar = () => {
+    window.location.assign(buildApiUrl('/integrations/google-calendar/connect'))
+  }
+
+  const disconnectGoogleCalendar = async () => {
+    setIsGoogleCalendarBusy(true)
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl('/integrations/google-calendar/disconnect'),
+        { method: 'POST' }
+      )
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to disconnect Google Calendar.'
+        )
+      ) {
+        setIsUserSettingsOpen(false)
+        return
+      }
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        throw new Error(problem?.detail ?? problem?.title ?? 'Unable to disconnect Calendar.')
+      }
+      setUserSettingsStatus('Google Calendar disconnected.')
+      await loadGoogleCalendarStatus()
+    } catch (error) {
+      setUserSettingsStatus(
+        error instanceof Error ? error.message : 'Unable to disconnect Calendar.'
+      )
+    } finally {
+      setIsGoogleCalendarBusy(false)
+    }
   }
 
   const updateUserSettingsField = (
@@ -219,8 +288,12 @@ export function useUserSettings({
 
   return {
     closeUserSettings,
+    connectGoogleCalendar,
     connectGoogleDrive,
+    disconnectGoogleCalendar,
+    googleCalendarStatus,
     handleUserSettingsSubmit,
+    isGoogleCalendarBusy,
     isUserSettingsOpen,
     isUserSettingsSaving,
     openUserSettings,

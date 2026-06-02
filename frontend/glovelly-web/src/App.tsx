@@ -381,8 +381,12 @@ function App({ appMetadata }: AppProps) {
   })
   const {
     closeUserSettings,
+    connectGoogleCalendar,
     connectGoogleDrive,
+    disconnectGoogleCalendar,
+    googleCalendarStatus,
     handleUserSettingsSubmit,
+    isGoogleCalendarBusy,
     isUserSettingsOpen,
     isUserSettingsSaving,
     openUserSettings,
@@ -1613,12 +1617,16 @@ function App({ appMetadata }: AppProps) {
           null
         )}
         invoiceFilenameTokens={invoiceFilenameTokens}
+        googleCalendarStatus={googleCalendarStatus}
+        isGoogleCalendarBusy={isGoogleCalendarBusy}
         isGoogleDriveConnected={authUser?.isGoogleDriveConnected ?? false}
         isOpen={isUserSettingsOpen}
         isSaving={isUserSettingsSaving}
         isGoogleDriveConnectDisabled={isLoading || isAdminLoading}
         onClose={closeUserSettings}
+        onConnectGoogleCalendar={connectGoogleCalendar}
         onConnectGoogleDrive={connectGoogleDrive}
+        onDisconnectGoogleCalendar={disconnectGoogleCalendar}
         onSubmit={handleUserSettingsSubmit}
         onUpdateField={updateUserSettingsField}
         sellerProfilePostcode={sellerProfile.postcode}

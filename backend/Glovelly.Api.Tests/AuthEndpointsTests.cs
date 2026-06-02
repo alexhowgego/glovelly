@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
@@ -73,7 +74,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         using (var scope = _factory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            dbContext.GoogleDriveConnections.Add(new GoogleDriveConnection
+            dbContext.GoogleConnections.Add(new GoogleConnection
             {
                 Id = Guid.NewGuid(),
                 UserId = TestAuthContext.UserId,
@@ -81,7 +82,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
                 EncryptedRefreshToken = "encrypted-refresh-token",
                 AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
                 RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
-                Scope = "https://www.googleapis.com/auth/drive.file",
+                GrantedScopes = "https://www.googleapis.com/auth/drive.file",
                 TokenType = "Bearer",
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
@@ -98,12 +99,12 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
-    public async Task UpdateSettings_WhenGoogleDriveConnected_PersistsInvoiceUploadFolderId()
+    public async Task Me_ReturnsGoogleDriveDisconnected_WhenConnectionOnlyHasCalendarScope()
     {
         using (var scope = _factory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            dbContext.GoogleDriveConnections.Add(new GoogleDriveConnection
+            dbContext.GoogleConnections.Add(new GoogleConnection
             {
                 Id = Guid.NewGuid(),
                 UserId = TestAuthContext.UserId,
@@ -111,7 +112,37 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
                 EncryptedRefreshToken = "encrypted-refresh-token",
                 AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
                 RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
-                Scope = "https://www.googleapis.com/auth/drive.file",
+                GrantedScopes = GoogleScopes.CalendarAppCreated,
+                TokenType = "Bearer",
+                ConnectedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var response = await _client.GetAsync("/auth/me");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.False(payload.GetProperty("isGoogleDriveConnected").GetBoolean());
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WhenGoogleDriveConnected_PersistsInvoiceUploadFolderId()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.GoogleConnections.Add(new GoogleConnection
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                EncryptedAccessToken = "encrypted-access-token",
+                EncryptedRefreshToken = "encrypted-refresh-token",
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
+                RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+                GrantedScopes = "https://www.googleapis.com/auth/drive.file",
                 TokenType = "Bearer",
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,

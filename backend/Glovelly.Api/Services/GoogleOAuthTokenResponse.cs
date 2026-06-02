@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Glovelly.Api.Services;
 
-public sealed class GoogleDriveOAuthTokenResponse
+public sealed class GoogleOAuthTokenResponse
 {
     [JsonPropertyName("access_token")]
     public string AccessToken { get; set; } = string.Empty;
@@ -21,4 +21,7 @@ public sealed class GoogleDriveOAuthTokenResponse
 
     [JsonPropertyName("token_type")]
     public string TokenType { get; set; } = "Bearer";
+
+    [JsonPropertyName("id_token")]
+    public string? IdToken { get; set; }
 }

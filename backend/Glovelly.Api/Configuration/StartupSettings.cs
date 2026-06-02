@@ -1,6 +1,6 @@
 namespace Glovelly.Api.Configuration;
 
-internal sealed record StartupSettings(
+public sealed record StartupSettings(
     string DevCorsPolicy,
     string? GoogleClientId,
     string? GoogleClientSecret,
@@ -16,7 +16,7 @@ internal sealed record StartupSettings(
     bool ShouldSeedDevelopmentData,
     bool ShouldSeedUatData)
 {
-    public static StartupSettings From(IConfiguration configuration, IWebHostEnvironment environment)
+    public static StartupSettings From(IConfiguration configuration, IHostEnvironment environment)
     {
         const string devCorsPolicy = "FrontendDevelopment";
 
