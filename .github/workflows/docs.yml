@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/docs.yml"
+      - ".config/dotnet-tools.json"
       - "docs/**"
   workflow_dispatch:
 

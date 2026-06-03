@@ -118,7 +118,7 @@ Glovelly now requires Google sign-in before the SPA can call the API.
    - `http://localhost:5153/signin-oidc`
    - `https://localhost:7087/signin-oidc`
    - Your production callback, for example `https://your-domain/signin-oidc`
-3. For local development, store the Google credentials with `dotnet user-secrets` from [backend/Glovelly.Api/Glovelly.Api.csproj](/Users/alexhowgego/dev/glovelly/backend/Glovelly.Api/Glovelly.Api.csproj:1):
+3. For local development, store the Google credentials with `dotnet user-secrets` from [backend/Glovelly.Api/Glovelly.Api.csproj](backend/Glovelly.Api/Glovelly.Api.csproj):
 
 ```bash
 cd backend/Glovelly.Api
@@ -168,7 +168,7 @@ Press `Ctrl+C` to stop both services.
 
 ## Docker
 
-The repository includes a single multi-stage [Dockerfile](/Users/alexhowgego/dev/glovelly/Dockerfile:1) that builds both services into one container image.
+The repository includes a single multi-stage [Dockerfile](Dockerfile) that builds both services into one container image.
 
 The container build:
 - Builds the React frontend with Vite
@@ -193,7 +193,7 @@ The app will be available at `http://localhost:8080`, with the frontend served f
 
 ## CI
 
-GitHub Actions runs the `Build and Push Container` workflow on pushes to `main`, on pull requests, and on manual dispatch.
+GitHub Actions runs the `Glovelly CI/CD` workflow on pushes to `main`, on pull requests, and on manual dispatch.
 
 The workflow:
 - Builds the React frontend, ASP.NET Core backend, and worker into a single Docker image
@@ -205,7 +205,7 @@ The workflow:
 - Deploys each internal pull request to the shared `glovelly-staging` Cloud Run service and comments the preview URL on the PR
 - Deploys the Calendar sync Cloud Run Job and Cloud Scheduler trigger for eligible environments
 
-The image is published to `europe-west1-docker.pkg.dev/glovelly-dev/glovelly/glovelly`.
+The image is published to the Google Artifact Registry image configured in `.github/workflows/main.yml`.
 
 You can view workflow runs from the [Actions tab](https://github.com/alexhowgego/glovelly/actions/workflows/main.yml).
 

@@ -1,5 +1,24 @@
 const CACHE_NAME = 'glovelly-shell-v1'
 const APP_SHELL = ['/', '/manifest.webmanifest', '/gordon-192.png', '/gordon-512.png']
+const API_PREFIXES = [
+  '/.well-known',
+  '/access',
+  '/admin',
+  '/app',
+  '/auth',
+  '/clients',
+  '/expense-statements',
+  '/gigs',
+  '/gig-imports',
+  '/health',
+  '/integrations',
+  '/invoices',
+  '/invoice-lines',
+  '/mcp',
+  '/oauth',
+  '/seller-profile',
+  '/test-auth',
+]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -27,21 +46,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   const requestUrl = new URL(event.request.url)
-  if (
-    requestUrl.pathname.startsWith('/auth') ||
-    requestUrl.pathname.startsWith('/test-auth') ||
-    requestUrl.pathname.startsWith('/admin') ||
-    requestUrl.pathname.startsWith('/clients') ||
-    requestUrl.pathname.startsWith('/gigs') ||
-    requestUrl.pathname.startsWith('/gig-imports') ||
-    requestUrl.pathname.startsWith('/invoices') ||
-    requestUrl.pathname.startsWith('/invoice-lines') ||
-    requestUrl.pathname.startsWith('/integrations') ||
-    requestUrl.pathname.startsWith('/seller-profile') ||
-    requestUrl.pathname.startsWith('/mcp') ||
-    requestUrl.pathname === '/app/metadata' ||
-    requestUrl.pathname === '/health'
-  ) {
+  if (API_PREFIXES.some((prefix) => requestUrl.pathname.startsWith(prefix))) {
     return
   }
 

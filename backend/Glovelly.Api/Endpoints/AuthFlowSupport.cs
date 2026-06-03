@@ -49,14 +49,20 @@ internal static class AuthFlowSupport
         return path.StartsWithSegments("/auth/me") ||
                path.StartsWithSegments("/access") ||
                path.StartsWithSegments("/admin") ||
+               path.StartsWithSegments("/app") ||
                path.StartsWithSegments("/clients") ||
+               path.StartsWithSegments("/expense-statements") ||
                path.StartsWithSegments("/gigs") ||
+               path.StartsWithSegments("/gig-imports") ||
+               path.StartsWithSegments("/health") ||
                path.StartsWithSegments("/integrations") ||
                path.StartsWithSegments("/invoices") ||
                path.StartsWithSegments("/invoice-lines") ||
                path.StartsWithSegments("/mcp") ||
+               path.StartsWithSegments("/oauth") ||
                path.StartsWithSegments("/seller-profile") ||
-               path.StartsWithSegments("/test-auth");
+               path.StartsWithSegments("/test-auth") ||
+               path.StartsWithSegments("/.well-known");
     }
 
     public static string GetAuthenticationFailureCode(Exception? exception)
