@@ -49,17 +49,17 @@ public sealed class GigImportModelTests
             },
         });
 
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var savedBatch = await dbContext.GigImportBatches
             .Include(batch => batch.Drafts)
-            .SingleAsync(batch => batch.Id == batchId);
+            .SingleAsync(batch => batch.Id == batchId, TestContext.Current.CancellationToken);
 
         Assert.Equal(GigImportBatchStatus.Draft, savedBatch.Status);
         Assert.Equal(userId, savedBatch.CreatedByUserId);
         Assert.Equal(2, savedBatch.Drafts.Count);
         Assert.All(savedBatch.Drafts, draft => Assert.Equal(GigImportDraftStatus.Pending, draft.Status));
-        Assert.Equal(0, await dbContext.Gigs.CountAsync());
+        Assert.Equal(0, await dbContext.Gigs.CountAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -92,20 +92,20 @@ public sealed class GigImportModelTests
             },
         };
         dbContext.GigImportBatches.Add(batch);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         batch.Status = GigImportBatchStatus.Committed;
         batch.Drafts.First(draft => draft.Status == GigImportDraftStatus.Accepted).Status = GigImportDraftStatus.Committed;
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var statuses = await dbContext.GigImportDrafts
             .OrderBy(draft => draft.ProposedTitle)
             .Select(draft => draft.Status)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(GigImportBatchStatus.Committed, await dbContext.GigImportBatches.Select(value => value.Status).SingleAsync());
+        Assert.Equal(GigImportBatchStatus.Committed, await dbContext.GigImportBatches.Select(value => value.Status).SingleAsync(TestContext.Current.CancellationToken));
         Assert.Equal([GigImportDraftStatus.Rejected, GigImportDraftStatus.Committed], statuses);
-        Assert.Equal(0, await dbContext.Gigs.CountAsync());
+        Assert.Equal(0, await dbContext.Gigs.CountAsync(TestContext.Current.CancellationToken));
     }
 
     private static AppDbContext CreateDbContext()

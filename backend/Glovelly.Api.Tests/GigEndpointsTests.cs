@@ -34,11 +34,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = true,
             status = 1,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonValueKind.Object, gig.ValueKind);
         Assert.Equal(JsonValueKind.Null, gig.GetProperty("invoiceId").ValueKind);
@@ -62,11 +62,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = false,
             status = 2,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonValueKind.Object, gig.ValueKind);
         Assert.Equal(TestData.FoxInvoiceId, gig.GetProperty("invoiceId").GetGuid());
@@ -90,11 +90,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = true,
             status = 0,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonValueKind.Object, problem.ValueKind);
         Assert.Equal("Invoice does not exist.", problem.GetProperty("errors").GetProperty("invoiceId")[0].GetString());
@@ -116,11 +116,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = false,
             status = 0,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonValueKind.Object, problem.ValueKind);
         Assert.Equal("Invoice client must match the gig client.", problem.GetProperty("errors").GetProperty("invoiceId")[0].GetString());
@@ -151,20 +151,20 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = true,
             status = 1,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         var response = await _client.PostAsJsonAsync(
             $"/gigs/{createdGig.GetProperty("id").GetGuid()}/mileage-estimate",
             new
             {
                 roundTrip = true,
-            });
+            }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var estimate = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var estimate = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(12.4m, estimate.GetProperty("distanceMiles").GetDecimal());
         Assert.Equal(19955.8656m, estimate.GetProperty("distanceMeters").GetDecimal());
@@ -191,7 +191,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             defaultPaymentWindowDays = 14,
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         settingsResponse.EnsureSuccessStatusCode();
 
         _factory.MileageEstimation.Result = Glovelly.Api.Services.MileageEstimateResult.Success(
@@ -214,16 +214,16 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = true,
             status = 1,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         var response = await _client.PostAsJsonAsync(
             $"/gigs/{createdGig.GetProperty("id").GetGuid()}/mileage-estimate",
             new
             {
                 roundTrip = true,
-            });
+            }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(_factory.MileageEstimation.LastRequest);
@@ -253,9 +253,9 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = true,
             status = 1,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         var response = await _client.PostAsJsonAsync(
             $"/gigs/{createdGig.GetProperty("id").GetGuid()}/mileage-estimate",
@@ -266,7 +266,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 destination = "Arena",
                 destinationPlaceId = "ChIJN1t_tDeuEmsRUsoyG83frY4",
                 roundTrip = false,
-            });
+            }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(_factory.MileageEstimation.LastRequest);
@@ -296,9 +296,9 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = true,
             status = 1,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         var response = await _client.PostAsJsonAsync(
             $"/gigs/{createdGig.GetProperty("id").GetGuid()}/mileage-estimate",
@@ -306,11 +306,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             {
                 originPostcode = "BS1 1AA",
                 originCountry = "GB",
-            });
+            }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Mileage provider quota was exceeded.", problem.GetProperty("detail").GetString());
         Assert.Equal("quota_exceeded", problem.GetProperty("code").GetString());
     }
@@ -353,11 +353,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = true,
             status = 1,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         createResponse.EnsureSuccessStatusCode();
 
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Object, createdGig.ValueKind);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
@@ -375,11 +375,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = true,
             status = 1,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
-        var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonValueKind.Object, updatedGig.ValueKind);
         Assert.Equal(TestData.FoxInvoiceId, updatedGig.GetProperty("invoiceId").GetGuid());
@@ -411,11 +411,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 },
             },
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         createResponse.EnsureSuccessStatusCode();
 
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
         var updateResponse = await _client.PutAsJsonAsync($"/gigs/{gigId}", new
@@ -446,11 +446,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 },
             },
             invoicedAt = createdGig.GetProperty("invoicedAt").GetString(),
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
-        var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var updatedExpenses = updatedGig.GetProperty("expenses").EnumerateArray().OrderBy(expense => expense.GetProperty("sortOrder").GetInt32()).ToArray();
 
         Assert.Equal(2, updatedExpenses.Length);
@@ -459,10 +459,10 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal("Parking", updatedExpenses[1].GetProperty("description").GetString());
         Assert.Equal(14.00m, updatedExpenses[1].GetProperty("amount").GetDecimal());
 
-        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.FoxInvoiceId}");
+        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.FoxInvoiceId}", TestContext.Current.CancellationToken);
         invoiceResponse.EnsureSuccessStatusCode();
 
-        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var lines = invoice.GetProperty("lines").EnumerateArray().Where(line => line.GetProperty("gigId").GetGuid() == gigId).ToArray();
 
         Assert.Equal(2, lines.Length);
@@ -496,11 +496,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 },
             },
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         createResponse.EnsureSuccessStatusCode();
 
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
         var expenseId = createdGig.GetProperty("expenses")[0].GetProperty("id").GetGuid();
 
@@ -509,36 +509,36 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
         form.Add(file, "file", "uber-receipt.pdf");
 
-        var uploadResponse = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form);
+        var uploadResponse = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, uploadResponse.StatusCode);
 
-        var attachment = await uploadResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var attachment = await uploadResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var attachmentId = attachment.GetProperty("id").GetGuid();
         Assert.Equal("uber-receipt.pdf", attachment.GetProperty("fileName").GetString());
         Assert.Equal("application/pdf", attachment.GetProperty("contentType").GetString());
         Assert.Equal("receipt evidence"u8.Length, attachment.GetProperty("sizeBytes").GetInt64());
         Assert.False(attachment.TryGetProperty("storageKey", out _));
 
-        var gigResponse = await _client.GetAsync($"/gigs/{gigId}");
+        var gigResponse = await _client.GetAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
         gigResponse.EnsureSuccessStatusCode();
 
-        var gig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var attachments = gig.GetProperty("expenses")[0].GetProperty("attachments").EnumerateArray().ToArray();
         Assert.Single(attachments);
         Assert.Equal(attachmentId, attachments[0].GetProperty("id").GetGuid());
 
-        var downloadResponse = await _client.GetAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}");
+        var downloadResponse = await _client.GetAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
         Assert.Equal("application/pdf", downloadResponse.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("receipt evidence", await downloadResponse.Content.ReadAsStringAsync());
+        Assert.Equal("receipt evidence", await downloadResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
 
-        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}");
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
-        var missingDownloadResponse = await _client.GetAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}");
+        var missingDownloadResponse = await _client.GetAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, missingDownloadResponse.StatusCode);
     }
 
@@ -565,11 +565,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 },
             },
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         createResponse.EnsureSuccessStatusCode();
 
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
         var expenseId = createdGig.GetProperty("expenses")[0].GetProperty("id").GetGuid();
 
@@ -578,11 +578,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         file.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
         form.Add(file, "file", "receipt.txt");
 
-        var response = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form);
+        var response = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Receipt files must be PDF, JPG, PNG, WebP or HEIC.", problem.GetProperty("errors").GetProperty("file")[0].GetString());
     }
 
@@ -603,17 +603,17 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             status = 1,
             expenses = Array.Empty<object>(),
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         createResponse.EnsureSuccessStatusCode();
 
         using var form = BuildReceiptDraftForm("taxi receipt"u8.ToArray(), "taxi.jpg", "image/jpeg");
 
-        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.True(result.GetProperty("inferredGig").GetBoolean());
 
         var gig = result.GetProperty("gig");
@@ -651,18 +651,18 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 status = 1,
                 expenses = Array.Empty<object>(),
                 invoicedAt = (string?)null,
-            });
+            }, TestContext.Current.CancellationToken);
 
             createResponse.EnsureSuccessStatusCode();
         }
 
         using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
 
-        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.True(result.GetProperty("hasNearbyCandidates").GetBoolean());
 
         var gig = result.GetProperty("gig");
@@ -693,18 +693,18 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 status = 1,
                 expenses = Array.Empty<object>(),
                 invoicedAt = (string?)null,
-            });
+            }, TestContext.Current.CancellationToken);
 
             createResponse.EnsureSuccessStatusCode();
         }
 
         using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
 
-        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.False(result.GetProperty("hasNearbyCandidates").GetBoolean());
 
         var candidates = result.GetProperty("candidates").EnumerateArray().ToArray();
@@ -730,18 +730,18 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 status = 1,
                 expenses = Array.Empty<object>(),
                 invoicedAt = (string?)null,
-            });
+            }, TestContext.Current.CancellationToken);
 
             createResponse.EnsureSuccessStatusCode();
         }
 
         using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
 
-        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("No gig was within 30 days. Choose a gig before saving this receipt draft.", result.GetProperty("message").GetString());
         Assert.Empty(result.GetProperty("candidates").EnumerateArray());
         Assert.Equal(30, result.GetProperty("autoAttachWindowDays").GetInt32());
@@ -763,19 +763,19 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             status = 1,
             expenses = Array.Empty<object>(),
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
         using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf", gigId);
 
-        var response = await _client.PostAsync("/gigs/receipt-drafts", form);
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.False(result.GetProperty("inferredGig").GetBoolean());
         Assert.Equal(gigId, result.GetProperty("gig").GetProperty("id").GetGuid());
     }
@@ -797,7 +797,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             status = 1,
             expenses = Array.Empty<object>(),
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         firstGigResponse.EnsureSuccessStatusCode();
 
         var secondGigResponse = await _client.PostAsJsonAsync("/gigs", new
@@ -813,17 +813,17 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             status = 1,
             expenses = Array.Empty<object>(),
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         secondGigResponse.EnsureSuccessStatusCode();
 
-        var secondGig = await secondGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var secondGig = await secondGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var secondGigId = secondGig.GetProperty("id").GetGuid();
 
         using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
-        var quickResponse = await _client.PostAsync("/gigs/receipt-drafts", form);
+        var quickResponse = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
         quickResponse.EnsureSuccessStatusCode();
 
-        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var expenseId = quickDraft.GetProperty("expenseId").GetGuid();
 
         var updateResponse = await _client.PatchAsJsonAsync($"/gigs/receipt-drafts/{expenseId}", new
@@ -831,11 +831,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             gigId = secondGigId,
             description = "Taxi from station",
             amount = 18.75m,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
-        var result = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var result = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.True(result.GetProperty("moved").GetBoolean());
 
         var targetGig = result.GetProperty("gig");
@@ -879,17 +879,17 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 },
             },
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = gig.GetProperty("id").GetGuid();
 
-        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.FoxInvoiceId}");
+        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.FoxInvoiceId}", TestContext.Current.CancellationToken);
         invoiceResponse.EnsureSuccessStatusCode();
 
-        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
 
         Assert.Equal(5, lines.Length);
@@ -961,14 +961,14 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 },
             },
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         response.EnsureSuccessStatusCode();
 
-        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.RiversideInvoiceId}");
+        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.RiversideInvoiceId}", TestContext.Current.CancellationToken);
         invoiceResponse.EnsureSuccessStatusCode();
 
-        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
 
         Assert.Equal(4, lines.Length);
@@ -994,11 +994,11 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             travelMiles = -3.00m,
             wasDriving = true,
             status = 999,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var errors = problem.GetProperty("errors");
 
         Assert.Equal("Client is required.", errors.GetProperty("clientId")[0].GetString());
@@ -1023,18 +1023,18 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             notes = "Outdoor afternoon set",
             wasDriving = true,
             status = 1,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var createdGigId = createdGig.GetProperty("id").GetGuid();
 
-        var listResponse = await _client.GetAsync("/gigs");
+        var listResponse = await _client.GetAsync("/gigs", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
 
-        var gigs = await listResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gigs = await listResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var savedGig = gigs.EnumerateArray().FirstOrDefault(gig => gig.GetProperty("id").GetGuid() == createdGigId);
 
         Assert.Equal(JsonValueKind.Object, savedGig.ValueKind);
@@ -1070,19 +1070,19 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                     amount = 8.50m,
                 },
             },
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
         var response = await _client.PatchAsJsonAsync($"/gigs/{gigId}/status", new
         {
             status = "Completed",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var updatedGig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedGig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Completed", updatedGig.GetProperty("status").GetString());
         Assert.Equal(TestData.FoxInvoiceId, updatedGig.GetProperty("invoiceId").GetGuid());
         Assert.Equal(1, updatedGig.GetProperty("expenses").GetArrayLength());
@@ -1102,19 +1102,19 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             travelMiles = 0,
             wasDriving = false,
             status = 1,
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
         var response = await _client.PatchAsJsonAsync($"/gigs/{gigId}/status", new
         {
             status = 999,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Status is invalid.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
@@ -1133,16 +1133,16 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             travelMiles = 0,
             wasDriving = false,
             status = "Confirmed",
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}");
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
-        var getResponse = await _client.GetAsync($"/gigs/{gigId}");
+        var getResponse = await _client.GetAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
     }
 
@@ -1159,21 +1159,21 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             travelMiles = 0,
             wasDriving = false,
             status = "Completed",
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}");
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
 
-        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Only planned gigs can be deleted.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
 
-        var getResponse = await _client.GetAsync($"/gigs/{gigId}");
+        var getResponse = await _client.GetAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
     }
 
@@ -1191,21 +1191,21 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             wasDriving = false,
             status = "Confirmed",
             invoiceId = TestData.FoxInvoiceId,
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}");
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
 
-        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Gigs with linked invoices cannot be deleted.",
             problem.GetProperty("errors").GetProperty("invoiceId")[0].GetString());
 
-        var getResponse = await _client.GetAsync($"/gigs/{gigId}");
+        var getResponse = await _client.GetAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
     }
 }

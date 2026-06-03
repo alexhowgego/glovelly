@@ -60,10 +60,10 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         });
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var settings = await dbContext.GoogleCalendarIntegrationSettings.SingleAsync();
-        var connection = await dbContext.GoogleConnections.SingleAsync();
+        var settings = await dbContext.GoogleCalendarIntegrationSettings.SingleAsync(TestContext.Current.CancellationToken);
+        var connection = await dbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(connection.Id, settings.GoogleConnectionId);
         Assert.Equal("calendar-id", settings.GoogleCalendarId);
         Assert.NotEqual("access-token", connection.EncryptedAccessToken);
@@ -94,9 +94,9 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         });
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var state = await dbContext.GigCalendarSyncStates.SingleAsync();
+        var state = await dbContext.GigCalendarSyncStates.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CalendarProvider.GoogleCalendar, state.Provider);
         Assert.Equal("calendar-id", state.ProviderCalendarId);
         Assert.Equal("event-id", state.ProviderEventId);
@@ -261,7 +261,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
                 CreatedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         using var scope = factory.Services.CreateScope();
@@ -284,9 +284,9 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         await queue.EnqueueGigAsync(
             TestAuthContext.UserId,
             Guid.Parse("33333333-3333-3333-3333-333333333333"),
-            CalendarSyncWorkItemReason.GigUpdated);
+            CalendarSyncWorkItemReason.GigUpdated, TestContext.Current.CancellationToken);
 
-        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
         Assert.Equal(CalendarSyncWorkItemReason.GigUpdated, workItem.Reason);
         Assert.Equal(CalendarProvider.GoogleCalendar, workItem.Provider);
@@ -301,10 +301,10 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var gigId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
-        await queue.EnqueueGigAsync(TestAuthContext.UserId, gigId, CalendarSyncWorkItemReason.GigCreated);
-        await queue.EnqueueGigAsync(TestAuthContext.UserId, gigId, CalendarSyncWorkItemReason.GigUpdated);
+        await queue.EnqueueGigAsync(TestAuthContext.UserId, gigId, CalendarSyncWorkItemReason.GigCreated, TestContext.Current.CancellationToken);
+        await queue.EnqueueGigAsync(TestAuthContext.UserId, gigId, CalendarSyncWorkItemReason.GigUpdated, TestContext.Current.CancellationToken);
 
-        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(gigId, workItem.GigId);
         Assert.Equal(CalendarSyncWorkItemReason.GigUpdated, workItem.Reason);
         Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
@@ -318,10 +318,10 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var queue = scope.ServiceProvider.GetRequiredService<ICalendarSyncWorkQueue>();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.ConnectionChanged);
-        await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.CalendarRecreated);
+        await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.ConnectionChanged, TestContext.Current.CancellationToken);
+        await queue.EnqueueFullSyncAsync(TestAuthContext.UserId, CalendarSyncWorkItemReason.CalendarRecreated, TestContext.Current.CancellationToken);
 
-        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Null(workItem.GigId);
         Assert.Equal(CalendarSyncWorkItemReason.CalendarRecreated, workItem.Reason);
         Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
@@ -351,7 +351,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
             dbContext.Gigs.Add(gig);
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         using var scope = factory.Services.CreateScope();
@@ -367,7 +367,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         }, CancellationToken.None);
 
         var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync();
+        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal("calendar-id", calendarClient.EventCalendarId);
         Assert.Equal(GoogleCalendarApiClient.BuildDeterministicEventId(gig.Id), calendarClient.EventId);
         Assert.Equal(calendarClient.EventId, syncState.ProviderEventId);
@@ -415,7 +415,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
                 "older-historical-hash",
                 "older-historical-event-id",
                 providerCalendarId: "older-deleted-calendar-id"));
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         using var scope = factory.Services.CreateScope();
@@ -431,11 +431,11 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         }, CancellationToken.None);
 
         var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var settings = await assertionDbContext.GoogleCalendarIntegrationSettings.SingleAsync();
-        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == gig.Id);
-        var historicalSyncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == historicalGigId);
-        var olderHistoricalSyncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == olderHistoricalGigId);
-        var fullSyncWorkItem = await assertionDbContext.CalendarSyncWorkItems.SingleAsync();
+        var settings = await assertionDbContext.GoogleCalendarIntegrationSettings.SingleAsync(TestContext.Current.CancellationToken);
+        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == gig.Id, TestContext.Current.CancellationToken);
+        var historicalSyncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == historicalGigId, TestContext.Current.CancellationToken);
+        var olderHistoricalSyncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(value => value.GigId == olderHistoricalGigId, TestContext.Current.CancellationToken);
+        var fullSyncWorkItem = await assertionDbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal("replacement-calendar-id", settings.GoogleCalendarId);
         Assert.Equal("replacement-calendar-id", syncState.ProviderCalendarId);
         Assert.Null(historicalSyncState.ProviderCalendarId);
@@ -474,7 +474,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             });
             dbContext.Gigs.Add(gig);
             dbContext.GigCalendarSyncStates.Add(CreateSyncState(gig.Id, "old-hash", "event-id"));
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         using var scope = factory.Services.CreateScope();
@@ -490,7 +490,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         }, CancellationToken.None);
 
         var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync();
+        var syncState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal("event-id", calendarClient.DeletedEventId);
         Assert.NotNull(syncState.DeletedAtUtc);
     }
@@ -505,13 +505,13 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
-        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5), TestContext.Current.CancellationToken);
 
         Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 0), result);
         Assert.Equal(workItemId, processor.ProcessedWorkItemIds.Single());
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CalendarSyncWorkItemStatus.Succeeded, workItem.Status);
         Assert.Null(workItem.ProcessingOwnerId);
         Assert.Null(workItem.ProcessingStartedAtUtc);
@@ -534,12 +534,12 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
-        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5, OwnerId: "test-owner"));
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5, OwnerId: "test-owner"), TestContext.Current.CancellationToken);
 
         Assert.Equal(new CalendarSyncDrainResult(1, 0, 1, 0, 0, 0), result);
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CalendarSyncWorkItemStatus.Pending, workItem.Status);
         Assert.Equal(1, workItem.AttemptCount);
         Assert.Null(workItem.ProcessingOwnerId);
@@ -564,12 +564,12 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
-        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5), TestContext.Current.CancellationToken);
 
         Assert.Equal(new CalendarSyncDrainResult(1, 0, 0, 1, 0, 0), result);
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CalendarSyncWorkItemStatus.Failed, workItem.Status);
         Assert.Equal(5, workItem.AttemptCount);
         Assert.Null(workItem.ProcessingOwnerId);
@@ -590,13 +590,13 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
-        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 1));
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 1), TestContext.Current.CancellationToken);
 
         Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 0), result);
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(1, await dbContext.CalendarSyncWorkItems.CountAsync(item => item.Status == CalendarSyncWorkItemStatus.Succeeded));
-        Assert.Equal(1, await dbContext.CalendarSyncWorkItems.CountAsync(item => item.Status == CalendarSyncWorkItemStatus.Pending));
+        Assert.Equal(1, await dbContext.CalendarSyncWorkItems.CountAsync(item => item.Status == CalendarSyncWorkItemStatus.Succeeded, TestContext.Current.CancellationToken));
+        Assert.Equal(1, await dbContext.CalendarSyncWorkItems.CountAsync(item => item.Status == CalendarSyncWorkItemStatus.Pending, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -612,7 +612,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
-        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5));
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5), TestContext.Current.CancellationToken);
 
         Assert.Equal(new CalendarSyncDrainResult(0, 0, 0, 0, 0, 0), result);
         Assert.Empty(processor.ProcessedWorkItemIds);
@@ -636,13 +636,13 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(
             MaxItems: 5,
             OwnerId: "new-owner",
-            ProcessingTimeout: TimeSpan.FromMinutes(10)));
+            ProcessingTimeout: TimeSpan.FromMinutes(10)), TestContext.Current.CancellationToken);
 
         Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 1), result);
         Assert.Equal(workItemId, processor.ProcessedWorkItemIds.Single());
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CalendarSyncWorkItemStatus.Succeeded, workItem.Status);
         Assert.Null(workItem.ProcessingOwnerId);
         Assert.Null(workItem.ProcessingStartedAtUtc);
@@ -666,13 +666,13 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
         var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(
             MaxItems: 5,
-            ProcessingTimeout: TimeSpan.FromMinutes(10)));
+            ProcessingTimeout: TimeSpan.FromMinutes(10)), TestContext.Current.CancellationToken);
 
         Assert.Equal(new CalendarSyncDrainResult(0, 0, 0, 0, 0, 0), result);
         Assert.Empty(processor.ProcessedWorkItemIds);
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync();
+        var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CalendarSyncWorkItemStatus.Processing, workItem.Status);
         Assert.Equal("active-owner", workItem.ProcessingOwnerId);
     }
@@ -686,7 +686,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             {
                 using var scope = serviceProvider.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var claimedItem = await dbContext.CalendarSyncWorkItems.SingleAsync(value => value.Id == workItemId);
+                var claimedItem = await dbContext.CalendarSyncWorkItems.SingleAsync(value => value.Id == workItemId, TestContext.Current.CancellationToken);
                 Assert.Equal(CalendarSyncWorkItemStatus.Processing, claimedItem.Status);
                 Assert.Equal("claim-owner", claimedItem.ProcessingOwnerId);
                 Assert.NotNull(claimedItem.ProcessingStartedAtUtc);
@@ -700,7 +700,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
         using var scope = factory.Services.CreateScope();
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
-        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5, OwnerId: "claim-owner"));
+        var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5, OwnerId: "claim-owner"), TestContext.Current.CancellationToken);
 
         Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 0), result);
     }
@@ -828,7 +828,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         });
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return workItemId;
     }
@@ -852,7 +852,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             ConnectedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         });
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return connectionId;
     }

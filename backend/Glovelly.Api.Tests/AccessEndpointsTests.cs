@@ -38,7 +38,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
             IsActive = true,
             CreatedUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
         });
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var response = await _client.PostAsJsonAsync("/access/request", new
         {
@@ -46,7 +46,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
                 "new-user@glovelly.local",
                 "New User",
                 "google-sub-new-user"),
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
@@ -98,7 +98,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
             IsActive = true,
             CreatedUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
         });
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var response = await _client.PostAsJsonAsync("/access/request", new
         {
@@ -106,7 +106,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
                 "new-user@glovelly.local",
                 "New User",
                 "google-sub-new-user"),
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
@@ -124,7 +124,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
                 "   ",
                 "New User",
                 "google-sub-new-user"),
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(_factory.Emails.SentEmails);
@@ -141,11 +141,11 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
                 "new-user@glovelly.local",
                 "New User",
                 "google-sub-new-user"),
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Unable to submit access request", problem.GetProperty("title").GetString());
         Assert.Equal(
             "We couldn't submit your access request right now. Please try again shortly.",
@@ -158,8 +158,8 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         var firstRequest = CreateAccessRequestWithToken("repeat-user@glovelly.local", "198.51.100.14");
         var secondRequest = CreateAccessRequestWithToken("REPEAT-USER@glovelly.local", "198.51.100.14");
 
-        var firstResponse = await _client.SendAsync(firstRequest);
-        var secondResponse = await _client.SendAsync(secondRequest);
+        var firstResponse = await _client.SendAsync(firstRequest, TestContext.Current.CancellationToken);
+        var secondResponse = await _client.SendAsync(secondRequest, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
@@ -171,7 +171,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var storedRequests = await dbContext.AccessRequests
             .OrderBy(value => value.RequestedAtUtc)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, storedRequests.Count);
         Assert.NotNull(storedRequests[0].NotificationSentAtUtc);
@@ -202,12 +202,12 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
                 });
             }
 
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var request = CreateAccessRequestWithToken("quota-target@glovelly.local", "198.51.100.15");
 
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Access request submitted.", await ReadMessageAsync(response));
@@ -217,7 +217,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         var verificationDbContext = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var storedRequest = await verificationDbContext.AccessRequests
             .OrderByDescending(value => value.RequestedAtUtc)
-            .FirstAsync(value => value.NormalizedEmail == "quota-target@glovelly.local");
+            .FirstAsync(value => value.NormalizedEmail == "quota-target@glovelly.local", TestContext.Current.CancellationToken);
 
         Assert.Null(storedRequest.NotificationSentAtUtc);
         Assert.Equal(
@@ -233,7 +233,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         for (var index = 0; index < 6; index++)
         {
             var request = CreateAccessRequestWithToken($"rate-limit-{index}@glovelly.local", "198.51.100.16");
-            responses.Add(await _client.SendAsync(request));
+            responses.Add(await _client.SendAsync(request, TestContext.Current.CancellationToken));
         }
 
         Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
@@ -246,7 +246,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        Assert.Equal(5, await dbContext.AccessRequests.CountAsync());
+        Assert.Equal(5, await dbContext.AccessRequests.CountAsync(TestContext.Current.CancellationToken));
         Assert.Equal(5, _factory.Emails.SentEmails.Count);
     }
 
@@ -258,7 +258,7 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
         var response = await _client.PostAsJsonAsync("/access/request", new
         {
             accessRequestToken = token,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Single(_factory.Emails.SentEmails);

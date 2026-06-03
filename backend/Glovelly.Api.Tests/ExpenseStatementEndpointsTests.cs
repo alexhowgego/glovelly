@@ -44,11 +44,11 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             gigIds = new[] { secondGig.GigId, firstGig.GigId },
             includeReceiptAttachments = true,
             includeReceiptAppendix = true,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var statement = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var statement = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(TestData.FoxAndFinchId, statement.GetProperty("clientId").GetGuid());
         Assert.Equal("Fox & Finch Events", statement.GetProperty("clientName").GetString());
         Assert.Equal(81.35m, statement.GetProperty("total").GetDecimal());
@@ -86,10 +86,10 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             reimbursedAt = "2026-07-10T00:00:00Z",
             method = "Bank transfer",
             note = "Paid by client",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
-        var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var updatedExpense = updatedGig.GetProperty("expenses")[0];
         Assert.Equal("Reimbursed", updatedExpense.GetProperty("reimbursementStatus").GetString());
         Assert.Equal("Bank transfer", updatedExpense.GetProperty("reimbursementMethod").GetString());
@@ -100,11 +100,11 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             gigIds = new[] { gig.GigId },
             includeReceiptAttachments = true,
             includeReceiptAppendix = false,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, defaultResponse.StatusCode);
 
-        var defaultStatement = await defaultResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var defaultStatement = await defaultResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Empty(defaultStatement.GetProperty("gigs").EnumerateArray());
         Assert.Equal(0m, defaultStatement.GetProperty("total").GetDecimal());
 
@@ -115,11 +115,11 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             includeReceiptAttachments = true,
             includeReceiptAppendix = false,
             includeReimbursedExpenses = true,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, includedResponse.StatusCode);
 
-        var includedStatement = await includedResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var includedStatement = await includedResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Single(includedStatement.GetProperty("gigs").EnumerateArray());
         Assert.Equal(120.00m, includedStatement.GetProperty("total").GetDecimal());
     }
@@ -140,11 +140,11 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             gigIds = new[] { gig.GigId },
             includeReceiptAttachments = true,
             includeReceiptAppendix = false,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var statement = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var statement = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var statementGig = Assert.Single(statement.GetProperty("gigs").EnumerateArray());
         Assert.Equal(gig.GigId, statementGig.GetProperty("gigId").GetGuid());
         Assert.True(statementGig.GetProperty("isInvoiced").GetBoolean());
@@ -170,13 +170,13 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             reimbursedAt = "2026-07-11T00:00:00Z",
             method = "Cash",
             note = "Settled on the night",
-        });
+        }, TestContext.Current.CancellationToken);
         reimbursementResponse.EnsureSuccessStatusCode();
 
-        var invoiceResponse = await _client.PostAsync($"/gigs/{gig.GigId}/generate-invoice", null);
+        var invoiceResponse = await _client.PostAsync($"/gigs/{gig.GigId}/generate-invoice", null, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Created, invoiceResponse.StatusCode);
 
-        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var lines = invoice.GetProperty("lines").EnumerateArray().ToArray();
 
         Assert.Contains(lines, line => line.GetProperty("description").GetString() == "Parking");
@@ -199,13 +199,13 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             gigIds = new[] { gig.GigId },
             includeReceiptAttachments = true,
             includeReceiptAppendix = true,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("Expense-Statement-Fox-Finch-Events-", response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName);
 
-        var pdfText = Encoding.ASCII.GetString(await response.Content.ReadAsByteArrayAsync());
+        var pdfText = Encoding.ASCII.GetString(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
         Assert.StartsWith("%PDF-1.4", pdfText);
         Assert.Contains("Expense Statement", pdfText);
         Assert.Contains("PDF expenses", pdfText);
@@ -213,9 +213,9 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
         Assert.Contains("Receipt Appendix", pdfText);
         Assert.Contains("taxi.pdf", pdfText);
 
-        var gigResponse = await _client.GetAsync($"/gigs/{gig.GigId}");
+        var gigResponse = await _client.GetAsync($"/gigs/{gig.GigId}", TestContext.Current.CancellationToken);
         gigResponse.EnsureSuccessStatusCode();
-        var currentGig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var currentGig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Null, currentGig.GetProperty("invoiceId").ValueKind);
         Assert.Equal(JsonValueKind.Null, currentGig.GetProperty("invoicedAt").ValueKind);
     }
@@ -236,9 +236,9 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             status = 1,
             expenses = new[] { new { description = "Parking", amount = 8.00m } },
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         riversideResponse.EnsureSuccessStatusCode();
-        var riversideGig = await riversideResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var riversideGig = await riversideResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         var response = await _client.PostAsJsonAsync("/expense-statements/preview", new
         {
@@ -246,10 +246,10 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
             gigIds = new[] { foxGig.GigId, riversideGig.GetProperty("id").GetGuid() },
             includeReceiptAttachments = false,
             includeReceiptAppendix = false,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "All selected gigs must belong to the selected client.",
             problem.GetProperty("errors").GetProperty("gigIds")[0].GetString());
@@ -299,7 +299,7 @@ public sealed class ExpenseStatementEndpointsTests : IClassFixture<GlovellyApiFa
         file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
         form.Add(file, "file", fileName);
 
-        var response = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form);
+        var response = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form, TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
     }
 

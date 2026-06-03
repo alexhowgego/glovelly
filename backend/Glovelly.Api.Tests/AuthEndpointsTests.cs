@@ -29,7 +29,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         var request = new HttpRequestMessage(HttpMethod.Get, "/auth/me");
         request.Headers.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
 
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -46,14 +46,14 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             invoiceFilenamePattern = "{MonthName} {Year} {InvoiceNumber}",
             invoiceEmailSubjectPattern = "{ClientName} invoice {InvoiceNumber}",
             invoiceReplyToEmail = "billing@example.com",
-        });
+        }, TestContext.Current.CancellationToken);
         updateResponse.EnsureSuccessStatusCode();
 
-        var response = await _client.GetAsync("/auth/me");
+        var response = await _client.GetAsync("/auth/me", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "{MonthName} {Year} {InvoiceNumber}",
             payload.GetProperty("invoiceFilenamePattern").GetString());
@@ -87,14 +87,14 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var response = await _client.GetAsync("/auth/me");
+        var response = await _client.GetAsync("/auth/me", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.True(payload.GetProperty("isGoogleDriveConnected").GetBoolean());
     }
 
@@ -117,14 +117,14 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var response = await _client.GetAsync("/auth/me");
+        var response = await _client.GetAsync("/auth/me", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.False(payload.GetProperty("isGoogleDriveConnected").GetBoolean());
     }
 
@@ -147,7 +147,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
@@ -158,15 +158,15 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
             invoiceUploadFolderId = "  drive-folder-id  ",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("drive-folder-id", payload.GetProperty("invoiceUploadFolderId").GetString());
 
-        var meResponse = await _client.GetAsync("/auth/me");
-        var mePayload = await meResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var meResponse = await _client.GetAsync("/auth/me", TestContext.Current.CancellationToken);
+        var mePayload = await meResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("drive-folder-id", mePayload.GetProperty("invoiceUploadFolderId").GetString());
     }
 
@@ -181,11 +181,11 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
             invoiceUploadFolderId = "drive-folder-id",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Connect Google Drive before setting an invoice upload folder.",
             problem.GetProperty("errors").GetProperty("invoiceUploadFolderId")[0].GetString());
@@ -203,11 +203,11 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             invoiceFilenamePattern = "  {ClientName} {InvoiceNumber}  ",
             invoiceEmailSubjectPattern = "  Invoice {InvoiceNumber} for {ClientName}  ",
             invoiceReplyToEmail = "  accounts@example.com  ",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "{ClientName} {InvoiceNumber}",
             payload.GetProperty("invoiceFilenamePattern").GetString());
@@ -222,7 +222,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var savedUser = await dbContext.Users.FindAsync(TestAuthContext.UserId);
+        var savedUser = await dbContext.Users.FindAsync([TestAuthContext.UserId], TestContext.Current.CancellationToken);
 
         Assert.NotNull(savedUser);
         Assert.Equal("{ClientName} {InvoiceNumber}", savedUser.InvoiceFilenamePattern);
@@ -242,11 +242,11 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             travelOriginPostcode = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Travel origin postcode must be 20 characters or fewer.",
             problem.GetProperty("errors").GetProperty("travelOriginPostcode")[0].GetString());
@@ -262,11 +262,11 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceEmailSubjectPattern = "   ",
             invoiceReplyToEmail = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Invoice email subject pattern cannot be empty or whitespace.",
             problem.GetProperty("errors").GetProperty("invoiceEmailSubjectPattern")[0].GetString());
@@ -281,11 +281,11 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "   ",
             invoiceReplyToEmail = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Invoice filename pattern cannot be empty or whitespace.",
             problem.GetProperty("errors").GetProperty("invoiceFilenamePattern")[0].GetString());
@@ -300,11 +300,11 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceReplyToEmail = "not-an-email",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Reply-to email must be a valid email address.",
             problem.GetProperty("errors").GetProperty("invoiceReplyToEmail")[0].GetString());
@@ -315,8 +315,8 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         var token = CreateAccessRequestToken("new-user@glovelly.local", "New User", "google-sub-new-user");
 
-        var response = await _client.GetAsync($"/auth/denied?code=not_authorized&request={Uri.EscapeDataString(token)}");
-        var html = await response.Content.ReadAsStringAsync();
+        var response = await _client.GetAsync($"/auth/denied?code=not_authorized&request={Uri.EscapeDataString(token)}", TestContext.Current.CancellationToken);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Request access", html);

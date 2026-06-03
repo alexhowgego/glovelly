@@ -36,11 +36,11 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
             passengerMileageRate = 0.15m,
             invoiceFilenamePattern = "  {ClientName} Invoice {InvoiceNumber}  ",
             invoiceEmailSubjectPattern = "  {ClientName}: invoice {InvoiceNumber}  ",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var client = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var client = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "{ClientName} Invoice {InvoiceNumber}",
             client.GetProperty("invoiceFilenamePattern").GetString());
@@ -68,11 +68,11 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
             mileageRate = 0.52m,
             passengerMileageRate = 0.15m,
             invoiceFilenamePattern = "   ",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Invoice filename pattern cannot be empty or whitespace.",
             problem.GetProperty("errors").GetProperty("invoiceFilenamePattern")[0].GetString());
@@ -98,11 +98,11 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
             passengerMileageRate = 0.15m,
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceEmailSubjectPattern = "   ",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Invoice email subject pattern cannot be empty or whitespace.",
             problem.GetProperty("errors").GetProperty("invoiceEmailSubjectPattern")[0].GetString());
@@ -121,25 +121,25 @@ public sealed class ClientEndpointsTests : IClassFixture<GlovellyApiFactory>
                 city = "Leeds",
                 country = "United Kingdom",
             },
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var client = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var client = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var clientId = client.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _client.DeleteAsync($"/clients/{clientId}");
+        var deleteResponse = await _client.DeleteAsync($"/clients/{clientId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync($"/clients/{clientId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync($"/clients/{clientId}", TestContext.Current.CancellationToken)).StatusCode);
     }
 
     [Fact]
     public async Task DeleteClient_WhenInvoiceExists_ReturnsValidationProblem()
     {
-        var response = await _client.DeleteAsync($"/clients/{TestData.FoxAndFinchId}");
+        var response = await _client.DeleteAsync($"/clients/{TestData.FoxAndFinchId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Delete the client's invoices before deleting the client.",
             problem.GetProperty("errors").GetProperty("invoices")[0].GetString());

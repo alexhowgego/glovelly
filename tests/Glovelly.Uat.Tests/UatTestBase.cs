@@ -13,7 +13,7 @@ public abstract class UatTestBase : IAsyncLifetime
 
     protected IPage Page => page ?? throw new InvalidOperationException("The Playwright page has not been initialized.");
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         playwright = await Playwright.CreateAsync();
         browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
@@ -34,7 +34,7 @@ public abstract class UatTestBase : IAsyncLifetime
         page = await context.NewPageAsync();
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (context is not null)
         {

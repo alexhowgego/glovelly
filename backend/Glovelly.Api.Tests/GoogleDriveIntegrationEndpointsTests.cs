@@ -42,7 +42,7 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
             AllowAutoRedirect = false,
         });
 
-        var response = await client.GetAsync("/integrations/google-drive/connect");
+        var response = await client.GetAsync("/integrations/google-drive/connect", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
@@ -77,7 +77,7 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         });
 
         var response = await client.GetAsync(
-            $"/integrations/google-drive/callback?code=auth-code&state={Uri.EscapeDataString(state)}");
+            $"/integrations/google-drive/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(
@@ -89,8 +89,8 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tokenProtector = scope.ServiceProvider.GetRequiredService<IGoogleTokenProtector>();
-        var connection = await dbContext.GoogleConnections.SingleAsync();
-        var driveSettings = await dbContext.GoogleDriveIntegrationSettings.SingleAsync();
+        var connection = await dbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
+        var driveSettings = await dbContext.GoogleDriveIntegrationSettings.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal(TestAuthContext.UserId, connection.UserId);
         Assert.Equal(connection.Id, driveSettings.GoogleConnectionId);
         Assert.NotEqual("ya29.test", connection.EncryptedAccessToken);
@@ -140,7 +140,7 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
                 ConnectedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
                 UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-1),
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var state = CreateGoogleDriveStateToken(factory.Services);
@@ -150,14 +150,14 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         });
 
         var response = await client.GetAsync(
-            $"/integrations/google-drive/callback?code=auth-code&state={Uri.EscapeDataString(state)}");
+            $"/integrations/google-drive/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
         using var assertionScope = factory.Services.CreateScope();
         var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var assertionTokenProtector = assertionScope.ServiceProvider.GetRequiredService<IGoogleTokenProtector>();
-        var connection = await assertionDbContext.GoogleConnections.SingleAsync();
+        var connection = await assertionDbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
         Assert.NotEqual("ya29.new", connection.EncryptedAccessToken);
         Assert.Equal("ya29.new", assertionTokenProtector.Unprotect(connection.EncryptedAccessToken));
         Assert.Equal(encryptedExistingRefreshToken, connection.EncryptedRefreshToken);
@@ -168,11 +168,11 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
     [Fact]
     public async Task Callback_WithoutState_ReturnsValidationProblem()
     {
-        var response = await _client.GetAsync("/integrations/google-drive/callback");
+        var response = await _client.GetAsync("/integrations/google-drive/callback", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Google Drive OAuth state is required.",
             problem.GetProperty("errors").GetProperty("state")[0].GetString());
@@ -182,11 +182,11 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
     public async Task Callback_WithInvalidState_ReturnsValidationProblem()
     {
         var response = await _client.GetAsync(
-            "/integrations/google-drive/callback?code=auth-code&state=not-a-state-token");
+            "/integrations/google-drive/callback?code=auth-code&state=not-a-state-token", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Google Drive OAuth state is invalid or expired.",
             problem.GetProperty("errors").GetProperty("state")[0].GetString());
@@ -198,11 +198,11 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         var state = CreateGoogleDriveStateToken();
 
         var response = await _client.GetAsync(
-            $"/integrations/google-drive/callback?state={Uri.EscapeDataString(state)}");
+            $"/integrations/google-drive/callback?state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Google Drive authorization code is required.",
             problem.GetProperty("errors").GetProperty("code")[0].GetString());
@@ -214,11 +214,11 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         var state = CreateGoogleDriveStateToken();
 
         var response = await _client.GetAsync(
-            $"/integrations/google-drive/callback?error=access_denied&error_description=User%20cancelled&state={Uri.EscapeDataString(state)}");
+            $"/integrations/google-drive/callback?error=access_denied&error_description=User%20cancelled&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Google Drive connection was not approved.", problem.GetProperty("title").GetString());
         Assert.Equal("User cancelled", problem.GetProperty("detail").GetString());
     }
@@ -252,17 +252,17 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
                 CreatedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var response = await _client.PostAsync("/integrations/google-drive/disconnect", content: null);
+        var response = await _client.PostAsync("/integrations/google-drive/disconnect", content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         using var assertionScope = _factory.Services.CreateScope();
         var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var connection = await assertionDbContext.GoogleConnections.SingleAsync();
-        var driveSettings = await assertionDbContext.GoogleDriveIntegrationSettings.SingleAsync();
+        var connection = await assertionDbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
+        var driveSettings = await assertionDbContext.GoogleDriveIntegrationSettings.SingleAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(connection.RevokedAtUtc);
         Assert.Empty(connection.EncryptedAccessToken);
         Assert.Empty(connection.EncryptedRefreshToken);

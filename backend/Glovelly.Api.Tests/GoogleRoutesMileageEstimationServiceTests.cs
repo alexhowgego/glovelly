@@ -35,7 +35,7 @@ public sealed class GoogleRoutesMileageEstimationServiceTests
         var result = await service.EstimateAsync(new MileageEstimateRequest(
             "BS1 1AA, GB",
             "Town Hall, Bristol",
-            RoundTrip: true));
+            RoundTrip: true), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(20000m, result.DistanceMeters);
@@ -81,7 +81,7 @@ public sealed class GoogleRoutesMileageEstimationServiceTests
         var result = await service.EstimateAsync(new MileageEstimateRequest(
             "BS1 1AA",
             "Town Hall",
-            RoundTrip: false));
+            RoundTrip: false), TestContext.Current.CancellationToken);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("google_routes_not_configured", result.FailureCode);
@@ -112,7 +112,7 @@ public sealed class GoogleRoutesMileageEstimationServiceTests
             "BS1 1AA, GB",
             "Town Hall, Bristol",
             RoundTrip: false,
-            DestinationPlaceId: "ChIJN1t_tDeuEmsRUsoyG83frY4"));
+            DestinationPlaceId: "ChIJN1t_tDeuEmsRUsoyG83frY4"), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
 
@@ -144,7 +144,7 @@ public sealed class GoogleRoutesMileageEstimationServiceTests
         var result = await service.EstimateAsync(new MileageEstimateRequest(
             "BS1 1AA",
             "Somewhere",
-            RoundTrip: false));
+            RoundTrip: false), TestContext.Current.CancellationToken);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("google_routes_route_not_found", result.FailureCode);
@@ -162,7 +162,7 @@ public sealed class GoogleRoutesMileageEstimationServiceTests
         var result = await service.EstimateAsync(new MileageEstimateRequest(
             "BS1 1AA",
             "Town Hall",
-            RoundTrip: false));
+            RoundTrip: false), TestContext.Current.CancellationToken);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("google_routes_http_403", result.FailureCode);

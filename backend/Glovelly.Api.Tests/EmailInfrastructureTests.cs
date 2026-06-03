@@ -17,7 +17,7 @@ public sealed class EmailInfrastructureTests
         await sender.SendAsync(new EmailMessage(
             To: [new EmailAddress("user@example.com")],
             Subject: "Test subject",
-            PlainTextBody: "Hello from Glovelly."));
+            PlainTextBody: "Hello from Glovelly."), TestContext.Current.CancellationToken);
 
         Assert.IsType<LoggingEmailSender>(sender);
     }
@@ -64,7 +64,7 @@ public sealed class EmailInfrastructureTests
                 To: [new EmailAddress("user@example.com")],
                 Subject: "Test subject",
                 PlainTextBody: "Hello from Glovelly.",
-                From: new EmailAddress("access@glovelly.test", "Glovelly Access"))));
+                From: new EmailAddress("access@glovelly.test", "Glovelly Access")), TestContext.Current.CancellationToken));
 
         Assert.Contains("Email:Resend:ApiKey", error.Message);
     }

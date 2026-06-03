@@ -19,7 +19,7 @@ public sealed class ApiCacheHeadersTests : IClassFixture<GlovellyApiFactory>
     [InlineData("/admin/users")]
     public async Task ApiEndpoints_ReturnNoStoreCacheHeaders(string path)
     {
-        var response = await _client.GetAsync(path);
+        var response = await _client.GetAsync(path, TestContext.Current.CancellationToken);
 
         response.EnsureSuccessStatusCode();
 

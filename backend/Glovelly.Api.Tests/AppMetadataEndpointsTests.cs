@@ -16,11 +16,11 @@ public sealed class AppMetadataEndpointsTests : IClassFixture<GlovellyApiFactory
     [Fact]
     public async Task Health_ReturnsOkStatus()
     {
-        var response = await _client.GetAsync("/health");
+        var response = await _client.GetAsync("/health", TestContext.Current.CancellationToken);
 
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<HealthPayload>();
+        var payload = await response.Content.ReadFromJsonAsync<HealthPayload>(TestContext.Current.CancellationToken);
         Assert.Equal("ok", payload?.Status);
     }
 

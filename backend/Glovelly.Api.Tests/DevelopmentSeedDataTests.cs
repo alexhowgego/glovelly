@@ -23,21 +23,21 @@ public sealed class DevelopmentSeedDataTests
         var seededAdminUserId = await dbContext.Users
             .Where(user => user.GoogleSubject == TestAuthContext.DefaultSubject)
             .Select(user => user.Id)
-            .SingleAsync();
+            .SingleAsync(TestContext.Current.CancellationToken);
         var invoice = await dbContext.Invoices
             .Include(value => value.Lines)
-            .SingleAsync(value => value.InvoiceNumber == "GLV-2026-002");
+            .SingleAsync(value => value.InvoiceNumber == "GLV-2026-002", TestContext.Current.CancellationToken);
         var gig = await dbContext.Gigs
             .Include(value => value.Expenses)
             .ThenInclude(value => value.Attachments)
-            .SingleAsync(value => value.InvoiceId == invoice.Id);
+            .SingleAsync(value => value.InvoiceId == invoice.Id, TestContext.Current.CancellationToken);
 
         Assert.Equal(InvoiceStatus.Draft, invoice.Status);
-        Assert.NotNull(await dbContext.SellerProfiles.SingleOrDefaultAsync(value => value.UserId == seededAdminUserId));
+        Assert.NotNull(await dbContext.SellerProfiles.SingleOrDefaultAsync(value => value.UserId == seededAdminUserId, TestContext.Current.CancellationToken));
         Assert.Contains(gig.Expenses, expense => expense.Attachments.Count == 1);
         Assert.Contains(gig.Expenses, expense => expense.ReimbursementStatus == GigExpenseReimbursementStatus.Reimbursed);
         var seededAttachment = gig.Expenses.SelectMany(expense => expense.Attachments).Single();
-        await using (var attachmentContent = (await attachmentStore.OpenReadAsync(seededAttachment.StorageKey)).Content)
+        await using (var attachmentContent = (await attachmentStore.OpenReadAsync(seededAttachment.StorageKey, TestContext.Current.CancellationToken)).Content)
         {
             Assert.True(attachmentContent.Length > 0);
         }
@@ -49,13 +49,13 @@ public sealed class DevelopmentSeedDataTests
         lunchExpense.ReimbursementMethod = null;
         lunchExpense.ReimbursementNote = null;
         lunchExpense.ReimbursementInvoiceId = null;
-        await workflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, seededAdminUserId);
-        await dbContext.SaveChangesAsync();
+        await workflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, seededAdminUserId, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var refreshedLines = await dbContext.InvoiceLines
             .Where(line => line.InvoiceId == invoice.Id)
             .OrderBy(line => line.SortOrder)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
         var refreshedGigLines = refreshedLines
             .Where(line => line.GigId == gig.Id)
             .ToList();
@@ -78,32 +78,32 @@ public sealed class DevelopmentSeedDataTests
         var seededAdminUserId = await dbContext.Users
             .Where(user => user.GoogleSubject == TestAuthContext.DefaultSubject)
             .Select(user => user.Id)
-            .SingleAsync();
-        var invoice = await dbContext.Invoices.SingleAsync(value => value.InvoiceNumber == "GLV-2026-002");
+            .SingleAsync(TestContext.Current.CancellationToken);
+        var invoice = await dbContext.Invoices.SingleAsync(value => value.InvoiceNumber == "GLV-2026-002", TestContext.Current.CancellationToken);
         var gig = await dbContext.Gigs
             .Include(value => value.Expenses)
-            .SingleAsync(value => value.InvoiceId == invoice.Id);
+            .SingleAsync(value => value.InvoiceId == invoice.Id, TestContext.Current.CancellationToken);
         var workflowService = CreateWorkflowService(dbContext);
 
         Assert.True(gig.WasDriving);
         Assert.True(gig.TravelMiles > 0);
 
         gig.WasDriving = false;
-        await workflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, seededAdminUserId);
-        await dbContext.SaveChangesAsync();
+        await workflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, seededAdminUserId, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var nonDrivingLines = await dbContext.InvoiceLines
             .Where(line => line.InvoiceId == invoice.Id && line.GigId == gig.Id)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
         Assert.DoesNotContain(nonDrivingLines, line => line.Type == InvoiceLineType.Mileage);
 
         gig.WasDriving = true;
-        await workflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, seededAdminUserId);
-        await dbContext.SaveChangesAsync();
+        await workflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, seededAdminUserId, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var drivingLines = await dbContext.InvoiceLines
             .Where(line => line.InvoiceId == invoice.Id && line.GigId == gig.Id)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
         Assert.Single(drivingLines, line =>
             line.Type == InvoiceLineType.Mileage &&
             line.Quantity == gig.TravelMiles);
