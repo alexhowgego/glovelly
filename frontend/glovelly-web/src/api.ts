@@ -5,6 +5,12 @@ const sessionExpiredErrorMessage = 'SESSION_EXPIRED'
 
 export type SessionExpiredHandler = (message: string) => void
 
+export type ProblemDetails = {
+  title?: string
+  detail?: string
+  errors?: Record<string, string[]>
+}
+
 export class SessionExpiredError extends Error {
   constructor() {
     super(sessionExpiredErrorMessage)
@@ -56,6 +62,16 @@ export async function fetchWithSession(input: string, init?: RequestInit) {
   })
 }
 
+export function jsonRequestInit(method: string, body?: unknown): RequestInit {
+  return {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }
+}
+
 export function isSessionExpiredResponse(response: Response) {
   return response.status === 401
 }
@@ -90,12 +106,71 @@ export async function parseProblemDetails(response: Response) {
   }
 
   try {
-    return (await response.json()) as {
-      title?: string
-      detail?: string
-      errors?: Record<string, string[]>
-    }
+    return (await response.json()) as ProblemDetails
   } catch {
     return null
   }
+}
+
+export function getProblemDetailsMessage(
+  problem: ProblemDetails | null,
+  fallback?: string
+) {
+  const validationMessages = problem?.errors
+    ? Object.values(problem.errors).flat().join(' ')
+    : null
+
+  return validationMessages || problem?.detail || problem?.title || fallback
+}
+
+export async function getResponseErrorMessage(
+  response: Response,
+  fallback: string
+) {
+  return getProblemDetailsMessage(await parseProblemDetails(response), fallback)
+}
+
+export function extractDownloadFilename(contentDisposition: string | null) {
+  if (!contentDisposition) {
+    return null
+  }
+
+  const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1])
+    } catch {
+      return encodedMatch[1]
+    }
+  }
+
+  const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1]
+  }
+
+  const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
+  return plainMatch?.[1]?.trim() ?? null
+}
+
+export async function createBlobObjectUrl(response: Response) {
+  return window.URL.createObjectURL(await response.blob())
+}
+
+export async function downloadResponseBlob(
+  response: Response,
+  fallbackFilename: string
+) {
+  const downloadUrl = await createBlobObjectUrl(response)
+  const link = document.createElement('a')
+  link.href = downloadUrl
+  link.download =
+    extractDownloadFilename(response.headers.get('Content-Disposition')) ??
+    fallbackFilename
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(downloadUrl)
+
+  return link.download
 }

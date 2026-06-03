@@ -3,8 +3,9 @@ import type { FormEvent } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  getResponseErrorMessage,
   handleSessionExpired,
-  parseProblemDetails,
+  jsonRequestInit,
 } from '../api'
 import { emptyClientSettingsForm, emptyForm } from '../forms'
 import type { Address, Client, ClientForm, ClientSettingsForm } from '../types'
@@ -257,18 +258,15 @@ export function useClientsWorkspace({
       const endpoint = isEdit
         ? buildApiUrl(`/clients/${selectedClient.id}`)
         : buildApiUrl('/clients')
-      const requestBody = JSON.stringify({
+      const requestBody = {
         ...payload,
         ...preservedClientSettings,
-      })
+      }
 
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: requestBody,
-      })
+      const response = await fetchWithSession(
+        endpoint,
+        jsonRequestInit(isEdit ? 'PUT' : 'POST', requestBody)
+      )
 
       if (
         handleSessionExpired(
@@ -334,12 +332,7 @@ export function useClientsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Delete failed.')
+        throw new Error(await getResponseErrorMessage(response, 'Delete failed.'))
       }
 
       let nextSelectedClientId = ''
@@ -426,12 +419,7 @@ export function useClientsWorkspace({
     try {
       const response = await fetchWithSession(
         buildApiUrl(`/clients/${selectedClient.id}`),
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        jsonRequestInit('PUT', {
             id: selectedClient.id,
             name: selectedClient.name,
             email: selectedClient.email,
@@ -440,8 +428,7 @@ export function useClientsWorkspace({
             passengerMileageRate,
             invoiceFilenamePattern: invoiceFilenamePattern || null,
             invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
-          }),
-        }
+          })
       )
 
       if (
@@ -456,12 +443,9 @@ export function useClientsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save client settings.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save client settings.')
+        )
       }
 
       const savedClient = (await response.json()) as Client

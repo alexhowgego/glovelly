@@ -2,9 +2,12 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'rea
 import type { FormEvent } from 'react'
 import {
   buildApiUrl,
+  createBlobObjectUrl,
+  downloadResponseBlob,
   fetchWithSession,
+  getResponseErrorMessage,
   handleSessionExpired,
-  parseProblemDetails,
+  jsonRequestInit,
 } from '../api'
 import { defaultGigStatus, emptyGigForm } from '../forms'
 import { toGigExpenseForm } from '../formatters'
@@ -41,29 +44,6 @@ type MileageEstimateResponse = {
   destinationLabel: string
   provider: string
   calculatedAtUtc: string
-}
-
-function extractDownloadFilename(contentDisposition: string | null) {
-  if (!contentDisposition) {
-    return null
-  }
-
-  const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (encodedMatch?.[1]) {
-    try {
-      return decodeURIComponent(encodedMatch[1])
-    } catch {
-      return encodedMatch[1]
-    }
-  }
-
-  const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
-  if (quotedMatch?.[1]) {
-    return quotedMatch[1]
-  }
-
-  const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
-  return plainMatch?.[1]?.trim() ?? null
 }
 
 function formatEditableNumber(value: number | null) {
@@ -339,12 +319,9 @@ export function useGigsWorkspace({
     setGigStatus('Cloning selected gig...')
 
     try {
-      const response = await fetchWithSession(buildApiUrl('/gigs'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await fetchWithSession(
+        buildApiUrl('/gigs'),
+        jsonRequestInit('POST', {
           clientId: selectedGig.clientId,
           title: selectedGig.title,
           date: selectedGig.date,
@@ -367,8 +344,8 @@ export function useGigsWorkspace({
                 }))
             : [],
           invoicedAt: null,
-        }),
-      })
+        })
+      )
 
       if (
         handleSessionExpired(
@@ -381,12 +358,7 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to clone gig.')
+        throw new Error(await getResponseErrorMessage(response, 'Unable to clone gig.'))
       }
 
       const savedGig = (await response.json()) as Gig
@@ -470,16 +442,10 @@ export function useGigsWorkspace({
     try {
       const response = await fetchWithSession(
         buildApiUrl(`/gigs/${selectedGig.id}/mileage-estimate`),
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            destination,
-            roundTrip: true,
-          }),
-        }
+        jsonRequestInit('POST', {
+          destination,
+          roundTrip: true,
+        })
       )
 
       if (
@@ -493,12 +459,9 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to estimate mileage.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to estimate mileage.')
+        )
       }
 
       const estimate = (await response.json()) as MileageEstimateResponse
@@ -641,12 +604,7 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to upload receipt.')
+        throw new Error(await getResponseErrorMessage(response, 'Unable to upload receipt.'))
       }
 
       await refreshGig(selectedGig.id)
@@ -752,12 +710,7 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to delete gig.')
+        throw new Error(await getResponseErrorMessage(response, 'Unable to delete gig.'))
       }
 
       const nextGigs = gigs.filter((gig) => gig.id !== selectedGig.id)
@@ -819,20 +772,14 @@ export function useGigsWorkspace({
     try {
       const response = await fetchWithSession(
         buildApiUrl(`/gigs/${selectedGig.id}/expenses/reimbursement`),
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            expenseIds: [expense.id],
-            status,
-            reimbursedAt,
-            method,
-            note,
-            linkedInvoiceId: null,
-          }),
-        }
+        jsonRequestInit('PATCH', {
+          expenseIds: [expense.id],
+          status,
+          reimbursedAt,
+          method,
+          note,
+          linkedInvoiceId: null,
+        })
       )
 
       if (
@@ -846,12 +793,9 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to update reimbursement.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to update reimbursement.')
+        )
       }
 
       const savedGig = (await response.json()) as Gig
@@ -929,12 +873,12 @@ export function useGigsWorkspace({
     )
 
     if (!redraftResponse.ok) {
-      const problem = await parseProblemDetails(redraftResponse)
-      const validationMessages = problem?.errors
-        ? Object.values(problem.errors).flat().join(' ')
-        : problem?.detail ?? problem?.title
-
-      throw new Error(validationMessages || 'Unable to regenerate draft invoice.')
+      throw new Error(
+        await getResponseErrorMessage(
+          redraftResponse,
+          'Unable to regenerate draft invoice.'
+        )
+      )
     }
 
     const redraftedInvoice = (await redraftResponse.json()) as Invoice
@@ -959,24 +903,15 @@ export function useGigsWorkspace({
 
     const cancelResponse = await fetchWithSession(
       buildApiUrl(`/invoices/${invoice.id}/status`),
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'Cancelled',
-        }),
-      }
+      jsonRequestInit('PUT', {
+        status: 'Cancelled',
+      })
     )
 
     if (!cancelResponse.ok) {
-      const problem = await parseProblemDetails(cancelResponse)
-      const validationMessages = problem?.errors
-        ? Object.values(problem.errors).flat().join(' ')
-        : problem?.detail ?? problem?.title
-
-      throw new Error(validationMessages || 'Unable to cancel linked invoice.')
+      throw new Error(
+        await getResponseErrorMessage(cancelResponse, 'Unable to cancel linked invoice.')
+      )
     }
 
     const cancelledInvoice = (await cancelResponse.json()) as Invoice
@@ -1065,12 +1000,9 @@ export function useGigsWorkspace({
         ? buildApiUrl(`/gigs/${selectedGig.id}`)
         : buildApiUrl('/gigs')
 
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await fetchWithSession(
+        endpoint,
+        jsonRequestInit(isEdit ? 'PUT' : 'POST', {
           clientId: payload.clientId,
           title: payload.title,
           date: payload.date,
@@ -1084,8 +1016,8 @@ export function useGigsWorkspace({
           invoiceId: null,
           expenses: normalizedExpenses,
           invoicedAt: null,
-        }),
-      })
+        })
+      )
 
       if (
         handleSessionExpired(
@@ -1098,12 +1030,7 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save gig.')
+        throw new Error(await getResponseErrorMessage(response, 'Unable to save gig.'))
       }
 
       const savedGig = (await response.json()) as Gig
@@ -1254,13 +1181,10 @@ export function useGigsWorkspace({
     setExpenseStatementStatus('Preparing PDF preview...')
 
     try {
-      const response = await fetchWithSession(buildApiUrl('/expense-statements/pdf'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(buildExpenseStatementPayload()),
-      })
+      const response = await fetchWithSession(
+        buildApiUrl('/expense-statements/pdf'),
+        jsonRequestInit('POST', buildExpenseStatementPayload())
+      )
 
       if (
         handleSessionExpired(
@@ -1273,16 +1197,15 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to preview the expense statement PDF.')
+        throw new Error(
+          await getResponseErrorMessage(
+            response,
+            'Unable to preview the expense statement PDF.'
+          )
+        )
       }
 
-      const blob = await response.blob()
-      const previewUrl = window.URL.createObjectURL(blob)
+      const previewUrl = await createBlobObjectUrl(response)
       setExpenseStatementPreviewUrl((current) => {
         if (current) {
           window.URL.revokeObjectURL(current)
@@ -1316,13 +1239,10 @@ export function useGigsWorkspace({
     setExpenseStatementStatus('Preparing expense statement PDF...')
 
     try {
-      const response = await fetchWithSession(buildApiUrl('/expense-statements/pdf'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(buildExpenseStatementPayload()),
-      })
+      const response = await fetchWithSession(
+        buildApiUrl('/expense-statements/pdf'),
+        jsonRequestInit('POST', buildExpenseStatementPayload())
+      )
 
       if (
         handleSessionExpired(
@@ -1335,26 +1255,17 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to download the expense statement PDF.')
+        throw new Error(
+          await getResponseErrorMessage(
+            response,
+            'Unable to download the expense statement PDF.'
+          )
+        )
       }
 
-      const contentDisposition = response.headers.get('Content-Disposition')
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = downloadUrl
-      link.download = extractDownloadFilename(contentDisposition) ?? fallbackFilename
-      document.body.append(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(downloadUrl)
-      setExpenseStatementStatus(`Downloaded ${link.download}.`)
-      setGigStatus(`Downloaded ${link.download}.`)
+      const filename = await downloadResponseBlob(response, fallbackFilename)
+      setExpenseStatementStatus(`Downloaded ${filename}.`)
+      setGigStatus(`Downloaded ${filename}.`)
     } catch (error) {
       setExpenseStatementStatus(
         error instanceof Error

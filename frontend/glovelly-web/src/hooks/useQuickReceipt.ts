@@ -2,8 +2,9 @@ import { useCallback, useState } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  getResponseErrorMessage,
   handleSessionExpired,
-  parseProblemDetails,
+  jsonRequestInit,
 } from '../api'
 import type {
   Gig,
@@ -112,12 +113,9 @@ export function useQuickReceipt({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save receipt draft.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save receipt draft.')
+        )
       }
 
       const receiptDraft = (await response.json()) as QuickReceiptDraftResponse
@@ -185,17 +183,11 @@ export function useQuickReceipt({
     try {
       const response = await fetchWithSession(
         buildApiUrl(`/gigs/receipt-drafts/${quickReceiptDraft.expenseId}`),
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        jsonRequestInit('PATCH', {
             gigId: quickReceiptSelectedGigId,
             description,
             amount,
-          }),
-        }
+          })
       )
 
       if (
@@ -209,12 +201,9 @@ export function useQuickReceipt({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save receipt details.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save receipt details.')
+        )
       }
 
       const update = (await response.json()) as QuickReceiptDraftUpdateResponse

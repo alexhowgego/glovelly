@@ -3,8 +3,9 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  getResponseErrorMessage,
   handleSessionExpired,
-  parseProblemDetails,
+  jsonRequestInit,
 } from '../api'
 import { emptyUserSettingsForm } from '../forms'
 import type { AuthUser, GoogleCalendarStatus, UserSettingsForm } from '../types'
@@ -162,8 +163,9 @@ export function useUserSettings({
         return
       }
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        throw new Error(problem?.detail ?? problem?.title ?? 'Unable to disconnect Calendar.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to disconnect Calendar.')
+        )
       }
       setUserSettingsStatus('Google Calendar disconnected.')
       await loadGoogleCalendarStatus()
@@ -220,12 +222,9 @@ export function useUserSettings({
     setIsUserSettingsSaving(true)
 
     try {
-      const response = await fetchWithSession(buildApiUrl('/auth/me/settings'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await fetchWithSession(
+        buildApiUrl('/auth/me/settings'),
+        jsonRequestInit('PUT', {
           mileageRate,
           passengerMileageRate,
           travelOriginPostcode: travelOriginPostcode || null,
@@ -234,8 +233,8 @@ export function useUserSettings({
           invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
           invoiceReplyToEmail: invoiceReplyToEmail || null,
           invoiceUploadFolderId: invoiceUploadFolderId || null,
-        }),
-      })
+        })
+      )
 
       if (
         handleSessionExpired(
@@ -249,12 +248,9 @@ export function useUserSettings({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save your settings.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save your settings.')
+        )
       }
 
       const savedSettings = (await response.json()) as SavedUserSettings

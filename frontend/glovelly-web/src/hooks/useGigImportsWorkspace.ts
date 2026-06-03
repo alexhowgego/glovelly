@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  getProblemDetailsMessage,
   handleSessionExpired,
+  jsonRequestInit,
   parseProblemDetails,
 } from '../api'
 import type {
@@ -38,9 +40,7 @@ export type GigImportDraftField =
   | 'status'
 
 function problemMessage(problem: Awaited<ReturnType<typeof parseProblemDetails>>) {
-  return problem?.errors
-    ? Object.values(problem.errors).flat().join(' ')
-    : problem?.detail ?? problem?.title
+  return getProblemDetailsMessage(problem)
 }
 
 function toDraftPayload(draft: GigImportDraft) {
@@ -277,16 +277,10 @@ export function useGigImportsWorkspace({
     try {
       const response = await fetchWithSession(
         buildApiUrl(`/gig-imports/${draft.batchId}/drafts/${draft.draftId}`),
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        jsonRequestInit('PUT', {
             ...toDraftPayload(draft),
             status: status ?? draft.status,
-          }),
-        }
+          })
       )
 
       if (
@@ -425,16 +419,10 @@ export function useGigImportsWorkspace({
     try {
       const response = await fetchWithSession(
         buildApiUrl(`/gig-imports/${batchDetail.batch.batchId}/commit`),
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        jsonRequestInit('POST', {
             draftIds: [],
             commitAccepted: true,
-          }),
-        }
+          })
       )
 
       if (

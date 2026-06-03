@@ -19,10 +19,13 @@ import type { AppNavigationItem, HeaderMetric } from './AppSections'
 import {
   buildApiUrl,
   buildReturnUrl,
+  createBlobObjectUrl,
+  downloadResponseBlob,
   fetchWithSession,
+  getResponseErrorMessage,
   isSessionExpiredError,
   isSessionExpiredResponse,
-  parseProblemDetails,
+  jsonRequestInit,
 } from './api'
 import {
   buildInvoiceEmailSubjectPreview,
@@ -58,29 +61,6 @@ function getCurrentMonthValue() {
 
 function buildMonthlyInvoiceNumber(month: string, sequence: number) {
   return `GLV-${month.replace('-', '')}-${String(sequence).padStart(3, '0')}`
-}
-
-function extractDownloadFilename(contentDisposition: string | null) {
-  if (!contentDisposition) {
-    return null
-  }
-
-  const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (encodedMatch?.[1]) {
-    try {
-      return decodeURIComponent(encodedMatch[1])
-    } catch {
-      return encodedMatch[1]
-    }
-  }
-
-  const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
-  if (quotedMatch?.[1]) {
-    return quotedMatch[1]
-  }
-
-  const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
-  return plainMatch?.[1]?.trim() ?? null
 }
 
 
@@ -861,8 +841,7 @@ function App({ appMetadata }: AppProps) {
         throw new Error('Unable to prepare the invoice PDF preview.')
       }
 
-      const blob = await response.blob()
-      const previewUrl = window.URL.createObjectURL(blob)
+      const previewUrl = await createBlobObjectUrl(response)
       setInvoicePreviewPdfUrl((current) => {
         if (current) {
           window.URL.revokeObjectURL(current)
@@ -898,18 +877,9 @@ function App({ appMetadata }: AppProps) {
         throw new Error('Unable to download the invoice PDF.')
       }
 
-      const contentDisposition = response.headers.get('Content-Disposition')
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = downloadUrl
-      link.download = extractDownloadFilename(contentDisposition) ?? fallbackFilename
-      document.body.append(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(downloadUrl)
-      setInvoicePreviewStatus(`Downloaded ${link.download}.`)
-      setInvoiceStatus(`Downloaded ${link.download}.`)
+      const filename = await downloadResponseBlob(response, fallbackFilename)
+      setInvoicePreviewStatus(`Downloaded ${filename}.`)
+      setInvoiceStatus(`Downloaded ${filename}.`)
     } catch (error) {
       setInvoicePreviewStatus(
         error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
@@ -966,15 +936,12 @@ function App({ appMetadata }: AppProps) {
     try {
       const completedGigs: Gig[] = []
       for (const gig of linkedGigs) {
-        const response = await fetchWithSession(buildApiUrl(`/gigs/${gig.id}/status`), {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        const response = await fetchWithSession(
+          buildApiUrl(`/gigs/${gig.id}/status`),
+          jsonRequestInit('PATCH', {
             status: 'Completed',
-          }),
-        })
+          })
+        )
 
         if (isSessionExpiredResponse(response)) {
           expireSession('Your session expired. Sign in again to keep managing gigs.')
@@ -982,11 +949,9 @@ function App({ appMetadata }: AppProps) {
         }
 
         if (!response.ok) {
-          const problem = await parseProblemDetails(response)
-          const validationMessages = problem?.errors
-            ? Object.values(problem.errors).flat().join(' ')
-            : problem?.detail ?? problem?.title
-          throw new Error(validationMessages || 'Unable to complete linked gig.')
+          throw new Error(
+            await getResponseErrorMessage(response, 'Unable to complete linked gig.')
+          )
         }
 
         completedGigs.push((await response.json()) as Gig)
@@ -1087,15 +1052,12 @@ function App({ appMetadata }: AppProps) {
       setGigStatus(`Generating invoice for ${selectedGigs.length} selected gig(s)...`)
 
       try {
-        const response = await fetchWithSession(buildApiUrl('/gigs/generate-invoice'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        const response = await fetchWithSession(
+          buildApiUrl('/gigs/generate-invoice'),
+          jsonRequestInit('POST', {
             gigIds: selectedGigs.map((gig) => gig.id),
-          }),
-        })
+          })
+        )
 
         if (response.status === 409) {
           const conflict = (await response.json()) as { message?: string }
@@ -1105,11 +1067,9 @@ function App({ appMetadata }: AppProps) {
         }
 
         if (!response.ok) {
-          const problem = await parseProblemDetails(response)
-          const validationMessages = problem?.errors
-            ? Object.values(problem.errors).flat().join(' ')
-            : problem?.detail ?? problem?.title
-          throw new Error(validationMessages || 'Unable to generate invoice.')
+          throw new Error(
+            await getResponseErrorMessage(response, 'Unable to generate invoice.')
+          )
         }
 
         const generatedInvoice = (await response.json()) as Invoice
@@ -1186,8 +1146,9 @@ function App({ appMetadata }: AppProps) {
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        throw new Error(problem?.detail || problem?.title || 'Unable to generate invoice.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to generate invoice.')
+        )
       }
 
       const generatedInvoice = (await response.json()) as Invoice
@@ -1246,36 +1207,31 @@ function App({ appMetadata }: AppProps) {
     )
 
     try {
-      const createInvoiceResponse = await fetchWithSession(buildApiUrl('/invoices'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const createInvoiceResponse = await fetchWithSession(
+        buildApiUrl('/invoices'),
+        jsonRequestInit('POST', {
           invoiceNumber: buildMonthlyInvoiceNumber(monthlyInvoiceMonth, invoices.length + 1),
           clientId: selectedClient.id,
           status: 'Draft',
           description: `Monthly invoice for ${monthlyInvoiceMonth}.`,
-        }),
-      })
+        })
+      )
 
       if (!createInvoiceResponse.ok) {
-        const problem = await parseProblemDetails(createInvoiceResponse)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-        throw new Error(validationMessages || 'Unable to create monthly invoice.')
+        throw new Error(
+          await getResponseErrorMessage(
+            createInvoiceResponse,
+            'Unable to create monthly invoice.'
+          )
+        )
       }
 
       const createdInvoice = (await createInvoiceResponse.json()) as Invoice
 
       for (const gig of gigsToInvoice) {
-        const linkGigResponse = await fetchWithSession(buildApiUrl(`/gigs/${gig.id}`), {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        const linkGigResponse = await fetchWithSession(
+          buildApiUrl(`/gigs/${gig.id}`),
+          jsonRequestInit('PUT', {
             clientId: gig.clientId,
             title: gig.title,
             date: gig.date,
@@ -1296,16 +1252,15 @@ function App({ appMetadata }: AppProps) {
                 amount: expense.amount,
               })),
             invoicedAt: gig.invoicedAt,
-          }),
-        })
+          })
+        )
 
         if (!linkGigResponse.ok) {
-          const problem = await parseProblemDetails(linkGigResponse)
-          const validationMessages = problem?.errors
-            ? Object.values(problem.errors).flat().join(' ')
-            : problem?.detail ?? problem?.title
           throw new Error(
-            validationMessages || `Unable to link ${gig.title} to the monthly invoice.`
+            await getResponseErrorMessage(
+              linkGigResponse,
+              `Unable to link ${gig.title} to the monthly invoice.`
+            )
           )
         }
       }
@@ -1318,11 +1273,12 @@ function App({ appMetadata }: AppProps) {
       )
 
       if (!redraftInvoiceResponse.ok) {
-        const problem = await parseProblemDetails(redraftInvoiceResponse)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-        throw new Error(validationMessages || 'Unable to prepare the monthly invoice PDF.')
+        throw new Error(
+          await getResponseErrorMessage(
+            redraftInvoiceResponse,
+            'Unable to prepare the monthly invoice PDF.'
+          )
+        )
       }
 
       const redraftedInvoice = (await redraftInvoiceResponse.json()) as Invoice
