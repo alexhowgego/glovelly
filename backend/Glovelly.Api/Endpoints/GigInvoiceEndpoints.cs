@@ -65,10 +65,7 @@ internal static class GigInvoiceEndpoints
             var client = gig.Client;
             if (client is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var invoice = await invoiceWorkflowService.GenerateInvoiceForGigAsync(gig, client, userId);

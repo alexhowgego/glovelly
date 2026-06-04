@@ -105,10 +105,7 @@ internal static class GoogleCalendarIntegrationEndpoints
 
             if (string.IsNullOrWhiteSpace(code))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["code"] = ["Google Calendar authorization code is required."]
-                });
+                return EndpointSupport.ValidationProblem("code", "Google Calendar authorization code is required.");
             }
 
             if (string.IsNullOrWhiteSpace(settings.GoogleClientId) ||
@@ -137,10 +134,7 @@ internal static class GoogleCalendarIntegrationEndpoints
 
             if (!GoogleScopes.Contains(tokenResponse.TokenResponse.Scope, GoogleScopes.CalendarAppCreated))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["scope"] = ["Google Calendar authorization did not grant the required Calendar scope."]
-                });
+                return EndpointSupport.ValidationProblem("scope", "Google Calendar authorization did not grant the required Calendar scope.");
             }
 
             _ = await googleConnectionService.SaveConnectionAsync(

@@ -45,10 +45,7 @@ public static class InvoiceLineEndpoints
 
             if (invoice is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["invoiceId"] = ["Invoice does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("invoiceId", "Invoice does not exist.");
             }
 
             var gigValidation = await EndpointSupport.ValidateInvoiceLineGigAsync(invoice, line.GigId, db);
@@ -88,10 +85,7 @@ public static class InvoiceLineEndpoints
 
             if (invoice is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["invoiceId"] = ["Invoice does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("invoiceId", "Invoice does not exist.");
             }
 
             var gigValidation = await EndpointSupport.ValidateInvoiceLineGigAsync(invoice, request.GigId, db);

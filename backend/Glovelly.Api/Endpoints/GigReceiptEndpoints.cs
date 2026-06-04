@@ -24,10 +24,7 @@ internal static class GigReceiptEndpoints
         {
             if (!request.HasFormContentType)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["file"] = ["Upload a receipt file."]
-                });
+                return EndpointSupport.ValidationProblem("file", "Upload a receipt file.");
             }
 
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -58,10 +55,7 @@ internal static class GigReceiptEndpoints
 
                 if (gig is null)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["gigId"] = ["Gig does not exist."]
-                    });
+                    return EndpointSupport.ValidationProblem("gigId", "Gig does not exist.");
                 }
             }
             else
@@ -154,10 +148,7 @@ internal static class GigReceiptEndpoints
 
             if (targetGig is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["gigId"] = ["Gig does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("gigId", "Gig does not exist.");
             }
 
             var expense = await db.GigExpenses
@@ -176,18 +167,12 @@ internal static class GigReceiptEndpoints
             var description = update.Description?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(description))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["description"] = ["Expense description is required."]
-                });
+                return EndpointSupport.ValidationProblem("description", "Expense description is required.");
             }
 
             if (update.Amount < 0)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["amount"] = ["Expense amount cannot be negative."]
-                });
+                return EndpointSupport.ValidationProblem("amount", "Expense amount cannot be negative.");
             }
 
             var previousGigId = expense.GigId;

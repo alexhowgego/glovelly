@@ -91,10 +91,7 @@ public static class InvoiceEndpoints
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == invoice.ClientId))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var issuedOn = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -151,10 +148,7 @@ public static class InvoiceEndpoints
                     .FirstOrDefaultAsync(client => client.Id == request.ClientId);
             if (requestClient is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var hasConflictingGigLinks = await db.InvoiceLines
@@ -168,10 +162,7 @@ public static class InvoiceEndpoints
 
             if (hasConflictingGigLinks)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Invoice client must match any linked gig line clients."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Invoice client must match any linked gig line clients.");
             }
 
             invoice.InvoiceNumber = request.InvoiceNumber.Trim();
@@ -239,10 +230,7 @@ public static class InvoiceEndpoints
             {
                 if (invoice.Client is null)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["clientId"] = ["Client does not exist."]
-                    });
+                    return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
                 }
 
                 await invoiceWorkflowService.IssueInvoiceAsync(invoice, invoice.Client, userId);
@@ -279,18 +267,12 @@ public static class InvoiceEndpoints
 
             if (invoice.Status is InvoiceStatus.Draft)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Draft invoices can be redrafted, but cannot be re-issued until they have been issued."]
-                });
+                return EndpointSupport.ValidationProblem("status", "Draft invoices can be redrafted, but cannot be re-issued until they have been issued.");
             }
 
             if (invoice.Status is InvoiceStatus.Cancelled)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Cancelled invoices must be moved back to Draft before they can be redrafted."]
-                });
+                return EndpointSupport.ValidationProblem("status", "Cancelled invoices must be moved back to Draft before they can be redrafted.");
             }
 
             var client = await db.Clients
@@ -299,18 +281,12 @@ public static class InvoiceEndpoints
 
             if (client is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             if (string.IsNullOrWhiteSpace(client.Email))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["recipient"] = ["Invoice recipient email is missing."]
-                });
+                return EndpointSupport.ValidationProblem("recipient", "Invoice recipient email is missing.");
             }
 
             await invoiceWorkflowService.ReissueInvoiceAsync(invoice, client, userId);
@@ -339,10 +315,7 @@ public static class InvoiceEndpoints
 
             if (invoice.Status is not InvoiceStatus.Draft)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = [$"{invoice.Status} invoices must be re-issued rather than redrafted."]
-                });
+                return EndpointSupport.ValidationProblem("status", $"{invoice.Status} invoices must be re-issued rather than redrafted.");
             }
 
             var client = await db.Clients
@@ -351,10 +324,7 @@ public static class InvoiceEndpoints
 
             if (client is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var linkedGigs = await db.Gigs
@@ -411,27 +381,18 @@ public static class InvoiceEndpoints
 
             if (invoice.Client is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             if (string.IsNullOrWhiteSpace(invoice.Client.Email))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["recipient"] = ["Invoice recipient email is missing."]
-                });
+                return EndpointSupport.ValidationProblem("recipient", "Invoice recipient email is missing.");
             }
 
             var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
             if (invoicePdf is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["pdf"] = ["Invoice PDF is missing."]
-                });
+                return EndpointSupport.ValidationProblem("pdf", "Invoice PDF is missing.");
             }
             await invoicePdf.Content.DisposeAsync();
 
@@ -481,13 +442,9 @@ public static class InvoiceEndpoints
             }
             catch (InvoiceEmailAttachmentLimitExceededException exception)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["attachments"] =
-                    [
-                        $"Invoice email attachments total {FormatBytes(exception.TotalAttachmentBytes)}, exceeding the configured {FormatBytes(exception.MaxTotalAttachmentBytes)} limit."
-                    ]
-                });
+                return EndpointSupport.ValidationProblem(
+                    "attachments",
+                    $"Invoice email attachments total {FormatBytes(exception.TotalAttachmentBytes)}, exceeding the configured {FormatBytes(exception.MaxTotalAttachmentBytes)} limit.");
             }
             catch (Exception exception)
             {
@@ -541,19 +498,13 @@ public static class InvoiceEndpoints
 
             if (invoice.Client is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
             if (invoicePdf is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["pdf"] = ["Invoice PDF is missing."]
-                });
+                return EndpointSupport.ValidationProblem("pdf", "Invoice PDF is missing.");
             }
             await invoicePdf.Content.DisposeAsync();
 
@@ -642,18 +593,12 @@ public static class InvoiceEndpoints
             var reason = request.Reason?.Trim();
             if (string.IsNullOrWhiteSpace(reason))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["reason"] = ["Adjustment reason is required."]
-                });
+                return EndpointSupport.ValidationProblem("reason", "Adjustment reason is required.");
             }
 
             if (request.Amount == 0)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["amount"] = ["Adjustment amount must be non-zero."]
-                });
+                return EndpointSupport.ValidationProblem("amount", "Adjustment amount must be non-zero.");
             }
 
             _ = await invoiceWorkflowService.CreateManualAdjustmentAsync(invoice, request.Amount, reason, userId);
@@ -682,10 +627,7 @@ public static class InvoiceEndpoints
 
             if (invoice.Status is not InvoiceStatus.Draft)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = [$"Only Draft invoices can be deleted. {invoice.Status} invoices must be retained for reporting."]
-                });
+                return EndpointSupport.ValidationProblem("status", $"Only Draft invoices can be deleted. {invoice.Status} invoices must be retained for reporting.");
             }
 
             var deletedAtUtc = DateTimeOffset.UtcNow;

@@ -66,28 +66,19 @@ internal static class GigImportEndpoints
 
             if (draft.Status == GigImportDraftStatus.Committed)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Committed import rows cannot be edited."]
-                });
+                return EndpointSupport.ValidationProblem("status", "Committed import rows cannot be edited.");
             }
 
             if (draft.Batch.Status != GigImportBatchStatus.Draft)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["batch"] = ["Only draft import batches can be edited."]
-                });
+                return EndpointSupport.ValidationProblem("batch", "Only draft import batches can be edited.");
             }
 
             if (request.ProposedClientId.HasValue && !await db.Clients
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == request.ProposedClientId.Value))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["proposedClientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("proposedClientId", "Client does not exist.");
             }
 
             if (!TryApplyDraftStatus(request.Status, draft, out var statusError))
@@ -144,10 +135,7 @@ internal static class GigImportEndpoints
 
             if (batch.Status != GigImportBatchStatus.Draft)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["batch"] = ["Only draft import batches can be committed."]
-                });
+                return EndpointSupport.ValidationProblem("batch", "Only draft import batches can be committed.");
             }
 
             var requestedDraftIds = request.DraftIds?.Where(value => value != Guid.Empty).Distinct().ToHashSet();
@@ -170,10 +158,7 @@ internal static class GigImportEndpoints
             {
                 if (reviewedDraftCount == 0)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["draftIds"] = ["Accept or reject at least one row before committing decisions."]
-                    });
+                    return EndpointSupport.ValidationProblem("draftIds", "Accept or reject at least one row before committing decisions.");
                 }
 
                 DeleteRejectedDrafts(db, batch, rejectedDrafts);
@@ -391,10 +376,7 @@ internal static class GigImportEndpoints
         if (!Enum.TryParse<GigImportDraftStatus>(requestedStatus, ignoreCase: true, out var status) ||
             status == GigImportDraftStatus.Committed)
         {
-            error = Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["status"] = ["Status is invalid."]
-            });
+            error = EndpointSupport.ValidationProblem("status", "Status is invalid.");
             return false;
         }
 

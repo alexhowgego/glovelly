@@ -25,18 +25,12 @@ internal static class GigExpenseEndpoints
 
             if (expenseIds.Count == 0)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["expenseIds"] = ["Select at least one expense."]
-                });
+                return EndpointSupport.ValidationProblem("expenseIds", "Select at least one expense.");
             }
 
             if (!Enum.IsDefined(request.Status))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Reimbursement status is invalid."]
-                });
+                return EndpointSupport.ValidationProblem("status", "Reimbursement status is invalid.");
             }
 
             var method = request.Method?.Trim();
@@ -45,18 +39,12 @@ internal static class GigExpenseEndpoints
             {
                 if (!request.ReimbursedAt.HasValue)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["reimbursedAt"] = ["Reimbursed date is required."]
-                    });
+                    return EndpointSupport.ValidationProblem("reimbursedAt", "Reimbursed date is required.");
                 }
 
                 if (string.IsNullOrWhiteSpace(method) && string.IsNullOrWhiteSpace(note))
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["note"] = ["Record a reimbursement method or note."]
-                    });
+                    return EndpointSupport.ValidationProblem("note", "Record a reimbursement method or note.");
                 }
             }
 
@@ -79,18 +67,12 @@ internal static class GigExpenseEndpoints
 
                 if (invoice is null)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["linkedInvoiceId"] = ["Linked invoice does not exist."]
-                    });
+                    return EndpointSupport.ValidationProblem("linkedInvoiceId", "Linked invoice does not exist.");
                 }
 
                 if (invoice.ClientId != gig.ClientId)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["linkedInvoiceId"] = ["Linked invoice client must match the gig client."]
-                    });
+                    return EndpointSupport.ValidationProblem("linkedInvoiceId", "Linked invoice client must match the gig client.");
                 }
             }
 
@@ -100,10 +82,7 @@ internal static class GigExpenseEndpoints
 
             if (expenses.Count != expenseIds.Count)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["expenseIds"] = ["One or more expenses do not belong to this gig."]
-                });
+                return EndpointSupport.ValidationProblem("expenseIds", "One or more expenses do not belong to this gig.");
             }
 
             foreach (var expense in expenses)
