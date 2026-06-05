@@ -48,11 +48,11 @@ internal static class TestAuthEndpoints
                 return Results.Forbid();
             }
 
-            await AppDbSeeder.SeedUatRegressionDataAsync(dbContext);
+            await UatRegressionDataSeeder.SeedAsync(dbContext);
 
             var user = await dbContext.Users
                 .AsNoTracking()
-                .FirstAsync(value => value.Id == AppDbSeeder.UatRegressionUserId && value.IsActive);
+                .FirstAsync(value => value.Id == UatRegressionDataSeeder.UserId && value.IsActive);
 
             var claims = new[]
             {
@@ -64,7 +64,7 @@ internal static class TestAuthEndpoints
                 new Claim("role", user.Role.ToString()),
                 new Claim(ClaimTypes.Name, user.DisplayName ?? user.Email),
                 new Claim("name", user.DisplayName ?? user.Email),
-                new Claim("sub", user.GoogleSubject ?? AppDbSeeder.UatRegressionGoogleSubject),
+                new Claim("sub", user.GoogleSubject ?? UatRegressionDataSeeder.GoogleSubject),
             };
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

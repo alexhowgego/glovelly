@@ -6,104 +6,22 @@ using System.Text;
 
 namespace Glovelly.Api.Data;
 
-public static class AppDbSeeder
+public sealed record DevelopmentDataSeedContext(
+    AppDbContext DbContext,
+    IConfiguration Configuration,
+    IExpenseAttachmentStore? AttachmentStore = null,
+    IBlobStore? BlobStore = null);
+
+public sealed record DevelopmentSeedFixture(
+    IReadOnlyList<Client> Clients,
+    IReadOnlyList<Invoice> Invoices,
+    IReadOnlyList<InvoiceLine> InvoiceLines,
+    IReadOnlyList<Gig> Gigs);
+
+public static class DevelopmentDataSeeder
 {
-    public static readonly Guid UatRegressionUserId = Guid.Parse("a1111111-1111-4111-8111-111111111111");
-    public static readonly Guid UatRegressionClientId = Guid.Parse("a2222222-2222-4222-8222-222222222222");
-    public static readonly Guid UatRegressionSellerProfileId = Guid.Parse("a3333333-3333-4333-8333-333333333333");
-    public const string UatRegressionGoogleSubject = "glovelly-uat-regression-user";
-    public const string UatRegressionEmail = "regression@glovelly.net";
-    public const string UatRegressionDisplayName = "Glovelly UAT Regression User";
     private static readonly DateTimeOffset SeededCreatedUtc = new(2026, 3, 15, 9, 0, 0, TimeSpan.Zero);
     private static readonly byte[] SeededPdfContent = "Seeded development invoice PDF placeholder"u8.ToArray();
-
-    public static async Task SeedUatRegressionDataAsync(AppDbContext dbContext)
-    {
-        var user = await dbContext.Users.FirstOrDefaultAsync(value => value.Id == UatRegressionUserId);
-        if (user is null)
-        {
-            user = new User
-            {
-                Id = UatRegressionUserId,
-                CreatedUtc = SeededCreatedUtc.UtcDateTime,
-            };
-            dbContext.Users.Add(user);
-        }
-
-        user.GoogleSubject = UatRegressionGoogleSubject;
-        user.Email = UatRegressionEmail;
-        user.DisplayName = UatRegressionDisplayName;
-        user.MileageRate = 0.45m;
-        user.PassengerMileageRate = 0.10m;
-        user.TravelOriginPostcode = "BS1 5AA";
-        user.DefaultPaymentWindowDays = 14;
-        user.InvoiceFilenamePattern = "{invoiceNumber}-{clientName}-{periodDate}";
-        user.InvoiceEmailSubjectPattern = "Invoice {invoiceNumber} for {clientName}";
-        user.InvoiceReplyToEmail = UatRegressionEmail;
-        user.Role = UserRole.User;
-        user.IsActive = true;
-
-        var client = await dbContext.Clients.FirstOrDefaultAsync(value => value.Id == UatRegressionClientId);
-        if (client is null)
-        {
-            client = new Client
-            {
-                Id = UatRegressionClientId,
-                CreatedByUserId = UatRegressionUserId,
-            };
-            dbContext.Clients.Add(client);
-        }
-
-        client.Name = "UAT Regression Client";
-        client.Email = "accounts+uat@glovelly.net";
-        client.MileageRate = 0.45m;
-        client.PassengerMileageRate = 0.10m;
-        client.InvoiceFilenamePattern = "{invoiceNumber}-{clientName}";
-        client.InvoiceEmailSubjectPattern = "UAT invoice {invoiceNumber}";
-        client.UpdatedByUserId = UatRegressionUserId;
-        client.BillingAddress = new Address
-        {
-            Line1 = "1 Regression Yard",
-            City = "Bristol",
-            StateOrCounty = "Bristol",
-            PostalCode = "BS1 5AA",
-            Country = "United Kingdom"
-        };
-
-        var sellerProfile = await dbContext.SellerProfiles
-            .FirstOrDefaultAsync(value => value.UserId == UatRegressionUserId);
-        if (sellerProfile is null)
-        {
-            sellerProfile = new SellerProfile
-            {
-                Id = UatRegressionSellerProfileId,
-                UserId = UatRegressionUserId,
-                CreatedUtc = SeededCreatedUtc,
-                CreatedByUserId = UatRegressionUserId,
-            };
-            dbContext.SellerProfiles.Add(sellerProfile);
-        }
-
-        sellerProfile.SellerName = "Glovelly UAT Music";
-        sellerProfile.Email = UatRegressionEmail;
-        sellerProfile.Phone = "07123 000000";
-        sellerProfile.AccountName = "Glovelly UAT Music";
-        sellerProfile.SortCode = "00-00-00";
-        sellerProfile.AccountNumber = "00000000";
-        sellerProfile.PaymentReferenceNote = "UAT-only invoice payment reference.";
-        sellerProfile.Address = new Address
-        {
-            Line1 = "1 Regression Yard",
-            City = "Bristol",
-            StateOrCounty = "Bristol",
-            PostalCode = "BS1 5AA",
-            Country = "United Kingdom"
-        };
-        sellerProfile.UpdatedUtc = SeededCreatedUtc;
-        sellerProfile.UpdatedByUserId = UatRegressionUserId;
-
-        await dbContext.SaveChangesAsync();
-    }
 
     public static async Task SeedAsync(
         AppDbContext dbContext,
@@ -111,15 +29,29 @@ public static class AppDbSeeder
         IExpenseAttachmentStore? attachmentStore = null,
         IBlobStore? blobStore = null)
     {
+        await SeedAsync(new DevelopmentDataSeedContext(dbContext, configuration, attachmentStore, blobStore));
+    }
+
+    public static async Task SeedAsync(DevelopmentDataSeedContext context)
+    {
+        var dbContext = context.DbContext;
+
         await dbContext.Database.EnsureCreatedAsync();
 
-        var seededAdminUserId = await SeedDevelopmentAdminUserAsync(dbContext, configuration);
+        var seededAdminUserId = await SeedDevelopmentAdminUserAsync(context);
         await SeedDevelopmentSellerProfileAsync(dbContext, seededAdminUserId);
 
         if (await dbContext.Clients.AnyAsync())
         {
             return;
         }
+
+        var fixture = BuildFixture(seededAdminUserId);
+        await SaveFixtureAsync(context, fixture, seededAdminUserId);
+    }
+
+    private static DevelopmentSeedFixture BuildFixture(Guid? seededAdminUserId)
+    {
 
         var foxAndFinchId = Guid.Parse("4a034228-78db-4db3-a132-41c97bb4d5cf");
         var northlightId = Guid.Parse("44b70ccb-d718-48c2-9703-8f965983e694");
@@ -484,21 +416,31 @@ public static class AppDbSeeder
             }
         };
 
-        dbContext.Clients.AddRange(clients);
-        dbContext.Invoices.AddRange(invoices);
+        return new DevelopmentSeedFixture(clients, invoices, invoiceLines, gigs);
+    }
+
+    private static async Task SaveFixtureAsync(
+        DevelopmentDataSeedContext context,
+        DevelopmentSeedFixture fixture,
+        Guid? seededAdminUserId)
+    {
+        var dbContext = context.DbContext;
+
+        dbContext.Clients.AddRange(fixture.Clients);
+        dbContext.Invoices.AddRange(fixture.Invoices);
         if (seededAdminUserId.HasValue)
         {
-            await SeedInvoicePdfAsync(invoices[0], seededAdminUserId.Value, blobStore);
-            await SeedInvoicePdfAsync(invoices[1], seededAdminUserId.Value, blobStore);
+            await SeedInvoicePdfAsync(fixture.Invoices[0], seededAdminUserId.Value, context.BlobStore);
+            await SeedInvoicePdfAsync(fixture.Invoices[1], seededAdminUserId.Value, context.BlobStore);
         }
-        dbContext.InvoiceLines.AddRange(invoiceLines);
-        dbContext.Gigs.AddRange(gigs);
+        dbContext.InvoiceLines.AddRange(fixture.InvoiceLines);
+        dbContext.Gigs.AddRange(fixture.Gigs);
 
         await dbContext.SaveChangesAsync();
 
-        if (attachmentStore is not null)
+        if (context.AttachmentStore is not null)
         {
-            await SeedExpenseAttachmentBlobsAsync(gigs, attachmentStore);
+            await SeedExpenseAttachmentBlobsAsync(fixture.Gigs, context.AttachmentStore);
         }
     }
 
@@ -523,8 +465,10 @@ public static class AppDbSeeder
         invoice.PdfGeneratedAt = invoice.FirstIssuedUtc ?? SeededCreatedUtc;
     }
 
-    private static async Task<Guid?> SeedDevelopmentAdminUserAsync(AppDbContext dbContext, IConfiguration configuration)
+    private static async Task<Guid?> SeedDevelopmentAdminUserAsync(DevelopmentDataSeedContext context)
     {
+        var dbContext = context.DbContext;
+        var configuration = context.Configuration;
         var googleSubject = configuration["DevelopmentSeeding:AdminGoogleSubject"]?.Trim();
         if (string.IsNullOrWhiteSpace(googleSubject))
         {

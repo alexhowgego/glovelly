@@ -18,7 +18,7 @@ public sealed class DevelopmentSeedDataTests
         var configuration = CreateSeedConfiguration();
 
         var attachmentStore = new InMemoryExpenseAttachmentStore();
-        await AppDbSeeder.SeedAsync(dbContext, configuration, attachmentStore);
+        await DevelopmentDataSeeder.SeedAsync(dbContext, configuration, attachmentStore);
 
         var seededAdminUserId = await dbContext.Users
             .Where(user => user.GoogleSubject == TestAuthContext.DefaultSubject)
@@ -73,7 +73,7 @@ public sealed class DevelopmentSeedDataTests
         await using var dbContext = CreateDbContext();
         var configuration = CreateSeedConfiguration();
         var attachmentStore = new InMemoryExpenseAttachmentStore();
-        await AppDbSeeder.SeedAsync(dbContext, configuration, attachmentStore);
+        await DevelopmentDataSeeder.SeedAsync(dbContext, configuration, attachmentStore);
 
         var seededAdminUserId = await dbContext.Users
             .Where(user => user.GoogleSubject == TestAuthContext.DefaultSubject)

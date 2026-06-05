@@ -66,19 +66,19 @@ public sealed class TestAuthEndpointsTests
         Assert.True(response.Headers.Contains("Set-Cookie"));
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
-        Assert.Equal(AppDbSeeder.UatRegressionEmail, payload.GetProperty("email").GetString());
+        Assert.Equal(UatRegressionDataSeeder.Email, payload.GetProperty("email").GetString());
 
         var meResponse = await client.GetAsync("/auth/me", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
         var mePayload = await meResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
-        Assert.Equal(AppDbSeeder.UatRegressionEmail, mePayload.GetProperty("email").GetString());
+        Assert.Equal(UatRegressionDataSeeder.Email, mePayload.GetProperty("email").GetString());
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.NotNull(await dbContext.Users.FindAsync([AppDbSeeder.UatRegressionUserId], TestContext.Current.CancellationToken));
-        Assert.NotNull(await dbContext.Clients.FindAsync([AppDbSeeder.UatRegressionClientId], TestContext.Current.CancellationToken));
-        Assert.NotNull(await dbContext.SellerProfiles.FindAsync([AppDbSeeder.UatRegressionSellerProfileId], TestContext.Current.CancellationToken));
+        Assert.NotNull(await dbContext.Users.FindAsync([UatRegressionDataSeeder.UserId], TestContext.Current.CancellationToken));
+        Assert.NotNull(await dbContext.Clients.FindAsync([UatRegressionDataSeeder.ClientId], TestContext.Current.CancellationToken));
+        Assert.NotNull(await dbContext.SellerProfiles.FindAsync([UatRegressionDataSeeder.SellerProfileId], TestContext.Current.CancellationToken));
     }
 
     private static GlovellyApiFactory CreateFactory(string environmentName)
