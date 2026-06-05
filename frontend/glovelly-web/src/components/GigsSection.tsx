@@ -267,6 +267,7 @@ export function GigsSection({
               </button>
               <button
                 className="ghost-button"
+                data-testid="gig-edit-button"
                 onClick={onStartEditing}
                 type="button"
                 disabled={!selectedGig}
@@ -344,7 +345,7 @@ export function GigsSection({
                 <article>
                   <p className="detail-label">Invoice link</p>
                   {selectedGig.isInvoiced ? (
-                    <button className="ghost-button" onClick={onOpenLinkedInvoice} type="button">
+                    <button className="ghost-button" data-testid="gig-open-linked-invoice-button" onClick={onOpenLinkedInvoice} type="button">
                       Open invoice
                     </button>
                   ) : (
@@ -403,7 +404,7 @@ export function GigsSection({
                 <p className="section-label">Management Pane</p>
                 <h2>{gigMode === 'create' ? 'Create gig' : 'Update gig'}</h2>
               </div>
-              <span className="status-pill">{gigStatus}</span>
+              <span className="status-pill" data-testid="gig-status">{gigStatus}</span>
             </div>
 
             <div className="form-grid">
@@ -486,6 +487,7 @@ export function GigsSection({
 
               <label className="checkbox-field full-width">
                 <input
+                  data-testid="gig-driving-checkbox"
                   type="checkbox"
                   checked={gigForm.wasDriving}
                   onChange={(event) => onUpdateGigField('wasDriving', event.target.checked)}
@@ -498,6 +500,7 @@ export function GigsSection({
                   <label>
                     <span>Travel miles</span>
                     <input
+                      data-testid="gig-travel-miles-input"
                       inputMode="decimal"
                       value={gigForm.travelMiles}
                       onChange={(event) => onUpdateGigField('travelMiles', event.target.value)}
@@ -508,6 +511,7 @@ export function GigsSection({
                   <div className="mileage-estimate-action">
                     <button
                       className="ghost-button"
+                      data-testid="gig-estimate-mileage-button"
                       disabled={gigMode !== 'edit' || isMileageEstimating}
                       onClick={onEstimateMileage}
                       type="button"
@@ -519,6 +523,7 @@ export function GigsSection({
                   <label>
                     <span>Passengers</span>
                     <input
+                      data-testid="gig-passenger-count-input"
                       inputMode="numeric"
                       value={gigForm.passengerCount}
                       onChange={(event) => onUpdateGigField('passengerCount', event.target.value)}
@@ -634,6 +639,7 @@ export function GigsSection({
                       <label className="expense-status-select">
                         <span>Reimbursement</span>
                         <select
+                          data-testid="gig-expense-reimbursement-select"
                           value={expense.reimbursementStatus}
                           onChange={(event) =>
                             onUpdateExpenseReimbursement(

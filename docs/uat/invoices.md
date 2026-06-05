@@ -13,7 +13,7 @@ Use these journeys when a change may affect invoice creation, generated invoice 
 
 ## Gig To Invoice
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient` covers the core create-preview-send path; expense-line, PDF download, and gig-link checks remain manual.
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`
 
 ### Steps
 
@@ -33,7 +33,7 @@ Generating an invoice links the gig, creates expected lines, and produces a down
 
 ## Combined Invoice
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs` covers the same-client happy path; negative selection checks remain manual/backend-covered.
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
 
 ### Steps
 
@@ -56,7 +56,7 @@ Expected result: the app blocks generation and explains that selected gigs must 
 
 ## Monthly Invoice
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
 
 ### Steps
 
@@ -73,7 +73,7 @@ The invoice is created as a draft, linked gigs remain linked, lines are generate
 
 ## Invoice Line Refresh Regression
 
-> **Automation:** Backend automated; manual UAT: invoice regeneration, reimbursement, and mileage rules have backend coverage; browser prompt and PDF preview behaviour remain manual.
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceLineRefreshWorkflowTests.LinkedDraftRefreshesGeneratedLinesWithoutDuplicatingOrDroppingManualAdjustments` and `Glovelly.Uat.Tests.InvoiceLineRefreshWorkflowTests.MileageDefaultsAndEstimationFlowsAreCoveredEndToEnd`
 
 ### Preconditions
 
@@ -168,7 +168,7 @@ Expected result: the app explains that a travel origin postcode, seller profile 
 
 ## Invoice Preview
 
-> **Automation:** Partially automated UAT: invoice generation preview is covered by `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`, `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests`, and `Glovelly.Uat.Tests.ExpenseStatementTests.CanGenerateExpenseStatementPreviewAndDownload`; redraft and re-issue preview checks remain manual/backend-covered.
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoicePreviewWorkflowTests.InvoicePreviewDownloadRedraftAndReissueShowLatestPdf`, with generation preview also covered by the core and aggregation invoice tests.
 
 ### Steps
 

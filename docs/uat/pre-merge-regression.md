@@ -122,7 +122,7 @@ Expected result: unsaved admin access edits are never discarded without confirma
 
 ## Gig To Invoice Journey
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient` covers the core create-preview-send path; expense, mileage, PDF download, and gig-link checks remain manual.
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`
 
 ### Steps
 
@@ -238,7 +238,7 @@ Expected result: expenses are copied only when accepted, receipt attachments are
 
 ## Combined Invoice Journey
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs` covers the same-client happy path; negative selection checks remain manual/backend-covered.
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
 
 ### Steps
 
@@ -275,7 +275,7 @@ Expected result: imported gigs stay in a modal launched from the profile menu, r
 
 ## Monthly Invoice Journey
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
 
 ### Steps
 

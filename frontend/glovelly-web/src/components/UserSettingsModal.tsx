@@ -217,6 +217,7 @@ export function UserSettingsModal({
               <label>
                 <span>Mileage rate</span>
                 <input
+                  data-testid="user-settings-mileage-rate-input"
                   inputMode="decimal"
                   placeholder="0.45"
                   type="text"
@@ -229,6 +230,7 @@ export function UserSettingsModal({
               <label>
                 <span>Passenger mileage rate</span>
                 <input
+                  data-testid="user-settings-passenger-mileage-rate-input"
                   inputMode="decimal"
                   placeholder="0.10"
                   type="text"
@@ -259,6 +261,7 @@ export function UserSettingsModal({
                 <span>Travel origin postcode</span>
                 <input
                   autoComplete="postal-code"
+                  data-testid="user-settings-travel-origin-postcode-input"
                   placeholder={travelOriginPlaceholder}
                   type="text"
                   value={form.travelOriginPostcode}
@@ -338,10 +341,10 @@ export function UserSettingsModal({
           <div className="settings-note">{settingsNote}</div>
 
           <div className="form-actions">
-            <button className="primary-button" type="submit" disabled={isSaving}>
+            <button className="primary-button" data-testid="user-settings-save-button" type="submit" disabled={isSaving}>
               {isSaving ? 'Saving…' : 'Save settings'}
             </button>
-            <span className="status-pill">{status}</span>
+            <span className="status-pill" data-testid="user-settings-status">{status}</span>
           </div>
         </form>
       </section>

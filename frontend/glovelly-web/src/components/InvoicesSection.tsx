@@ -186,6 +186,7 @@ export function InvoicesSection({
               </button>
               <button
                 className="ghost-button"
+                data-testid="invoice-redraft-reissue-button"
                 onClick={() => selectedInvoice && void onReissue(selectedInvoice)}
                 type="button"
                 disabled={!selectedInvoice || isInvoiceLoading || selectedInvoice.status === 'Cancelled'}
@@ -243,6 +244,7 @@ export function InvoicesSection({
               </button>
               <button
                 className="primary-button"
+                data-testid="invoice-download-pdf-button"
                 onClick={() => selectedInvoice && void onDownloadPdf(selectedInvoice)}
                 type="button"
                 disabled={!selectedInvoice || isInvoiceLoading}
@@ -283,6 +285,7 @@ export function InvoicesSection({
                   <p className="detail-label">Status</p>
                   <div className="field-with-inline-help">
                     <select
+                      data-testid="invoice-status-select"
                       value={selectedInvoice.status}
                       onChange={(event) =>
                         void onInvoiceStatusChange(
@@ -399,6 +402,7 @@ export function InvoicesSection({
                   <label>
                     Amount
                     <input
+                      data-testid="invoice-adjustment-amount-input"
                       type="number"
                       step="0.01"
                       value={adjustmentAmount}
@@ -410,13 +414,14 @@ export function InvoicesSection({
                   <label>
                     Reason
                     <input
+                      data-testid="invoice-adjustment-reason-input"
                       value={adjustmentReason}
                       onChange={(event) => onAdjustmentReasonChange(event.target.value)}
                       placeholder="Goodwill discount, surcharge, correction..."
                       disabled={isInvoiceLoading}
                     />
                   </label>
-                  <button className="ghost-button" type="submit" disabled={isInvoiceLoading}>
+                  <button className="ghost-button" data-testid="invoice-add-adjustment-button" type="submit" disabled={isInvoiceLoading}>
                     Add adjustment
                   </button>
                 </form>
@@ -434,6 +439,7 @@ export function InvoicesSection({
                             {gigId ? (
                               <button
                                 className="link-button invoice-line-link"
+                                data-testid="invoice-line-link"
                                 onClick={() => onOpenGig(gigId)}
                                 type="button"
                               >
@@ -443,7 +449,7 @@ export function InvoicesSection({
                               <strong>{line.description}</strong>
                             )}
                             <span>
-                              {line.type} · {line.quantity} x {formatCurrency(line.unitPrice)}
+                              <span data-testid="invoice-line-type">{line.type}</span> · {line.quantity} x {formatCurrency(line.unitPrice)}
                             </span>
                             {line.type === 'ManualAdjustment' ? (
                               <span>Audit: {formatDateTime(line.createdUtc)}</span>

@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using System.Text.Json;
 using Xunit;
 
 namespace Glovelly.Uat.Tests;
@@ -130,6 +131,30 @@ public abstract class UatTestBase : IAsyncLifetime
             BaseAddress = new Uri(BaseUrl(), UriKind.Absolute),
             Timeout = TimeSpan.FromSeconds(15),
         };
+    }
+
+    protected async Task<int> FetchWithSessionAsync(string path, string method = "GET", object? body = null)
+    {
+        var bodyJson = body is null ? null : JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        return await Page.EvaluateAsync<int>(
+            """
+            async ({ path, method, bodyJson }) => {
+              const response = await fetch(path, {
+                method,
+                credentials: 'include',
+                headers: bodyJson ? { 'Content-Type': 'application/json' } : undefined,
+                body: bodyJson ?? undefined,
+              });
+              return response.status;
+            }
+            """,
+            new
+            {
+                path,
+                method,
+                bodyJson,
+            });
     }
 
     private async Task CaptureFailureDiagnosticsAsync(string testName)
