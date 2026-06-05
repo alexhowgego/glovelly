@@ -62,12 +62,18 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
         foreach (var expense in expenses)
         {
+            var expenseIndex = await Page.GetByTestId("gig-expense-item").CountAsync();
             await Page.GetByTestId("gig-expense-amount-input").FillAsync(expense.Amount);
             await Page.GetByTestId("gig-expense-description-input").FillAsync(expense.Description);
             await Page.GetByTestId("add-gig-expense-button").ClickAsync();
-            await ExpenseRow(expense.Description).WaitForAsync(new LocatorWaitForOptions
+
+            await Assertions.Expect(Page.GetByTestId("gig-expense-item")).ToHaveCountAsync(expenseIndex + 1, new LocatorAssertionsToHaveCountOptions
             {
-                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+            await Assertions.Expect(ExpenseRowAt(expenseIndex).Locator("input").First).ToHaveValueAsync(expense.Description, new LocatorAssertionsToHaveValueOptions
+            {
+                Timeout = 30_000,
             });
         }
 
@@ -243,10 +249,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
         HasText = gigTitle,
     });
 
-    protected ILocator ExpenseRow(string description) => Page.GetByTestId("gig-expense-item").Filter(new LocatorFilterOptions
-    {
-        HasText = description,
-    });
+    protected ILocator ExpenseRowAt(int index) => Page.GetByTestId("gig-expense-item").Nth(index);
 
     private ILocator InvoiceLine(string expectedText) => Page.GetByTestId("invoice-line-item").Filter(new LocatorFilterOptions
     {

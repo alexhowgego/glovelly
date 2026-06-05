@@ -49,7 +49,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
 
             await OpenGigAsync(gigTitle);
             await Page.GetByTestId("gig-edit-button").ClickAsync();
-            await SetExpenseReimbursementAsync(reimbursedExpense, "Reimbursed");
+            await SetExpenseReimbursementAsync(0, "Reimbursed");
 
             await OpenLinkedInvoiceFromGigAsync();
             await OpenInvoiceLinesAsync();
@@ -60,7 +60,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
 
             await OpenGigAsync(gigTitle);
             await Page.GetByTestId("gig-edit-button").ClickAsync();
-            await SetExpenseReimbursementAsync(reimbursedExpense, "Unreimbursed");
+            await SetExpenseReimbursementAsync(0, "Unreimbursed");
 
             await OpenLinkedInvoiceFromGigAsync();
             await OpenInvoiceLinesAsync();
@@ -214,12 +214,12 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         await AssertInvoiceLineCountAsync(adjustmentReason, 1);
     }
 
-    private async Task SetExpenseReimbursementAsync(string expenseDescription, string status)
+    private async Task SetExpenseReimbursementAsync(int expenseIndex, string status)
     {
         Page.Dialog += AcceptReimbursementDialogs;
         try
         {
-            await ExpenseRow(expenseDescription)
+            await ExpenseRowAt(expenseIndex)
                 .GetByTestId("gig-expense-reimbursement-select")
                 .SelectOptionAsync(new[] { status });
             await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
