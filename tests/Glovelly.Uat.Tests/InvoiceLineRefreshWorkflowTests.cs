@@ -125,8 +125,8 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 await DownloadPreviewPdfAsync();
                 await OpenPreviewedInvoiceAsync();
                 await OpenInvoiceLinesAsync();
-                await AssertInvoiceLineContainsAsync("Mileage");
-                await AssertInvoiceLineContainsAsync("PassengerMileage");
+                await AssertInvoiceLineTypeCountAsync("Mileage", 1);
+                await AssertInvoiceLineTypeCountAsync("PassengerMileage", 1);
                 await AssertInvoiceLineContainsAsync("0.45");
                 await AssertInvoiceLineContainsAsync("0.10");
                 await DownloadInvoicePdfAsync();
@@ -150,7 +150,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 await GenerateInvoiceAndWaitForPreviewAsync();
                 await OpenPreviewedInvoiceAsync();
                 await OpenInvoiceLinesAsync();
-                await AssertInvoiceLineContainsAsync("Mileage");
+                await AssertInvoiceLineTypeCountAsync("Mileage", 1);
 
                 await CreateGigAsync(
                     clientName,
@@ -170,7 +170,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 await GenerateInvoiceAndWaitForPreviewAsync();
                 await OpenPreviewedInvoiceAsync();
                 await OpenInvoiceLinesAsync();
-                await AssertInvoiceLineContainsAsync("Mileage");
+                await AssertInvoiceLineTypeCountAsync("Mileage", 1);
 
                 await SaveUserMileageSettingsViaUiAsync(mileageRate: string.Empty, passengerMileageRate: string.Empty, travelOriginPostcode: string.Empty);
                 await PutSellerProfileAsync(postcode: string.Empty);
