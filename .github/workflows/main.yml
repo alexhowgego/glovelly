@@ -89,8 +89,21 @@ jobs:
       - name: Run backend tests
         run: dotnet test glovelly.sln --no-restore -m:1
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/glovelly-web/package-lock.json
+
+      - name: Restore frontend dependencies
+        run: npm --prefix frontend/glovelly-web ci
+
       - name: Run frontend lint
         run: npm --prefix frontend/glovelly-web run lint
+
+      - name: Build frontend
+        run: npm --prefix frontend/glovelly-web run build
 
       - name: Authenticate to Google Cloud
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
