@@ -2,15 +2,23 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'rea
 import type { FormEvent } from 'react'
 import {
   buildApiUrl,
-  createBlobObjectUrl,
-  downloadResponseBlob,
   fetchWithSession,
   getResponseErrorMessage,
   handleSessionExpired,
   jsonRequestInit,
 } from '../api'
 import { defaultGigStatus, emptyGigForm } from '../forms'
-import { toGigExpenseForm } from '../formatters'
+import {
+  canCancelInvoice,
+  formatEditableNumber,
+  formatReimbursementStatus,
+  hasInvoiceRelevantGigChanges,
+  shouldCloseAfterSave,
+  toEditableGigExpenses,
+  toCreateGigForm,
+  toEditableGigForm,
+} from './gigWorkspaceHelpers'
+import type { NormalizedGigExpensePayload } from './gigWorkspaceHelpers'
 import type {
   Client,
   Gig,
@@ -18,8 +26,8 @@ import type {
   GigExpenseReimbursementStatus,
   GigForm,
   Invoice,
-  InvoiceStatus,
 } from '../types'
+import { useExpenseStatementWorkspace } from './useExpenseStatementWorkspace'
 
 type UseGigsWorkspaceOptions = {
   clientNamesById: ReadonlyMap<string, string>
@@ -27,12 +35,6 @@ type UseGigsWorkspaceOptions = {
   onLinkedInvoiceUpdated: (invoice: Invoice, message: string) => void
   onOpenSection: (section: 'gigs') => void
   onSessionExpired: (message: string) => void
-}
-
-type NormalizedGigExpensePayload = {
-  sortOrder: number
-  description: string
-  amount: number
 }
 
 type MileageEstimateResponse = {
@@ -44,48 +46,6 @@ type MileageEstimateResponse = {
   destinationLabel: string
   provider: string
   calculatedAtUtc: string
-}
-
-function formatEditableNumber(value: number | null) {
-  if (value === null || value === 0) {
-    return ''
-  }
-
-  return Number.isInteger(value) ? String(value) : value.toFixed(2)
-}
-
-function shouldCloseAfterSave(event: FormEvent<HTMLFormElement>) {
-  const submitter = (event.nativeEvent as SubmitEvent).submitter as
-    | HTMLButtonElement
-    | null
-
-  return submitter?.dataset.closeAfterSave !== 'false'
-}
-
-function toEditableGigForm(gig: Gig): GigForm {
-  return {
-    clientId: gig.clientId,
-    title: gig.title,
-    date: gig.date,
-    venue: gig.venue,
-    fee: String(gig.fee),
-    travelMiles: formatEditableNumber(gig.travelMiles),
-    passengerCount: formatEditableNumber(gig.passengerCount),
-    notes: gig.notes ?? '',
-    wasDriving: gig.wasDriving,
-    status: gig.status,
-    expenses: gig.expenses
-      .slice()
-      .sort((left, right) => left.sortOrder - right.sortOrder)
-      .map(toGigExpenseForm),
-  }
-}
-
-function toCreateGigForm(clients: Client[]): GigForm {
-  return {
-    ...emptyGigForm(),
-    clientId: clients[0]?.id ?? '',
-  }
 }
 
 export function useGigsWorkspace({
@@ -107,28 +67,7 @@ export function useGigsWorkspace({
   const [isMileageEstimating, setIsMileageEstimating] = useState(false)
   const [gigExpenseAmount, setGigExpenseAmount] = useState('')
   const [gigExpenseDescription, setGigExpenseDescription] = useState('')
-  const [isExpenseStatementOpen, setIsExpenseStatementOpen] = useState(false)
-  const [expenseStatementGigIds, setExpenseStatementGigIds] = useState<string[]>([])
-  const [expenseStatementExpenseIds, setExpenseStatementExpenseIds] = useState<string[]>([])
-  const [includeStatementReceiptAttachments, setIncludeStatementReceiptAttachments] =
-    useState(true)
-  const [includeStatementReceiptAppendix, setIncludeStatementReceiptAppendix] =
-    useState(true)
-  const [expenseStatementStatus, setExpenseStatementStatus] = useState('')
-  const [expenseStatementPreviewUrl, setExpenseStatementPreviewUrl] =
-    useState<string | null>(null)
-  const [isExpenseStatementLoading, setIsExpenseStatementLoading] = useState(false)
   const deferredGigSearchQuery = useDeferredValue(gigSearchQuery)
-
-  const clearExpenseStatementPreviewUrl = useCallback(() => {
-    setExpenseStatementPreviewUrl((current) => {
-      if (current) {
-        window.URL.revokeObjectURL(current)
-      }
-
-      return null
-    })
-  }, [])
 
   const gigsById = useMemo(() => new Map(gigs.map((gig) => [gig.id, gig])), [gigs])
 
@@ -167,30 +106,33 @@ export function useGigsWorkspace({
       .sort((left, right) => left.date.localeCompare(right.date))
   }, [gigs, selectedGigIds])
 
-  const expenseStatementGigs = useMemo(() => {
-    const statementGigIdSet = new Set(expenseStatementGigIds)
-
-    return gigs
-      .filter((gig) => statementGigIdSet.has(gig.id))
-      .sort((left, right) => left.date.localeCompare(right.date))
-  }, [expenseStatementGigIds, gigs])
-
-  const expenseStatementSelectedExpenses = useMemo(() => {
-    const selectedExpenseIdSet = new Set(expenseStatementExpenseIds)
-    return expenseStatementGigs.flatMap((gig) =>
-      gig.expenses.filter((expense) => selectedExpenseIdSet.has(expense.id))
-    )
-  }, [expenseStatementExpenseIds, expenseStatementGigs])
-
-  const expenseStatementTotal = expenseStatementSelectedExpenses.reduce(
-    (total, expense) => total + expense.amount,
-    0
-  )
-
-  const expenseStatementReceiptCount = expenseStatementSelectedExpenses.reduce(
-    (count, expense) => count + expense.attachments.length,
-    0
-  )
+  const {
+    closeExpenseStatement,
+    downloadExpenseStatementPdf,
+    expenseStatementExpenseIds,
+    expenseStatementGigs,
+    expenseStatementPreviewUrl,
+    expenseStatementReceiptCount,
+    expenseStatementStatus,
+    expenseStatementTotal,
+    includeStatementReceiptAppendix,
+    includeStatementReceiptAttachments,
+    isExpenseStatementLoading,
+    isExpenseStatementOpen,
+    openExpenseStatement,
+    previewExpenseStatement,
+    resetExpenseStatementWorkspace,
+    setIncludeStatementReceiptAppendix,
+    setIncludeStatementReceiptAttachments,
+    toggleExpenseStatementExpense,
+  } = useExpenseStatementWorkspace({
+    clientNamesById,
+    gigs,
+    selectedGig,
+    selectedGigs,
+    onSessionExpired,
+    setGigStatus,
+  })
 
   const hasUnsavedGigEditorChanges = () => {
     if (!isGigEditorOpen) {
@@ -214,8 +156,6 @@ export function useGigsWorkspace({
       current.filter((gigId) => gigs.some((gig) => gig.id === gigId))
     )
   }, [gigs])
-
-  useEffect(() => clearExpenseStatementPreviewUrl, [clearExpenseStatementPreviewUrl])
 
   useEffect(() => {
     if (gigForm.clientId || clients.length === 0) {
@@ -245,22 +185,14 @@ export function useGigsWorkspace({
     setIsGigLoading(false)
     setGigExpenseAmount('')
     setGigExpenseDescription('')
-    setIsExpenseStatementOpen(false)
-    setExpenseStatementGigIds([])
-    setExpenseStatementExpenseIds([])
-    setExpenseStatementStatus('')
-    clearExpenseStatementPreviewUrl()
-    setIsExpenseStatementLoading(false)
-  }, [clearExpenseStatementPreviewUrl])
+    resetExpenseStatementWorkspace()
+  }, [resetExpenseStatementWorkspace])
 
   const mergeSavedGig = useCallback((savedGig: Gig) => {
     setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
     setGigForm((current) => ({
       ...current,
-      expenses: savedGig.expenses
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map(toGigExpenseForm),
+      expenses: toEditableGigExpenses(savedGig),
     }))
   }, [])
 
@@ -1090,193 +1022,6 @@ export function useGigsWorkspace({
     })
   }
 
-  const openExpenseStatement = async () => {
-    const targetGigs = selectedGigs.length > 0 ? selectedGigs : selectedGig ? [selectedGig] : []
-    const clientIds = new Set(targetGigs.map((gig) => gig.clientId))
-
-    if (targetGigs.length === 0) {
-      setGigStatus('Select a gig before generating an expense statement.')
-      return
-    }
-
-    if (clientIds.size > 1) {
-      setGigStatus('Expense statements can only include gigs for one client.')
-      return
-    }
-
-    if (!targetGigs.some((gig) => gig.expenses.length > 0)) {
-      setGigStatus('Add expenses before generating an expense statement.')
-      return
-    }
-
-    const defaultExpenseIds = targetGigs.flatMap((gig) =>
-      gig.expenses
-        .filter((expense) => expense.reimbursementStatus === 'Unreimbursed')
-        .map((expense) => expense.id)
-    )
-
-    setExpenseStatementGigIds(targetGigs.map((gig) => gig.id))
-    setExpenseStatementExpenseIds(defaultExpenseIds)
-    setIncludeStatementReceiptAttachments(true)
-    setIncludeStatementReceiptAppendix(true)
-    clearExpenseStatementPreviewUrl()
-    setExpenseStatementStatus(
-      defaultExpenseIds.length > 0
-        ? 'Review expenses before downloading the PDF.'
-        : 'All expenses are reimbursed or not claimable. Include at least one to download a statement.'
-    )
-    setIsExpenseStatementOpen(true)
-  }
-
-  const closeExpenseStatement = () => {
-    setIsExpenseStatementOpen(false)
-    setExpenseStatementStatus('')
-    clearExpenseStatementPreviewUrl()
-  }
-
-  const toggleExpenseStatementExpense = (expenseId: string) => {
-    setExpenseStatementExpenseIds((current) =>
-      current.includes(expenseId)
-        ? current.filter((value) => value !== expenseId)
-        : [...current, expenseId]
-    )
-    clearExpenseStatementPreviewUrl()
-  }
-
-  const updateIncludeStatementReceiptAttachments = (value: boolean) => {
-    setIncludeStatementReceiptAttachments(value)
-    if (!value) {
-      setIncludeStatementReceiptAppendix(false)
-    }
-    clearExpenseStatementPreviewUrl()
-  }
-
-  const updateIncludeStatementReceiptAppendix = (value: boolean) => {
-    setIncludeStatementReceiptAppendix(value)
-    clearExpenseStatementPreviewUrl()
-  }
-
-  const buildExpenseStatementPayload = () => {
-    const clientId = expenseStatementGigs[0]?.clientId ?? ''
-
-    return {
-      clientId,
-      gigIds: expenseStatementGigIds,
-      expenseIds: expenseStatementExpenseIds,
-      includeReceiptAttachments: includeStatementReceiptAttachments,
-      includeReceiptAppendix:
-        includeStatementReceiptAttachments && includeStatementReceiptAppendix,
-      includeReimbursedExpenses: true,
-    }
-  }
-
-  const previewExpenseStatement = async () => {
-    if (expenseStatementGigs.length === 0 || expenseStatementExpenseIds.length === 0) {
-      clearExpenseStatementPreviewUrl()
-      setExpenseStatementStatus('Select at least one expense to preview the statement.')
-      return null
-    }
-
-    setIsExpenseStatementLoading(true)
-    setExpenseStatementStatus('Preparing PDF preview...')
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl('/expense-statements/pdf'),
-        jsonRequestInit('POST', buildExpenseStatementPayload())
-      )
-
-      if (
-        handleSessionExpired(
-          response,
-          onSessionExpired,
-          'Your session expired. Sign in again to keep managing gigs.'
-        )
-      ) {
-        return null
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          await getResponseErrorMessage(
-            response,
-            'Unable to preview the expense statement PDF.'
-          )
-        )
-      }
-
-      const previewUrl = await createBlobObjectUrl(response)
-      setExpenseStatementPreviewUrl((current) => {
-        if (current) {
-          window.URL.revokeObjectURL(current)
-        }
-
-        return previewUrl
-      })
-      setExpenseStatementStatus('PDF preview ready.')
-      return previewUrl
-    } catch (error) {
-      clearExpenseStatementPreviewUrl()
-      setExpenseStatementStatus(
-        error instanceof Error ? error.message : 'Unable to preview the expense statement PDF.'
-      )
-      return null
-    } finally {
-      setIsExpenseStatementLoading(false)
-    }
-  }
-
-  const downloadExpenseStatementPdf = async () => {
-    if (expenseStatementGigs.length === 0 || expenseStatementExpenseIds.length === 0) {
-      setExpenseStatementStatus('Select at least one expense to download a statement.')
-      return
-    }
-
-    const clientName =
-      clientNamesById.get(expenseStatementGigs[0].clientId) ?? 'Client'
-    const fallbackFilename = `Expense-Statement-${clientName}.pdf`
-    setIsExpenseStatementLoading(true)
-    setExpenseStatementStatus('Preparing expense statement PDF...')
-
-    try {
-      const response = await fetchWithSession(
-        buildApiUrl('/expense-statements/pdf'),
-        jsonRequestInit('POST', buildExpenseStatementPayload())
-      )
-
-      if (
-        handleSessionExpired(
-          response,
-          onSessionExpired,
-          'Your session expired. Sign in again to keep managing gigs.'
-        )
-      ) {
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          await getResponseErrorMessage(
-            response,
-            'Unable to download the expense statement PDF.'
-          )
-        )
-      }
-
-      const filename = await downloadResponseBlob(response, fallbackFilename)
-      setExpenseStatementStatus(`Downloaded ${filename}.`)
-      setGigStatus(`Downloaded ${filename}.`)
-    } catch (error) {
-      setExpenseStatementStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to download the expense statement PDF.'
-      )
-    } finally {
-      setIsExpenseStatementLoading(false)
-    }
-  }
-
   return {
     applyGigs,
     cloneSelectedGig,
@@ -1327,8 +1072,8 @@ export function useGigsWorkspace({
     setGigs,
     setGigSearchQuery,
     setGigStatus,
-    setIncludeStatementReceiptAppendix: updateIncludeStatementReceiptAppendix,
-    setIncludeStatementReceiptAttachments: updateIncludeStatementReceiptAttachments,
+    setIncludeStatementReceiptAppendix,
+    setIncludeStatementReceiptAttachments,
     setSelectedGigId,
     setSelectedGigIds,
     startGigCreate,
@@ -1343,75 +1088,4 @@ export function useGigsWorkspace({
     includeStatementReceiptAttachments,
     toggleExpenseStatementExpense,
   }
-}
-
-function formatReimbursementStatus(status: GigExpenseReimbursementStatus) {
-  switch (status) {
-    case 'Unreimbursed':
-      return 'Claimable'
-    case 'NotClaimable':
-      return 'Not claimable'
-    default:
-      return status
-  }
-}
-
-function canCancelInvoice(status: InvoiceStatus) {
-  return status === 'Draft' || status === 'Issued' || status === 'Overdue'
-}
-
-function hasInvoiceRelevantGigChanges(
-  gig: Gig,
-  payload: {
-    clientId: string
-    title: string
-    date: string
-    venue: string
-    fee: string
-    notes: string
-    wasDriving: boolean
-    travelMiles: string
-    passengerCount: string
-    status: Gig['status']
-    expenses: GigExpenseForm[]
-  },
-  fee: number,
-  normalizedExpenses: NormalizedGigExpensePayload[]
-) {
-  if (
-    gig.clientId !== payload.clientId ||
-    gig.title !== payload.title ||
-    gig.date !== payload.date ||
-    gig.venue !== payload.venue ||
-    gig.fee !== fee ||
-    gig.travelMiles !== (payload.travelMiles ? Number(payload.travelMiles) : 0) ||
-    (gig.passengerCount ?? 0) !==
-      (payload.passengerCount ? Number(payload.passengerCount) : 0) ||
-    (gig.notes ?? '') !== (payload.notes || '') ||
-    gig.wasDriving !== payload.wasDriving
-  ) {
-    return true
-  }
-
-  const currentExpenses = gig.expenses
-    .slice()
-    .sort((left, right) => left.sortOrder - right.sortOrder)
-    .map((expense, index) => ({
-      sortOrder: index + 1,
-      description: expense.description,
-      amount: expense.amount,
-    }))
-
-  if (currentExpenses.length !== normalizedExpenses.length) {
-    return true
-  }
-
-  return currentExpenses.some((expense, index) => {
-    const nextExpense = normalizedExpenses[index]
-    return (
-      expense.sortOrder !== nextExpense.sortOrder ||
-      expense.description !== nextExpense.description ||
-      expense.amount !== nextExpense.amount
-    )
-  })
 }
