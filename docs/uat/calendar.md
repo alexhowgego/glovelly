@@ -12,6 +12,8 @@ Use this checklist when changes touch gigs, user settings, Google OAuth, or Cale
 
 ## Connect Calendar
 
+> **Automation:** Environment/manual UAT: OAuth consent and real Google Calendar connection need an environment check; backend integration rules have API coverage.
+
 ### Steps
 
 1. Open user settings.
@@ -24,6 +26,8 @@ The Google Calendar card shows as connected. Glovelly creates or reuses a dedica
 
 ## Gig Eligibility
 
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GoogleCalendarIntegrationModelTests` covers eligibility and sync planning; real Calendar event visibility remains manual.
+
 ### Steps
 
 1. Create or identify one `Confirmed` gig, one `Completed` gig, one `Draft` gig, and one `Cancelled` gig.
@@ -35,6 +39,8 @@ The Google Calendar card shows as connected. Glovelly creates or reuses a dedica
 Confirmed and completed gigs appear as all-day events. Draft and cancelled gigs do not appear. If a previously synced gig is moved to cancelled, its Calendar event is removed during sync.
 
 ## Delayed Updates
+
+> **Automation:** Environment/manual UAT: asynchronous worker timing and real Calendar updates need an environment check; queue and processor rules have backend coverage.
 
 ### Steps
 

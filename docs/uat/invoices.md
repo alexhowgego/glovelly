@@ -13,7 +13,7 @@ Use these journeys when a change may affect invoice creation, generated invoice 
 
 ## Gig To Invoice
 
-> **Automation:** Automated: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient` covers the core create-preview-send path; expense-line, PDF download, and gig-link checks remain manual.
 
 ### Steps
 
@@ -33,7 +33,7 @@ Generating an invoice links the gig, creates expected lines, and produces a down
 
 ## Combined Invoice
 
-> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs` covers the same-client happy path; negative selection checks remain manual/backend-covered.
 
 ### Steps
 
@@ -56,7 +56,7 @@ Expected result: the app blocks generation and explains that selected gigs must 
 
 ## Monthly Invoice
 
-> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
 
 ### Steps
 
@@ -72,6 +72,8 @@ Expected result: the app blocks generation and explains that selected gigs must 
 The invoice is created as a draft, linked gigs remain linked, lines are generated after redraft, and the PDF can be previewed and downloaded.
 
 ## Invoice Line Refresh Regression
+
+> **Automation:** Backend automated; manual UAT: invoice regeneration, reimbursement, and mileage rules have backend coverage; browser prompt and PDF preview behaviour remain manual.
 
 ### Preconditions
 
@@ -166,6 +168,8 @@ Expected result: the app explains that a travel origin postcode, seller profile 
 
 ## Invoice Preview
 
+> **Automation:** Partially automated UAT: invoice generation preview is covered by `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`, `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests`, and `Glovelly.Uat.Tests.ExpenseStatementTests.CanGenerateExpenseStatementPreviewAndDownload`; redraft and re-issue preview checks remain manual/backend-covered.
+
 ### Steps
 
 1. Generate an invoice from a gig or from selected gigs.
@@ -188,6 +192,8 @@ The same invoice PDF can be previewed reactively from the invoice pane, download
 Expected result: redraft and re-issue update the PDF, preserve the expected invoice history rules, and show the latest PDF in the preview modal.
 
 ## Invoice Status And Delivery
+
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.InvoiceStatusEndpointsTests` and `Glovelly.Api.Tests.InvoiceDeliveryEndpointsTests` cover server-side status and delivery rules; browser prompts and configured email/Drive checks remain manual.
 
 ### Steps
 

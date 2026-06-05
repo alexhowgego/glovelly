@@ -11,6 +11,8 @@ Use these journeys when a change may affect MCP gig extraction, staged import ba
 
 ## Create A Staged Import Batch
 
+> **Automation:** Backend automated; manual UAT: MCP/staging endpoint rules have backend coverage; creating a batch through a real MCP client or LLM harness remains manual.
+
 ### Steps
 
 1. Use the MCP client to create a gig import batch with a recognisable source name, such as `Swing Into Christmas 2026`.
@@ -25,6 +27,8 @@ Use these journeys when a change may affect MCP gig extraction, staged import ba
 The MCP call creates a staged batch without creating real gigs. Informal but parseable dates/times are normalised; vague values are left blank for review rather than failing the whole tool call.
 
 ## Notification And Modal Entry
+
+> **Automation:** Manual UAT
 
 ### Steps
 
@@ -41,6 +45,8 @@ The import review modal opens from the profile menu. Imported gigs are not a pri
 
 ## Review And Autosave Rows
 
+> **Automation:** Manual UAT
+
 ### Steps
 
 1. Select the staged batch in the modal.
@@ -56,6 +62,8 @@ Draft edits autosave. There is no row-level `Save` button. Accepting or rejectin
 
 ## Commit Decisions
 
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigImportEndpointsTests.CommitAcceptedRows_CreatesLinkedGigAndMarksDraftCommitted` and `CommitAcceptedRows_DeletesRejectedDraftsAndKeepsPendingRows` cover commit rules; modal workflow remains manual.
+
 ### Steps
 
 1. With one or more accepted rows and one or more rejected rows, click `Commit decisions`.
@@ -70,6 +78,8 @@ Draft edits autosave. There is no row-level `Save` button. Accepting or rejectin
 Accepted rows become real gigs with source import linkage. Rejected rows are deleted from the import on commit. Pending rows remain staged. Previously rejected rows should not reappear or jump back into the review list on later passes.
 
 ## Validation And Multi-Pass Review
+
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigImportEndpointsTests.CommitSelectedRows_WithMissingRequiredFields_ReturnsValidationProblem` covers validation blocking; multi-pass modal workflow remains manual.
 
 ### Steps
 
