@@ -101,7 +101,7 @@ export function handleSessionExpired(
 
 export async function parseProblemDetails(response: Response) {
   const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.includes('application/json')) {
+  if (!contentType.includes('application/json') && !contentType.includes('+json')) {
     return null
   }
 
