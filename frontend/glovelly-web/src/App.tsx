@@ -107,6 +107,7 @@ function App({ appMetadata }: AppProps) {
     adminForm,
     adminMode,
     adminSearchQuery,
+    adminSort,
     adminStatus,
     adminUsers,
     closeAdminEditor,
@@ -121,6 +122,7 @@ function App({ appMetadata }: AppProps) {
     selectedAdminUser,
     selectAdminUser,
     setAdminSearchQuery,
+    setAdminSort,
     startAdminCreate,
     startAdminEdit,
     totalAdmins,
@@ -133,6 +135,7 @@ function App({ appMetadata }: AppProps) {
     clientNamesById,
     clientSettingsForm,
     clientSettingsStatus,
+    clientSort,
     clients,
     closeClientEditor,
     closeClientSettings,
@@ -150,6 +153,7 @@ function App({ appMetadata }: AppProps) {
     searchQuery,
     selectedClient,
     selectClient,
+    setClientSort,
     setSearchQuery,
     startCreating,
     startEditing,
@@ -184,6 +188,7 @@ function App({ appMetadata }: AppProps) {
     gigForm,
     gigMode,
     gigSearchQuery,
+    gigSort,
     gigStatus,
     gigs,
     gigsById,
@@ -213,6 +218,7 @@ function App({ appMetadata }: AppProps) {
     setGigExpenseDescription,
     setGigs,
     setGigSearchQuery,
+    setGigSort,
     setGigStatus,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
@@ -277,6 +283,7 @@ function App({ appMetadata }: AppProps) {
     handleSendInvoiceEmail,
     invoices,
     invoiceSearchQuery,
+    invoiceSort,
     invoiceStatus,
     isInvoiceEditorOpen,
     issuedInvoiceCount,
@@ -290,6 +297,7 @@ function App({ appMetadata }: AppProps) {
     setIsInvoiceLoading,
     setSelectedInvoiceId,
     setInvoiceSearchQuery,
+    setInvoiceSort,
     startInvoiceEdit,
   } = useInvoicesWorkspace({
     clientNamesById,
@@ -1343,6 +1351,7 @@ function App({ appMetadata }: AppProps) {
       <ClientsSection
         filteredClients={filteredClients}
         form={form}
+        clientSort={clientSort}
         canDeleteSelectedClient={clientDeleteEligibility.canDelete}
         clientDeleteHelperText={clientDeleteEligibility.helperText}
         isApiConnected={isApiConnected}
@@ -1361,6 +1370,7 @@ function App({ appMetadata }: AppProps) {
         onResetForm={startCreating}
         onSearchQueryChange={setSearchQuery}
         onSelectClient={selectClient}
+        onSortChange={setClientSort}
         onStartEditing={startEditing}
         onSubmit={handleSubmit}
         onUpdateAddressField={updateAddressField}
@@ -1375,6 +1385,7 @@ function App({ appMetadata }: AppProps) {
         isEditorOpen={isAdminEditorOpen}
         adminMode={adminMode}
         adminSearchQuery={adminSearchQuery}
+        adminSort={adminSort}
         adminStatus={adminStatus}
         adminUsers={adminUsers}
         activeUsersCount={activeUsersCount}
@@ -1385,6 +1396,7 @@ function App({ appMetadata }: AppProps) {
         onResetForm={startAdminCreate}
         onSearchQueryChange={setAdminSearchQuery}
         onSelectUser={selectAdminUser}
+        onSortChange={setAdminSort}
         onStartEditing={startAdminEdit}
         onSubmit={handleAdminSubmit}
         onUpdateField={updateAdminField}
@@ -1403,6 +1415,7 @@ function App({ appMetadata }: AppProps) {
         isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
         gigSearchQuery={gigSearchQuery}
+        gigSort={gigSort}
         gigStatus={gigStatus}
         gigs={gigs}
         isGigLoading={isGigLoading}
@@ -1427,6 +1440,7 @@ function App({ appMetadata }: AppProps) {
         onResetForm={startGigCreate}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={selectGig}
+        onSortChange={setGigSort}
         onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
         onSubmit={handleGigSubmit}
@@ -1449,6 +1463,7 @@ function App({ appMetadata }: AppProps) {
         filteredInvoices={filteredInvoices}
         isEditorOpen={isInvoiceEditorOpen}
         invoiceSearchQuery={invoiceSearchQuery}
+        invoiceSort={invoiceSort}
         invoiceStatus={invoiceStatus}
         googleDrivePublishLink={
           invoiceStatus.startsWith('Uploaded ') ? googleDrivePublishLink : null
@@ -1474,6 +1489,7 @@ function App({ appMetadata }: AppProps) {
         onSendEmail={handleSendInvoiceEmailWithIssuePrompt}
         onSearchQueryChange={setInvoiceSearchQuery}
         onSelectInvoice={setSelectedInvoiceId}
+        onSortChange={setInvoiceSort}
         onStartEditing={startInvoiceEdit}
         sellerProfileNotice={sellerProfileNotice}
         selectedInvoice={selectedInvoice}

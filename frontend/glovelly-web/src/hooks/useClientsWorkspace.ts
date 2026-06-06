@@ -8,7 +8,7 @@ import {
   jsonRequestInit,
 } from '../api'
 import { emptyClientSettingsForm, emptyForm } from '../forms'
-import type { Address, Client, ClientForm, ClientSettingsForm } from '../types'
+import type { Address, Client, ClientForm, ClientSettingsForm, ClientSort } from '../types'
 
 type UseClientsWorkspaceOptions = {
   isApiConnected: boolean
@@ -59,6 +59,7 @@ export function useClientsWorkspace({
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [clientSort, setClientSort] = useState<ClientSort>({ key: 'name', direction: 'asc' })
   const [isClientEditorOpen, setIsClientEditorOpen] = useState(false)
   const [mode, setMode] = useState<'create' | 'edit'>('create')
   const [form, setForm] = useState<ClientForm>(emptyForm)
@@ -81,11 +82,40 @@ export function useClientsWorkspace({
 
   const filteredClients = useMemo(() => {
     const query = deferredSearchQuery.trim().toLowerCase()
+    const sortDirection = clientSort.direction === 'asc' ? 1 : -1
+    const compareText = (left: string, right: string) => left.localeCompare(right)
+    const compareByKey = (left: Client, right: Client) => {
+      switch (clientSort.key) {
+        case 'city':
+          return compareText(left.billingAddress.city, right.billingAddress.city)
+        case 'country':
+          return compareText(left.billingAddress.country, right.billingAddress.country)
+        case 'email':
+          return compareText(left.email, right.email)
+        case 'name':
+        default:
+          return compareText(left.name, right.name)
+      }
+    }
+    const sortedClients = [...clients].sort((left, right) => {
+      const primaryComparison = compareByKey(left, right)
+      if (primaryComparison !== 0) {
+        return primaryComparison * sortDirection
+      }
+
+      const nameComparison = left.name.localeCompare(right.name)
+      if (nameComparison !== 0) {
+        return nameComparison
+      }
+
+      return left.id.localeCompare(right.id)
+    })
+
     if (!query) {
-      return clients
+      return sortedClients
     }
 
-    return clients.filter((client) =>
+    return sortedClients.filter((client) =>
       [
         client.name,
         client.email,
@@ -96,7 +126,7 @@ export function useClientsWorkspace({
         .toLowerCase()
         .includes(query)
     )
-  }, [clients, deferredSearchQuery])
+  }, [clientSort, clients, deferredSearchQuery])
 
   const selectedClient = clientsById.get(selectedClientId) ?? filteredClients[0] ?? null
 
@@ -122,6 +152,7 @@ export function useClientsWorkspace({
     setClients([])
     setSelectedClientId('')
     setSearchQuery('')
+    setClientSort({ key: 'name', direction: 'asc' })
     setIsClientEditorOpen(false)
     setMode('create')
     setForm(emptyForm())
@@ -479,6 +510,7 @@ export function useClientsWorkspace({
     clientNamesById,
     clientSettingsForm,
     clientSettingsStatus,
+    clientSort,
     clients,
     closeClientEditor,
     closeClientSettings,
@@ -497,6 +529,7 @@ export function useClientsWorkspace({
     selectedClient,
     selectClient,
     setSelectedClientId,
+    setClientSort,
     setSearchQuery,
     startCreating,
     startEditing,

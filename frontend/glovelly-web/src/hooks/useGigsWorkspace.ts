@@ -25,6 +25,7 @@ import type {
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
+  GigSort,
   Invoice,
 } from '../types'
 import { useExpenseStatementWorkspace } from './useExpenseStatementWorkspace'
@@ -59,6 +60,7 @@ export function useGigsWorkspace({
   const [selectedGigId, setSelectedGigId] = useState<string>('')
   const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
   const [gigSearchQuery, setGigSearchQuery] = useState('')
+  const [gigSort, setGigSort] = useState<GigSort>({ key: 'date', direction: 'desc' })
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
@@ -73,13 +75,44 @@ export function useGigsWorkspace({
 
   const filteredGigs = useMemo(() => {
     const query = deferredGigSearchQuery.trim().toLowerCase()
+    const sortDirection = gigSort.direction === 'asc' ? 1 : -1
+    const compareText = (left: string, right: string) => left.localeCompare(right)
+    const compareNumber = (left: number, right: number) => left - right
+    const getClientName = (gig: Gig) => clientNamesById.get(gig.clientId) ?? ''
+    const compareByKey = (left: Gig, right: Gig) => {
+      switch (gigSort.key) {
+        case 'client':
+          return compareText(getClientName(left), getClientName(right))
+        case 'fee':
+          return compareNumber(left.fee, right.fee)
+        case 'status':
+          return compareText(left.status, right.status)
+        case 'title':
+          return compareText(left.title, right.title)
+        case 'venue':
+          return compareText(left.venue, right.venue)
+        case 'date':
+        default:
+          return compareText(left.date, right.date)
+      }
+    }
     const sortedGigs = [...gigs].sort((left, right) => {
-      const dateComparison = right.date.localeCompare(left.date)
+      const primaryComparison = compareByKey(left, right)
+      if (primaryComparison !== 0) {
+        return primaryComparison * sortDirection
+      }
+
+      const dateComparison = left.date.localeCompare(right.date)
       if (dateComparison !== 0) {
         return dateComparison
       }
 
-      return left.title.localeCompare(right.title)
+      const titleComparison = left.title.localeCompare(right.title)
+      if (titleComparison !== 0) {
+        return titleComparison
+      }
+
+      return left.id.localeCompare(right.id)
     })
 
     if (!query) {
@@ -94,7 +127,7 @@ export function useGigsWorkspace({
         .toLowerCase()
         .includes(query)
     })
-  }, [clientNamesById, deferredGigSearchQuery, gigs])
+  }, [clientNamesById, deferredGigSearchQuery, gigSort, gigs])
 
   const selectedGig = gigsById.get(selectedGigId) ?? filteredGigs[0] ?? null
 
@@ -178,6 +211,7 @@ export function useGigsWorkspace({
     setSelectedGigId('')
     setSelectedGigIds([])
     setGigSearchQuery('')
+    setGigSort({ key: 'date', direction: 'desc' })
     setIsGigEditorOpen(false)
     setGigMode('create')
     setGigForm(emptyGigForm())
@@ -1044,6 +1078,7 @@ export function useGigsWorkspace({
     gigForm,
     gigMode,
     gigSearchQuery,
+    gigSort,
     gigStatus,
     gigs,
     gigsById,
@@ -1071,6 +1106,7 @@ export function useGigsWorkspace({
     setGigExpenseDescription,
     setGigs,
     setGigSearchQuery,
+    setGigSort,
     setGigStatus,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,

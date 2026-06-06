@@ -6,6 +6,8 @@ import type {
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
+  GigSort,
+  GigSortKey,
   GigStatus,
   SellerProfile,
 } from '../types'
@@ -21,6 +23,7 @@ type GigsSectionProps = {
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
   gigSearchQuery: string
+  gigSort: GigSort
   gigStatus: string
   gigs: Gig[]
   isGigLoading: boolean
@@ -45,6 +48,7 @@ type GigsSectionProps = {
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
   onSelectGig: (gigId: string) => void
+  onSortChange: (sort: GigSort) => void
   onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -80,6 +84,7 @@ export function GigsSection({
   isEditorOpen,
   gigMode,
   gigSearchQuery,
+  gigSort,
   gigStatus,
   gigs,
   isGigLoading,
@@ -104,6 +109,7 @@ export function GigsSection({
   onResetForm,
   onSearchQueryChange,
   onSelectGig,
+  onSortChange,
   onToggleGigSelection,
   onStartEditing,
   onSubmit,
@@ -122,6 +128,14 @@ export function GigsSection({
   const selectedClientId = selectedGigs[0]?.clientId ?? null
   const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
   const hasInvoicedSelection = selectedGigs.some((gig) => gig.isInvoiced)
+  const gigSortOptions: { value: GigSortKey; label: string }[] = [
+    { value: 'date', label: 'Date' },
+    { value: 'title', label: 'Gig' },
+    { value: 'client', label: 'Client' },
+    { value: 'venue', label: 'Venue' },
+    { value: 'fee', label: 'Fee' },
+    { value: 'status', label: 'Status' },
+  ]
 
   return (
     <section className="section-layout">
@@ -147,6 +161,42 @@ export function GigsSection({
               onChange={(event) => onSearchQueryChange(event.target.value)}
             />
           </label>
+
+          <div className="compact-list-toolbar" aria-label="Gig list controls">
+            <label>
+              <span>Sort by</span>
+              <select
+                value={gigSort.key}
+                onChange={(event) =>
+                  onSortChange({ ...gigSort, key: event.target.value as GigSortKey })
+                }
+              >
+                {gigSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="compact-sort-direction"
+              type="button"
+              aria-label={
+                gigSort.direction === 'asc'
+                  ? 'Sort ascending. Click to sort descending.'
+                  : 'Sort descending. Click to sort ascending.'
+              }
+              title={gigSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+              onClick={() =>
+                onSortChange({
+                  ...gigSort,
+                  direction: gigSort.direction === 'asc' ? 'desc' : 'asc',
+                })
+              }
+            >
+              {gigSort.direction === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
 
           <div className="gig-summary-grid">
             <article>

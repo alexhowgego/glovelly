@@ -4,7 +4,7 @@ import {
   formatDateTime,
   getAllowedInvoiceStatusTransitions,
 } from '../formatters'
-import type { Invoice, InvoiceStatus } from '../types'
+import type { Invoice, InvoiceSort, InvoiceSortKey, InvoiceStatus } from '../types'
 
 type InvoicesSectionProps = {
   adjustmentAmount: string
@@ -15,6 +15,7 @@ type InvoicesSectionProps = {
   googleDrivePublishLink: { href: string; fileName: string | null } | null
   isEditorOpen: boolean
   invoiceSearchQuery: string
+  invoiceSort: InvoiceSort
   invoiceStatus: string
   invoices: Invoice[]
   issuedInvoiceCount: number
@@ -37,6 +38,7 @@ type InvoicesSectionProps = {
   onSendEmail: (invoice: Invoice) => Promise<Invoice | null>
   onSearchQueryChange: (value: string) => void
   onSelectInvoice: (invoiceId: string) => void
+  onSortChange: (sort: InvoiceSort) => void
   onStartEditing: () => void
   sellerProfileNotice: string
   selectedInvoice: Invoice | null
@@ -51,6 +53,7 @@ export function InvoicesSection({
   googleDrivePublishLink,
   isEditorOpen,
   invoiceSearchQuery,
+  invoiceSort,
   invoiceStatus,
   invoices,
   issuedInvoiceCount,
@@ -73,6 +76,7 @@ export function InvoicesSection({
   onSendEmail,
   onSearchQueryChange,
   onSelectInvoice,
+  onSortChange,
   onStartEditing,
   sellerProfileNotice,
   selectedInvoice,
@@ -80,6 +84,14 @@ export function InvoicesSection({
   const selectedInvoiceClientName =
     (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
     'Unknown client'
+  const invoiceSortOptions: { value: InvoiceSortKey; label: string }[] = [
+    { value: 'invoiceDate', label: 'Date' },
+    { value: 'dueDate', label: 'Due date' },
+    { value: 'invoiceNumber', label: 'Invoice' },
+    { value: 'client', label: 'Client' },
+    { value: 'status', label: 'Status' },
+    { value: 'total', label: 'Total' },
+  ]
 
   return (
     <section className="section-layout">
@@ -119,6 +131,42 @@ export function InvoicesSection({
               onChange={(event) => onSearchQueryChange(event.target.value)}
             />
           </label>
+
+          <div className="compact-list-toolbar" aria-label="Invoice list controls">
+            <label>
+              <span>Sort by</span>
+              <select
+                value={invoiceSort.key}
+                onChange={(event) =>
+                  onSortChange({ ...invoiceSort, key: event.target.value as InvoiceSortKey })
+                }
+              >
+                {invoiceSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="compact-sort-direction"
+              type="button"
+              aria-label={
+                invoiceSort.direction === 'asc'
+                  ? 'Sort ascending. Click to sort descending.'
+                  : 'Sort descending. Click to sort ascending.'
+              }
+              title={invoiceSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+              onClick={() =>
+                onSortChange({
+                  ...invoiceSort,
+                  direction: invoiceSort.direction === 'asc' ? 'desc' : 'asc',
+                })
+              }
+            >
+              {invoiceSort.direction === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
 
           <div className="gig-summary-grid">
             <article>

@@ -9,7 +9,7 @@ import {
   throwIfSessionExpired,
 } from '../api'
 import { defaultAdminStatus, emptyAdminForm } from '../forms'
-import type { AdminUser, AdminUserForm } from '../types'
+import type { AdminSort, AdminUser, AdminUserForm } from '../types'
 
 type UseAdminWorkspaceOptions = {
   onSessionExpired: (message: string) => void
@@ -37,6 +37,10 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
   const [adminSearchQuery, setAdminSearchQuery] = useState('')
+  const [adminSort, setAdminSort] = useState<AdminSort>({
+    key: 'displayName',
+    direction: 'asc',
+  })
   const [isAdminEditorOpen, setIsAdminEditorOpen] = useState(false)
   const [adminMode, setAdminMode] = useState<'create' | 'edit'>('create')
   const [adminForm, setAdminForm] = useState<AdminUserForm>(emptyAdminForm)
@@ -48,6 +52,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
     setAdminUsers([])
     setSelectedAdminUserId('')
     setAdminSearchQuery('')
+    setAdminSort({ key: 'displayName', direction: 'asc' })
     setIsAdminEditorOpen(false)
     setAdminMode('create')
     setAdminForm(emptyAdminForm())
@@ -83,17 +88,52 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
   )
   const filteredAdminUsers = useMemo(() => {
     const query = deferredAdminSearchQuery.trim().toLowerCase()
+    const sortDirection = adminSort.direction === 'asc' ? 1 : -1
+    const compareText = (left: string, right: string) => left.localeCompare(right)
+    const compareBoolean = (left: boolean, right: boolean) => Number(left) - Number(right)
+    const getDisplayName = (user: AdminUser) => user.displayName || user.email
+    const compareByKey = (left: AdminUser, right: AdminUser) => {
+      switch (adminSort.key) {
+        case 'access':
+          return compareBoolean(left.isActive, right.isActive)
+        case 'email':
+          return compareText(left.email, right.email)
+        case 'enrolment':
+          return compareBoolean(left.isEnrolled, right.isEnrolled)
+        case 'lastLogin':
+          return compareText(left.lastLoginUtc ?? '', right.lastLoginUtc ?? '')
+        case 'role':
+          return compareText(left.role, right.role)
+        case 'displayName':
+        default:
+          return compareText(getDisplayName(left), getDisplayName(right))
+      }
+    }
+    const sortedAdminUsers = [...adminUsers].sort((left, right) => {
+      const primaryComparison = compareByKey(left, right)
+      if (primaryComparison !== 0) {
+        return primaryComparison * sortDirection
+      }
+
+      const nameComparison = getDisplayName(left).localeCompare(getDisplayName(right))
+      if (nameComparison !== 0) {
+        return nameComparison
+      }
+
+      return left.id.localeCompare(right.id)
+    })
+
     if (!query) {
-      return adminUsers
+      return sortedAdminUsers
     }
 
-    return adminUsers.filter((user) =>
+    return sortedAdminUsers.filter((user) =>
       [user.email, user.displayName ?? '', user.role, user.googleSubject ?? '']
         .join(' ')
         .toLowerCase()
         .includes(query)
     )
-  }, [adminUsers, deferredAdminSearchQuery])
+  }, [adminSort, adminUsers, deferredAdminSearchQuery])
 
   const selectedAdminUser =
     adminUsersById.get(selectedAdminUserId) ?? filteredAdminUsers[0] ?? null
@@ -339,6 +379,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
     adminForm,
     adminMode,
     adminSearchQuery,
+    adminSort,
     adminStatus,
     adminUsers,
     closeAdminEditor,
@@ -353,6 +394,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
     selectedAdminUser,
     selectAdminUser,
     setAdminSearchQuery,
+    setAdminSort,
     setSelectedAdminUserId,
     startAdminCreate,
     startAdminEdit,

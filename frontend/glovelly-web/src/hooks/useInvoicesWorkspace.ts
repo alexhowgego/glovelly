@@ -9,7 +9,7 @@ import {
 } from '../api'
 import { defaultInvoiceStatus } from '../forms'
 import { formatCurrency, formatDateTime } from '../formatters'
-import type { Invoice, InvoiceStatus } from '../types'
+import type { Invoice, InvoiceSort, InvoiceStatus } from '../types'
 
 type GoogleDrivePublishLink = {
   href: string
@@ -36,6 +36,10 @@ export function useInvoicesWorkspace({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
+  const [invoiceSort, setInvoiceSort] = useState<InvoiceSort>({
+    key: 'invoiceDate',
+    direction: 'desc',
+  })
   const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
   const [googleDrivePublishLink, setGoogleDrivePublishLink] =
     useState<GoogleDrivePublishLink | null>(null)
@@ -51,13 +55,44 @@ export function useInvoicesWorkspace({
 
   const filteredInvoices = useMemo(() => {
     const query = deferredInvoiceSearchQuery.trim().toLowerCase()
+    const sortDirection = invoiceSort.direction === 'asc' ? 1 : -1
+    const compareText = (left: string, right: string) => left.localeCompare(right)
+    const compareNumber = (left: number, right: number) => left - right
+    const getClientName = (invoice: Invoice) => clientNamesById.get(invoice.clientId) ?? ''
+    const compareByKey = (left: Invoice, right: Invoice) => {
+      switch (invoiceSort.key) {
+        case 'client':
+          return compareText(getClientName(left), getClientName(right))
+        case 'dueDate':
+          return compareText(left.dueDate, right.dueDate)
+        case 'invoiceNumber':
+          return compareText(left.invoiceNumber, right.invoiceNumber)
+        case 'status':
+          return compareText(left.status, right.status)
+        case 'total':
+          return compareNumber(left.total, right.total)
+        case 'invoiceDate':
+        default:
+          return compareText(left.invoiceDate, right.invoiceDate)
+      }
+    }
     const sortedInvoices = [...invoices].sort((left, right) => {
-      const dateComparison = right.invoiceDate.localeCompare(left.invoiceDate)
+      const primaryComparison = compareByKey(left, right)
+      if (primaryComparison !== 0) {
+        return primaryComparison * sortDirection
+      }
+
+      const dateComparison = left.invoiceDate.localeCompare(right.invoiceDate)
       if (dateComparison !== 0) {
         return dateComparison
       }
 
-      return left.invoiceNumber.localeCompare(right.invoiceNumber)
+      const numberComparison = left.invoiceNumber.localeCompare(right.invoiceNumber)
+      if (numberComparison !== 0) {
+        return numberComparison
+      }
+
+      return left.id.localeCompare(right.id)
     })
 
     if (!query) {
@@ -77,7 +112,7 @@ export function useInvoicesWorkspace({
         .toLowerCase()
         .includes(query)
     })
-  }, [clientNamesById, deferredInvoiceSearchQuery, invoices])
+  }, [clientNamesById, deferredInvoiceSearchQuery, invoiceSort, invoices])
 
   const selectedInvoice =
     invoicesById.get(selectedInvoiceId) ?? filteredInvoices[0] ?? null
@@ -92,6 +127,7 @@ export function useInvoicesWorkspace({
     setSelectedInvoiceId('')
     setIsInvoiceEditorOpen(false)
     setInvoiceSearchQuery('')
+    setInvoiceSort({ key: 'invoiceDate', direction: 'desc' })
     setInvoiceStatus(defaultInvoiceStatus)
     setGoogleDrivePublishLink(null)
     setIsInvoiceLoading(false)
@@ -453,6 +489,7 @@ export function useInvoicesWorkspace({
     handleSendInvoiceEmail,
     invoices,
     invoiceSearchQuery,
+    invoiceSort,
     invoiceStatus,
     isInvoiceEditorOpen,
     issuedInvoiceCount: invoices.filter((invoice) => invoice.status === 'Issued').length,
@@ -467,6 +504,7 @@ export function useInvoicesWorkspace({
     setIsInvoiceLoading,
     setSelectedInvoiceId,
     setInvoiceSearchQuery,
+    setInvoiceSort,
     startInvoiceEdit,
   }
 }

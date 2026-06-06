@@ -1,12 +1,13 @@
 import type { FormEvent } from 'react'
 import { formatDateTime } from '../formatters'
-import type { AdminUser, AdminUserForm } from '../types'
+import type { AdminSort, AdminSortKey, AdminUser, AdminUserForm } from '../types'
 
 type AdminSectionProps = {
   adminForm: AdminUserForm
   isEditorOpen: boolean
   adminMode: 'create' | 'edit'
   adminSearchQuery: string
+  adminSort: AdminSort
   adminStatus: string
   adminUsers: AdminUser[]
   activeUsersCount: number
@@ -17,6 +18,7 @@ type AdminSectionProps = {
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
   onSelectUser: (userId: string) => void
+  onSortChange: (sort: AdminSort) => void
   onStartEditing: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onUpdateField: (field: keyof AdminUserForm, value: string | boolean) => void
@@ -29,6 +31,7 @@ export function AdminSection({
   isEditorOpen,
   adminMode,
   adminSearchQuery,
+  adminSort,
   adminStatus,
   adminUsers,
   activeUsersCount,
@@ -39,12 +42,22 @@ export function AdminSection({
   onResetForm,
   onSearchQueryChange,
   onSelectUser,
+  onSortChange,
   onStartEditing,
   onSubmit,
   onUpdateField,
   selectedAdminUser,
   totalAdmins,
 }: AdminSectionProps) {
+  const adminSortOptions: { value: AdminSortKey; label: string }[] = [
+    { value: 'displayName', label: 'User' },
+    { value: 'email', label: 'Email' },
+    { value: 'role', label: 'Role' },
+    { value: 'access', label: 'Access' },
+    { value: 'enrolment', label: 'Sign-in' },
+    { value: 'lastLogin', label: 'Last login' },
+  ]
+
   return (
     <section className="section-layout admin-zone">
       <div className="admin-banner panel">
@@ -94,22 +107,67 @@ export function AdminSection({
             />
           </label>
 
-          <div className="client-list">
+          <div className="compact-list-toolbar" aria-label="Admin user list controls">
+            <label>
+              <span>Sort by</span>
+              <select
+                value={adminSort.key}
+                onChange={(event) =>
+                  onSortChange({ ...adminSort, key: event.target.value as AdminSortKey })
+                }
+              >
+                {adminSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="compact-sort-direction"
+              type="button"
+              aria-label={
+                adminSort.direction === 'asc'
+                  ? 'Sort ascending. Click to sort descending.'
+                  : 'Sort descending. Click to sort ascending.'
+              }
+              title={adminSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+              onClick={() =>
+                onSortChange({
+                  ...adminSort,
+                  direction: adminSort.direction === 'asc' ? 'desc' : 'asc',
+                })
+              }
+            >
+              {adminSort.direction === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
+
+          <div className="compact-record-list admin-record-list" aria-label="People with access">
+            <div className="compact-record-header admin-record-row">
+              <span>User</span>
+              <span>Email</span>
+              <span>Role</span>
+              <span>Access</span>
+              <span>Sign-in</span>
+              <span>Last login</span>
+            </div>
             {filteredAdminUsers.map((user) => (
               <button
                 key={user.id}
-                className={`client-card ${selectedAdminUser?.id === user.id ? 'selected' : ''}`}
+                className={`compact-record-row admin-record-row ${selectedAdminUser?.id === user.id ? 'selected' : ''}`}
                 onClick={() => onSelectUser(user.id)}
                 type="button"
               >
-                <div>
+                <div className="compact-primary-cell">
                   <strong>{user.displayName || user.email}</strong>
                   <span>{user.email}</span>
                 </div>
-                <small>
-                  {user.role} · {user.isActive ? 'Active' : 'Inactive'} ·{' '}
-                  {user.isEnrolled ? 'Bound' : 'Invited'}
-                </small>
+                <span>{user.email}</span>
+                <span className="compact-status-cell">{user.role}</span>
+                <span>{user.isActive ? 'Active' : 'Inactive'}</span>
+                <span>{user.isEnrolled ? 'Bound' : 'Invited'}</span>
+                <span>{formatDateTime(user.lastLoginUtc)}</span>
               </button>
             ))}
 

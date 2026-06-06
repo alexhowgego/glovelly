@@ -1,9 +1,10 @@
 import type { FormEvent } from 'react'
-import type { Client, ClientForm } from '../types'
+import type { Client, ClientForm, ClientSort, ClientSortKey } from '../types'
 
 type ClientsSectionProps = {
   filteredClients: Client[]
   form: ClientForm
+  clientSort: ClientSort
   canDeleteSelectedClient: boolean
   clientDeleteHelperText: string
   isApiConnected: boolean
@@ -22,6 +23,7 @@ type ClientsSectionProps = {
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
   onSelectClient: (clientId: string) => void
+  onSortChange: (sort: ClientSort) => void
   onStartEditing: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onUpdateAddressField: (field: keyof Client['billingAddress'], value: string) => void
@@ -34,6 +36,7 @@ type ClientsSectionProps = {
 export function ClientsSection({
   filteredClients,
   form,
+  clientSort,
   canDeleteSelectedClient,
   clientDeleteHelperText,
   isApiConnected,
@@ -52,6 +55,7 @@ export function ClientsSection({
   onResetForm,
   onSearchQueryChange,
   onSelectClient,
+  onSortChange,
   onStartEditing,
   onSubmit,
   onUpdateAddressField,
@@ -60,6 +64,13 @@ export function ClientsSection({
   selectedClient,
   status,
 }: ClientsSectionProps) {
+  const clientSortOptions: { value: ClientSortKey; label: string }[] = [
+    { value: 'name', label: 'Client' },
+    { value: 'email', label: 'Email' },
+    { value: 'city', label: 'City' },
+    { value: 'country', label: 'Country' },
+  ]
+
   return (
     <section className="section-layout">
       <div className="workspace">
@@ -85,22 +96,64 @@ export function ClientsSection({
             />
           </label>
 
-          <div className="client-list">
+          <div className="compact-list-toolbar" aria-label="Client list controls">
+            <label>
+              <span>Sort by</span>
+              <select
+                value={clientSort.key}
+                onChange={(event) =>
+                  onSortChange({ ...clientSort, key: event.target.value as ClientSortKey })
+                }
+              >
+                {clientSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="compact-sort-direction"
+              type="button"
+              aria-label={
+                clientSort.direction === 'asc'
+                  ? 'Sort ascending. Click to sort descending.'
+                  : 'Sort descending. Click to sort ascending.'
+              }
+              title={clientSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+              onClick={() =>
+                onSortChange({
+                  ...clientSort,
+                  direction: clientSort.direction === 'asc' ? 'desc' : 'asc',
+                })
+              }
+            >
+              {clientSort.direction === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
+
+          <div className="compact-record-list client-record-list" aria-label="Clients">
+            <div className="compact-record-header client-record-row">
+              <span>Client</span>
+              <span>Email</span>
+              <span>City</span>
+              <span>Country</span>
+            </div>
             {filteredClients.map((client) => (
               <button
                 key={client.id}
-                className={`client-card ${selectedClient?.id === client.id ? 'selected' : ''}`}
+                className={`compact-record-row client-record-row ${selectedClient?.id === client.id ? 'selected' : ''}`}
                 data-testid="client-card"
                 onClick={() => onSelectClient(client.id)}
                 type="button"
               >
-                <div>
+                <div className="compact-primary-cell">
                   <strong>{client.name}</strong>
                   <span>{client.email}</span>
                 </div>
-                <small>
-                  {client.billingAddress.city}, {client.billingAddress.country}
-                </small>
+                <span>{client.email}</span>
+                <span>{client.billingAddress.city || 'No city set'}</span>
+                <span>{client.billingAddress.country || 'No country set'}</span>
               </button>
             ))}
 
