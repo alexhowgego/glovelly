@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Xunit;
 
@@ -161,10 +160,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 await Page.GetByTestId("gig-edit-button").ClickAsync();
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();
-                await Assertions.Expect(Page.GetByTestId("gig-status")).ToContainTextAsync(new Regex("(?i)unable|route|estimate|address not found"), new LocatorAssertionsToContainTextOptions
-                {
-                    Timeout = 60_000,
-                });
+                await ExpectGigStatusContainsAnyAsync("unable", "route", "estimate", "address not found");
                 await Page.GetByTestId("gig-travel-miles-input").FillAsync("9");
                 await SaveGigAndWaitForResponseAsync();
                 await GenerateInvoiceAndWaitForPreviewAsync();
@@ -212,6 +208,25 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         await Page.GetByTestId("invoice-adjustment-reason-input").FillAsync(adjustmentReason);
         await Page.GetByTestId("invoice-add-adjustment-button").ClickAsync();
         await AssertInvoiceLineCountAsync(adjustmentReason, 1);
+    }
+
+    private async Task ExpectGigStatusContainsAnyAsync(params string[] expectedFragments)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        var lastStatus = string.Empty;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            lastStatus = await Page.GetByTestId("gig-status").InnerTextAsync();
+            if (expectedFragments.Any(fragment => lastStatus.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+        }
+
+        Assert.Fail($"Expected gig status to contain one of [{string.Join(", ", expectedFragments)}], but was '{lastStatus}'.");
     }
 
     private async Task SetExpenseReimbursementAsync(int expenseIndex, string status)
