@@ -161,7 +161,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 await Page.GetByTestId("gig-edit-button").ClickAsync();
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();
-                await Assertions.Expect(Page.GetByTestId("gig-status")).ToContainTextAsync(new Regex("unable|route|estimate|address not found", RegexOptions.IgnoreCase), new LocatorAssertionsToContainTextOptions
+                await Assertions.Expect(Page.GetByTestId("gig-status")).ToContainTextAsync(new Regex("(?i)unable|route|estimate|address not found"), new LocatorAssertionsToContainTextOptions
                 {
                     Timeout = 60_000,
                 });
