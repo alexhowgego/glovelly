@@ -16,9 +16,22 @@ export type AppNavigationItem = {
   disabled?: boolean
 }
 
-export type HeaderMetric = {
-  value: number
-  label: string
+export type DashboardGigSummary = {
+  title: string
+  clientName: string
+  dateLabel: string
+  venue: string
+}
+
+export type DashboardInvoiceCandidate = DashboardGigSummary & {
+  feeLabel: string
+}
+
+export type DashboardSummary = {
+  outstandingBalanceLabel: string
+  outstandingInvoiceCount: number
+  nextGig: DashboardGigSummary | null
+  invoiceCandidate: DashboardInvoiceCandidate | null
 }
 
 type AppShellProps = {
@@ -28,10 +41,11 @@ type AppShellProps = {
   children: ReactNode
   currentSection: AppNavigationItem | undefined
   currentSectionContent: ReactNode
-  headerMetrics: HeaderMetric[]
+  dashboardSummary: DashboardSummary
   isAdmin: boolean
   isAdminLoading: boolean
   isGigLoading: boolean
+  isInvoiceLoading: boolean
   isLoading: boolean
   isProfileMenuOpen: boolean
   isQuickReceiptSaving: boolean
@@ -40,7 +54,9 @@ type AppShellProps = {
   navigationItems: AppNavigationItem[]
   pendingGigImportCount: number
   onOpenGigImports: () => void
+  onOpenNextGig: () => void
   onOpenSellerProfile: () => void
+  onGenerateDashboardInvoice: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
   onQuickReceiptFile: (file: File) => void
@@ -59,10 +75,11 @@ export function AppShell({
   children,
   currentSection,
   currentSectionContent,
-  headerMetrics,
+  dashboardSummary,
   isAdmin,
   isAdminLoading,
   isGigLoading,
+  isInvoiceLoading,
   isLoading,
   isProfileMenuOpen,
   isQuickReceiptSaving,
@@ -71,7 +88,9 @@ export function AppShell({
   navigationItems,
   pendingGigImportCount,
   onOpenGigImports,
+  onOpenNextGig,
   onOpenSellerProfile,
+  onGenerateDashboardInvoice,
   onOpenUserSettings,
   onProfileMenuToggle,
   onQuickReceiptFile,
@@ -270,13 +289,62 @@ export function AppShell({
             </nav>
 
             <div className="content-header-aside">
-              <div className="hero-metrics">
-                {headerMetrics.map((metric) => (
-                  <article key={metric.label}>
-                    <span>{metric.value}</span>
-                    <p>{metric.label}</p>
-                  </article>
-                ))}
+              <div className="dashboard-summary" aria-label="Dashboard summary">
+                <article className="dashboard-card outstanding-card">
+                  <p className="section-label">Outstanding balance</p>
+                  <strong>{dashboardSummary.outstandingBalanceLabel}</strong>
+                  <span>
+                    {dashboardSummary.outstandingInvoiceCount === 1
+                      ? '1 invoice needs attention'
+                      : `${dashboardSummary.outstandingInvoiceCount} invoices need attention`}
+                  </span>
+                </article>
+
+                <article className="dashboard-card">
+                  <p className="section-label">Next gig</p>
+                  {dashboardSummary.nextGig ? (
+                    <>
+                      <strong>{dashboardSummary.nextGig.title}</strong>
+                      <span>
+                        {dashboardSummary.nextGig.dateLabel} · {dashboardSummary.nextGig.clientName}
+                      </span>
+                      <span>{dashboardSummary.nextGig.venue}</span>
+                      <button
+                        className="ghost-button compact-action"
+                        onClick={onOpenNextGig}
+                        type="button"
+                      >
+                        Open gig
+                      </button>
+                    </>
+                  ) : (
+                    <span>No upcoming gigs on the books.</span>
+                  )}
+                </article>
+
+                <article className="dashboard-card invoice-action-card">
+                  <p className="section-label">Invoice prompt</p>
+                  {dashboardSummary.invoiceCandidate ? (
+                    <>
+                      <strong>{dashboardSummary.invoiceCandidate.title}</strong>
+                      <span>
+                        {dashboardSummary.invoiceCandidate.dateLabel} ·{' '}
+                        {dashboardSummary.invoiceCandidate.clientName}
+                      </span>
+                      <span>{dashboardSummary.invoiceCandidate.feeLabel}</span>
+                      <button
+                        className="primary-button compact-action"
+                        disabled={isLoading || isInvoiceLoading}
+                        onClick={onGenerateDashboardInvoice}
+                        type="button"
+                      >
+                        Generate invoice
+                      </button>
+                    </>
+                  ) : (
+                    <span>No recent uninvoiced gigs ready for a draft.</span>
+                  )}
+                </article>
               </div>
             </div>
           </div>

@@ -14,4 +14,4 @@ export {
   SignInScreen,
   UserSettingsModal,
 } from './components'
-export type { AppNavigationItem, HeaderMetric } from './components'
+export type { AppNavigationItem, DashboardSummary } from './components'

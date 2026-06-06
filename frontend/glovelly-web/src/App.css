@@ -914,6 +914,60 @@
   font-size: 1.02rem;
 }
 
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) repeat(2, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-card {
+  border-radius: 22px;
+  padding: 18px;
+  background: var(--surface-highlight);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 90%, transparent);
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dashboard-card strong {
+  color: var(--heading);
+  font-size: 1.02rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-card span {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.dashboard-card > .section-label {
+  margin-bottom: 2px;
+}
+
+.outstanding-card strong {
+  display: block;
+  font-family: var(--display);
+  font-size: clamp(2rem, 6vw, 3.1rem);
+  color: var(--heading);
+  line-height: 0.95;
+}
+
+.invoice-action-card {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #f47d2a 18%, transparent), transparent 64%),
+    var(--surface-highlight);
+}
+
+.compact-action {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 9px 14px;
+  min-height: 40px;
+}
+
 .hero-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1760,6 +1814,7 @@ button:disabled {
     border-radius: 22px;
   }
 
+  .dashboard-summary,
   .hero-metrics,
   .form-grid,
   .detail-grid,

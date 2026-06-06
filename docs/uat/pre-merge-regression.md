@@ -38,6 +38,24 @@ For local development, engineers usually run:
 
 Navigation, session state, and core reads are healthy.
 
+## Dashboard Summary
+
+> **Automation:** Manual UAT
+
+### Steps
+
+1. Sign in with at least one draft, issued, or overdue invoice available.
+2. Confirm the dashboard shows an outstanding balance that includes draft, issued, and overdue invoice totals, but excludes paid and cancelled invoices.
+3. Confirm the `Next gig` card shows the earliest non-cancelled upcoming gig.
+4. Click `Open gig` and confirm the app opens Gigs with that gig selected.
+5. Identify a recent past or current uninvoiced gig with status `Planned` or `Completed`.
+6. Confirm the invoice prompt shows that gig and click `Generate invoice`.
+7. Confirm the invoice preview opens, the gig becomes linked to the generated invoice, and returning to the dashboard no longer offers that gig as the invoice prompt.
+
+### Expected Results
+
+The top-level dashboard surfaces actionable work without relying on stale search filters or manual workspace navigation.
+
 ## Connected Services
 
 When changes touch Google Calendar, run the focused [Google Calendar](calendar.md) journey.
