@@ -77,7 +77,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
             });
         }
 
-        await Page.GetByTestId("gig-save-close-button").ClickAsync();
+        await SaveGigAndWaitForResponseAsync();
         await GigCard(gigTitle).WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -210,6 +210,21 @@ public abstract class InvoiceUatTestBase : UatTestBase
         await RunAndAcceptConfirmAsync(
             async () => await Page.GetByTestId("invoice-redraft-reissue-button").ClickAsync());
         await WaitForInvoicePreviewAsync();
+    }
+
+    protected async Task SaveGigAndWaitForResponseAsync()
+    {
+        var response = await Page.RunAndWaitForResponseAsync(
+            async () => await Page.GetByTestId("gig-save-close-button").ClickAsync(),
+            response =>
+            {
+                var path = new Uri(response.Url).AbsolutePath;
+
+                return response.Request.Method is "POST" or "PUT" &&
+                    (path == "/gigs" || path.StartsWith("/gigs/", StringComparison.Ordinal));
+            });
+
+        Assert.True(response.Ok, $"Expected gig save to succeed, got HTTP {response.Status} for {response.Url}.");
     }
 
     protected async Task RunAndAcceptConfirmAsync(Func<Task> action)

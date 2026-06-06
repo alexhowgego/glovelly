@@ -146,7 +146,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 });
                 var estimatedMiles = await Page.GetByTestId("gig-travel-miles-input").InputValueAsync();
                 Assert.True(decimal.Parse(estimatedMiles, CultureInfo.InvariantCulture) > 0, "Expected Google Routes to return positive mileage.");
-                await Page.GetByTestId("gig-save-close-button").ClickAsync();
+                await SaveGigAndWaitForResponseAsync();
                 await GenerateInvoiceAndWaitForPreviewAsync();
                 await OpenPreviewedInvoiceAsync();
                 await OpenInvoiceLinesAsync();
@@ -166,7 +166,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                     Timeout = 60_000,
                 });
                 await Page.GetByTestId("gig-travel-miles-input").FillAsync("9");
-                await Page.GetByTestId("gig-save-close-button").ClickAsync();
+                await SaveGigAndWaitForResponseAsync();
                 await GenerateInvoiceAndWaitForPreviewAsync();
                 await OpenPreviewedInvoiceAsync();
                 await OpenInvoiceLinesAsync();
