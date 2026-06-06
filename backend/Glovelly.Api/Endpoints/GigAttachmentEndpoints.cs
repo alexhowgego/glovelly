@@ -39,10 +39,7 @@ internal static class GigAttachmentEndpoints
         {
             if (!request.HasFormContentType)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["file"] = ["Upload a receipt file."]
-                });
+                return EndpointSupport.ValidationProblem("file", "Upload a receipt file.");
             }
 
             var userId = currentUserAccessor.TryGetUserId(user);

@@ -41,11 +41,11 @@ public sealed class SmokeTests : UatTestBase
     public async Task HealthEndpointRespondsSuccessfully()
     {
         using var httpClient = CreateHttpClient();
-        using var response = await httpClient.GetAsync("/health");
+        using var response = await httpClient.GetAsync("/health", TestContext.Current.CancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Expected /health to return a successful response, but received HTTP {(int)response.StatusCode}.");
 
-        var payload = await response.Content.ReadFromJsonAsync<HealthPayload>();
+        var payload = await response.Content.ReadFromJsonAsync<HealthPayload>(TestContext.Current.CancellationToken);
         Assert.Equal("ok", payload?.Status);
     }
 
@@ -53,11 +53,11 @@ public sealed class SmokeTests : UatTestBase
     public async Task AppMetadataEndpointRespondsSuccessfully()
     {
         using var httpClient = CreateHttpClient();
-        using var response = await httpClient.GetAsync("/app/metadata");
+        using var response = await httpClient.GetAsync("/app/metadata", TestContext.Current.CancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Expected /app/metadata to return a successful response, but received HTTP {(int)response.StatusCode}.");
 
-        var payload = await response.Content.ReadFromJsonAsync<AppMetadataPayload>();
+        var payload = await response.Content.ReadFromJsonAsync<AppMetadataPayload>(TestContext.Current.CancellationToken);
         Assert.Contains("Glovelly", payload?.Title ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -67,10 +67,10 @@ public sealed class SmokeTests : UatTestBase
     public async Task KeyStaticAssetLoadsSuccessfully(string path)
     {
         using var httpClient = CreateHttpClient();
-        using var response = await httpClient.GetAsync(path);
+        using var response = await httpClient.GetAsync(path, TestContext.Current.CancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Expected {path} to return a successful response, but received HTTP {(int)response.StatusCode}.");
-        var content = await response.Content.ReadAsByteArrayAsync();
+        var content = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
         Assert.NotEmpty(content);
     }
 

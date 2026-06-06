@@ -20,12 +20,15 @@ Use a fresh browser session if possible. If the environment already contains cli
 
 ## Automation Status
 
-Each journey can show its automated coverage with a short status line:
+Each top-level journey should show its coverage with a short status line. Use these labels consistently:
 
-- **Manual**: no automated browser coverage yet.
-- **Automated**: covered end-to-end by the named Playwright UAT test.
-- **Partially automated**: the named Playwright UAT test covers the main path, but manual judgement or extra variants remain.
-- **Not automatable / judgement-based**: intentionally kept as a human review check.
+- **Automated UAT**: fully covered by the named Playwright UAT test.
+- **Partially automated UAT**: the named Playwright UAT test covers the main path, but documented variants, manual judgement, or environment checks remain.
+- **Backend automated; manual UAT**: server-side rules have automated backend/API coverage, but the browser journey still needs manual UAT.
+- **Manual UAT**: no specific automated coverage for this journey yet.
+- **Environment/manual UAT**: external services, OAuth, real delivery, or human judgement make the journey manual even where some backend rules are automated.
+
+`Automated UAT` and `Partially automated UAT` mean browser-level Playwright coverage in `tests/Glovelly.Uat.Tests`, not just backend integration tests.
 
 When adding or changing Playwright UAT coverage, update the matching UAT page in the same pull request so release reviewers can see what still needs human attention.
 
@@ -38,7 +41,7 @@ When adding or changing Playwright UAT coverage, update the matching UAT page in
 - [Google Calendar](calendar.md): Calendar connection, eligible gig statuses, and asynchronous sync expectations.
 - [Enrolment and access](enrolment.md): sign-in, seller profile, settings, and admin access checks.
 
-> **Automation:** Partially automated: `Glovelly.Uat.Tests.SmokeTests` covers public smoke endpoints and sign-in entry point visibility; journey-specific automation is noted on each page.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.SmokeTests` covers public smoke endpoints and sign-in entry point visibility; journey-specific automation is noted on each page.
 
 ## Good Testing Notes
 

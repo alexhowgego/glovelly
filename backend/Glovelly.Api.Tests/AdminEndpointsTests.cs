@@ -28,18 +28,18 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
             passengerMileageRate = (decimal?)null,
             role = "User",
             isActive = false,
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdUser = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdUser = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var userId = createdUser.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _client.DeleteAsync($"/admin/users/{userId}");
+        var deleteResponse = await _client.DeleteAsync($"/admin/users/{userId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
-        var listResponse = await _client.GetAsync("/admin/users");
+        var listResponse = await _client.GetAsync("/admin/users", TestContext.Current.CancellationToken);
         listResponse.EnsureSuccessStatusCode();
-        var users = await listResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var users = await listResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.DoesNotContain(
             users.EnumerateArray(),
             user => user.GetProperty("id").GetGuid() == userId);
@@ -57,23 +57,23 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
             passengerMileageRate = (decimal?)null,
             role = "User",
             isActive = true,
-        });
+        }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
-        var createdUser = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdUser = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var userId = createdUser.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _client.DeleteAsync($"/admin/users/{userId}");
+        var deleteResponse = await _client.DeleteAsync($"/admin/users/{userId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
 
-        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Only inactive users can be deleted.",
             problem.GetProperty("errors").GetProperty("isActive")[0].GetString());
 
-        var listResponse = await _client.GetAsync("/admin/users");
+        var listResponse = await _client.GetAsync("/admin/users", TestContext.Current.CancellationToken);
         listResponse.EnsureSuccessStatusCode();
-        var users = await listResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var users = await listResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Contains(
             users.EnumerateArray(),
             user => user.GetProperty("id").GetGuid() == userId);
@@ -82,11 +82,11 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task DeleteUser_WhenCurrentUser_ReturnsValidationProblem()
     {
-        var deleteResponse = await _client.DeleteAsync($"/admin/users/{TestAuthContext.UserId}");
+        var deleteResponse = await _client.DeleteAsync($"/admin/users/{TestAuthContext.UserId}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
 
-        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "You cannot delete your own administrator account.",
             problem.GetProperty("errors").GetProperty("id")[0].GetString());

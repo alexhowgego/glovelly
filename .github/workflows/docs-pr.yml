@@ -9,6 +9,7 @@ on:
     paths:
       - ".github/workflows/docs-pr.yml"
       - ".github/workflows/docs.yml"
+      - ".config/dotnet-tools.json"
       - "docs/**"
 
 permissions:

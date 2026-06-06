@@ -145,10 +145,7 @@ internal static class AuthEndpoints
                 GoogleScopes.Contains(googleConnection.GrantedScopes, GoogleScopes.DriveFile);
             if (invoiceUploadFolderId is not null && !isGoogleDriveConnected)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["invoiceUploadFolderId"] = ["Connect Google Drive before setting an invoice upload folder."]
-                });
+                return EndpointSupport.ValidationProblem("invoiceUploadFolderId", "Connect Google Drive before setting an invoice upload folder.");
             }
 
             GoogleDriveIntegrationSettings? googleDriveSettings = null;

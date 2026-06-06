@@ -32,11 +32,11 @@ public sealed class InvoiceLineEndpointsTests : IClassFixture<GlovellyApiFactory
             wasDriving = true,
             status = 1,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         createGigResponse.EnsureSuccessStatusCode();
 
-        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Object, createdGig.ValueKind);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
@@ -50,11 +50,11 @@ public sealed class InvoiceLineEndpointsTests : IClassFixture<GlovellyApiFactory
             unitPrice = 120.00m,
             gigId,
             calculationNotes = "  Snapshot from agreed booking rate.  ",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, createLineResponse.StatusCode);
 
-        var createdLine = await createLineResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdLine = await createLineResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonValueKind.Object, createdLine.ValueKind);
         Assert.Equal("Headline performance fee", createdLine.GetProperty("description").GetString());
@@ -63,10 +63,10 @@ public sealed class InvoiceLineEndpointsTests : IClassFixture<GlovellyApiFactory
         Assert.Equal(gigId, createdLine.GetProperty("gigId").GetGuid());
         Assert.Equal(300.00m, createdLine.GetProperty("lineTotal").GetDecimal());
 
-        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.FoxInvoiceId}");
+        var invoiceResponse = await _client.GetAsync($"/invoices/{TestData.FoxInvoiceId}", TestContext.Current.CancellationToken);
         invoiceResponse.EnsureSuccessStatusCode();
 
-        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonValueKind.Object, invoice.ValueKind);
         Assert.Equal(300.00m, invoice.GetProperty("total").GetDecimal());
@@ -88,11 +88,11 @@ public sealed class InvoiceLineEndpointsTests : IClassFixture<GlovellyApiFactory
             wasDriving = false,
             status = 0,
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         createGigResponse.EnsureSuccessStatusCode();
 
-        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Object, createdGig.ValueKind);
         var gigId = createdGig.GetProperty("id").GetGuid();
 
@@ -105,11 +105,11 @@ public sealed class InvoiceLineEndpointsTests : IClassFixture<GlovellyApiFactory
             quantity = 1m,
             unitPrice = 25.00m,
             gigId,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, createLineResponse.StatusCode);
 
-        var problem = await createLineResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await createLineResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonValueKind.Object, problem.ValueKind);
         Assert.Equal("Gig client must match the invoice client.", problem.GetProperty("errors").GetProperty("gigId")[0].GetString());

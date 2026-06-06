@@ -6,6 +6,14 @@ namespace Glovelly.Api.Endpoints;
 
 internal static class EndpointSupport
 {
+    public static IResult ValidationProblem(string field, string message)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [field] = [message]
+        });
+    }
+
     public static IQueryable<Client> WhereVisibleTo(this IQueryable<Client> query, Guid? userId)
     {
         return query.Where(client => client.CreatedByUserId == null || client.CreatedByUserId == userId);
@@ -103,18 +111,12 @@ internal static class EndpointSupport
     {
         if (client.MileageRate.HasValue && client.MileageRate.Value < 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["mileageRate"] = ["Mileage rate cannot be negative."]
-            });
+            return ValidationProblem("mileageRate", "Mileage rate cannot be negative.");
         }
 
         if (client.PassengerMileageRate.HasValue && client.PassengerMileageRate.Value < 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["passengerMileageRate"] = ["Passenger mileage rate cannot be negative."]
-            });
+            return ValidationProblem("passengerMileageRate", "Passenger mileage rate cannot be negative.");
         }
 
         if (TryValidateInvoiceFilenamePattern(client.InvoiceFilenamePattern, out var patternErrors))
@@ -284,10 +286,7 @@ internal static class EndpointSupport
 
         return allowed
             ? null
-            : Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["status"] = [$"Invoice status cannot move from {currentStatus} to {requestedStatus}."]
-            });
+            : ValidationProblem("status", $"Invoice status cannot move from {currentStatus} to {requestedStatus}.");
     }
 
     public static async Task<IResult?> ValidateInvoiceLineGigAsync(
@@ -307,18 +306,12 @@ internal static class EndpointSupport
 
         if (gig is null)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["gigId"] = ["Gig does not exist."]
-            });
+            return ValidationProblem("gigId", "Gig does not exist.");
         }
 
         if (gig.ClientId != invoice.ClientId)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["gigId"] = ["Gig client must match the invoice client."]
-            });
+            return ValidationProblem("gigId", "Gig client must match the invoice client.");
         }
 
         return null;

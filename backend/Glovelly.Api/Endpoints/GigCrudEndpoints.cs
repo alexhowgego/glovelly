@@ -61,10 +61,7 @@ internal static class GigCrudEndpoints
 
             if (!Enum.IsDefined(request.Status))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Status is invalid."]
-                });
+                return EndpointSupport.ValidationProblem("status", "Status is invalid.");
             }
 
             gig.Status = request.Status;
@@ -102,10 +99,7 @@ internal static class GigCrudEndpoints
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == gig.ClientId))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             if (gig.InvoiceId.HasValue)
@@ -117,18 +111,12 @@ internal static class GigCrudEndpoints
 
                 if (invoice is null)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["invoiceId"] = ["Invoice does not exist."]
-                    });
+                    return EndpointSupport.ValidationProblem("invoiceId", "Invoice does not exist.");
                 }
 
                 if (invoice.ClientId != gig.ClientId)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["invoiceId"] = ["Invoice client must match the gig client."]
-                    });
+                    return EndpointSupport.ValidationProblem("invoiceId", "Invoice client must match the gig client.");
                 }
             }
 
@@ -188,10 +176,7 @@ internal static class GigCrudEndpoints
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == request.ClientId))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var requestedInvoiceId = request.InvoiceId ?? gig.InvoiceId;
@@ -205,18 +190,12 @@ internal static class GigCrudEndpoints
 
                 if (invoice is null)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["invoiceId"] = ["Invoice does not exist."]
-                    });
+                    return EndpointSupport.ValidationProblem("invoiceId", "Invoice does not exist.");
                 }
 
                 if (invoice.ClientId != request.ClientId)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["invoiceId"] = ["Invoice client must match the gig client."]
-                    });
+                    return EndpointSupport.ValidationProblem("invoiceId", "Invoice client must match the gig client.");
                 }
             }
 
@@ -313,18 +292,12 @@ internal static class GigCrudEndpoints
 
             if (gig.Status != GigStatus.Confirmed)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Only planned gigs can be deleted."]
-                });
+                return EndpointSupport.ValidationProblem("status", "Only planned gigs can be deleted.");
             }
 
             if (gig.InvoiceId.HasValue)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["invoiceId"] = ["Gigs with linked invoices cannot be deleted."]
-                });
+                return EndpointSupport.ValidationProblem("invoiceId", "Gigs with linked invoices cannot be deleted.");
             }
 
             foreach (var attachment in gig.Expenses.SelectMany(expense => expense.Attachments).ToList())

@@ -19,11 +19,11 @@ public sealed class SellerProfileEndpointsTests : IClassFixture<GlovellyApiFacto
     [Fact]
     public async Task Get_WhenNoProfileExists_ReturnsEmptyEditableState()
     {
-        var response = await _client.GetAsync("/seller-profile");
+        var response = await _client.GetAsync("/seller-profile", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var profile = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var profile = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Null, profile.GetProperty("id").ValueKind);
         Assert.False(profile.GetProperty("isConfigured").GetBoolean());
         Assert.False(profile.GetProperty("isInvoiceReady").GetBoolean());
@@ -42,11 +42,11 @@ public sealed class SellerProfileEndpointsTests : IClassFixture<GlovellyApiFacto
             city = "Manchester",
             country = "United Kingdom",
             sortCode = "12-34-56",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Account name is required when payment details are provided.",
             problem.GetProperty("errors").GetProperty("accountName")[0].GetString());
@@ -73,19 +73,19 @@ public sealed class SellerProfileEndpointsTests : IClassFixture<GlovellyApiFacto
             sortCode = "12-34-56",
             accountNumber = "12345678",
             paymentReferenceNote = "Use invoice number as the payment reference.",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, saveResponse.StatusCode);
 
-        var savedProfile = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var savedProfile = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.True(savedProfile.GetProperty("isConfigured").GetBoolean());
         Assert.True(savedProfile.GetProperty("isInvoiceReady").GetBoolean());
         Assert.Empty(savedProfile.GetProperty("missingFields").EnumerateArray());
 
-        var getResponse = await _client.GetAsync("/seller-profile");
+        var getResponse = await _client.GetAsync("/seller-profile", TestContext.Current.CancellationToken);
         getResponse.EnsureSuccessStatusCode();
 
-        var fetchedProfile = await getResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var fetchedProfile = await getResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Glovelly Music Ltd", fetchedProfile.GetProperty("sellerName").GetString());
         Assert.Equal("1 Chapel Street", fetchedProfile.GetProperty("addressLine1").GetString());
         Assert.Equal("Suite 4", fetchedProfile.GetProperty("addressLine2").GetString());

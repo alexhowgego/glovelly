@@ -60,6 +60,7 @@ export function InvoiceGenerationPreviewModal({
           <div className="actions">
             <button
               className="ghost-button"
+              data-testid="invoice-preview-download-button"
               disabled={isLoading || !pdfUrl}
               onClick={onDownload}
               type="button"

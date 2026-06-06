@@ -131,7 +131,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         using var request = new HttpRequestMessage(HttpMethod.Options, "/mcp");
 
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal("*", response.Headers.GetValues("Access-Control-Allow-Origin").Single());
@@ -147,7 +147,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         using var request = new HttpRequestMessage(HttpMethod.Get, "/mcp");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
         Assert.Contains("Mcp-Session-Id", response.Headers.GetValues("Access-Control-Expose-Headers").Single());
@@ -189,7 +189,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("2025-06-18", response.Headers.GetValues("MCP-Protocol-Version").Single());
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("2025-06-18", payload.GetProperty("result").GetProperty("protocolVersion").GetString());
         Assert.Equal("glovelly", payload.GetProperty("result").GetProperty("serverInfo").GetProperty("name").GetString());
         Assert.True(payload.GetProperty("result").GetProperty("capabilities").TryGetProperty("tools", out _));
@@ -202,7 +202,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         using var client = factory.CreateClient();
         using var request = CreateMcpRequest(ListInvoicesPayload());
 
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains("resource_metadata=", response.Headers.WwwAuthenticate.ToString());
@@ -214,11 +214,11 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         using var factory = CreateMcpOAuthFactory();
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/.well-known/oauth-protected-resource");
+        var response = await client.GetAsync("/.well-known/oauth-protected-resource", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("https://glovelly.test/mcp", payload.GetProperty("resource").GetString());
         Assert.Equal(
             "https://glovelly.test",
@@ -232,11 +232,11 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         using var factory = CreateMcpOAuthFactory();
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/.well-known/oauth-authorization-server");
+        var response = await client.GetAsync("/.well-known/oauth-authorization-server", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("https://glovelly.test", payload.GetProperty("issuer").GetString());
         Assert.Equal("https://glovelly.test/oauth/authorize", payload.GetProperty("authorization_endpoint").GetString());
         Assert.Equal("https://glovelly.test/oauth/token", payload.GetProperty("token_endpoint").GetString());
@@ -280,21 +280,21 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
                 ["redirect_uri"] = "https://chatgpt.test/callback",
                 ["code_verifier"] = codeVerifier,
                 ["resource"] = "https://glovelly.test/mcp",
-            }));
+            }), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, tokenResponse.StatusCode);
-        var tokenPayload = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var tokenPayload = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var accessToken = tokenPayload.GetProperty("access_token").GetString();
         Assert.False(string.IsNullOrWhiteSpace(accessToken));
 
         using var request = CreateMcpRequest(ListInvoicesPayload());
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.NotEmpty(payload
             .GetProperty("result")
             .GetProperty("structuredContent")
@@ -309,11 +309,11 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         using var client = factory.CreateClient();
         using var request = CreateMcpRequest(ListInvoicesPayload());
 
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var result = payload
             .GetProperty("result")
             .GetProperty("structuredContent");
@@ -331,7 +331,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         using var client = factory.CreateClient();
         using var request = CreateMcpRequest(ListInvoicesPayload());
 
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -348,7 +348,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         request.Headers.Remove("MCP-Protocol-Version");
         request.Headers.Add("MCP-Protocol-Version", "1900-01-01");
 
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -365,7 +365,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var tools = payload
             .GetProperty("result")
             .GetProperty("tools")
@@ -578,7 +578,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         var issueResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
         {
             status = "Issued",
-        });
+        }, TestContext.Current.CancellationToken);
         issueResponse.EnsureSuccessStatusCode();
 
         var result = await CallToolAsync("glovelly_list_invoices", new
@@ -600,7 +600,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
             name = "Fox Theatre",
             email = "accounts@foxtheatre.test",
             billingAddress = new { },
-        });
+        }, TestContext.Current.CancellationToken);
         createClientResponse.EnsureSuccessStatusCode();
 
         var result = await CallToolAsync("glovelly_list_invoices", new
@@ -669,10 +669,10 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         };
         request.Headers.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
 
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var result = payload
             .GetProperty("result")
             .GetProperty("structuredContent");
@@ -779,7 +779,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(0, await db.Gigs.CountAsync());
+        Assert.Equal(0, await db.Gigs.CountAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -941,7 +941,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         });
         request.Headers.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
 
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);

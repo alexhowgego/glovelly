@@ -39,7 +39,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             invoiceFilenamePattern = (string?)null,
             invoiceEmailSubjectPattern = (string?)null,
             invoiceReplyToEmail = "alex@example.com",
-        });
+        }, TestContext.Current.CancellationToken);
         updateSettingsResponse.EnsureSuccessStatusCode();
 
         var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 invoice content");
@@ -55,10 +55,10 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
         {
             message = "Please process this one this week.",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         var message = Assert.Single(_factory.Emails.SentEmails);
         Assert.Equal("bookings@foxandfinch.co.uk", message.To.Single().Address);
@@ -99,7 +99,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
         {
             message = "Blob-backed PDF attached.",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -124,7 +124,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         {
             message = "Receipt attached too.",
             includeReceipts = true,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -141,7 +141,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal("Taxi - airport-taxi-receipt.jpg", entry.FullName);
         using var entryStream = entry.Open();
         using var entryMemory = new MemoryStream();
-        await entryStream.CopyToAsync(entryMemory);
+        await entryStream.CopyToAsync(entryMemory, TestContext.Current.CancellationToken);
         Assert.Equal(receiptBytes, entryMemory.ToArray());
     }
 
@@ -158,7 +158,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
         {
             message = "No receipt pack please.",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -183,12 +183,12 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var response = await client.PostAsJsonAsync($"/invoices/{invoiceId}/send-email", new
         {
             includeReceipts = true,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(_factory.Emails.SentEmails);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Contains(
             "exceeding the configured",
             problem.GetProperty("errors").GetProperty("attachments")[0].GetString());
@@ -204,7 +204,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             invoiceFilenamePattern = (string?)null,
             invoiceEmailSubjectPattern = "{ClientName} invoice {InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         updateSettingsResponse.EnsureSuccessStatusCode();
 
         var invoice = await CreateInvoiceWithPdfAsync(
@@ -217,7 +217,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await _client.PostAsync(
             $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -235,7 +235,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             invoiceFilenamePattern = (string?)null,
             invoiceEmailSubjectPattern = "User invoice {InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         updateSettingsResponse.EnsureSuccessStatusCode();
 
         var updateClientResponse = await _client.PutAsJsonAsync($"/clients/{TestData.FoxAndFinchId}", new
@@ -255,7 +255,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             passengerMileageRate = 0.15m,
             invoiceFilenamePattern = (string?)null,
             invoiceEmailSubjectPattern = "Client invoice {InvoiceNumber} for {ClientName}",
-        });
+        }, TestContext.Current.CancellationToken);
         updateClientResponse.EnsureSuccessStatusCode();
 
         var invoice = await CreateInvoiceWithPdfAsync(
@@ -268,7 +268,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await _client.PostAsync(
             $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -289,7 +289,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await _client.PostAsync(
             $"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -314,9 +314,9 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
                 postalCode = "LS1 1AA",
                 country = "United Kingdom",
             },
-        });
+        }, TestContext.Current.CancellationToken);
         createClientResponse.EnsureSuccessStatusCode();
-        var client = await createClientResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var client = await createClientResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 
         var invoice = await CreateInvoiceWithPdfAsync(
             _factory,
@@ -329,12 +329,12 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var response = await _client.PostAsJsonAsync($"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email", new
         {
             message = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(_factory.Emails.SentEmails);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Invoice recipient email is missing.",
             problem.GetProperty("errors").GetProperty("recipient")[0].GetString());
@@ -346,12 +346,12 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var response = await _client.PostAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/send-email", new
         {
             message = "Please pay this invoice.",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(_factory.Emails.SentEmails);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Invoice PDF is missing.",
             problem.GetProperty("errors").GetProperty("pdf")[0].GetString());
@@ -382,7 +382,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var createdInvoice = await CreateInvoiceWithPdfAsync(
@@ -396,10 +396,10 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await client.PostAsync(
             $"/invoices/{invoiceId}/publish/google-drive",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var publishResult = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var publishResult = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var updatedInvoice = publishResult.GetProperty("invoice");
 
         Assert.Equal("access-token", driveClient.AccessToken);
@@ -453,7 +453,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
                 CreatedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var createdInvoice = await CreateInvoiceWithPdfAsync(
@@ -466,7 +466,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await client.PostAsync(
             $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("drive-folder-id", driveClient.ParentFolderId);
@@ -488,12 +488,12 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await client.PostAsync(
             $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Null(driveClient.FileName);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Unable to publish invoice to Google Drive", problem.GetProperty("title").GetString());
         Assert.Equal("Google Drive is not connected.", problem.GetProperty("detail").GetString());
     }
@@ -522,7 +522,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var createdInvoice = await CreateInvoiceWithPdfAsync(
@@ -535,12 +535,12 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await client.PostAsync(
             $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Null(driveClient.FileName);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Unable to publish invoice to Google Drive", problem.GetProperty("title").GetString());
         Assert.Equal("Google Drive is not connected.", problem.GetProperty("detail").GetString());
     }
@@ -569,7 +569,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var createdInvoice = await CreateInvoiceWithPdfAsync(
@@ -582,7 +582,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await client.PostAsync(
             $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var tokenClient = factory.Services.GetRequiredService<FakeGoogleOAuthTokenClient>();
@@ -592,7 +592,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         using var assertionScope = factory.Services.CreateScope();
         var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var assertionTokenProtector = assertionScope.ServiceProvider.GetRequiredService<IGoogleTokenProtector>();
-        var connection = await assertionDbContext.GoogleConnections.SingleAsync();
+        var connection = await assertionDbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
         Assert.Equal("new-access-token", assertionTokenProtector.Unprotect(connection.EncryptedAccessToken));
     }
 
@@ -621,7 +621,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
                 ConnectedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             });
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var createdInvoice = await CreateInvoiceWithPdfAsync(
@@ -634,14 +634,14 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         var response = await client.PostAsync(
             $"/invoices/{createdInvoice.GetProperty("id").GetGuid()}/publish/google-drive",
-            content: null);
+            content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Null(driveClient.FileName);
 
         using var assertionScope = factory.Services.CreateScope();
         var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var connection = await assertionDbContext.GoogleConnections.SingleAsync();
+        var connection = await assertionDbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(connection.RevokedAtUtc);
     }
 
@@ -701,10 +701,10 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var invoiceEntity = await dbContext.Invoices.SingleAsync(value => value.Id == invoiceId);
+        var invoiceEntity = await dbContext.Invoices.SingleAsync(value => value.Id == invoiceId, TestContext.Current.CancellationToken);
         var invoicePdfService = scope.ServiceProvider.GetRequiredService<IInvoicePdfService>();
         await invoicePdfService.SaveGeneratedPdfAsync(invoiceEntity, TestAuthContext.UserId, pdfBytes);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return invoice;
     }
@@ -813,7 +813,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             CreatedByUserId = TestAuthContext.UserId,
             CreatedUtc = DateTimeOffset.UtcNow,
         });
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return (invoiceId, receiptBytes);
     }

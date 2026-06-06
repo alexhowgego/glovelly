@@ -163,10 +163,7 @@ internal static class GoogleDriveIntegrationEndpoints
 
             if (!GoogleScopes.Contains(tokenResponse.TokenResponse.Scope, GoogleScopes.DriveFile))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["scope"] = ["Google Drive authorization did not grant the required Drive scope."]
-                });
+                return EndpointSupport.ValidationProblem("scope", "Google Drive authorization did not grant the required Drive scope.");
             }
 
             var connection = await googleConnectionService.SaveConnectionAsync(

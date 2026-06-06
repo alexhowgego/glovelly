@@ -60,7 +60,7 @@ public static class InvoiceEndpoints
                     .Select(value => value.InvoiceFilenamePattern)
                     .FirstOrDefaultAsync(cancellationToken)
                 : null;
-            var periodDate = await ResolveInvoicePeriodDateAsync(db, invoice.Id, cancellationToken);
+            var periodDate = await InvoiceEndpointSupport.ResolveInvoicePeriodDateAsync(db, invoice.Id, cancellationToken);
 
             return Results.Stream(
                 pdf.Content,
@@ -91,10 +91,7 @@ public static class InvoiceEndpoints
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == invoice.ClientId))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var issuedOn = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -151,10 +148,7 @@ public static class InvoiceEndpoints
                     .FirstOrDefaultAsync(client => client.Id == request.ClientId);
             if (requestClient is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var hasConflictingGigLinks = await db.InvoiceLines
@@ -168,10 +162,7 @@ public static class InvoiceEndpoints
 
             if (hasConflictingGigLinks)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Invoice client must match any linked gig line clients."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Invoice client must match any linked gig line clients.");
             }
 
             invoice.InvoiceNumber = request.InvoiceNumber.Trim();
@@ -239,10 +230,7 @@ public static class InvoiceEndpoints
             {
                 if (invoice.Client is null)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["clientId"] = ["Client does not exist."]
-                    });
+                    return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
                 }
 
                 await invoiceWorkflowService.IssueInvoiceAsync(invoice, invoice.Client, userId);
@@ -279,18 +267,12 @@ public static class InvoiceEndpoints
 
             if (invoice.Status is InvoiceStatus.Draft)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Draft invoices can be redrafted, but cannot be re-issued until they have been issued."]
-                });
+                return EndpointSupport.ValidationProblem("status", "Draft invoices can be redrafted, but cannot be re-issued until they have been issued.");
             }
 
             if (invoice.Status is InvoiceStatus.Cancelled)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Cancelled invoices must be moved back to Draft before they can be redrafted."]
-                });
+                return EndpointSupport.ValidationProblem("status", "Cancelled invoices must be moved back to Draft before they can be redrafted.");
             }
 
             var client = await db.Clients
@@ -299,18 +281,12 @@ public static class InvoiceEndpoints
 
             if (client is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             if (string.IsNullOrWhiteSpace(client.Email))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["recipient"] = ["Invoice recipient email is missing."]
-                });
+                return EndpointSupport.ValidationProblem("recipient", "Invoice recipient email is missing.");
             }
 
             await invoiceWorkflowService.ReissueInvoiceAsync(invoice, client, userId);
@@ -339,10 +315,7 @@ public static class InvoiceEndpoints
 
             if (invoice.Status is not InvoiceStatus.Draft)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = [$"{invoice.Status} invoices must be re-issued rather than redrafted."]
-                });
+                return EndpointSupport.ValidationProblem("status", $"{invoice.Status} invoices must be re-issued rather than redrafted.");
             }
 
             var client = await db.Clients
@@ -351,10 +324,7 @@ public static class InvoiceEndpoints
 
             if (client is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
             var linkedGigs = await db.Gigs
@@ -385,241 +355,7 @@ public static class InvoiceEndpoints
             return Results.Ok(invoice);
         });
 
-        group.MapPost("/{id:guid}/send-email", async (
-            Guid id,
-            InvoiceEmailDeliveryRequest? request,
-            AppDbContext db,
-            ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor,
-            IInvoiceDeliveryService invoiceDeliveryService,
-            IInvoicePdfService invoicePdfService,
-            ILoggerFactory loggerFactory,
-            CancellationToken cancellationToken) =>
-        {
-            var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
-            var userId = currentUserAccessor.TryGetUserId(user);
-            var invoice = await db.Invoices
-                .WhereVisibleTo(userId)
-                .Include(value => value.Client)
-                .Include(value => value.Lines)
-                .FirstOrDefaultAsync(value => value.Id == id, cancellationToken);
-
-            if (invoice is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (invoice.Client is null)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
-            }
-
-            if (string.IsNullOrWhiteSpace(invoice.Client.Email))
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["recipient"] = ["Invoice recipient email is missing."]
-                });
-            }
-
-            var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
-            if (invoicePdf is null)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["pdf"] = ["Invoice PDF is missing."]
-                });
-            }
-            await invoicePdf.Content.DisposeAsync();
-
-            var userDefaultFilenamePattern = userId.HasValue
-                ? await db.Users
-                    .AsNoTracking()
-                    .Where(value => value.Id == userId.Value && value.IsActive)
-                    .Select(value => value.InvoiceFilenamePattern)
-                    .FirstOrDefaultAsync(cancellationToken)
-                : null;
-            var periodDate = await ResolveInvoicePeriodDateAsync(db, invoice.Id, cancellationToken);
-            var attachmentFileName = InvoicePdfFilenameBuilder.Build(
-                invoice,
-                invoice.Client,
-                userDefaultFilenamePattern,
-                periodDate);
-            var sendingUser = userId.HasValue
-                ? await db.Users
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(
-                        value => value.Id == userId.Value && value.IsActive,
-                        cancellationToken)
-                : null;
-            var emailSubject = InvoiceEmailSubjectBuilder.Build(
-                invoice,
-                invoice.Client,
-                sendingUser?.InvoiceEmailSubjectPattern,
-                periodDate);
-            var senderIdentity = InvoiceEmailSenderIdentityBuilder.Build(sendingUser);
-            IReadOnlyList<InvoiceExpenseReceiptAttachment> receiptAttachments = request?.IncludeReceipts is true
-                ? await BuildInvoiceReceiptAttachmentsAsync(db, invoice, cancellationToken)
-                : [];
-
-            try
-            {
-                await invoiceDeliveryService.DeliverAsync(
-                    InvoiceDeliveryChannel.Email,
-                    invoice,
-                    invoice.Client,
-                    userId,
-                    request?.Message,
-                    emailSubject,
-                    attachmentFileName,
-                    senderIdentity,
-                    cancellationToken,
-                    receiptAttachments);
-            }
-            catch (InvoiceEmailAttachmentLimitExceededException exception)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["attachments"] =
-                    [
-                        $"Invoice email attachments total {FormatBytes(exception.TotalAttachmentBytes)}, exceeding the configured {FormatBytes(exception.MaxTotalAttachmentBytes)} limit."
-                    ]
-                });
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(
-                    exception,
-                    "Failed to send invoice {InvoiceId} ({InvoiceNumber}) by email.",
-                    invoice.Id,
-                    invoice.InvoiceNumber);
-                return Results.Problem(
-                    title: "Unable to send invoice email",
-                    detail: "We couldn't send the invoice email right now. Please try again shortly.",
-                    statusCode: StatusCodes.Status500InternalServerError);
-            }
-
-            EndpointSupport.StampUpdate(invoice, userId);
-            await db.SaveChangesAsync(cancellationToken);
-
-            logger.LogInformation(
-                "Invoice {InvoiceId} ({InvoiceNumber}) delivered by {Channel} to {Recipient} by user {UserId}.",
-                invoice.Id,
-                invoice.InvoiceNumber,
-                invoice.LastDeliveryChannel,
-                invoice.LastDeliveryRecipient,
-                userId);
-
-            return Results.Ok(invoice);
-        });
-
-        group.MapPost("/{id:guid}/publish/google-drive", async (
-            Guid id,
-            AppDbContext db,
-            ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor,
-            IInvoiceDeliveryService invoiceDeliveryService,
-            IInvoicePdfService invoicePdfService,
-            ILoggerFactory loggerFactory,
-            CancellationToken cancellationToken) =>
-        {
-            var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
-            var userId = currentUserAccessor.TryGetUserId(user);
-            var invoice = await db.Invoices
-                .WhereVisibleTo(userId)
-                .Include(value => value.Client)
-                .Include(value => value.Lines)
-                .FirstOrDefaultAsync(value => value.Id == id, cancellationToken);
-
-            if (invoice is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (invoice.Client is null)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["clientId"] = ["Client does not exist."]
-                });
-            }
-
-            var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
-            if (invoicePdf is null)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["pdf"] = ["Invoice PDF is missing."]
-                });
-            }
-            await invoicePdf.Content.DisposeAsync();
-
-            var userDefaultFilenamePattern = userId.HasValue
-                ? await db.Users
-                    .AsNoTracking()
-                    .Where(value => value.Id == userId.Value && value.IsActive)
-                    .Select(value => value.InvoiceFilenamePattern)
-                    .FirstOrDefaultAsync(cancellationToken)
-                : null;
-            var periodDate = await ResolveInvoicePeriodDateAsync(db, invoice.Id, cancellationToken);
-            var attachmentFileName = InvoicePdfFilenameBuilder.Build(
-                invoice,
-                invoice.Client,
-                userDefaultFilenamePattern,
-                periodDate);
-            var emailSubject = InvoiceEmailSubjectBuilder.Build(
-                invoice,
-                invoice.Client,
-                defaultPattern: null,
-                periodDate);
-
-            InvoiceDeliveryResult deliveryResult;
-            try
-            {
-                deliveryResult = await invoiceDeliveryService.DeliverAsync(
-                    InvoiceDeliveryChannel.GoogleDrive,
-                    invoice,
-                    invoice.Client,
-                    userId,
-                    null,
-                    emailSubject,
-                    attachmentFileName,
-                    InvoiceEmailSenderIdentityBuilder.Build(null),
-                    cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(
-                    exception,
-                    "Failed to publish invoice {InvoiceId} ({InvoiceNumber}) to Google Drive.",
-                    invoice.Id,
-                    invoice.InvoiceNumber);
-                return Results.Problem(
-                    title: "Unable to publish invoice to Google Drive",
-                    detail: exception.Message,
-                    statusCode: StatusCodes.Status500InternalServerError);
-            }
-
-            EndpointSupport.StampUpdate(invoice, userId);
-            await db.SaveChangesAsync(cancellationToken);
-
-            logger.LogInformation(
-                "Invoice {InvoiceId} ({InvoiceNumber}) delivered by {Channel} to {Recipient} by user {UserId}.",
-                invoice.Id,
-                invoice.InvoiceNumber,
-                invoice.LastDeliveryChannel,
-                invoice.LastDeliveryRecipient,
-                userId);
-
-            return Results.Ok(new InvoiceGoogleDrivePublishResponse(
-                invoice,
-                deliveryResult.FileId,
-                deliveryResult.FileName,
-                deliveryResult.WebViewLink));
-        });
+        group.MapInvoiceDeliveryEndpoints();
 
         group.MapPost("/{id:guid}/adjustments", async (
             Guid id,
@@ -642,18 +378,12 @@ public static class InvoiceEndpoints
             var reason = request.Reason?.Trim();
             if (string.IsNullOrWhiteSpace(reason))
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["reason"] = ["Adjustment reason is required."]
-                });
+                return EndpointSupport.ValidationProblem("reason", "Adjustment reason is required.");
             }
 
             if (request.Amount == 0)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["amount"] = ["Adjustment amount must be non-zero."]
-                });
+                return EndpointSupport.ValidationProblem("amount", "Adjustment amount must be non-zero.");
             }
 
             _ = await invoiceWorkflowService.CreateManualAdjustmentAsync(invoice, request.Amount, reason, userId);
@@ -682,10 +412,7 @@ public static class InvoiceEndpoints
 
             if (invoice.Status is not InvoiceStatus.Draft)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["status"] = [$"Only Draft invoices can be deleted. {invoice.Status} invoices must be retained for reporting."]
-                });
+                return EndpointSupport.ValidationProblem("status", $"Only Draft invoices can be deleted. {invoice.Status} invoices must be retained for reporting.");
             }
 
             var deletedAtUtc = DateTimeOffset.UtcNow;
@@ -720,90 +447,6 @@ public static class InvoiceEndpoints
         return group;
     }
 
-    private static async Task<DateOnly?> ResolveInvoicePeriodDateAsync(
-        AppDbContext db,
-        Guid invoiceId,
-        CancellationToken cancellationToken = default)
-    {
-        var firstGigDate = await db.InvoiceLines
-            .AsNoTracking()
-            .Where(line => line.InvoiceId == invoiceId && line.GigId.HasValue)
-            .Join(
-                db.Gigs.AsNoTracking(),
-                line => line.GigId!.Value,
-                gig => gig.Id,
-                (_, gig) => gig.Date)
-            .OrderBy(date => date)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return firstGigDate == default
-            ? null
-            : new DateOnly(firstGigDate.Year, firstGigDate.Month, 1);
-    }
-
-    private static async Task<IReadOnlyList<InvoiceExpenseReceiptAttachment>> BuildInvoiceReceiptAttachmentsAsync(
-        AppDbContext db,
-        Invoice invoice,
-        CancellationToken cancellationToken)
-    {
-        var expenseLineKeys = invoice.Lines
-            .Where(line => line.Type is InvoiceLineType.MiscExpense && line.GigId.HasValue)
-            .Select(line => new
-            {
-                GigId = line.GigId!.Value,
-                Description = line.Description.Trim(),
-                Amount = line.UnitPrice,
-            })
-            .ToList();
-
-        if (expenseLineKeys.Count == 0)
-        {
-            return [];
-        }
-
-        var gigIds = expenseLineKeys
-            .Select(line => line.GigId)
-            .Distinct()
-            .ToList();
-        var expenses = await db.GigExpenses
-            .AsNoTracking()
-            .Include(expense => expense.Attachments)
-            .Where(expense => gigIds.Contains(expense.GigId))
-            .OrderBy(expense => expense.SortOrder)
-            .ThenBy(expense => expense.Description)
-            .ToListAsync(cancellationToken);
-
-        return expenses
-            .Where(expense => expense.Attachments.Count > 0)
-            .Where(expense => expenseLineKeys.Any(line =>
-                line.GigId == expense.GigId &&
-                string.Equals(line.Description, expense.Description.Trim(), StringComparison.Ordinal) &&
-                line.Amount == expense.Amount))
-            .SelectMany(expense => expense.Attachments
-                .OrderBy(attachment => attachment.CreatedAt)
-                .Select(attachment => new InvoiceExpenseReceiptAttachment(
-                    expense.Description,
-                    attachment.FileName,
-                    attachment.ContentType,
-                    attachment.SizeBytes,
-                    attachment.StorageKey)))
-            .ToList();
-    }
-
-    private static string FormatBytes(long byteCount)
-    {
-        const decimal oneMegabyte = 1024m * 1024m;
-        return byteCount < oneMegabyte
-            ? $"{byteCount} bytes"
-            : $"{byteCount / oneMegabyte:0.##} MB";
-    }
-
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
     private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);
-    private sealed record InvoiceEmailDeliveryRequest(string? Message, bool IncludeReceipts = false);
-    private sealed record InvoiceGoogleDrivePublishResponse(
-        Invoice Invoice,
-        string? FileId,
-        string? FileName,
-        string? WebViewLink);
 }

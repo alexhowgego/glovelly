@@ -12,6 +12,14 @@ export default defineConfig({
   server: {
     allowedHosts: ['localhost', ...extraAllowedHosts],
     proxy: {
+      '/.well-known': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
+      '/access': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
       '/auth': {
         target: 'http://localhost:5153',
         changeOrigin: true,
@@ -25,6 +33,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/gigs': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
+      '/health': {
         target: 'http://localhost:5153',
         changeOrigin: true,
       },
@@ -49,6 +61,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/mcp': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
+      '/oauth': {
         target: 'http://localhost:5153',
         changeOrigin: true,
       },

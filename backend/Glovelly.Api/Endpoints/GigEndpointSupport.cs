@@ -60,26 +60,17 @@ internal static class GigEndpointSupport
     {
         if (file is null || file.Length == 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["file"] = ["Upload a receipt file."]
-            });
+            return EndpointSupport.ValidationProblem("file", "Upload a receipt file.");
         }
 
         if (file.Length > settings.MaxFileSizeBytes)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["file"] = [$"Receipt files must be {settings.MaxFileSizeBytes / 1024 / 1024} MB or smaller."]
-            });
+            return EndpointSupport.ValidationProblem("file", $"Receipt files must be {settings.MaxFileSizeBytes / 1024 / 1024} MB or smaller.");
         }
 
         if (!settings.AllowedContentTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["file"] = ["Receipt files must be PDF, JPG, PNG, WebP or HEIC."]
-            });
+            return EndpointSupport.ValidationProblem("file", "Receipt files must be PDF, JPG, PNG, WebP or HEIC.");
         }
 
         return null;

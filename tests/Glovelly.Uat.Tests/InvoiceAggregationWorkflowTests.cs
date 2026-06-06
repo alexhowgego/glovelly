@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Glovelly.Uat.Tests;
 
-public sealed class InvoiceAggregationWorkflowTests : UatTestBase
+public sealed class InvoiceAggregationWorkflowTests : InvoiceUatTestBase
 {
     [Fact]
     public Task CanGenerateCombinedInvoiceForSameClientGigs() => RunWithDiagnosticsAsync(
@@ -12,19 +12,35 @@ public sealed class InvoiceAggregationWorkflowTests : UatTestBase
         {
             var runId = CreateRunId();
             var clientName = $"{runId} Combined Client";
-            var firstGigTitle = $"{runId} Combined Gig 1";
-            var secondGigTitle = $"{runId} Combined Gig 2";
+            var otherClientName = $"{runId} Other Combined Client";
+            var laterGigTitle = $"{runId} Combined Gig Later";
+            var earlierGigTitle = $"{runId} Combined Gig Earlier";
+            var otherGigTitle = $"{runId} Different Client Gig";
+            var baseDate = DateTime.UtcNow.AddDays(35);
 
             await AuthenticateWithUatSecretAsync();
             await CreateClientAsync(clientName);
-            await CreateGigAsync(clientName, firstGigTitle, DateTime.UtcNow.AddDays(21).ToString("yyyy-MM-dd"));
-            await CreateGigAsync(clientName, secondGigTitle, DateTime.UtcNow.AddDays(22).ToString("yyyy-MM-dd"));
+            await CreateClientAsync(otherClientName, "other-invoices-uat@example.com");
+            await CreateGigAsync(clientName, laterGigTitle, baseDate.AddDays(5).ToString("yyyy-MM-dd"));
+            await CreateGigAsync(clientName, earlierGigTitle, baseDate.ToString("yyyy-MM-dd"));
+            await CreateGigAsync(otherClientName, otherGigTitle, baseDate.AddDays(1).ToString("yyyy-MM-dd"));
 
-            await SelectGigForBatchInvoiceAsync(firstGigTitle);
-            await SelectGigForBatchInvoiceAsync(secondGigTitle);
+            await SelectGigForBatchInvoiceAsync(laterGigTitle);
+            await SelectGigForBatchInvoiceAsync(earlierGigTitle);
+
+            var otherClientCheckbox = GigCard(otherGigTitle).Locator("input[type=checkbox]");
+            await Assertions.Expect(otherClientCheckbox).ToBeDisabledAsync();
+            await Assertions.Expect(GigCard(otherGigTitle)).ToContainTextAsync("Different client");
+
             await Page.GetByTestId("generate-invoice-button").ClickAsync();
-            await OpenGeneratedInvoicePreviewAsync();
-            await AssertInvoiceLinesContainAsync(firstGigTitle, secondGigTitle);
+            await WaitForInvoicePreviewAsync();
+            await DownloadPreviewPdfAsync();
+            await OpenPreviewedInvoiceAsync();
+            await OpenInvoiceLinesAsync();
+            await AssertInvoiceLineContainsAsync(earlierGigTitle);
+            await AssertInvoiceLineContainsAsync(laterGigTitle);
+            await AssertLinesAreOrderedAsync(earlierGigTitle, laterGigTitle);
+            await DownloadInvoicePdfAsync();
         });
 
     [Fact]
@@ -52,54 +68,22 @@ public sealed class InvoiceAggregationWorkflowTests : UatTestBase
                 new LocatorAssertionsToContainTextOptions { Timeout = 30_000 });
 
             await Page.GetByTestId("generate-monthly-invoice-button").ClickAsync();
-            await OpenGeneratedInvoicePreviewAsync();
-            await AssertInvoiceLinesContainAsync(firstGigTitle, secondGigTitle);
+            await WaitForInvoicePreviewAsync();
+            await DownloadPreviewPdfAsync();
+            await OpenPreviewedInvoiceAsync();
+            await OpenInvoiceLinesAsync();
+            await AssertInvoiceLineContainsAsync(firstGigTitle);
+            await AssertInvoiceLineContainsAsync(secondGigTitle);
+            await DownloadInvoicePdfAsync();
+
+            await OpenGigFromInvoiceLineAsync(firstGigTitle);
+            await ExpectContainsAsync(Page.GetByTestId("generate-invoice-button"), "Already invoiced");
         });
-
-    private async Task CreateClientAsync(string clientName)
-    {
-        await Page.GetByTestId("nav-clients").ClickAsync();
-        await Page.GetByTestId("new-client-button").ClickAsync();
-        await Page.GetByTestId("client-form").WaitForAsync();
-
-        await Page.GetByTestId("client-name-input").FillAsync(clientName);
-        await Page.GetByTestId("client-email-input").FillAsync("invoices-uat@example.com");
-        await Page.GetByTestId("client-address-line1-input").FillAsync("3 UAT Invoice Street");
-        await Page.GetByTestId("client-city-input").FillAsync("Bristol");
-        await Page.GetByTestId("client-postal-code-input").FillAsync("BS1 5AA");
-        await Page.GetByTestId("client-country-input").FillAsync("United Kingdom");
-        await Page.GetByTestId("client-save-close-button").ClickAsync();
-
-        await ClientCard(clientName).WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
-    }
-
-    private async Task CreateGigAsync(string clientName, string gigTitle, string gigDate)
-    {
-        await Page.GetByTestId("nav-gigs").ClickAsync();
-        await Page.GetByTestId("new-gig-button").ClickAsync();
-        await Page.GetByTestId("gig-form").WaitForAsync();
-
-        await Page.GetByTestId("gig-client-select").SelectOptionAsync(new[]
-        {
-            new SelectOptionValue { Label = clientName },
-        });
-        await Page.GetByTestId("gig-date-input").FillAsync(gigDate);
-        await Page.GetByTestId("gig-title-input").FillAsync(gigTitle);
-        await Page.GetByTestId("gig-venue-input").FillAsync("UAT Invoice Hall");
-        await Page.GetByTestId("gig-fee-input").FillAsync("125.00");
-        await Page.GetByTestId("gig-save-close-button").ClickAsync();
-
-        await GigCard(gigTitle).WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
-    }
 
     private async Task SelectGigForBatchInvoiceAsync(string gigTitle)
     {
+        await Page.GetByTestId("nav-gigs").ClickAsync();
+        await Page.GetByTestId("gig-search-input").FillAsync(string.Empty);
         var card = GigCard(gigTitle);
         await card.WaitForAsync(new LocatorWaitForOptions
         {
@@ -108,47 +92,14 @@ public sealed class InvoiceAggregationWorkflowTests : UatTestBase
         await card.Locator("input[type=checkbox]").CheckAsync();
     }
 
-    private async Task OpenGeneratedInvoicePreviewAsync()
+    private async Task AssertLinesAreOrderedAsync(string firstText, string secondText)
     {
-        await Page.GetByTestId("invoice-preview-modal").WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
-        await Page.GetByTestId("invoice-preview-frame").WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
-        await Page.GetByTestId("open-invoice-button").ClickAsync();
-        await Page.GetByTestId("invoice-line-items-button").WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
+        var lineTexts = (await Page.GetByTestId("invoice-line-item").AllInnerTextsAsync()).ToList();
+        var firstIndex = lineTexts.FindIndex(text => text.Contains(firstText, StringComparison.Ordinal));
+        var secondIndex = lineTexts.FindIndex(text => text.Contains(secondText, StringComparison.Ordinal));
+
+        Assert.True(firstIndex >= 0, $"Expected to find invoice line containing '{firstText}'.");
+        Assert.True(secondIndex >= 0, $"Expected to find invoice line containing '{secondText}'.");
+        Assert.True(firstIndex < secondIndex, $"Expected '{firstText}' to appear before '{secondText}'.");
     }
-
-    private async Task AssertInvoiceLinesContainAsync(params string[] expectedGigTitles)
-    {
-        await Page.GetByTestId("invoice-line-items-button").ClickAsync();
-
-        foreach (var expectedGigTitle in expectedGigTitles)
-        {
-            await Page.GetByTestId("invoice-line-item").Filter(new LocatorFilterOptions
-            {
-                HasText = expectedGigTitle,
-            }).WaitForAsync(new LocatorWaitForOptions
-            {
-                State = WaitForSelectorState.Visible,
-                Timeout = 30_000,
-            });
-        }
-    }
-
-    private ILocator ClientCard(string clientName) => Page.GetByTestId("client-card").Filter(new LocatorFilterOptions
-    {
-        HasText = clientName,
-    });
-
-    private ILocator GigCard(string gigTitle) => Page.GetByTestId("gig-card").Filter(new LocatorFilterOptions
-    {
-        HasText = gigTitle,
-    });
 }

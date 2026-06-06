@@ -3,8 +3,9 @@ import type { FormEvent } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  getResponseErrorMessage,
   handleSessionExpired,
-  parseProblemDetails,
+  jsonRequestInit,
 } from '../api'
 import { emptySellerProfileForm } from '../forms'
 import type { SellerProfile, SellerProfileForm } from '../types'
@@ -111,12 +112,9 @@ export function useSellerProfile({
     setIsSellerProfileSaving(true)
 
     try {
-      const response = await fetchWithSession(buildApiUrl('/seller-profile'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await fetchWithSession(
+        buildApiUrl('/seller-profile'),
+        jsonRequestInit('PUT', {
           sellerName: sellerProfileForm.sellerName.trim() || null,
           addressLine1: sellerProfileForm.addressLine1.trim() || null,
           addressLine2: sellerProfileForm.addressLine2.trim() || null,
@@ -130,8 +128,8 @@ export function useSellerProfile({
           sortCode: sellerProfileForm.sortCode.trim() || null,
           accountNumber: sellerProfileForm.accountNumber.trim() || null,
           paymentReferenceNote: sellerProfileForm.paymentReferenceNote.trim() || null,
-        }),
-      })
+        })
+      )
 
       if (
         handleSessionExpired(
@@ -145,12 +143,9 @@ export function useSellerProfile({
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save seller profile.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save seller profile.')
+        )
       }
 
       const savedProfile = (await response.json()) as SellerProfile

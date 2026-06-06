@@ -20,7 +20,7 @@ public sealed class TestAuthEndpointsTests
         await using var factory = CreateFactory("Production");
         var client = factory.CreateClient();
 
-        var response = await client.PostAsync("/test-auth/login", null);
+        var response = await client.PostAsync("/test-auth/login", null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
     }
@@ -31,7 +31,7 @@ public sealed class TestAuthEndpointsTests
         await using var factory = CreateFactory("Staging");
         var client = factory.CreateClient();
 
-        var response = await client.PostAsync("/test-auth/login", null);
+        var response = await client.PostAsync("/test-auth/login", null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -44,7 +44,7 @@ public sealed class TestAuthEndpointsTests
         var request = new HttpRequestMessage(HttpMethod.Post, "/test-auth/login");
         request.Headers.Add("X-Glovelly-Uat-Secret", "wrong-secret");
 
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -60,25 +60,25 @@ public sealed class TestAuthEndpointsTests
         var request = new HttpRequestMessage(HttpMethod.Post, "/test-auth/login");
         request.Headers.Add("X-Glovelly-Uat-Secret", UatSecret);
 
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(response.Headers.Contains("Set-Cookie"));
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-        Assert.Equal(AppDbSeeder.UatRegressionEmail, payload.GetProperty("email").GetString());
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(UatRegressionDataSeeder.Email, payload.GetProperty("email").GetString());
 
-        var meResponse = await client.GetAsync("/auth/me");
+        var meResponse = await client.GetAsync("/auth/me", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
-        var mePayload = await meResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-        Assert.Equal(AppDbSeeder.UatRegressionEmail, mePayload.GetProperty("email").GetString());
+        var mePayload = await meResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(UatRegressionDataSeeder.Email, mePayload.GetProperty("email").GetString());
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.NotNull(await dbContext.Users.FindAsync(AppDbSeeder.UatRegressionUserId));
-        Assert.NotNull(await dbContext.Clients.FindAsync(AppDbSeeder.UatRegressionClientId));
-        Assert.NotNull(await dbContext.SellerProfiles.FindAsync(AppDbSeeder.UatRegressionSellerProfileId));
+        Assert.NotNull(await dbContext.Users.FindAsync([UatRegressionDataSeeder.UserId], TestContext.Current.CancellationToken));
+        Assert.NotNull(await dbContext.Clients.FindAsync([UatRegressionDataSeeder.ClientId], TestContext.Current.CancellationToken));
+        Assert.NotNull(await dbContext.SellerProfiles.FindAsync([UatRegressionDataSeeder.SellerProfileId], TestContext.Current.CancellationToken));
     }
 
     private static GlovellyApiFactory CreateFactory(string environmentName)

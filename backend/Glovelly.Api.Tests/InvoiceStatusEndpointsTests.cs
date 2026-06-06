@@ -23,11 +23,11 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         var response = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
         {
             status = "Paid",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Paid", updatedInvoice.GetProperty("status").GetString());
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("updatedByUserId").GetGuid());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("statusUpdatedUtc").ValueKind);
@@ -39,17 +39,17 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         var makePaidResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
         {
             status = "Paid",
-        });
+        }, TestContext.Current.CancellationToken);
         makePaidResponse.EnsureSuccessStatusCode();
 
         var response = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
         {
             status = "Cancelled",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Invoice status cannot move from Paid to Cancelled.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
@@ -66,17 +66,17 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             description = "Headline performance",
             quantity = 2m,
             unitPrice = 150m,
-        });
+        }, TestContext.Current.CancellationToken);
         createLineResponse.EnsureSuccessStatusCode();
 
         var response = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
         {
             status = "Paid",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(300m, updatedInvoice.GetProperty("total").GetDecimal());
         Assert.Single(updatedInvoice.GetProperty("lines").EnumerateArray());
     }
@@ -89,11 +89,11 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         var response = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
         {
             status = "Issued",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Issued", updatedInvoice.GetProperty("status").GetString());
         Assert.Equal(expectedInvoiceDate.ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("invoiceDate").GetString());
         Assert.Equal(expectedInvoiceDate.AddDays(14).ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("dueDate").GetString());
@@ -120,7 +120,7 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             defaultPaymentWindowDays = 30,
             invoiceFilenamePattern = "{InvoiceNumber}",
             invoiceReplyToEmail = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         updateSettingsResponse.EnsureSuccessStatusCode();
 
         var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -128,11 +128,11 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         var response = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
         {
             status = "Issued",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             expectedInvoiceDate.AddDays(30).ToString("yyyy-MM-dd"),
             updatedInvoice.GetProperty("dueDate").GetString());
@@ -151,26 +151,26 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             description = "Headline performance",
             quantity = 2m,
             unitPrice = 150m,
-        });
+        }, TestContext.Current.CancellationToken);
         createLineResponse.EnsureSuccessStatusCode();
 
         var markIssuedResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
         {
             status = "Issued",
-        });
+        }, TestContext.Current.CancellationToken);
         markIssuedResponse.EnsureSuccessStatusCode();
 
         var markPaidResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
         {
             status = "Paid",
-        });
+        }, TestContext.Current.CancellationToken);
         markPaidResponse.EnsureSuccessStatusCode();
 
-        var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/reissue", null);
+        var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/reissue", null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Draft", updatedInvoice.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("statusUpdatedUtc").ValueKind);
         Assert.Equal(expectedInvoiceDate.ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("invoiceDate").GetString());
@@ -190,11 +190,11 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     [Fact]
     public async Task Reissue_WhenInvoiceIsDraft_ReturnsValidationProblem()
     {
-        var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/reissue", null);
+        var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/reissue", null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Draft invoices can be redrafted, but cannot be re-issued until they have been issued.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
@@ -206,14 +206,14 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         var cancelResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
         {
             status = "Cancelled",
-        });
+        }, TestContext.Current.CancellationToken);
         cancelResponse.EnsureSuccessStatusCode();
 
-        var response = await _client.PostAsync($"/invoices/{TestData.FoxInvoiceId}/reissue", null);
+        var response = await _client.PostAsync($"/invoices/{TestData.FoxInvoiceId}/reissue", null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Cancelled invoices must be moved back to Draft before they can be redrafted.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
@@ -224,11 +224,11 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     {
         var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/redraft", null);
+        var response = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/redraft", null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Draft", updatedInvoice.GetProperty("status").GetString());
         Assert.Equal(expectedInvoiceDate.ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("invoiceDate").GetString());
         Assert.Equal(expectedInvoiceDate.AddDays(14).ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("dueDate").GetString());
@@ -253,18 +253,18 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             description = "Headline performance",
             quantity = 1m,
             unitPrice = 200m,
-        });
+        }, TestContext.Current.CancellationToken);
         createLineResponse.EnsureSuccessStatusCode();
 
         var response = await _client.PostAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/adjustments", new
         {
             amount = -25m,
             reason = "Goodwill discount",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(175m, updatedInvoice.GetProperty("total").GetDecimal());
 
         var manualAdjustment = updatedInvoice.GetProperty("lines")
@@ -287,11 +287,11 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         {
             amount = 25m,
             reason = "   ",
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Adjustment reason is required.", problem.GetProperty("errors").GetProperty("reason")[0].GetString());
     }
 
@@ -306,16 +306,16 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             dueDate = "2026-06-15",
             status = "Draft",
             description = "Draft invoice to delete",
-        });
+        }, TestContext.Current.CancellationToken);
         createInvoiceResponse.EnsureSuccessStatusCode();
 
-        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var invoiceId = createdInvoice.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _client.DeleteAsync($"/invoices/{invoiceId}");
+        var deleteResponse = await _client.DeleteAsync($"/invoices/{invoiceId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
-        var getResponse = await _client.GetAsync($"/invoices/{invoiceId}");
+        var getResponse = await _client.GetAsync($"/invoices/{invoiceId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
     }
 
@@ -330,10 +330,10 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             dueDate = "2026-06-16",
             status = "Draft",
             description = "Draft invoice linked to a gig",
-        });
+        }, TestContext.Current.CancellationToken);
         createInvoiceResponse.EnsureSuccessStatusCode();
 
-        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdInvoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var invoiceId = createdInvoice.GetProperty("id").GetGuid();
 
         var createGigResponse = await _client.PostAsJsonAsync("/gigs", new
@@ -351,22 +351,22 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             status = "Completed",
             expenses = Array.Empty<object>(),
             invoicedAt = (string?)null,
-        });
+        }, TestContext.Current.CancellationToken);
         createGigResponse.EnsureSuccessStatusCode();
 
-        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var createdGig = await createGigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var gigId = createdGig.GetProperty("id").GetGuid();
         Assert.Equal(invoiceId, createdGig.GetProperty("invoiceId").GetGuid());
         Assert.True(createdGig.GetProperty("isInvoiced").GetBoolean());
         Assert.Equal(JsonValueKind.String, createdGig.GetProperty("invoicedAt").ValueKind);
 
-        var deleteResponse = await _client.DeleteAsync($"/invoices/{invoiceId}");
+        var deleteResponse = await _client.DeleteAsync($"/invoices/{invoiceId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
-        var gigResponse = await _client.GetAsync($"/gigs/{gigId}");
+        var gigResponse = await _client.GetAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
         gigResponse.EnsureSuccessStatusCode();
 
-        var gig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var gig = await gigResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Null, gig.GetProperty("invoiceId").ValueKind);
         Assert.False(gig.GetProperty("isInvoiced").GetBoolean());
         Assert.Equal(JsonValueKind.Null, gig.GetProperty("invoicedAt").ValueKind);
@@ -375,10 +375,10 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     [Fact]
     public async Task DeleteInvoice_WhenNotDraft_ReturnsValidationProblem()
     {
-        var response = await _client.DeleteAsync($"/invoices/{TestData.FoxInvoiceId}");
+        var response = await _client.DeleteAsync($"/invoices/{TestData.FoxInvoiceId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
             "Only Draft invoices can be deleted. Issued invoices must be retained for reporting.",
             problem.GetProperty("errors").GetProperty("status")[0].GetString());
@@ -390,10 +390,10 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         _client.DefaultRequestHeaders.Remove("X-Test-UserId");
         _client.DefaultRequestHeaders.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
 
-        var response = await _client.GetAsync("/invoices");
+        var response = await _client.GetAsync("/invoices", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var invoices = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var invoices = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Array, invoices.ValueKind);
         Assert.Empty(invoices.EnumerateArray());
     }

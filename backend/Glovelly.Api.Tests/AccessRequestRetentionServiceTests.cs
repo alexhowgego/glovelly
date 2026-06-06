@@ -19,7 +19,7 @@ public sealed class AccessRequestRetentionServiceTests
             CreateRequest("expired@glovelly.local", now.AddDays(-183)),
             CreateRequest("boundary@glovelly.local", now.AddDays(-180)),
             CreateRequest("recent@glovelly.local", now.AddDays(-30)));
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var service = CreateService(dbContext, now);
 
@@ -28,7 +28,7 @@ public sealed class AccessRequestRetentionServiceTests
         var remainingEmails = await dbContext.AccessRequests
             .OrderBy(value => value.RequestedAtUtc)
             .Select(value => value.NormalizedEmail)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(
             ["boundary@glovelly.local", "recent@glovelly.local"],
@@ -43,13 +43,13 @@ public sealed class AccessRequestRetentionServiceTests
         dbContext.AccessRequests.AddRange(
             CreateRequest("expired@glovelly.local", now.AddDays(-181)),
             CreateRequest("recent@glovelly.local", now.AddDays(-10)));
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var service = CreateService(dbContext, now);
 
         await service.CleanupIfDueAsync(CancellationToken.None);
 
-        Assert.Equal(2, await dbContext.AccessRequests.CountAsync());
+        Assert.Equal(2, await dbContext.AccessRequests.CountAsync(TestContext.Current.CancellationToken));
     }
 
     private static AccessRequestRetentionService CreateService(AppDbContext dbContext, DateTimeOffset now)

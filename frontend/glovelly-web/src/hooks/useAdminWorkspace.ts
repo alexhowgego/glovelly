@@ -3,8 +3,9 @@ import type { FormEvent } from 'react'
 import {
   buildApiUrl,
   fetchWithSession,
+  getResponseErrorMessage,
   handleSessionExpired,
-  parseProblemDetails,
+  jsonRequestInit,
   throwIfSessionExpired,
 } from '../api'
 import { defaultAdminStatus, emptyAdminForm } from '../forms'
@@ -214,13 +215,10 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
         ? buildApiUrl(`/admin/users/${selectedAdminUser.id}`)
         : buildApiUrl('/admin/users')
 
-      const response = await fetchWithSession(endpoint, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
+      const response = await fetchWithSession(
+        endpoint,
+        jsonRequestInit(isEdit ? 'PUT' : 'POST', payload)
+      )
 
       if (
         handleSessionExpired(
@@ -238,12 +236,9 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to save enrolment.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save enrolment.')
+        )
       }
 
       const savedUser = (await response.json()) as AdminUser
@@ -320,12 +315,9 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
       }
 
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const validationMessages = problem?.errors
-          ? Object.values(problem.errors).flat().join(' ')
-          : problem?.detail ?? problem?.title
-
-        throw new Error(validationMessages || 'Unable to delete user.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to delete user.')
+        )
       }
 
       const nextUsers = adminUsers.filter((user) => user.id !== selectedAdminUser.id)

@@ -76,10 +76,7 @@ public static class AdminEndpoints
 
             if (user.GoogleSubject is not null && normalized.GoogleSubject != user.GoogleSubject)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["googleSubject"] = ["Google subject cannot be changed after enrolment."]
-                });
+                return EndpointSupport.ValidationProblem("googleSubject", "Google subject cannot be changed after enrolment.");
             }
 
             var currentUserId = currentUserAccessor.TryGetUserId(principal);
@@ -87,18 +84,12 @@ public static class AdminEndpoints
             {
                 if (!normalized.IsActive)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["isActive"] = ["You cannot deactivate your own administrator account."]
-                    });
+                    return EndpointSupport.ValidationProblem("isActive", "You cannot deactivate your own administrator account.");
                 }
 
                 if (normalized.Role != UserRole.Admin)
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]>
-                    {
-                        ["role"] = ["You cannot remove administrator access from your own account."]
-                    });
+                    return EndpointSupport.ValidationProblem("role", "You cannot remove administrator access from your own account.");
                 }
             }
 
@@ -130,18 +121,12 @@ public static class AdminEndpoints
             var currentUserId = currentUserAccessor.TryGetUserId(principal);
             if (currentUserId == user.Id)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["id"] = ["You cannot delete your own administrator account."]
-                });
+                return EndpointSupport.ValidationProblem("id", "You cannot delete your own administrator account.");
             }
 
             if (user.IsActive)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["isActive"] = ["Only inactive users can be deleted."]
-                });
+                return EndpointSupport.ValidationProblem("isActive", "Only inactive users can be deleted.");
             }
 
             db.Users.Remove(user);

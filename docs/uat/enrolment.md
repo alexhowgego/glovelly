@@ -12,6 +12,8 @@ Use these journeys when a change may affect sign-in, session handling, seller pr
 
 ## Sign-In And Session Smoke
 
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.SmokeTests.SignInEntryPointIsVisible` covers the public sign-in entry point and authenticated UAT tests cover the test-auth session path; real Google sign-in, refresh, and sign-out remain manual.
+
 ### Steps
 
 1. Open Glovelly.
@@ -27,6 +29,8 @@ The user can sign in, navigate through the core workspaces, refresh without losi
 
 ## Seller Profile And Defaults
 
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.SellerProfileEndpointsTests` covers profile persistence and validation; PDF/default browser checks remain manual.
+
 ### Steps
 
 1. Open seller profile.
@@ -40,6 +44,8 @@ The user can sign in, navigate through the core workspaces, refresh without losi
 The invoice PDF reflects seller profile and payment details. Missing profile details produce helpful UI notices rather than broken invoices.
 
 ## User Settings
+
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.AuthEndpointsTests.UpdateSettings_*` covers settings persistence and validation; browser default reuse remains manual.
 
 ### Steps
 
@@ -55,6 +61,8 @@ Saved defaults are reused in later client, gig, or invoice workflows where expec
 
 ## Admin Access
 
+> **Automation:** Backend automated; manual UAT: admin access APIs have backend coverage; browser role-management flow remains manual.
+
 ### Steps
 
 1. Open Admin as an administrator.
@@ -68,6 +76,8 @@ Saved defaults are reused in later client, gig, or invoice workflows where expec
 Admin changes persist and non-admin users cannot access admin workflows.
 
 ## Inactive User Deletion
+
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.AdminEndpointsTests.DeleteUser_WhenInactive_DeletesUser`, `DeleteUser_WhenActive_ReturnsValidationProblem`, and `DeleteUser_WhenCurrentUser_ReturnsValidationProblem`
 
 ### Steps
 

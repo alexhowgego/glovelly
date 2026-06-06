@@ -33,21 +33,21 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             draftIds = Array.Empty<Guid>(),
             commitAccepted = true,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(1, payload.GetProperty("createdCount").GetInt32());
         var gigId = payload.GetProperty("gigIds")[0].GetGuid();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var gig = await db.Gigs.Include(value => value.Expenses).SingleAsync(value => value.Id == gigId);
+        var gig = await db.Gigs.Include(value => value.Expenses).SingleAsync(value => value.Id == gigId, TestContext.Current.CancellationToken);
         var draftStatus = await db.GigImportDrafts
             .Where(value => value.Id == draftId)
             .Select(value => value.Status)
-            .SingleAsync();
+            .SingleAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(TestData.FoxAndFinchId, gig.ClientId);
         Assert.Equal("Swing Into Christmas", gig.Title);
@@ -75,11 +75,11 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             draftIds = new[] { draftId },
             commitAccepted = false,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var errors = problem.GetProperty("errors").GetProperty($"drafts.{draftId}");
         Assert.Contains(errors.EnumerateArray(), value => value.GetString() == "Client is required.");
         Assert.Contains(errors.EnumerateArray(), value => value.GetString() == "Title is required.");
@@ -99,7 +99,7 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             draftIds = Array.Empty<Guid>(),
             commitAccepted = true,
-        });
+        }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -109,12 +109,12 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
             .Where(value => value.BatchId == batchId)
             .OrderBy(value => value.ProposedTitle)
             .Select(value => new { value.Id, value.Status })
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(drafts, draft => draft.Id == rejectedDraftId);
         Assert.Contains(drafts, draft => draft.Id == acceptedDraftId && draft.Status == GigImportDraftStatus.Committed);
         Assert.Contains(drafts, draft => draft.Id == pendingDraftId && draft.Status == GigImportDraftStatus.Pending);
-        Assert.Equal(GigImportBatchStatus.Draft, await db.GigImportBatches.Where(value => value.Id == batchId).Select(value => value.Status).SingleAsync());
+        Assert.Equal(GigImportBatchStatus.Draft, await db.GigImportBatches.Where(value => value.Id == batchId).Select(value => value.Status).SingleAsync(TestContext.Current.CancellationToken));
     }
 
     private async Task SeedImportBatchAsync(Guid batchId, Guid draftId, bool includeRequiredFields = true)
@@ -149,7 +149,7 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
             },
         });
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task SeedImportBatchWithDecisionStatesAsync(
@@ -176,7 +176,7 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
             },
         });
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private static GigImportDraft CreateDraft(Guid draftId, string title, GigImportDraftStatus status)
@@ -199,6 +199,6 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.Gigs.CountAsync();
+        return await db.Gigs.CountAsync(TestContext.Current.CancellationToken);
     }
 }

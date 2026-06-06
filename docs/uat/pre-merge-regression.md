@@ -22,7 +22,7 @@ For local development, engineers usually run:
 
 ## Core Smoke Journey
 
-> **Automation:** Partially automated: `Glovelly.Uat.Tests.SmokeTests`
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.SmokeTests` covers public smoke endpoints and sign-in entry point visibility; signed-in workspace navigation remains manual.
 
 ### Steps
 
@@ -44,6 +44,8 @@ When changes touch Google Calendar, run the focused [Google Calendar](calendar.m
 
 ## Cross-Workspace Navigation Shortcuts
 
+> **Automation:** Manual UAT
+
 ### Steps
 
 1. Open Gigs and select a gig with a known client.
@@ -62,6 +64,8 @@ When changes touch Google Calendar, run the focused [Google Calendar](calendar.m
 Cross-workspace shortcuts preserve the intended target record, clear stale search filters that would hide the target, and leave unrelated records unchanged.
 
 ## Editor Navigation Regression Checks
+
+> **Automation:** Manual UAT
 
 ### Purpose
 
@@ -118,7 +122,7 @@ Expected result: unsaved admin access edits are never discarded without confirma
 
 ## Gig To Invoice Journey
 
-> **Automation:** Automated: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.CoreInvoiceWorkflowTests.AuthenticatedUserCanCreatePreviewAndSendInvoiceToConfiguredRecipient`
 
 ### Steps
 
@@ -141,6 +145,8 @@ Expected result: unsaved admin access edits are never discarded without confirma
 Generating an invoice links the gig, creates expected lines, includes saved mileage when applicable, and produces a downloadable PDF.
 
 ## Editing An Invoiced Gig
+
+> **Automation:** Backend automated; manual UAT
 
 ### Purpose
 
@@ -166,6 +172,8 @@ Expected result: if the linked invoice is a draft, the app asks whether to regen
 
 ## Cancelling A Gig With A Linked Invoice
 
+> **Automation:** Backend automated; manual UAT
+
 ### Steps
 
 1. Start with a gig linked to an invoice.
@@ -178,6 +186,8 @@ Expected result: if the linked invoice is a draft, the app asks whether to regen
 The app asks whether to cancel the linked invoice. If accepted and the invoice status allows cancellation, the invoice moves to `Cancelled`. If declined, the gig is cancelled but the invoice remains unchanged.
 
 ## Deleting A Gig
+
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.DeleteGig_WhenPlanned_DeletesGig`, `DeleteGig_WhenNotPlanned_ReturnsValidationProblem`, and `DeleteGig_WhenLinkedToInvoice_ReturnsValidationProblem`
 
 ### Positive Check
 
@@ -200,6 +210,8 @@ Expected result: the planned, uninvoiced gig is removed from the list and cannot
 Expected result: only planned gigs with no linked invoice can be deleted. Linked invoice history is never removed by deleting a gig.
 
 ## Cloning A Gig
+
+> **Automation:** Manual UAT
 
 ### Without Expenses
 
@@ -226,7 +238,7 @@ Expected result: expenses are copied only when accepted, receipt attachments are
 
 ## Combined Invoice Journey
 
-> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
 
 ### Steps
 
@@ -249,6 +261,8 @@ Expected result: the app blocks generation and explains that selected gigs must 
 
 ## Imported Gig Review Smoke Check
 
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigImportEndpointsTests` covers commit rules; modal entry, autosave, and notification dots remain manual.
+
 Run the focused [Imported gigs](gig-imports.md) journey when the change touches MCP, gigs, or profile-menu workflows. For broad pre-merge smoke, at minimum:
 
 1. Open the profile menu.
@@ -261,7 +275,7 @@ Expected result: imported gigs stay in a modal launched from the profile menu, r
 
 ## Monthly Invoice Journey
 
-> **Automation:** Automated: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateMonthlyInvoiceForEligibleClientGigs`
 
 ### Steps
 

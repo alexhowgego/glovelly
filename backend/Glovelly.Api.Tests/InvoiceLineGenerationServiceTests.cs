@@ -47,7 +47,7 @@ public sealed class InvoiceLineGenerationServiceTests
             DueDate = new DateOnly(2026, 6, 15),
             CreatedByUserId = TestAuthContext.UserId,
         });
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var gig = new Gig
         {
@@ -71,7 +71,7 @@ public sealed class InvoiceLineGenerationServiceTests
                 DefaultPassengerMileageRate = 0.20m,
             }));
 
-        var lines = await service.BuildGeneratedInvoiceLinesForGigAsync(gig, TestAuthContext.UserId);
+        var lines = await service.BuildGeneratedInvoiceLinesForGigAsync(gig, TestAuthContext.UserId, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, lines.Count);
         Assert.Equal(InvoiceLineType.Mileage, lines[0].Type);

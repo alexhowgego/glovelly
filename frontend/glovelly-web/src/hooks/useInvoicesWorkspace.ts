@@ -1,7 +1,10 @@
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import {
   buildApiUrl,
+  downloadResponseBlob,
   fetchWithSession,
+  getProblemDetailsMessage,
+  jsonRequestInit,
   parseProblemDetails,
 } from '../api'
 import { defaultInvoiceStatus } from '../forms'
@@ -23,29 +26,6 @@ type GoogleDrivePublishResponse = {
 type UseInvoicesWorkspaceOptions = {
   clientNamesById: ReadonlyMap<string, string>
   onInvoiceDeleted: (invoice: Invoice) => void
-}
-
-function extractDownloadFilename(contentDisposition: string | null) {
-  if (!contentDisposition) {
-    return null
-  }
-
-  const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (encodedMatch?.[1]) {
-    try {
-      return decodeURIComponent(encodedMatch[1])
-    } catch {
-      return encodedMatch[1]
-    }
-  }
-
-  const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i)
-  if (quotedMatch?.[1]) {
-    return quotedMatch[1]
-  }
-
-  const plainMatch = contentDisposition.match(/filename=([^;]+)/i)
-  return plainMatch?.[1]?.trim() ?? null
 }
 
 export function useInvoicesWorkspace({
@@ -144,17 +124,8 @@ export function useInvoicesWorkspace({
         throw new Error('Unable to download the invoice PDF.')
       }
 
-      const contentDisposition = response.headers.get('Content-Disposition')
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = downloadUrl
-      link.download = extractDownloadFilename(contentDisposition) ?? fallbackFilename
-      document.body.append(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(downloadUrl)
-      setInvoiceStatus(`Downloaded ${link.download}.`)
+      const filename = await downloadResponseBlob(response, fallbackFilename)
+      setInvoiceStatus(`Downloaded ${filename}.`)
     } catch (error) {
       setInvoiceStatus(
         error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
@@ -173,18 +144,17 @@ export function useInvoicesWorkspace({
     setInvoiceStatus(`Updating ${invoice.invoiceNumber} to ${status}...`)
 
     try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/status`), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      })
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/status`),
+        jsonRequestInit('PUT', { status })
+      )
 
       if (!response.ok) {
         const problem = await parseProblemDetails(response)
         const fieldError = problem?.errors?.status?.[0]
-        throw new Error(fieldError ?? problem?.detail ?? problem?.title ?? 'Unable to update status.')
+        throw new Error(
+          fieldError ?? getProblemDetailsMessage(problem, 'Unable to update status.')
+        )
       }
 
       const updatedInvoice = (await response.json()) as Invoice
@@ -230,9 +200,10 @@ export function useInvoicesWorkspace({
         throw new Error(
           fieldError ??
             statusError ??
-            problem?.detail ??
-            problem?.title ??
-            `Unable to ${actionLabel.toLowerCase()} invoice.`
+            getProblemDetailsMessage(
+              problem,
+              `Unable to ${actionLabel.toLowerCase()} invoice.`
+            )
         )
       }
 
@@ -274,16 +245,13 @@ export function useInvoicesWorkspace({
     setInvoiceStatus(`Sending ${invoice.invoiceNumber} to client...`)
 
     try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/send-email`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/send-email`),
+        jsonRequestInit('POST', {
           message: message.trim() || null,
           includeReceipts,
-        }),
-      })
+        })
+      )
 
       if (!response.ok) {
         const problem = await parseProblemDetails(response)
@@ -294,9 +262,7 @@ export function useInvoicesWorkspace({
           recipientError ??
             pdfError ??
             attachmentError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to send invoice email.'
+            getProblemDetailsMessage(problem, 'Unable to send invoice email.')
         )
       }
 
@@ -343,9 +309,7 @@ export function useInvoicesWorkspace({
         throw new Error(
           folderError ??
             pdfError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to publish invoice to Google Drive.'
+            getProblemDetailsMessage(problem, 'Unable to publish invoice to Google Drive.')
         )
       }
 
@@ -395,16 +359,13 @@ export function useInvoicesWorkspace({
     setInvoiceStatus(`Saving adjustment on ${invoice.invoiceNumber}...`)
 
     try {
-      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/adjustments`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/adjustments`),
+        jsonRequestInit('POST', {
           amount,
           reason,
-        }),
-      })
+        })
+      )
 
       if (!response.ok) {
         const problem = await parseProblemDetails(response)
@@ -413,9 +374,7 @@ export function useInvoicesWorkspace({
         throw new Error(
           amountError ??
             reasonError ??
-            problem?.detail ??
-            problem?.title ??
-            'Unable to add invoice adjustment.'
+            getProblemDetailsMessage(problem, 'Unable to add invoice adjustment.')
         )
       }
 
@@ -461,7 +420,7 @@ export function useInvoicesWorkspace({
         const problem = await parseProblemDetails(response)
         const statusError = problem?.errors?.status?.[0]
         throw new Error(
-          statusError ?? problem?.detail ?? problem?.title ?? 'Unable to delete invoice.'
+          statusError ?? getProblemDetailsMessage(problem, 'Unable to delete invoice.')
         )
       }
 

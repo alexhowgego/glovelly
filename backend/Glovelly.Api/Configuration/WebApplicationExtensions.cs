@@ -19,7 +19,7 @@ internal static class WebApplicationExtensions
         {
             var attachmentStore = scope.ServiceProvider.GetRequiredService<IExpenseAttachmentStore>();
             var blobStore = scope.ServiceProvider.GetRequiredService<IBlobStore>();
-            await AppDbSeeder.SeedAsync(dbContext, configuration, attachmentStore, blobStore);
+            await DevelopmentDataSeeder.SeedAsync(dbContext, configuration, attachmentStore, blobStore);
         }
         else
         {
@@ -28,7 +28,7 @@ internal static class WebApplicationExtensions
 
         if (shouldSeedUatData)
         {
-            await AppDbSeeder.SeedUatRegressionDataAsync(dbContext);
+            await UatRegressionDataSeeder.SeedAsync(dbContext);
         }
     }
 
