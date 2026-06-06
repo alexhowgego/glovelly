@@ -135,26 +135,37 @@ export function InvoicesSection({
             </article>
           </div>
 
-          <div className="client-list">
+          <div className="compact-record-list invoice-record-list" aria-label="Invoices">
+            <div className="compact-record-header invoice-record-row">
+              <span>Invoice</span>
+              <span>Client</span>
+              <span>Date</span>
+              <span>Due</span>
+              <span>Status</span>
+              <span>Total</span>
+            </div>
             {filteredInvoices.map((invoice) => {
               const clientName = clientNamesById.get(invoice.clientId) ?? 'Unknown client'
 
               return (
                 <button
                   key={invoice.id}
-                  className={`client-card ${selectedInvoice?.id === invoice.id ? 'selected' : ''}`}
+                  className={`compact-record-row invoice-record-row ${selectedInvoice?.id === invoice.id ? 'selected' : ''}`}
                   data-testid="invoice-card"
                   onClick={() => onSelectInvoice(invoice.id)}
                   type="button"
                 >
-                  <div>
+                  <div className="compact-primary-cell">
                     <strong>{invoice.invoiceNumber}</strong>
                     <span>{clientName}</span>
                   </div>
-                  <small className="gig-card-meta">
-                    {formatDate(invoice.invoiceDate)} · {invoice.status}
-                  </small>
-                  <small className="gig-card-meta">{formatCurrency(invoice.total)}</small>
+                  <span>{clientName}</span>
+                  <span>{formatDate(invoice.invoiceDate)}</span>
+                  <span>{formatDate(invoice.dueDate)}</span>
+                  <span className="compact-status-cell">{invoice.status}</span>
+                  <span className="compact-money-cell">
+                    {formatCurrency(invoice.total)}
+                  </span>
                 </button>
               )
             })}

@@ -163,7 +163,16 @@ export function GigsSection({
             </article>
           </div>
 
-          <div className="client-list">
+          <div className="compact-record-list gig-record-list" aria-label="Gigs">
+            <div className="compact-record-header gig-record-row">
+              <span title="Select gigs" aria-label="Select gigs" />
+              <span>Gig</span>
+              <span>Client</span>
+              <span>Date</span>
+              <span>Venue</span>
+              <span>Fee</span>
+              <span>Status</span>
+            </div>
             {filteredGigs.map((gig) => {
               const clientName = clientNamesById.get(gig.clientId) ?? 'Unknown client'
               const isDifferentSelectedClient =
@@ -171,43 +180,44 @@ export function GigsSection({
                 selectedClientId !== gig.clientId &&
                 !selectedGigIds.includes(gig.id)
               const isSelectionDisabled = isDifferentSelectedClient
+              const selectionLabel = gig.isInvoiced
+                ? 'Invoiced gig'
+                : isDifferentSelectedClient
+                  ? 'Different client'
+                  : 'Select gig'
 
               return (
                 <button
                   key={gig.id}
-                  className={`client-card ${selectedGig?.id === gig.id ? 'selected' : ''}`}
+                  className={`compact-record-row gig-record-row ${selectedGig?.id === gig.id ? 'selected' : ''}`}
                   data-testid="gig-card"
                   onClick={() => onSelectGig(gig.id)}
                   type="button"
                 >
                   <label
-                    className="gig-select-toggle"
+                    className="compact-select-toggle gig-select-toggle"
                     onClick={(event) => event.stopPropagation()}
+                    title={selectionLabel}
                   >
                     <input
                       type="checkbox"
+                      aria-label={selectionLabel}
                       checked={selectedGigIds.includes(gig.id)}
                       disabled={isSelectionDisabled}
                       onChange={() => onToggleGigSelection(gig.id)}
                     />
-                    <span>
-                      {gig.isInvoiced
-                        ? 'Invoiced'
-                        : isDifferentSelectedClient
-                          ? 'Different client'
-                          : 'Select'}
-                    </span>
                   </label>
-                  <div>
+                  <div className="compact-primary-cell">
                     <strong>{gig.title}</strong>
                     <span>{clientName}</span>
                   </div>
-                  <small className="gig-card-meta">
-                    {formatDate(gig.date)} · {gig.venue}
-                  </small>
-                  <small className="gig-card-meta">
-                    {formatCurrency(gig.fee)} · {formatGigStatus(gig.status)}
-                  </small>
+                  <span>{clientName}</span>
+                  <span>{formatDate(gig.date)}</span>
+                  <span>{gig.venue || 'No venue set'}</span>
+                  <span>{formatCurrency(gig.fee)}</span>
+                  <span className="compact-status-cell">
+                    {formatGigStatus(gig.status)}
+                  </span>
                 </button>
               )
             })}

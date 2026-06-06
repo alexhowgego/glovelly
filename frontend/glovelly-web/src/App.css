@@ -1238,6 +1238,136 @@
   contain-intrinsic-size: 500px;
 }
 
+.compact-record-list {
+  display: grid;
+  align-content: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 0;
+  max-height: min(62svh, 720px);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+  border-radius: 18px;
+  background: var(--surface-elevated);
+}
+
+.compact-record-row {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: grid;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-border) 74%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.compact-record-row:last-child {
+  border-bottom: 0;
+}
+
+.gig-record-row {
+  grid-template-columns:
+    28px
+    minmax(0, 1.45fr)
+    minmax(0, 0.95fr)
+    minmax(0, 0.72fr)
+    minmax(0, 1fr)
+    minmax(0, 0.65fr)
+    minmax(0, 0.75fr);
+}
+
+.invoice-record-row {
+  grid-template-columns:
+    minmax(0, 1.25fr)
+    minmax(0, 1fr)
+    minmax(0, 0.72fr)
+    minmax(0, 0.72fr)
+    minmax(0, 0.7fr)
+    minmax(0, 0.7fr);
+}
+
+.compact-record-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--surface-subtle) 92%, var(--surface-elevated));
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+button.compact-record-row {
+  min-height: 50px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+button.compact-record-row:hover,
+button.compact-record-row:focus-visible,
+button.compact-record-row.selected {
+  background: var(--surface-accent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, #f47d2a 72%, var(--surface-border));
+}
+
+.compact-record-row strong,
+.compact-record-row span,
+.compact-record-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-record-row strong {
+  color: var(--heading);
+}
+
+.compact-record-row span,
+.compact-record-row small {
+  color: var(--muted);
+}
+
+.compact-record-row .compact-status-cell {
+  color: var(--heading);
+  font-weight: 700;
+}
+
+.compact-money-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-primary-cell {
+  display: grid;
+  gap: 2px;
+}
+
+.compact-primary-cell span {
+  display: none;
+}
+
+.compact-select-toggle {
+  min-width: 0;
+  overflow: hidden;
+  justify-self: center;
+}
+
 .client-card {
   text-align: left;
   border: 1px solid var(--surface-border);
@@ -1636,7 +1766,8 @@
 .primary-button,
 .ghost-button,
 .danger-button,
-.client-card {
+.client-card,
+.compact-record-row {
   font: inherit;
 }
 
@@ -1836,6 +1967,39 @@ button:disabled {
 
   .status-pill {
     border-radius: 16px;
+  }
+
+  .compact-record-list {
+    max-height: 52svh;
+    border-radius: 16px;
+  }
+
+  .compact-record-header {
+    display: none;
+  }
+
+  .compact-record-row,
+  .gig-record-row,
+  .invoice-record-row {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  button.compact-record-row {
+    min-height: 0;
+    padding: 12px 14px;
+  }
+
+  .compact-primary-cell span {
+    display: block;
+  }
+
+  .gig-record-row .compact-select-toggle {
+    margin-bottom: 2px;
+  }
+
+  .compact-money-cell {
+    text-align: left;
   }
 
   .content-header-top {
