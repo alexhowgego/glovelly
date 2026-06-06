@@ -34,6 +34,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
         string gigDate,
         string fee = "125.00",
         string venue = "UAT Invoice Hall",
+        string status = "Confirmed",
         bool wasDriving = false,
         string travelMiles = "0",
         string passengerCount = "0",
@@ -52,6 +53,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
         await Page.GetByTestId("gig-title-input").FillAsync(gigTitle);
         await Page.GetByTestId("gig-venue-input").FillAsync(venue);
         await Page.GetByTestId("gig-fee-input").FillAsync(fee);
+        await Page.GetByTestId("gig-status-select").SelectOptionAsync(status);
 
         if (wasDriving)
         {

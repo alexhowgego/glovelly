@@ -320,7 +320,7 @@ export function GigsSection({
                 </article>
                 <article>
                   <p className="detail-label">Status</p>
-                  <strong>{formatGigStatus(selectedGig.status)}</strong>
+                  <strong data-testid="selected-gig-status">{formatGigStatus(selectedGig.status)}</strong>
                 </article>
                 <article>
                   <p className="detail-label">Date</p>
@@ -473,6 +473,7 @@ export function GigsSection({
               <label>
                 <span>Status</span>
                 <select
+                  data-testid="gig-status-select"
                   value={gigForm.status}
                   onChange={(event) =>
                     onUpdateGigField('status', event.target.value as GigStatus)

@@ -290,7 +290,7 @@ export function AppShell({
 
             <div className="content-header-aside">
               <div className="dashboard-summary" aria-label="Dashboard summary">
-                <article className="dashboard-card outstanding-card">
+                <article className="dashboard-card outstanding-card" data-testid="dashboard-outstanding-balance">
                   <p className="section-label">Outstanding balance</p>
                   <strong>{dashboardSummary.outstandingBalanceLabel}</strong>
                   <span>
@@ -300,7 +300,7 @@ export function AppShell({
                   </span>
                 </article>
 
-                <article className="dashboard-card">
+                <article className="dashboard-card" data-testid="dashboard-next-gig">
                   <p className="section-label">Next gig</p>
                   {dashboardSummary.nextGig ? (
                     <>
@@ -311,6 +311,7 @@ export function AppShell({
                       <span>{dashboardSummary.nextGig.venue}</span>
                       <button
                         className="ghost-button compact-action"
+                        data-testid="dashboard-open-next-gig-button"
                         onClick={onOpenNextGig}
                         type="button"
                       >
@@ -322,7 +323,7 @@ export function AppShell({
                   )}
                 </article>
 
-                <article className="dashboard-card invoice-action-card">
+                <article className="dashboard-card invoice-action-card" data-testid="dashboard-invoice-prompt">
                   <p className="section-label">Invoice prompt</p>
                   {dashboardSummary.invoiceCandidate ? (
                     <>
@@ -334,6 +335,7 @@ export function AppShell({
                       <span>{dashboardSummary.invoiceCandidate.feeLabel}</span>
                       <button
                         className="primary-button compact-action"
+                        data-testid="dashboard-generate-invoice-button"
                         disabled={isLoading || isInvoiceLoading}
                         onClick={onGenerateDashboardInvoice}
                         type="button"

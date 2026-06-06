@@ -40,7 +40,7 @@ Navigation, session state, and core reads are healthy.
 
 ## Dashboard Summary
 
-> **Automation:** Manual UAT
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.DashboardSummaryTests.DashboardHighlightsNextGigOutstandingBalanceAndInvoicePrompt`; manual balance edge-case spot checks remain useful when paid, cancelled, issued, and overdue invoices already exist together.
 
 ### Steps
 
