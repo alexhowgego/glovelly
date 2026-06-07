@@ -25,6 +25,8 @@ import type {
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
+  GigQuickFilter,
+  GigSort,
   Invoice,
 } from '../types'
 import { useExpenseStatementWorkspace } from './useExpenseStatementWorkspace'
@@ -59,6 +61,8 @@ export function useGigsWorkspace({
   const [selectedGigId, setSelectedGigId] = useState<string>('')
   const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
   const [gigSearchQuery, setGigSearchQuery] = useState('')
+  const [gigQuickFilter, setGigQuickFilter] = useState<GigQuickFilter>('all')
+  const [gigSort, setGigSort] = useState<GigSort>({ key: 'priority', direction: 'asc' })
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
@@ -73,20 +77,105 @@ export function useGigsWorkspace({
 
   const filteredGigs = useMemo(() => {
     const query = deferredGigSearchQuery.trim().toLowerCase()
+    const today = new Date().toISOString().slice(0, 10)
+    const sortDirection = gigSort.direction === 'asc' ? 1 : -1
+    const compareText = (left: string, right: string) => left.localeCompare(right)
+    const compareNumber = (left: number, right: number) => left - right
+    const getClientName = (gig: Gig) => clientNamesById.get(gig.clientId) ?? ''
+    const getPriorityBucket = (gig: Gig) => {
+      if (gig.status === 'Cancelled') {
+        return 5
+      }
+
+      if (gig.status === 'Confirmed' && gig.date >= today) {
+        return 0
+      }
+
+      if (gig.status === 'Completed' && !gig.isInvoiced && gig.date <= today) {
+        return 1
+      }
+
+      if (gig.status === 'Confirmed' && !gig.isInvoiced && gig.date < today) {
+        return 2
+      }
+
+      if (gig.status === 'Draft') {
+        return 3
+      }
+
+      return 4
+    }
+    const comparePriority = (left: Gig, right: Gig) => {
+      const bucketComparison = getPriorityBucket(left) - getPriorityBucket(right)
+      if (bucketComparison !== 0) {
+        return bucketComparison
+      }
+
+      const bucket = getPriorityBucket(left)
+      if (bucket === 0) {
+        return compareText(left.date, right.date)
+      }
+
+      return compareText(right.date, left.date)
+    }
+    const compareByKey = (left: Gig, right: Gig) => {
+      switch (gigSort.key) {
+        case 'client':
+          return compareText(getClientName(left), getClientName(right))
+        case 'fee':
+          return compareNumber(left.fee, right.fee)
+        case 'status':
+          return compareText(left.status, right.status)
+        case 'title':
+          return compareText(left.title, right.title)
+        case 'venue':
+          return compareText(left.venue, right.venue)
+        case 'priority':
+          return comparePriority(left, right)
+        case 'date':
+        default:
+          return compareText(left.date, right.date)
+      }
+    }
     const sortedGigs = [...gigs].sort((left, right) => {
-      const dateComparison = right.date.localeCompare(left.date)
+      const primaryComparison = compareByKey(left, right)
+      if (primaryComparison !== 0) {
+        return primaryComparison * sortDirection
+      }
+
+      const dateComparison = left.date.localeCompare(right.date)
       if (dateComparison !== 0) {
         return dateComparison
       }
 
-      return left.title.localeCompare(right.title)
+      const titleComparison = left.title.localeCompare(right.title)
+      if (titleComparison !== 0) {
+        return titleComparison
+      }
+
+      return left.id.localeCompare(right.id)
+    })
+    const quickFilteredGigs = sortedGigs.filter((gig) => {
+      switch (gigQuickFilter) {
+        case 'completed':
+          return gig.status === 'Completed'
+        case 'drafts':
+          return gig.status === 'Draft'
+        case 'uninvoiced':
+          return !gig.isInvoiced && gig.status !== 'Cancelled'
+        case 'upcoming':
+          return gig.status !== 'Cancelled' && gig.date >= today
+        case 'all':
+        default:
+          return true
+      }
     })
 
     if (!query) {
-      return sortedGigs
+      return quickFilteredGigs
     }
 
-    return sortedGigs.filter((gig) => {
+    return quickFilteredGigs.filter((gig) => {
       const clientName = clientNamesById.get(gig.clientId) ?? ''
 
       return [gig.title, gig.venue, gig.date, gig.status, clientName]
@@ -94,7 +183,7 @@ export function useGigsWorkspace({
         .toLowerCase()
         .includes(query)
     })
-  }, [clientNamesById, deferredGigSearchQuery, gigs])
+  }, [clientNamesById, deferredGigSearchQuery, gigQuickFilter, gigSort, gigs])
 
   const selectedGig = gigsById.get(selectedGigId) ?? filteredGigs[0] ?? null
 
@@ -178,6 +267,8 @@ export function useGigsWorkspace({
     setSelectedGigId('')
     setSelectedGigIds([])
     setGigSearchQuery('')
+    setGigQuickFilter('all')
+    setGigSort({ key: 'priority', direction: 'asc' })
     setIsGigEditorOpen(false)
     setGigMode('create')
     setGigForm(emptyGigForm())
@@ -339,6 +430,13 @@ export function useGigsWorkspace({
   }
 
   const closeGigEditor = () => {
+    if (
+      hasUnsavedGigEditorChanges() &&
+      !window.confirm('Discard unsaved gig changes and close the editor?')
+    ) {
+      return
+    }
+
     setIsGigEditorOpen(false)
     setGigMode('create')
     setGigForm(toCreateGigForm(clients))
@@ -1043,7 +1141,9 @@ export function useGigsWorkspace({
     gigExpenseDescription,
     gigForm,
     gigMode,
+    gigQuickFilter,
     gigSearchQuery,
+    gigSort,
     gigStatus,
     gigs,
     gigsById,
@@ -1070,7 +1170,9 @@ export function useGigsWorkspace({
     setGigExpenseAmount,
     setGigExpenseDescription,
     setGigs,
+    setGigQuickFilter,
     setGigSearchQuery,
+    setGigSort,
     setGigStatus,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,

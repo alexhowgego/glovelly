@@ -47,8 +47,8 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
             await AssertInvoiceLineCountAsync(adjustmentReason, 1);
 
             await OpenGigAsync(gigTitle);
-            await Page.GetByTestId("gig-edit-button").ClickAsync();
-            await SetExpenseReimbursementAsync(0, "Reimbursed");
+            await EnsureGigEditorOpenAsync();
+            await SetExpenseReimbursementAsync(reimbursedExpense, "Reimbursed");
 
             await OpenLinkedInvoiceFromGigAsync();
             await OpenInvoiceLinesAsync();
@@ -58,8 +58,8 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
             await AssertInvoiceLineTypeCountAsync("PerformanceFee", 1);
 
             await OpenGigAsync(gigTitle);
-            await Page.GetByTestId("gig-edit-button").ClickAsync();
-            await SetExpenseReimbursementAsync(0, "Unreimbursed");
+            await EnsureGigEditorOpenAsync();
+            await SetExpenseReimbursementAsync(reimbursedExpense, "Unreimbursed");
 
             await OpenLinkedInvoiceFromGigAsync();
             await OpenInvoiceLinesAsync();
@@ -67,7 +67,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
             await AssertInvoiceLineCountAsync(adjustmentReason, 1);
 
             await OpenGigAsync(gigTitle);
-            await Page.GetByTestId("gig-edit-button").ClickAsync();
+            await EnsureGigEditorOpenAsync();
             await Page.GetByTestId("gig-driving-checkbox").UncheckAsync();
             await SaveGigAndAcceptLinkedRedraftAsync();
 
@@ -78,7 +78,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
             await AssertInvoiceLineTypeCountAsync("PerformanceFee", 1);
 
             await OpenGigAsync(gigTitle);
-            await Page.GetByTestId("gig-edit-button").ClickAsync();
+            await EnsureGigEditorOpenAsync();
             await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
             await Assertions.Expect(Page.GetByTestId("gig-travel-miles-input")).ToHaveValueAsync("18");
             await Assertions.Expect(Page.GetByTestId("gig-passenger-count-input")).ToHaveValueAsync("1");
@@ -136,7 +136,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                     DateTime.UtcNow.AddDays(51).ToString("yyyy-MM-dd"),
                     venue: "Bristol Beacon, Bristol");
                 await OpenGigAsync(estimatedGigTitle);
-                await Page.GetByTestId("gig-edit-button").ClickAsync();
+                await EnsureGigEditorOpenAsync();
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();
                 await Assertions.Expect(Page.GetByTestId("gig-travel-miles-input")).Not.ToHaveValueAsync(string.Empty, new LocatorAssertionsToHaveValueOptions
@@ -157,7 +157,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                     DateTime.UtcNow.AddDays(52).ToString("yyyy-MM-dd"),
                     venue: "The Moon");
                 await OpenGigAsync(fallbackGigTitle);
-                await Page.GetByTestId("gig-edit-button").ClickAsync();
+                await EnsureGigEditorOpenAsync();
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();
                 await ExpectGigStatusContainsAnyAsync("unable", "route", "estimate", "address not found");
@@ -176,7 +176,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                     DateTime.UtcNow.AddDays(53).ToString("yyyy-MM-dd"),
                     venue: "Bristol Beacon, Bristol");
                 await OpenGigAsync(originRequiredGigTitle);
-                await Page.GetByTestId("gig-edit-button").ClickAsync();
+                await EnsureGigEditorOpenAsync();
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-travel-miles-input").FillAsync("12");
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();
@@ -229,14 +229,17 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         Assert.Fail($"Expected gig status to contain one of [{string.Join(", ", expectedFragments)}], but was '{lastStatus}'.");
     }
 
-    private async Task SetExpenseReimbursementAsync(int expenseIndex, string status)
+    private async Task SetExpenseReimbursementAsync(string expenseDescription, string status)
     {
         Page.Dialog += AcceptReimbursementDialogs;
         try
         {
-            await ExpenseRowAt(expenseIndex)
-                .GetByTestId("gig-expense-reimbursement-select")
-                .SelectOptionAsync(new[] { status });
+            var expenseRow = await ExpenseRowForDescriptionAsync(expenseDescription);
+            var redraftResponse = await RunAndWaitForInvoiceRedraftAsync(
+                async () => await expenseRow.GetByTestId("gig-expense-reimbursement-select")
+                    .SelectOptionAsync(new[] { status }));
+
+            AssertRedraftSucceeded(redraftResponse);
             await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
         }
         finally
@@ -256,12 +259,38 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         }
     }
 
+    private async Task<ILocator> ExpenseRowForDescriptionAsync(string expenseDescription)
+    {
+        var rows = Page.GetByTestId("gig-expense-item");
+        await Assertions.Expect(rows.First).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
+        {
+            Timeout = 30_000,
+        });
+
+        var rowCount = await rows.CountAsync();
+        for (var index = 0; index < rowCount; index++)
+        {
+            var row = rows.Nth(index);
+            var descriptionInput = row.Locator("input").First;
+            if (await descriptionInput.InputValueAsync() == expenseDescription)
+            {
+                return row;
+            }
+        }
+
+        Assert.Fail($"Expected to find gig expense row with description '{expenseDescription}'.");
+        throw new InvalidOperationException($"Expected to find gig expense row with description '{expenseDescription}'.");
+    }
+
     private async Task SaveGigAndAcceptLinkedRedraftAsync()
     {
         Page.Dialog += AcceptLinkedRedraftDialog;
         try
         {
-            await Page.GetByTestId("gig-save-close-button").ClickAsync();
+            var redraftResponse = await RunAndWaitForInvoiceRedraftAsync(
+                async () => await Page.GetByTestId("gig-save-close-button").ClickAsync());
+
+            AssertRedraftSucceeded(redraftResponse);
             await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
         }
         finally
@@ -277,6 +306,24 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 _ => dialog.DismissAsync(),
             };
         }
+    }
+
+    private Task<IResponse> RunAndWaitForInvoiceRedraftAsync(Func<Task> action) =>
+        Page.RunAndWaitForResponseAsync(
+            action,
+            response =>
+            {
+                var path = new Uri(response.Url).AbsolutePath;
+
+                return response.Request.Method == "POST" &&
+                    path.StartsWith("/invoices/", StringComparison.Ordinal) &&
+                    path.EndsWith("/redraft", StringComparison.Ordinal);
+            },
+            new PageRunAndWaitForResponseOptions { Timeout = 30_000 });
+
+    private static void AssertRedraftSucceeded(IResponse redraftResponse)
+    {
+        Assert.True(redraftResponse.Ok, $"Expected invoice redraft to succeed, got HTTP {redraftResponse.Status} for {redraftResponse.Url}.");
     }
 
     private async Task SaveUserMileageSettingsViaUiAsync(string mileageRate, string passengerMileageRate, string travelOriginPostcode)

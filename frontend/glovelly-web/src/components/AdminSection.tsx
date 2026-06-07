@@ -1,12 +1,16 @@
+import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { formatDateTime } from '../formatters'
-import type { AdminUser, AdminUserForm } from '../types'
+import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
+import type { AdminSort, AdminSortKey, AdminUser, AdminUserForm } from '../types'
 
 type AdminSectionProps = {
   adminForm: AdminUserForm
   isEditorOpen: boolean
   adminMode: 'create' | 'edit'
   adminSearchQuery: string
+  adminSort: AdminSort
   adminStatus: string
   adminUsers: AdminUser[]
   activeUsersCount: number
@@ -17,6 +21,7 @@ type AdminSectionProps = {
   onResetForm: () => void
   onSearchQueryChange: (value: string) => void
   onSelectUser: (userId: string) => void
+  onSortChange: (sort: AdminSort) => void
   onStartEditing: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onUpdateField: (field: keyof AdminUserForm, value: string | boolean) => void
@@ -29,6 +34,7 @@ export function AdminSection({
   isEditorOpen,
   adminMode,
   adminSearchQuery,
+  adminSort,
   adminStatus,
   adminUsers,
   activeUsersCount,
@@ -39,12 +45,37 @@ export function AdminSection({
   onResetForm,
   onSearchQueryChange,
   onSelectUser,
+  onSortChange,
   onStartEditing,
   onSubmit,
   onUpdateField,
   selectedAdminUser,
   totalAdmins,
 }: AdminSectionProps) {
+  const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
+  const workspaceStyle = detailPanelBlockSize > 0
+    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
+    : undefined
+  const adminSortOptions: { value: AdminSortKey; label: string }[] = [
+    { value: 'displayName', label: 'User' },
+    { value: 'email', label: 'Email' },
+    { value: 'role', label: 'Role' },
+    { value: 'access', label: 'Access' },
+    { value: 'enrolment', label: 'Sign-in' },
+    { value: 'lastLogin', label: 'Last login' },
+  ]
+
+  useEffect(() => {
+    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
+      return
+    }
+
+    window.setTimeout(() => {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [isEditorOpen])
+
   return (
     <section className="section-layout admin-zone">
       <div className="admin-banner panel">
@@ -72,7 +103,7 @@ export function AdminSection({
         </div>
       </div>
 
-      <div className="admin-workspace">
+      <div className="admin-workspace" style={workspaceStyle}>
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -84,32 +115,78 @@ export function AdminSection({
             </button>
           </div>
 
-          <label className="search-field">
-            <span>Search</span>
-            <input
-              type="search"
-              placeholder="Name, email, role..."
-              value={adminSearchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-            />
-          </label>
+          <div className="compact-list-controls" aria-label="Admin user list controls">
+            <div className="compact-list-main-controls">
+              <label className="search-field compact-search-field">
+                <span>Search</span>
+                <input
+                  type="search"
+                  placeholder="Name, email, role..."
+                  value={adminSearchQuery}
+                  onChange={(event) => onSearchQueryChange(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Sort by</span>
+                <select
+                  value={adminSort.key}
+                  onChange={(event) =>
+                    onSortChange({ ...adminSort, key: event.target.value as AdminSortKey })
+                  }
+                >
+                  {adminSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="compact-sort-direction"
+                type="button"
+                aria-label={
+                  adminSort.direction === 'asc'
+                    ? 'Sort ascending. Click to sort descending.'
+                    : 'Sort descending. Click to sort ascending.'
+                }
+                title={adminSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+                onClick={() =>
+                  onSortChange({
+                    ...adminSort,
+                    direction: adminSort.direction === 'asc' ? 'desc' : 'asc',
+                  })
+                }
+              >
+                {adminSort.direction === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+          </div>
 
-          <div className="client-list">
+          <div className="compact-record-list admin-record-list" aria-label="People with access">
+            <div className="compact-record-header admin-record-row">
+              <span>User</span>
+              <span>Email</span>
+              <span>Role</span>
+              <span>Access</span>
+              <span>Sign-in</span>
+              <span>Last login</span>
+            </div>
             {filteredAdminUsers.map((user) => (
               <button
                 key={user.id}
-                className={`client-card ${selectedAdminUser?.id === user.id ? 'selected' : ''}`}
+                className={`compact-record-row admin-record-row ${selectedAdminUser?.id === user.id ? 'selected' : ''}`}
                 onClick={() => onSelectUser(user.id)}
                 type="button"
               >
-                <div>
+                <div className="compact-primary-cell">
                   <strong>{user.displayName || user.email}</strong>
                   <span>{user.email}</span>
                 </div>
-                <small>
-                  {user.role} · {user.isActive ? 'Active' : 'Inactive'} ·{' '}
-                  {user.isEnrolled ? 'Bound' : 'Invited'}
-                </small>
+                <span>{user.email}</span>
+                <span className="compact-status-cell">{user.role}</span>
+                <span>{user.isActive ? 'Active' : 'Inactive'}</span>
+                <span>{user.isEnrolled ? 'Bound' : 'Invited'}</span>
+                <span>{formatDateTime(user.lastLoginUtc)}</span>
               </button>
             ))}
 
@@ -122,7 +199,7 @@ export function AdminSection({
           </div>
         </div>
 
-        <div className="panel">
+        <div ref={detailPanelRef} className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Access Overview</p>
@@ -134,10 +211,11 @@ export function AdminSection({
             </div>
             <div className="actions">
               <button
-                className="ghost-button"
-                onClick={onStartEditing}
+                className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
+                onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
                 disabled={!selectedAdminUser}
+                aria-expanded={isEditorOpen}
               >
                 Edit access
               </button>
@@ -200,7 +278,7 @@ export function AdminSection({
           )}
         </div>
 
-        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
           <form
             aria-hidden={!isEditorOpen}
             className="editor-panel panel"

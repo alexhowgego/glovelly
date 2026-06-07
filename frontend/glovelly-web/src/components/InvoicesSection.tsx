@@ -1,10 +1,19 @@
+import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import {
   formatCurrency,
   formatDate,
   formatDateTime,
   getAllowedInvoiceStatusTransitions,
 } from '../formatters'
-import type { Invoice, InvoiceStatus } from '../types'
+import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
+import type {
+  Invoice,
+  InvoiceQuickFilter,
+  InvoiceSort,
+  InvoiceSortKey,
+  InvoiceStatus,
+} from '../types'
 
 type InvoicesSectionProps = {
   adjustmentAmount: string
@@ -14,7 +23,9 @@ type InvoicesSectionProps = {
   filteredInvoices: Invoice[]
   googleDrivePublishLink: { href: string; fileName: string | null } | null
   isEditorOpen: boolean
+  invoiceQuickFilter: InvoiceQuickFilter
   invoiceSearchQuery: string
+  invoiceSort: InvoiceSort
   invoiceStatus: string
   invoices: Invoice[]
   issuedInvoiceCount: number
@@ -35,8 +46,10 @@ type InvoicesSectionProps = {
   onPublishGoogleDrive: (invoice: Invoice) => Promise<Invoice | null>
   onReissue: (invoice: Invoice) => Promise<Invoice | null>
   onSendEmail: (invoice: Invoice) => Promise<Invoice | null>
+  onQuickFilterChange: (filter: InvoiceQuickFilter) => void
   onSearchQueryChange: (value: string) => void
   onSelectInvoice: (invoiceId: string) => void
+  onSortChange: (sort: InvoiceSort) => void
   onStartEditing: () => void
   sellerProfileNotice: string
   selectedInvoice: Invoice | null
@@ -50,7 +63,9 @@ export function InvoicesSection({
   filteredInvoices,
   googleDrivePublishLink,
   isEditorOpen,
+  invoiceQuickFilter,
   invoiceSearchQuery,
+  invoiceSort,
   invoiceStatus,
   invoices,
   issuedInvoiceCount,
@@ -71,19 +86,52 @@ export function InvoicesSection({
   onPublishGoogleDrive,
   onReissue,
   onSendEmail,
+  onQuickFilterChange,
   onSearchQueryChange,
   onSelectInvoice,
+  onSortChange,
   onStartEditing,
   sellerProfileNotice,
   selectedInvoice,
 }: InvoicesSectionProps) {
+  const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
+  const workspaceStyle = detailPanelBlockSize > 0
+    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
+    : undefined
   const selectedInvoiceClientName =
     (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
     'Unknown client'
+  const invoiceSortOptions: { value: InvoiceSortKey; label: string }[] = [
+    { value: 'priority', label: 'Priority' },
+    { value: 'invoiceDate', label: 'Date' },
+    { value: 'dueDate', label: 'Due date' },
+    { value: 'invoiceNumber', label: 'Invoice' },
+    { value: 'client', label: 'Client' },
+    { value: 'status', label: 'Status' },
+    { value: 'total', label: 'Total' },
+  ]
+  const invoiceFilterOptions: { value: InvoiceQuickFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'outstanding', label: 'Outstanding' },
+    { value: 'drafts', label: 'Drafts' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'paid', label: 'Paid' },
+  ]
+
+  useEffect(() => {
+    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
+      return
+    }
+
+    window.setTimeout(() => {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [isEditorOpen])
 
   return (
     <section className="section-layout">
-      <div className="gig-workspace">
+      <div className="gig-workspace" style={workspaceStyle}>
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -109,17 +157,6 @@ export function InvoicesSection({
             </span>
           </div>
 
-          <label className="search-field">
-            <span>Search</span>
-            <input
-              data-testid="invoice-search-input"
-              type="search"
-              placeholder="Invoice number, client or description..."
-              value={invoiceSearchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-            />
-          </label>
-
           <div className="gig-summary-grid">
             <article>
               <span>{invoices.length}</span>
@@ -135,26 +172,97 @@ export function InvoicesSection({
             </article>
           </div>
 
-          <div className="client-list">
+          <div className="compact-list-controls" aria-label="Invoice list controls">
+            <div className="compact-list-main-controls">
+              <label className="search-field compact-search-field">
+                <span>Search</span>
+                <input
+                  data-testid="invoice-search-input"
+                  type="search"
+                  placeholder="Invoice number, client or description..."
+                  value={invoiceSearchQuery}
+                  onChange={(event) => onSearchQueryChange(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Sort by</span>
+                <select
+                  value={invoiceSort.key}
+                  onChange={(event) =>
+                    onSortChange({ ...invoiceSort, key: event.target.value as InvoiceSortKey })
+                  }
+                >
+                  {invoiceSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="compact-sort-direction"
+                type="button"
+                aria-label={
+                  invoiceSort.direction === 'asc'
+                    ? 'Sort ascending. Click to sort descending.'
+                    : 'Sort descending. Click to sort ascending.'
+                }
+                title={invoiceSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+                onClick={() =>
+                  onSortChange({
+                    ...invoiceSort,
+                    direction: invoiceSort.direction === 'asc' ? 'desc' : 'asc',
+                  })
+                }
+              >
+                {invoiceSort.direction === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+            <div className="compact-filter-chips" aria-label="Invoice filters">
+              {invoiceFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={`compact-filter-chip ${invoiceQuickFilter === option.value ? 'selected' : ''}`}
+                  type="button"
+                  onClick={() => onQuickFilterChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="compact-record-list invoice-record-list" aria-label="Invoices">
+            <div className="compact-record-header invoice-record-row">
+              <span>Invoice</span>
+              <span>Client</span>
+              <span>Date</span>
+              <span>Due</span>
+              <span>Status</span>
+              <span>Total</span>
+            </div>
             {filteredInvoices.map((invoice) => {
               const clientName = clientNamesById.get(invoice.clientId) ?? 'Unknown client'
 
               return (
                 <button
                   key={invoice.id}
-                  className={`client-card ${selectedInvoice?.id === invoice.id ? 'selected' : ''}`}
+                  className={`compact-record-row invoice-record-row ${selectedInvoice?.id === invoice.id ? 'selected' : ''}`}
                   data-testid="invoice-card"
                   onClick={() => onSelectInvoice(invoice.id)}
                   type="button"
                 >
-                  <div>
+                  <div className="compact-primary-cell">
                     <strong>{invoice.invoiceNumber}</strong>
                     <span>{clientName}</span>
                   </div>
-                  <small className="gig-card-meta">
-                    {formatDate(invoice.invoiceDate)} · {invoice.status}
-                  </small>
-                  <small className="gig-card-meta">{formatCurrency(invoice.total)}</small>
+                  <span>{clientName}</span>
+                  <span>{formatDate(invoice.invoiceDate)}</span>
+                  <span>{formatDate(invoice.dueDate)}</span>
+                  <span className="compact-status-cell">{invoice.status}</span>
+                  <span className="compact-money-cell">
+                    {formatCurrency(invoice.total)}
+                  </span>
                 </button>
               )
             })}
@@ -168,7 +276,7 @@ export function InvoicesSection({
           </div>
         </div>
 
-        <div className="panel">
+        <div ref={detailPanelRef} className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Invoice Overview</p>
@@ -176,11 +284,12 @@ export function InvoicesSection({
             </div>
             <div className="actions">
               <button
-                className="ghost-button"
+                className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
                 data-testid="invoice-line-items-button"
-                onClick={onStartEditing}
+                onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
                 disabled={!selectedInvoice}
+                aria-expanded={isEditorOpen}
               >
                 Line items
               </button>
@@ -369,7 +478,7 @@ export function InvoicesSection({
           )}
         </div>
 
-        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
           <div aria-hidden={!isEditorOpen} className="panel editor-panel">
             <div className="panel-heading">
               <div>

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { formatCurrency, formatDate } from '../formatters'
 import type {
   Gig,
@@ -44,12 +45,38 @@ export function ExpenseStatementModal({
   status,
   total,
 }: ExpenseStatementModalProps) {
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsPreviewVisible(false)
+    }
+  }, [isOpen])
+
   if (!isOpen) {
     return null
   }
 
   const selectedExpenseIdSet = new Set(expenseIds)
   const selectedExpenseCount = expenseIds.length
+  const shouldShowPreview = isPreviewVisible && Boolean(previewPdfUrl)
+  const previewButtonLabel = shouldShowPreview
+    ? 'Show expenses'
+    : previewPdfUrl
+      ? 'Show preview'
+      : 'Preview PDF'
+
+  const handlePreviewToggle = () => {
+    if (shouldShowPreview) {
+      setIsPreviewVisible(false)
+      return
+    }
+
+    setIsPreviewVisible(true)
+    if (!previewPdfUrl) {
+      onPreview()
+    }
+  }
 
   return (
     <div className="settings-overlay" onClick={onClose} role="presentation">
@@ -107,44 +134,46 @@ export function ExpenseStatementModal({
 
         <div
           className={`expense-statement-body ${
-            previewPdfUrl ? 'has-preview' : 'without-preview'
+            shouldShowPreview ? 'has-preview' : 'without-preview'
           }`}
         >
-          <div className="expense-statement-gigs">
-            {gigs.map((gig) => (
-              <section className="expense-statement-gig" key={gig.id}>
-                <div className="expense-statement-gig-header">
-                  <div>
-                    <strong>{gig.title}</strong>
-                    <span>
-                      {formatDate(gig.date)} · {gig.venue}
-                    </span>
+          {!shouldShowPreview && (
+            <div className="expense-statement-gigs">
+              {gigs.map((gig) => (
+                <section className="expense-statement-gig" key={gig.id}>
+                  <div className="expense-statement-gig-header">
+                    <div>
+                      <strong>{gig.title}</strong>
+                      <span>
+                        {formatDate(gig.date)} · {gig.venue}
+                      </span>
+                    </div>
+                    {gig.isInvoiced && <span className="expense-status-badge">Invoiced</span>}
                   </div>
-                  {gig.isInvoiced && <span className="expense-status-badge">Invoiced</span>}
-                </div>
 
-                {gig.expenses.length > 0 ? (
-                  <div className="expense-statement-expenses">
-                    {gig.expenses
-                      .slice()
-                      .sort((left, right) => left.sortOrder - right.sortOrder)
-                      .map((expense) => (
-                        <ExpenseStatementExpenseRow
-                          expense={expense}
-                          isSelected={selectedExpenseIdSet.has(expense.id)}
-                          key={expense.id}
-                          onToggleExpense={onToggleExpense}
-                        />
-                      ))}
-                  </div>
-                ) : (
-                  <p className="attachment-helper">No expenses recorded for this gig.</p>
-                )}
-              </section>
-            ))}
-          </div>
+                  {gig.expenses.length > 0 ? (
+                    <div className="expense-statement-expenses">
+                      {gig.expenses
+                        .slice()
+                        .sort((left, right) => left.sortOrder - right.sortOrder)
+                        .map((expense) => (
+                          <ExpenseStatementExpenseRow
+                            expense={expense}
+                            isSelected={selectedExpenseIdSet.has(expense.id)}
+                            key={expense.id}
+                            onToggleExpense={onToggleExpense}
+                          />
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="attachment-helper">No expenses recorded for this gig.</p>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
 
-          {previewPdfUrl && (
+          {shouldShowPreview && previewPdfUrl && (
             <div className="expense-statement-preview">
               <iframe data-testid="expense-statement-preview-frame" src={previewPdfUrl} title="Expense statement PDF preview" />
             </div>
@@ -161,10 +190,11 @@ export function ExpenseStatementModal({
               className="ghost-button"
               data-testid="expense-statement-preview-button"
               disabled={isSaving || selectedExpenseCount === 0}
-              onClick={onPreview}
+              aria-pressed={shouldShowPreview}
+              onClick={handlePreviewToggle}
               type="button"
             >
-              Preview PDF
+              {previewButtonLabel}
             </button>
             <button
               className="primary-button"

@@ -1,11 +1,17 @@
+import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
+import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Client,
   Gig,
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
+  GigQuickFilter,
+  GigSort,
+  GigSortKey,
   GigStatus,
   SellerProfile,
 } from '../types'
@@ -20,7 +26,9 @@ type GigsSectionProps = {
   gigForm: GigForm
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
+  gigQuickFilter: GigQuickFilter
   gigSearchQuery: string
+  gigSort: GigSort
   gigStatus: string
   gigs: Gig[]
   isGigLoading: boolean
@@ -43,8 +51,10 @@ type GigsSectionProps = {
   onDeleteExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
+  onQuickFilterChange: (filter: GigQuickFilter) => void
   onSearchQueryChange: (value: string) => void
   onSelectGig: (gigId: string) => void
+  onSortChange: (sort: GigSort) => void
   onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -79,7 +89,9 @@ export function GigsSection({
   gigForm,
   isEditorOpen,
   gigMode,
+  gigQuickFilter,
   gigSearchQuery,
+  gigSort,
   gigStatus,
   gigs,
   isGigLoading,
@@ -102,8 +114,10 @@ export function GigsSection({
   onDeleteExpenseAttachment,
   onRemoveGigExpense,
   onResetForm,
+  onQuickFilterChange,
   onSearchQueryChange,
   onSelectGig,
+  onSortChange,
   onToggleGigSelection,
   onStartEditing,
   onSubmit,
@@ -117,15 +131,46 @@ export function GigsSection({
   selectedGigIds,
   selectedGigs,
 }: GigsSectionProps) {
+  const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
+  const workspaceStyle = detailPanelBlockSize > 0
+    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
+    : undefined
   const selectedGigClientName =
     (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
   const selectedClientId = selectedGigs[0]?.clientId ?? null
   const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
   const hasInvoicedSelection = selectedGigs.some((gig) => gig.isInvoiced)
+  const gigSortOptions: { value: GigSortKey; label: string }[] = [
+    { value: 'priority', label: 'Priority' },
+    { value: 'date', label: 'Date' },
+    { value: 'title', label: 'Gig' },
+    { value: 'client', label: 'Client' },
+    { value: 'venue', label: 'Venue' },
+    { value: 'fee', label: 'Fee' },
+    { value: 'status', label: 'Status' },
+  ]
+  const gigFilterOptions: { value: GigQuickFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'upcoming', label: 'Upcoming' },
+    { value: 'uninvoiced', label: 'Uninvoiced' },
+    { value: 'drafts', label: 'Drafts' },
+    { value: 'completed', label: 'Completed' },
+  ]
+
+  useEffect(() => {
+    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
+      return
+    }
+
+    window.setTimeout(() => {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [isEditorOpen])
 
   return (
     <section className="section-layout">
-      <div className="gig-workspace">
+      <div className="gig-workspace" style={workspaceStyle}>
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -136,17 +181,6 @@ export function GigsSection({
               New gig
             </button>
           </div>
-
-          <label className="search-field">
-            <span>Search</span>
-              <input
-                data-testid="gig-search-input"
-                type="search"
-              placeholder="Client, title, venue..."
-              value={gigSearchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-            />
-          </label>
 
           <div className="gig-summary-grid">
             <article>
@@ -163,7 +197,76 @@ export function GigsSection({
             </article>
           </div>
 
-          <div className="client-list">
+          <div className="compact-list-controls" aria-label="Gig list controls">
+            <div className="compact-list-main-controls">
+              <label className="search-field compact-search-field">
+                <span>Search</span>
+                <input
+                  data-testid="gig-search-input"
+                  type="search"
+                  placeholder="Client, title, venue..."
+                  value={gigSearchQuery}
+                  onChange={(event) => onSearchQueryChange(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Sort by</span>
+                <select
+                  value={gigSort.key}
+                  onChange={(event) =>
+                    onSortChange({ ...gigSort, key: event.target.value as GigSortKey })
+                  }
+                >
+                  {gigSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="compact-sort-direction"
+                type="button"
+                aria-label={
+                  gigSort.direction === 'asc'
+                    ? 'Sort ascending. Click to sort descending.'
+                    : 'Sort descending. Click to sort ascending.'
+                }
+                title={gigSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+                onClick={() =>
+                  onSortChange({
+                    ...gigSort,
+                    direction: gigSort.direction === 'asc' ? 'desc' : 'asc',
+                  })
+                }
+              >
+                {gigSort.direction === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+            <div className="compact-filter-chips" aria-label="Gig filters">
+              {gigFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={`compact-filter-chip ${gigQuickFilter === option.value ? 'selected' : ''}`}
+                  type="button"
+                  onClick={() => onQuickFilterChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="compact-record-list gig-record-list" aria-label="Gigs">
+            <div className="compact-record-header gig-record-row">
+              <span title="Select gigs" aria-label="Select gigs" />
+              <span>Gig</span>
+              <span>Client</span>
+              <span>Date</span>
+              <span>Venue</span>
+              <span>Fee</span>
+              <span>Status</span>
+            </div>
             {filteredGigs.map((gig) => {
               const clientName = clientNamesById.get(gig.clientId) ?? 'Unknown client'
               const isDifferentSelectedClient =
@@ -171,43 +274,44 @@ export function GigsSection({
                 selectedClientId !== gig.clientId &&
                 !selectedGigIds.includes(gig.id)
               const isSelectionDisabled = isDifferentSelectedClient
+              const selectionLabel = gig.isInvoiced
+                ? 'Invoiced gig'
+                : isDifferentSelectedClient
+                  ? 'Different client'
+                  : 'Select gig'
 
               return (
                 <button
                   key={gig.id}
-                  className={`client-card ${selectedGig?.id === gig.id ? 'selected' : ''}`}
+                  className={`compact-record-row gig-record-row ${selectedGig?.id === gig.id ? 'selected' : ''}`}
                   data-testid="gig-card"
                   onClick={() => onSelectGig(gig.id)}
                   type="button"
                 >
                   <label
-                    className="gig-select-toggle"
+                    className="compact-select-toggle gig-select-toggle"
                     onClick={(event) => event.stopPropagation()}
+                    title={selectionLabel}
                   >
                     <input
                       type="checkbox"
+                      aria-label={selectionLabel}
                       checked={selectedGigIds.includes(gig.id)}
                       disabled={isSelectionDisabled}
                       onChange={() => onToggleGigSelection(gig.id)}
                     />
-                    <span>
-                      {gig.isInvoiced
-                        ? 'Invoiced'
-                        : isDifferentSelectedClient
-                          ? 'Different client'
-                          : 'Select'}
-                    </span>
                   </label>
-                  <div>
+                  <div className="compact-primary-cell">
                     <strong>{gig.title}</strong>
                     <span>{clientName}</span>
                   </div>
-                  <small className="gig-card-meta">
-                    {formatDate(gig.date)} · {gig.venue}
-                  </small>
-                  <small className="gig-card-meta">
-                    {formatCurrency(gig.fee)} · {formatGigStatus(gig.status)}
-                  </small>
+                  <span>{clientName}</span>
+                  <span>{formatDate(gig.date)}</span>
+                  <span>{gig.venue || 'No venue set'}</span>
+                  <span>{formatCurrency(gig.fee)}</span>
+                  <span className="compact-status-cell">
+                    {formatGigStatus(gig.status)}
+                  </span>
                 </button>
               )
             })}
@@ -221,7 +325,7 @@ export function GigsSection({
           </div>
         </div>
 
-        <div className="panel">
+        <div ref={detailPanelRef} className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Gig Overview</p>
@@ -266,11 +370,12 @@ export function GigsSection({
                   : 'Expense statement'}
               </button>
               <button
-                className="ghost-button"
+                className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
                 data-testid="gig-edit-button"
-                onClick={onStartEditing}
+                onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
                 disabled={!selectedGig}
+                aria-expanded={isEditorOpen}
               >
                 Edit gig
               </button>
@@ -320,7 +425,7 @@ export function GigsSection({
                 </article>
                 <article>
                   <p className="detail-label">Status</p>
-                  <strong>{formatGigStatus(selectedGig.status)}</strong>
+                  <strong data-testid="selected-gig-status">{formatGigStatus(selectedGig.status)}</strong>
                 </article>
                 <article>
                   <p className="detail-label">Date</p>
@@ -392,10 +497,10 @@ export function GigsSection({
           )}
         </div>
 
-        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
           <form
             aria-hidden={!isEditorOpen}
-            className="editor-panel panel"
+            className="editor-panel panel gig-editor-panel"
             data-testid="gig-form"
             onSubmit={onSubmit}
           >
@@ -473,6 +578,7 @@ export function GigsSection({
               <label>
                 <span>Status</span>
                 <select
+                  data-testid="gig-status-select"
                   value={gigForm.status}
                   onChange={(event) =>
                     onUpdateGigField('status', event.target.value as GigStatus)

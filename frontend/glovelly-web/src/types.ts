@@ -25,6 +25,13 @@ export type ClientForm = {
   billingAddress: Address
 }
 
+export type SortDirection = 'asc' | 'desc'
+export type ClientSortKey = 'name' | 'email' | 'city' | 'country'
+export type ClientSort = {
+  key: ClientSortKey
+  direction: SortDirection
+}
+
 export type AuthUser = {
   userId: string
   role: string
@@ -72,6 +79,18 @@ export type AdminUserForm = {
   googleSubject: string
   role: 'Admin' | 'User'
   isActive: boolean
+}
+
+export type AdminSortKey =
+  | 'displayName'
+  | 'email'
+  | 'role'
+  | 'access'
+  | 'enrolment'
+  | 'lastLogin'
+export type AdminSort = {
+  key: AdminSortKey
+  direction: SortDirection
 }
 
 export type UserSettingsForm = {
@@ -225,6 +244,13 @@ export type Gig = {
   expenses: GigExpense[]
 }
 
+export type GigSortKey = 'priority' | 'date' | 'title' | 'client' | 'venue' | 'fee' | 'status'
+export type GigSort = {
+  key: GigSortKey
+  direction: SortDirection
+}
+export type GigQuickFilter = 'all' | 'upcoming' | 'uninvoiced' | 'drafts' | 'completed'
+
 export type GigImportDraftConfidence = 'Low' | 'Medium' | 'High'
 export type GigImportDraftStatus = 'Pending' | 'Accepted' | 'Rejected' | 'Committed'
 export type GigImportBatchStatus = 'Draft' | 'Committed' | 'Abandoned'
@@ -355,6 +381,20 @@ export type Invoice = {
   total: number
   lines: InvoiceLine[]
 }
+
+export type InvoiceSortKey =
+  | 'priority'
+  | 'invoiceDate'
+  | 'dueDate'
+  | 'invoiceNumber'
+  | 'client'
+  | 'status'
+  | 'total'
+export type InvoiceSort = {
+  key: InvoiceSortKey
+  direction: SortDirection
+}
+export type InvoiceQuickFilter = 'all' | 'outstanding' | 'drafts' | 'overdue' | 'paid'
 
 export type GigForm = {
   clientId: string

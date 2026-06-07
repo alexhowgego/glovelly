@@ -15,7 +15,7 @@ import {
   SignInScreen,
   UserSettingsModal,
 } from './AppSections'
-import type { AppNavigationItem, HeaderMetric } from './AppSections'
+import type { AppNavigationItem, DashboardSummary } from './AppSections'
 import {
   buildApiUrl,
   buildReturnUrl,
@@ -30,6 +30,7 @@ import {
   buildInvoiceFilenamePreview,
   invoiceFilenameTokens,
 } from './invoicePreview'
+import { formatCurrency, formatDate } from './formatters'
 import { useAdminWorkspace } from './hooks/useAdminWorkspace'
 import { useClientsWorkspace } from './hooks/useClientsWorkspace'
 import { useGigsWorkspace } from './hooks/useGigsWorkspace'
@@ -106,6 +107,7 @@ function App({ appMetadata }: AppProps) {
     adminForm,
     adminMode,
     adminSearchQuery,
+    adminSort,
     adminStatus,
     adminUsers,
     closeAdminEditor,
@@ -120,6 +122,7 @@ function App({ appMetadata }: AppProps) {
     selectedAdminUser,
     selectAdminUser,
     setAdminSearchQuery,
+    setAdminSort,
     startAdminCreate,
     startAdminEdit,
     totalAdmins,
@@ -132,6 +135,7 @@ function App({ appMetadata }: AppProps) {
     clientNamesById,
     clientSettingsForm,
     clientSettingsStatus,
+    clientSort,
     clients,
     closeClientEditor,
     closeClientSettings,
@@ -149,6 +153,7 @@ function App({ appMetadata }: AppProps) {
     searchQuery,
     selectedClient,
     selectClient,
+    setClientSort,
     setSearchQuery,
     startCreating,
     startEditing,
@@ -182,7 +187,9 @@ function App({ appMetadata }: AppProps) {
     gigExpenseDescription,
     gigForm,
     gigMode,
+    gigQuickFilter,
     gigSearchQuery,
+    gigSort,
     gigStatus,
     gigs,
     gigsById,
@@ -211,7 +218,9 @@ function App({ appMetadata }: AppProps) {
     setGigExpenseAmount,
     setGigExpenseDescription,
     setGigs,
+    setGigQuickFilter,
     setGigSearchQuery,
+    setGigSort,
     setGigStatus,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
@@ -219,8 +228,6 @@ function App({ appMetadata }: AppProps) {
     setSelectedGigIds,
     startGigCreate,
     startGigEdit,
-    uninvoicedGigCount,
-    upcomingGigCount,
     updateGigExpenseField,
     updateGigField,
     updateExpenseReimbursement,
@@ -277,12 +284,13 @@ function App({ appMetadata }: AppProps) {
     handlePublishInvoiceGoogleDrive,
     handleSendInvoiceEmail,
     invoices,
+    invoiceQuickFilter,
     invoiceSearchQuery,
+    invoiceSort,
     invoiceStatus,
     isInvoiceEditorOpen,
     issuedInvoiceCount,
     isInvoiceLoading,
-    overdueInvoiceCount,
     resetInvoicesWorkspace,
     selectedInvoice,
     setAdjustmentAmount,
@@ -290,8 +298,10 @@ function App({ appMetadata }: AppProps) {
     setInvoices,
     setInvoiceStatus,
     setIsInvoiceLoading,
+    setInvoiceQuickFilter,
     setSelectedInvoiceId,
     setInvoiceSearchQuery,
+    setInvoiceSort,
     startInvoiceEdit,
   } = useInvoicesWorkspace({
     clientNamesById,
@@ -688,7 +698,6 @@ function App({ appMetadata }: AppProps) {
     setMonthlyInvoiceStatus('')
   }, [selectedClient?.id, monthlyInvoiceMonth])
 
-  const outstandingInvoiceCount = issuedInvoiceCount + overdueInvoiceCount
   const sellerProfileMissingLabels = useMemo(() => {
     const labels: Record<string, string> = {
       sellerName: 'seller name',
@@ -744,24 +753,73 @@ function App({ appMetadata }: AppProps) {
     (count, batch) => count + batch.pendingCount + batch.acceptedCount,
     0
   )
-  const headerMetrics: HeaderMetric[] = [
-    {
-      value: upcomingGigCount,
-      label: 'upcoming gigs',
-    },
-    {
-      value: uninvoicedGigCount,
-      label: 'uninvoiced gigs',
-    },
-    {
-      value: outstandingInvoiceCount,
-      label: 'outstanding invoices',
-    },
-    {
-      value: draftInvoiceCount,
-      label: 'draft invoices',
-    },
-  ]
+  const nextDashboardGig = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+
+    return [...gigs]
+      .filter((gig) => gig.status !== 'Cancelled' && gig.date >= today)
+      .sort((left, right) => {
+        const dateComparison = left.date.localeCompare(right.date)
+        if (dateComparison !== 0) {
+          return dateComparison
+        }
+
+        return left.title.localeCompare(right.title)
+      })[0] ?? null
+  }, [gigs])
+
+  const dashboardInvoiceCandidate = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+
+    return [...gigs]
+      .filter(
+        (gig) =>
+          !gig.isInvoiced &&
+          gig.status !== 'Cancelled' &&
+          gig.status !== 'Draft' &&
+          gig.date <= today
+      )
+      .sort((left, right) => {
+        const dateComparison = right.date.localeCompare(left.date)
+        if (dateComparison !== 0) {
+          return dateComparison
+        }
+
+        const statusPriority = (gig: Gig) => (gig.status === 'Completed' ? 0 : 1)
+        const statusComparison = statusPriority(left) - statusPriority(right)
+        if (statusComparison !== 0) {
+          return statusComparison
+        }
+
+        return left.title.localeCompare(right.title)
+      })[0] ?? null
+  }, [gigs])
+
+  const dashboardSummary: DashboardSummary = useMemo(() => {
+    const outstandingInvoices = invoices.filter(
+      (invoice) => invoice.status !== 'Paid' && invoice.status !== 'Cancelled'
+    )
+    const toGigSummary = (gig: Gig) => ({
+      title: gig.title,
+      clientName: clientNamesById.get(gig.clientId) ?? 'Unknown client',
+      dateLabel: formatDate(gig.date),
+      venue: gig.venue || 'No venue set',
+    })
+
+    return {
+      outstandingBalanceLabel: formatCurrency(
+        outstandingInvoices.reduce((total, invoice) => total + invoice.total, 0)
+      ),
+      outstandingInvoiceCount: outstandingInvoices.length,
+      nextGig: nextDashboardGig ? toGigSummary(nextDashboardGig) : null,
+      invoiceCandidate: dashboardInvoiceCandidate
+        ? {
+            ...toGigSummary(dashboardInvoiceCandidate),
+            feeLabel: formatCurrency(dashboardInvoiceCandidate.fee),
+          }
+        : null,
+    }
+  }, [clientNamesById, dashboardInvoiceCandidate, invoices, nextDashboardGig])
 
   const signIn = () => {
     const loginUrl = buildApiUrl(
@@ -961,28 +1019,30 @@ function App({ appMetadata }: AppProps) {
     return updatedInvoice
   }
 
-  const handleGenerateInvoice = async () => {
-    if (selectedGigs.length > 0) {
-      const distinctClientIds = new Set(selectedGigs.map((gig) => gig.clientId))
+  const handleGenerateInvoice = async (explicitGig?: Gig) => {
+    const invoiceGigs = explicitGig ? [] : selectedGigs
+
+    if (invoiceGigs.length > 0) {
+      const distinctClientIds = new Set(invoiceGigs.map((gig) => gig.clientId))
       if (distinctClientIds.size > 1) {
         setGigStatus('Selected gigs must all belong to the same client.')
         return
       }
 
-      const alreadyInvoicedGig = selectedGigs.find((gig) => gig.isInvoiced)
+      const alreadyInvoicedGig = invoiceGigs.find((gig) => gig.isInvoiced)
       if (alreadyInvoicedGig) {
         setGigStatus(`"${alreadyInvoicedGig.title}" is already linked to an invoice.`)
         return
       }
 
       setIsInvoiceLoading(true)
-      setGigStatus(`Generating invoice for ${selectedGigs.length} selected gig(s)...`)
+      setGigStatus(`Generating invoice for ${invoiceGigs.length} selected gig(s)...`)
 
       try {
         const response = await fetchWithSession(
           buildApiUrl('/gigs/generate-invoice'),
           jsonRequestInit('POST', {
-            gigIds: selectedGigs.map((gig) => gig.id),
+            gigIds: invoiceGigs.map((gig) => gig.id),
           })
         )
 
@@ -1001,7 +1061,7 @@ function App({ appMetadata }: AppProps) {
 
         const generatedInvoice = (await response.json()) as Invoice
         const nowIso = new Date().toISOString()
-        const selectedIds = new Set(selectedGigs.map((gig) => gig.id))
+        const selectedIds = new Set(invoiceGigs.map((gig) => gig.id))
 
         setInvoices((current) => [
           generatedInvoice,
@@ -1022,7 +1082,7 @@ function App({ appMetadata }: AppProps) {
         )
         setSelectedGigIds([])
         setGigStatus(
-          `Invoice ${generatedInvoice.invoiceNumber} generated from ${selectedGigs.length} selected gig(s).`
+          `Invoice ${generatedInvoice.invoiceNumber} generated from ${invoiceGigs.length} selected gig(s).`
         )
         setInvoiceStatus(
           sellerProfile.isInvoiceReady
@@ -1039,7 +1099,9 @@ function App({ appMetadata }: AppProps) {
       return
     }
 
-    if (!selectedGig) {
+    const invoiceGig = explicitGig ?? selectedGig
+
+    if (!invoiceGig) {
       setGigStatus('Select one or more gigs first.')
       return
     }
@@ -1049,7 +1111,7 @@ function App({ appMetadata }: AppProps) {
 
     try {
       const response = await fetchWithSession(
-        buildApiUrl(`/gigs/${selectedGig.id}/generate-invoice`),
+        buildApiUrl(`/gigs/${invoiceGig.id}/generate-invoice`),
         {
           method: 'POST',
         }
@@ -1061,7 +1123,7 @@ function App({ appMetadata }: AppProps) {
           invoiceId?: string
         }
 
-        const existingInvoiceId = conflict.invoiceId ?? selectedGig.invoiceId
+        const existingInvoiceId = conflict.invoiceId ?? invoiceGig.invoiceId
         if (existingInvoiceId) {
           setSelectedInvoiceId(existingInvoiceId)
           setActiveSection('invoices')
@@ -1084,7 +1146,7 @@ function App({ appMetadata }: AppProps) {
       setSelectedInvoiceId(generatedInvoice.id)
       setGigs((current) =>
         current.map((gig) =>
-          gig.id === selectedGig.id
+          gig.id === invoiceGig.id
             ? {
                 ...gig,
                 invoiceId: generatedInvoice.id,
@@ -1106,6 +1168,29 @@ function App({ appMetadata }: AppProps) {
     } finally {
       setIsInvoiceLoading(false)
     }
+  }
+
+  const openDashboardNextGig = () => {
+    if (!nextDashboardGig) {
+      return
+    }
+
+    setSelectedGigId(nextDashboardGig.id)
+    setSelectedGigIds([])
+    setGigSearchQuery('')
+    setActiveSection('gigs')
+  }
+
+  const generateDashboardInvoice = () => {
+    if (!dashboardInvoiceCandidate) {
+      return
+    }
+
+    setSelectedGigId(dashboardInvoiceCandidate.id)
+    setSelectedGigIds([])
+    setGigSearchQuery('')
+    setActiveSection('gigs')
+    void handleGenerateInvoice(dashboardInvoiceCandidate)
   }
 
   const handleGenerateMonthlyInvoice = async () => {
@@ -1270,6 +1355,7 @@ function App({ appMetadata }: AppProps) {
       <ClientsSection
         filteredClients={filteredClients}
         form={form}
+        clientSort={clientSort}
         canDeleteSelectedClient={clientDeleteEligibility.canDelete}
         clientDeleteHelperText={clientDeleteEligibility.helperText}
         isApiConnected={isApiConnected}
@@ -1288,6 +1374,7 @@ function App({ appMetadata }: AppProps) {
         onResetForm={startCreating}
         onSearchQueryChange={setSearchQuery}
         onSelectClient={selectClient}
+        onSortChange={setClientSort}
         onStartEditing={startEditing}
         onSubmit={handleSubmit}
         onUpdateAddressField={updateAddressField}
@@ -1302,6 +1389,7 @@ function App({ appMetadata }: AppProps) {
         isEditorOpen={isAdminEditorOpen}
         adminMode={adminMode}
         adminSearchQuery={adminSearchQuery}
+        adminSort={adminSort}
         adminStatus={adminStatus}
         adminUsers={adminUsers}
         activeUsersCount={activeUsersCount}
@@ -1312,6 +1400,7 @@ function App({ appMetadata }: AppProps) {
         onResetForm={startAdminCreate}
         onSearchQueryChange={setAdminSearchQuery}
         onSelectUser={selectAdminUser}
+        onSortChange={setAdminSort}
         onStartEditing={startAdminEdit}
         onSubmit={handleAdminSubmit}
         onUpdateField={updateAdminField}
@@ -1329,7 +1418,9 @@ function App({ appMetadata }: AppProps) {
         gigForm={gigForm}
         isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
+        gigQuickFilter={gigQuickFilter}
         gigSearchQuery={gigSearchQuery}
+        gigSort={gigSort}
         gigStatus={gigStatus}
         gigs={gigs}
         isGigLoading={isGigLoading}
@@ -1340,7 +1431,7 @@ function App({ appMetadata }: AppProps) {
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateExpenseStatement={openExpenseStatement}
-        onGenerateInvoice={handleGenerateInvoice}
+        onGenerateInvoice={() => void handleGenerateInvoice()}
         onEstimateMileage={estimateGigMileage}
         onDeleteGig={deleteGig}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
@@ -1352,8 +1443,10 @@ function App({ appMetadata }: AppProps) {
         onDeleteExpenseAttachment={deleteExpenseAttachment}
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
+        onQuickFilterChange={setGigQuickFilter}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={selectGig}
+        onSortChange={setGigSort}
         onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
         onSubmit={handleGigSubmit}
@@ -1375,7 +1468,9 @@ function App({ appMetadata }: AppProps) {
         draftInvoiceCount={draftInvoiceCount}
         filteredInvoices={filteredInvoices}
         isEditorOpen={isInvoiceEditorOpen}
+        invoiceQuickFilter={invoiceQuickFilter}
         invoiceSearchQuery={invoiceSearchQuery}
+        invoiceSort={invoiceSort}
         invoiceStatus={invoiceStatus}
         googleDrivePublishLink={
           invoiceStatus.startsWith('Uploaded ') ? googleDrivePublishLink : null
@@ -1399,8 +1494,10 @@ function App({ appMetadata }: AppProps) {
         onPublishGoogleDrive={handlePublishInvoiceGoogleDriveWithIssuePrompt}
         onReissue={handleInvoiceReissueWithPreview}
         onSendEmail={handleSendInvoiceEmailWithIssuePrompt}
+        onQuickFilterChange={setInvoiceQuickFilter}
         onSearchQueryChange={setInvoiceSearchQuery}
         onSelectInvoice={setSelectedInvoiceId}
+        onSortChange={setInvoiceSort}
         onStartEditing={startInvoiceEdit}
         sellerProfileNotice={sellerProfileNotice}
         selectedInvoice={selectedInvoice}
@@ -1414,10 +1511,11 @@ function App({ appMetadata }: AppProps) {
       authUser={authUser}
       currentSection={currentSection}
       currentSectionContent={currentSectionContent}
-      headerMetrics={headerMetrics}
+      dashboardSummary={dashboardSummary}
       isAdmin={isAdmin}
       isAdminLoading={isAdminLoading}
       isGigLoading={isGigLoading}
+      isInvoiceLoading={isInvoiceLoading}
       isLoading={isLoading}
       isProfileMenuOpen={isProfileMenuOpen}
       isQuickReceiptSaving={isQuickReceiptSaving}
@@ -1425,7 +1523,9 @@ function App({ appMetadata }: AppProps) {
       isUserSettingsSaving={isUserSettingsSaving}
       navigationItems={navigationItems}
       pendingGigImportCount={pendingGigImportCount}
+      onGenerateDashboardInvoice={generateDashboardInvoice}
       onOpenGigImports={openGigImports}
+      onOpenNextGig={openDashboardNextGig}
       onOpenSellerProfile={openSellerProfile}
       onOpenUserSettings={openUserSettings}
       onProfileMenuToggle={toggleProfileMenu}

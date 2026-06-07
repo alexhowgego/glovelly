@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import type {
   AppMetadata,
@@ -16,9 +17,22 @@ export type AppNavigationItem = {
   disabled?: boolean
 }
 
-export type HeaderMetric = {
-  value: number
-  label: string
+export type DashboardGigSummary = {
+  title: string
+  clientName: string
+  dateLabel: string
+  venue: string
+}
+
+export type DashboardInvoiceCandidate = DashboardGigSummary & {
+  feeLabel: string
+}
+
+export type DashboardSummary = {
+  outstandingBalanceLabel: string
+  outstandingInvoiceCount: number
+  nextGig: DashboardGigSummary | null
+  invoiceCandidate: DashboardInvoiceCandidate | null
 }
 
 type AppShellProps = {
@@ -28,10 +42,11 @@ type AppShellProps = {
   children: ReactNode
   currentSection: AppNavigationItem | undefined
   currentSectionContent: ReactNode
-  headerMetrics: HeaderMetric[]
+  dashboardSummary: DashboardSummary
   isAdmin: boolean
   isAdminLoading: boolean
   isGigLoading: boolean
+  isInvoiceLoading: boolean
   isLoading: boolean
   isProfileMenuOpen: boolean
   isQuickReceiptSaving: boolean
@@ -40,7 +55,9 @@ type AppShellProps = {
   navigationItems: AppNavigationItem[]
   pendingGigImportCount: number
   onOpenGigImports: () => void
+  onOpenNextGig: () => void
   onOpenSellerProfile: () => void
+  onGenerateDashboardInvoice: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
   onQuickReceiptFile: (file: File) => void
@@ -59,10 +76,11 @@ export function AppShell({
   children,
   currentSection,
   currentSectionContent,
-  headerMetrics,
+  dashboardSummary,
   isAdmin,
   isAdminLoading,
   isGigLoading,
+  isInvoiceLoading,
   isLoading,
   isProfileMenuOpen,
   isQuickReceiptSaving,
@@ -71,7 +89,9 @@ export function AppShell({
   navigationItems,
   pendingGigImportCount,
   onOpenGigImports,
+  onOpenNextGig,
   onOpenSellerProfile,
+  onGenerateDashboardInvoice,
   onOpenUserSettings,
   onProfileMenuToggle,
   onQuickReceiptFile,
@@ -82,6 +102,7 @@ export function AppShell({
   sellerProfile,
   themePreference,
 }: AppShellProps) {
+  const [isReturnToTopVisible, setIsReturnToTopVisible] = useState(false)
   const profileDisplayName = authUser?.name?.trim() || authUser?.email || 'User'
   const profileImageUrl = authUser?.profileImageUrl?.trim() || ''
   const profileInitials = profileDisplayName
@@ -90,6 +111,30 @@ export function AppShell({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
+  const returnToTop = () => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    window.scrollTo({
+      top: 0,
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    })
+  }
+
+  useEffect(() => {
+    const updateReturnToTopVisibility = () => {
+      const isPhoneLayout = window.matchMedia('(max-width: 760px)').matches
+      setIsReturnToTopVisible(isPhoneLayout && window.scrollY >= window.innerHeight / 2)
+    }
+
+    updateReturnToTopVisibility()
+    window.addEventListener('scroll', updateReturnToTopVisibility, { passive: true })
+    window.addEventListener('resize', updateReturnToTopVisibility)
+
+    return () => {
+      window.removeEventListener('scroll', updateReturnToTopVisibility)
+      window.removeEventListener('resize', updateReturnToTopVisibility)
+    }
+  }, [])
 
   return (
     <main className="app-shell">
@@ -106,9 +151,15 @@ export function AppShell({
               </div>
 
               <div className="header-actions">
-                <label className="primary-button quick-receipt-button">
-                  <span aria-hidden="true">+</span>
-                  Scan receipt
+                <label className={`primary-button quick-receipt-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}>
+                  <span className="quick-receipt-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path d="M8.4 6.5 9.7 4h4.6l1.3 2.5H19a3 3 0 0 1 3 3V17a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V9.5a3 3 0 0 1 3-3h3.4Z" />
+                      <path d="M12 16.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+                      <path d="M18 10h.01" />
+                    </svg>
+                  </span>
+                  <span className="quick-receipt-label">Scan receipt</span>
                   <input
                     type="file"
                     accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
@@ -270,13 +321,64 @@ export function AppShell({
             </nav>
 
             <div className="content-header-aside">
-              <div className="hero-metrics">
-                {headerMetrics.map((metric) => (
-                  <article key={metric.label}>
-                    <span>{metric.value}</span>
-                    <p>{metric.label}</p>
-                  </article>
-                ))}
+              <div className="dashboard-summary" aria-label="Dashboard summary">
+                <article className="dashboard-card outstanding-card" data-testid="dashboard-outstanding-balance">
+                  <p className="section-label">Outstanding balance</p>
+                  <strong>{dashboardSummary.outstandingBalanceLabel}</strong>
+                  <span>
+                    {dashboardSummary.outstandingInvoiceCount === 1
+                      ? '1 invoice needs attention'
+                      : `${dashboardSummary.outstandingInvoiceCount} invoices need attention`}
+                  </span>
+                </article>
+
+                <article className="dashboard-card" data-testid="dashboard-next-gig">
+                  <p className="section-label">Next gig</p>
+                  {dashboardSummary.nextGig ? (
+                    <>
+                      <strong>{dashboardSummary.nextGig.title}</strong>
+                      <span>
+                        {dashboardSummary.nextGig.dateLabel} · {dashboardSummary.nextGig.clientName}
+                      </span>
+                      <span>{dashboardSummary.nextGig.venue}</span>
+                      <button
+                        className="ghost-button compact-action"
+                        data-testid="dashboard-open-next-gig-button"
+                        onClick={onOpenNextGig}
+                        type="button"
+                      >
+                        Open gig
+                      </button>
+                    </>
+                  ) : (
+                    <span>No upcoming gigs on the books.</span>
+                  )}
+                </article>
+
+                <article className="dashboard-card invoice-action-card" data-testid="dashboard-invoice-prompt">
+                  <p className="section-label">Invoice prompt</p>
+                  {dashboardSummary.invoiceCandidate ? (
+                    <>
+                      <strong>{dashboardSummary.invoiceCandidate.title}</strong>
+                      <span>
+                        {dashboardSummary.invoiceCandidate.dateLabel} ·{' '}
+                        {dashboardSummary.invoiceCandidate.clientName}
+                      </span>
+                      <span>{dashboardSummary.invoiceCandidate.feeLabel}</span>
+                      <button
+                        className="primary-button compact-action"
+                        data-testid="dashboard-generate-invoice-button"
+                        disabled={isLoading || isInvoiceLoading}
+                        onClick={onGenerateDashboardInvoice}
+                        type="button"
+                      >
+                        Generate invoice
+                      </button>
+                    </>
+                  ) : (
+                    <span>No recent uninvoiced gigs ready for a draft.</span>
+                  )}
+                </article>
               </div>
             </div>
           </div>
@@ -302,6 +404,17 @@ export function AppShell({
           {formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}
         </p>
       </div>
+
+      <button
+        aria-label="Return to top"
+        aria-hidden={!isReturnToTopVisible}
+        className={`primary-button return-to-top-button ${isReturnToTopVisible ? 'visible' : ''}`}
+        onClick={returnToTop}
+        tabIndex={isReturnToTopVisible ? 0 : -1}
+        type="button"
+      >
+        Return to top
+      </button>
 
       {children}
     </main>

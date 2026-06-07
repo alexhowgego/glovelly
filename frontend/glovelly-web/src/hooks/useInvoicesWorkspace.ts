@@ -9,7 +9,7 @@ import {
 } from '../api'
 import { defaultInvoiceStatus } from '../forms'
 import { formatCurrency, formatDateTime } from '../formatters'
-import type { Invoice, InvoiceStatus } from '../types'
+import type { Invoice, InvoiceQuickFilter, InvoiceSort, InvoiceStatus } from '../types'
 
 type GoogleDrivePublishLink = {
   href: string
@@ -36,6 +36,12 @@ export function useInvoicesWorkspace({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
+  const [invoiceQuickFilter, setInvoiceQuickFilter] =
+    useState<InvoiceQuickFilter>('all')
+  const [invoiceSort, setInvoiceSort] = useState<InvoiceSort>({
+    key: 'priority',
+    direction: 'asc',
+  })
   const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
   const [googleDrivePublishLink, setGoogleDrivePublishLink] =
     useState<GoogleDrivePublishLink | null>(null)
@@ -51,20 +57,97 @@ export function useInvoicesWorkspace({
 
   const filteredInvoices = useMemo(() => {
     const query = deferredInvoiceSearchQuery.trim().toLowerCase()
+    const sortDirection = invoiceSort.direction === 'asc' ? 1 : -1
+    const compareText = (left: string, right: string) => left.localeCompare(right)
+    const compareNumber = (left: number, right: number) => left - right
+    const getClientName = (invoice: Invoice) => clientNamesById.get(invoice.clientId) ?? ''
+    const getPriorityBucket = (invoice: Invoice) => {
+      switch (invoice.status) {
+        case 'Overdue':
+          return 0
+        case 'Issued':
+          return 1
+        case 'Draft':
+          return 2
+        case 'Paid':
+          return 4
+        case 'Cancelled':
+          return 5
+        default:
+          return 3
+      }
+    }
+    const comparePriority = (left: Invoice, right: Invoice) => {
+      const bucketComparison = getPriorityBucket(left) - getPriorityBucket(right)
+      if (bucketComparison !== 0) {
+        return bucketComparison
+      }
+
+      const bucket = getPriorityBucket(left)
+      if (bucket === 0 || bucket === 1) {
+        return compareText(left.dueDate, right.dueDate)
+      }
+
+      return compareText(right.invoiceDate, left.invoiceDate)
+    }
+    const compareByKey = (left: Invoice, right: Invoice) => {
+      switch (invoiceSort.key) {
+        case 'client':
+          return compareText(getClientName(left), getClientName(right))
+        case 'dueDate':
+          return compareText(left.dueDate, right.dueDate)
+        case 'invoiceNumber':
+          return compareText(left.invoiceNumber, right.invoiceNumber)
+        case 'status':
+          return compareText(left.status, right.status)
+        case 'total':
+          return compareNumber(left.total, right.total)
+        case 'priority':
+          return comparePriority(left, right)
+        case 'invoiceDate':
+        default:
+          return compareText(left.invoiceDate, right.invoiceDate)
+      }
+    }
     const sortedInvoices = [...invoices].sort((left, right) => {
-      const dateComparison = right.invoiceDate.localeCompare(left.invoiceDate)
+      const primaryComparison = compareByKey(left, right)
+      if (primaryComparison !== 0) {
+        return primaryComparison * sortDirection
+      }
+
+      const dateComparison = left.invoiceDate.localeCompare(right.invoiceDate)
       if (dateComparison !== 0) {
         return dateComparison
       }
 
-      return left.invoiceNumber.localeCompare(right.invoiceNumber)
+      const numberComparison = left.invoiceNumber.localeCompare(right.invoiceNumber)
+      if (numberComparison !== 0) {
+        return numberComparison
+      }
+
+      return left.id.localeCompare(right.id)
+    })
+    const quickFilteredInvoices = sortedInvoices.filter((invoice) => {
+      switch (invoiceQuickFilter) {
+        case 'drafts':
+          return invoice.status === 'Draft'
+        case 'outstanding':
+          return invoice.status !== 'Paid' && invoice.status !== 'Cancelled'
+        case 'overdue':
+          return invoice.status === 'Overdue'
+        case 'paid':
+          return invoice.status === 'Paid'
+        case 'all':
+        default:
+          return true
+      }
     })
 
     if (!query) {
-      return sortedInvoices
+      return quickFilteredInvoices
     }
 
-    return sortedInvoices.filter((invoice) => {
+    return quickFilteredInvoices.filter((invoice) => {
       const clientName = clientNamesById.get(invoice.clientId) ?? ''
 
       return [
@@ -77,7 +160,7 @@ export function useInvoicesWorkspace({
         .toLowerCase()
         .includes(query)
     })
-  }, [clientNamesById, deferredInvoiceSearchQuery, invoices])
+  }, [clientNamesById, deferredInvoiceSearchQuery, invoiceQuickFilter, invoiceSort, invoices])
 
   const selectedInvoice =
     invoicesById.get(selectedInvoiceId) ?? filteredInvoices[0] ?? null
@@ -92,6 +175,8 @@ export function useInvoicesWorkspace({
     setSelectedInvoiceId('')
     setIsInvoiceEditorOpen(false)
     setInvoiceSearchQuery('')
+    setInvoiceQuickFilter('all')
+    setInvoiceSort({ key: 'priority', direction: 'asc' })
     setInvoiceStatus(defaultInvoiceStatus)
     setGoogleDrivePublishLink(null)
     setIsInvoiceLoading(false)
@@ -108,6 +193,13 @@ export function useInvoicesWorkspace({
   }
 
   const closeInvoiceEditor = () => {
+    if (
+      (adjustmentAmount.trim().length > 0 || adjustmentReason.trim().length > 0) &&
+      !window.confirm('Discard unsaved invoice adjustment and close line items?')
+    ) {
+      return
+    }
+
     setIsInvoiceEditorOpen(false)
     setAdjustmentAmount('')
     setAdjustmentReason('')
@@ -452,7 +544,9 @@ export function useInvoicesWorkspace({
     handlePublishInvoiceGoogleDrive,
     handleSendInvoiceEmail,
     invoices,
+    invoiceQuickFilter,
     invoiceSearchQuery,
+    invoiceSort,
     invoiceStatus,
     isInvoiceEditorOpen,
     issuedInvoiceCount: invoices.filter((invoice) => invoice.status === 'Issued').length,
@@ -465,8 +559,10 @@ export function useInvoicesWorkspace({
     setInvoices,
     setInvoiceStatus,
     setIsInvoiceLoading,
+    setInvoiceQuickFilter,
     setSelectedInvoiceId,
     setInvoiceSearchQuery,
+    setInvoiceSort,
     startInvoiceEdit,
   }
 }
