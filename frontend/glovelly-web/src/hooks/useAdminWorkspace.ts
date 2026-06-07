@@ -209,6 +209,13 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
   }
 
   const closeAdminEditor = () => {
+    if (
+      hasUnsavedAdminEditorChanges() &&
+      !window.confirm('Discard unsaved access changes and close the editor?')
+    ) {
+      return
+    }
+
     setIsAdminEditorOpen(false)
     setAdminMode('create')
     setAdminForm(emptyAdminForm())

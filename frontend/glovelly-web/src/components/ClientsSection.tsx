@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
+import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type { Client, ClientForm, ClientSort, ClientSortKey } from '../types'
 
 type ClientsSectionProps = {
@@ -64,6 +67,11 @@ export function ClientsSection({
   selectedClient,
   status,
 }: ClientsSectionProps) {
+  const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
+  const workspaceStyle = detailPanelBlockSize > 0
+    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
+    : undefined
   const clientSortOptions: { value: ClientSortKey; label: string }[] = [
     { value: 'name', label: 'Client' },
     { value: 'email', label: 'Email' },
@@ -71,9 +79,19 @@ export function ClientsSection({
     { value: 'country', label: 'Country' },
   ]
 
+  useEffect(() => {
+    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
+      return
+    }
+
+    window.setTimeout(() => {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [isEditorOpen])
+
   return (
     <section className="section-layout">
-      <div className="workspace">
+      <div className="workspace" style={workspaceStyle}>
         <div className="clients-panel panel">
           <div className="panel-heading">
             <div>
@@ -175,7 +193,7 @@ export function ClientsSection({
           </div>
         </div>
 
-        <div className="detail-panel panel">
+        <div ref={detailPanelRef} className="detail-panel panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Overview</p>
@@ -191,10 +209,11 @@ export function ClientsSection({
                 Settings
               </button>
               <button
-                className="ghost-button"
-                onClick={onStartEditing}
+                className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
+                onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
                 disabled={!selectedClient}
+                aria-expanded={isEditorOpen}
               >
                 Edit
               </button>
@@ -276,7 +295,7 @@ export function ClientsSection({
           )}
         </div>
 
-        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
           <form
             aria-hidden={!isEditorOpen}
             className="editor-panel panel"

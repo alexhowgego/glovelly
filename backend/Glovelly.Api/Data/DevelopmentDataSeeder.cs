@@ -411,6 +411,47 @@ public static class DevelopmentDataSeeder
                         ReimbursementUpdatedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero),
                         ReimbursementMethod = "Invoice GLV-2026-002",
                         ReimbursementNote = "Seeded example of a reimbursed expense that should not regenerate as a chargeable invoice line."
+                    },
+                    new GigExpense
+                    {
+                        Id = DevelopmentGuid(5000),
+                        SortOrder = 3,
+                        Description = "Parking",
+                        Amount = 9.80m,
+                        ReimbursementStatus = GigExpenseReimbursementStatus.Unreimbursed
+                    },
+                    new GigExpense
+                    {
+                        Id = DevelopmentGuid(5001),
+                        SortOrder = 4,
+                        Description = "Train fare",
+                        Amount = 27.40m,
+                        ReimbursementStatus = GigExpenseReimbursementStatus.Unreimbursed
+                    },
+                    new GigExpense
+                    {
+                        Id = DevelopmentGuid(5002),
+                        SortOrder = 5,
+                        Description = "Replacement strings",
+                        Amount = 18.00m,
+                        ReimbursementStatus = GigExpenseReimbursementStatus.NotClaimable,
+                        ReimbursementUpdatedByUserId = seededAdminUserId,
+                        ReimbursementUpdatedAt = new DateTimeOffset(2026, 5, 11, 19, 0, 0, TimeSpan.Zero),
+                        ReimbursementNote = "Personal consumables, not billed to the client."
+                    },
+                    new GigExpense
+                    {
+                        Id = DevelopmentGuid(5003),
+                        SortOrder = 6,
+                        Description = "Accommodation deposit",
+                        Amount = 85.00m,
+                        ReimbursementStatus = GigExpenseReimbursementStatus.Reimbursed,
+                        ReimbursementInvoiceId = invoices[1].Id,
+                        ReimbursementUpdatedByUserId = seededAdminUserId,
+                        ReimbursedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero),
+                        ReimbursementUpdatedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero),
+                        ReimbursementMethod = "Invoice GLV-2026-002",
+                        ReimbursementNote = "Venue reimbursed accommodation directly."
                     }
                 ]
             }

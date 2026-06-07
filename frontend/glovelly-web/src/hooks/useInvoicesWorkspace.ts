@@ -193,6 +193,13 @@ export function useInvoicesWorkspace({
   }
 
   const closeInvoiceEditor = () => {
+    if (
+      (adjustmentAmount.trim().length > 0 || adjustmentReason.trim().length > 0) &&
+      !window.confirm('Discard unsaved invoice adjustment and close line items?')
+    ) {
+      return
+    }
+
     setIsInvoiceEditorOpen(false)
     setAdjustmentAmount('')
     setAdjustmentReason('')

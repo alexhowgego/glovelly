@@ -1,5 +1,8 @@
+import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { formatDateTime } from '../formatters'
+import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type { AdminSort, AdminSortKey, AdminUser, AdminUserForm } from '../types'
 
 type AdminSectionProps = {
@@ -49,6 +52,11 @@ export function AdminSection({
   selectedAdminUser,
   totalAdmins,
 }: AdminSectionProps) {
+  const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
+  const workspaceStyle = detailPanelBlockSize > 0
+    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
+    : undefined
   const adminSortOptions: { value: AdminSortKey; label: string }[] = [
     { value: 'displayName', label: 'User' },
     { value: 'email', label: 'Email' },
@@ -57,6 +65,16 @@ export function AdminSection({
     { value: 'enrolment', label: 'Sign-in' },
     { value: 'lastLogin', label: 'Last login' },
   ]
+
+  useEffect(() => {
+    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
+      return
+    }
+
+    window.setTimeout(() => {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [isEditorOpen])
 
   return (
     <section className="section-layout admin-zone">
@@ -85,7 +103,7 @@ export function AdminSection({
         </div>
       </div>
 
-      <div className="admin-workspace">
+      <div className="admin-workspace" style={workspaceStyle}>
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -181,7 +199,7 @@ export function AdminSection({
           </div>
         </div>
 
-        <div className="panel">
+        <div ref={detailPanelRef} className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Access Overview</p>
@@ -193,10 +211,11 @@ export function AdminSection({
             </div>
             <div className="actions">
               <button
-                className="ghost-button"
-                onClick={onStartEditing}
+                className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
+                onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
                 disabled={!selectedAdminUser}
+                aria-expanded={isEditorOpen}
               >
                 Edit access
               </button>
@@ -259,7 +278,7 @@ export function AdminSection({
           )}
         </div>
 
-        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
           <form
             aria-hidden={!isEditorOpen}
             className="editor-panel panel"

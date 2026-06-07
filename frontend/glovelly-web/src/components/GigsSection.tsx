@@ -1,5 +1,8 @@
+import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
+import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Client,
   Gig,
@@ -128,6 +131,11 @@ export function GigsSection({
   selectedGigIds,
   selectedGigs,
 }: GigsSectionProps) {
+  const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
+  const workspaceStyle = detailPanelBlockSize > 0
+    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
+    : undefined
   const selectedGigClientName =
     (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
   const selectedClientId = selectedGigs[0]?.clientId ?? null
@@ -150,9 +158,19 @@ export function GigsSection({
     { value: 'completed', label: 'Completed' },
   ]
 
+  useEffect(() => {
+    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
+      return
+    }
+
+    window.setTimeout(() => {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [isEditorOpen])
+
   return (
     <section className="section-layout">
-      <div className="gig-workspace">
+      <div className="gig-workspace" style={workspaceStyle}>
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -307,7 +325,7 @@ export function GigsSection({
           </div>
         </div>
 
-        <div className="panel">
+        <div ref={detailPanelRef} className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Gig Overview</p>
@@ -352,11 +370,12 @@ export function GigsSection({
                   : 'Expense statement'}
               </button>
               <button
-                className="ghost-button"
+                className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
                 data-testid="gig-edit-button"
-                onClick={onStartEditing}
+                onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
                 disabled={!selectedGig}
+                aria-expanded={isEditorOpen}
               >
                 Edit gig
               </button>
@@ -478,7 +497,7 @@ export function GigsSection({
           )}
         </div>
 
-        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
           <form
             aria-hidden={!isEditorOpen}
             className="editor-panel panel"

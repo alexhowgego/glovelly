@@ -214,6 +214,13 @@ export function useClientsWorkspace({
   }
 
   const closeClientEditor = () => {
+    if (
+      hasUnsavedClientEditorChanges() &&
+      !window.confirm('Discard unsaved client changes and close the editor?')
+    ) {
+      return
+    }
+
     setIsClientEditorOpen(false)
     setMode('create')
     setForm(emptyForm())

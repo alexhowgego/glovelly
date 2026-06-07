@@ -1,9 +1,12 @@
+import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import {
   formatCurrency,
   formatDate,
   formatDateTime,
   getAllowedInvoiceStatusTransitions,
 } from '../formatters'
+import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Invoice,
   InvoiceQuickFilter,
@@ -91,6 +94,11 @@ export function InvoicesSection({
   sellerProfileNotice,
   selectedInvoice,
 }: InvoicesSectionProps) {
+  const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
+  const workspaceStyle = detailPanelBlockSize > 0
+    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
+    : undefined
   const selectedInvoiceClientName =
     (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
     'Unknown client'
@@ -111,9 +119,19 @@ export function InvoicesSection({
     { value: 'paid', label: 'Paid' },
   ]
 
+  useEffect(() => {
+    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
+      return
+    }
+
+    window.setTimeout(() => {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [isEditorOpen])
+
   return (
     <section className="section-layout">
-      <div className="gig-workspace">
+      <div className="gig-workspace" style={workspaceStyle}>
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -258,7 +276,7 @@ export function InvoicesSection({
           </div>
         </div>
 
-        <div className="panel">
+        <div ref={detailPanelRef} className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Invoice Overview</p>
@@ -266,11 +284,12 @@ export function InvoicesSection({
             </div>
             <div className="actions">
               <button
-                className="ghost-button"
+                className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
                 data-testid="invoice-line-items-button"
-                onClick={onStartEditing}
+                onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
                 disabled={!selectedInvoice}
+                aria-expanded={isEditorOpen}
               >
                 Line items
               </button>
@@ -459,7 +478,7 @@ export function InvoicesSection({
           )}
         </div>
 
-        <div className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
+        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
           <div aria-hidden={!isEditorOpen} className="panel editor-panel">
             <div className="panel-heading">
               <div>

@@ -430,6 +430,13 @@ export function useGigsWorkspace({
   }
 
   const closeGigEditor = () => {
+    if (
+      hasUnsavedGigEditorChanges() &&
+      !window.confirm('Discard unsaved gig changes and close the editor?')
+    ) {
+      return
+    }
+
     setIsGigEditorOpen(false)
     setGigMode('create')
     setGigForm(toCreateGigForm(clients))
