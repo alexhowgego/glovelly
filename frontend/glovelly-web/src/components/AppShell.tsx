@@ -151,9 +151,15 @@ export function AppShell({
               </div>
 
               <div className="header-actions">
-                <label className="primary-button quick-receipt-button">
-                  <span aria-hidden="true">+</span>
-                  Scan receipt
+                <label className={`primary-button quick-receipt-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}>
+                  <span className="quick-receipt-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path d="M8.4 6.5 9.7 4h4.6l1.3 2.5H19a3 3 0 0 1 3 3V17a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V9.5a3 3 0 0 1 3-3h3.4Z" />
+                      <path d="M12 16.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+                      <path d="M18 10h.01" />
+                    </svg>
+                  </span>
+                  <span className="quick-receipt-label">Scan receipt</span>
                   <input
                     type="file"
                     accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"

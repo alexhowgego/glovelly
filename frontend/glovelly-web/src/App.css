@@ -124,17 +124,59 @@
   min-width: fit-content;
 }
 
-.quick-receipt-button {
+.primary-button.quick-receipt-button {
+  width: 52px;
+  min-width: 52px;
+  height: 52px;
   min-height: 52px;
-  padding-inline: 18px;
-  gap: 8px;
+  padding: 0;
+  border: 1px solid var(--surface-border);
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: none;
+  gap: 0;
   white-space: nowrap;
   cursor: pointer;
 }
 
-.quick-receipt-button span {
-  font-size: 1.2rem;
+.primary-button.quick-receipt-button:hover,
+.primary-button.quick-receipt-button:focus-visible {
+  background: transparent;
+  box-shadow: none;
+}
+
+.quick-receipt-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-gradient-soft);
+  color: white;
+  flex: 0 0 38px;
   line-height: 1;
+  box-shadow: var(--surface-shadow-soft);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.quick-receipt-button:hover .quick-receipt-icon,
+.quick-receipt-button:focus-visible .quick-receipt-icon {
+  transform: translateY(-1px);
+  box-shadow: var(--surface-shadow-soft);
+}
+
+.quick-receipt-icon svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .quick-receipt-button input,
@@ -144,6 +186,16 @@
   block-size: 1px;
   opacity: 0;
   pointer-events: none;
+}
+
+.quick-receipt-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .content-header-copy,
@@ -2515,9 +2567,37 @@ button:disabled {
     justify-content: space-between;
   }
 
-  .quick-receipt-button {
-    flex: 1;
+  .primary-button.quick-receipt-button {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    z-index: 70;
+    width: 52px;
+    min-width: 52px;
+    height: 52px;
+    min-height: 52px;
+    flex: 0 0 52px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
     justify-content: center;
+  }
+
+  .primary-button.quick-receipt-button:hover,
+  .primary-button.quick-receipt-button:focus-visible {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .quick-receipt-button .quick-receipt-icon {
+    opacity: 0.62;
+  }
+
+  .quick-receipt-button.mobile-scrolled .quick-receipt-icon,
+  .quick-receipt-button:hover .quick-receipt-icon,
+  .quick-receipt-button:focus-visible .quick-receipt-icon {
+    opacity: 1;
   }
 
   .content-header.panel {
