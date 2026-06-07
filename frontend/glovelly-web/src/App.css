@@ -587,7 +587,7 @@
 }
 
 .expense-statement-body.has-preview {
-  grid-template-columns: minmax(280px, 0.58fr) minmax(620px, 1.42fr);
+  grid-template-columns: 1fr;
   align-items: stretch;
 }
 
@@ -2535,14 +2535,22 @@ button:disabled {
   .content-header-copy {
     grid-column: 1;
     gap: 8px;
+    padding-right: 66px;
   }
 
   .content-header-copy .hero-text {
     display: none;
   }
 
-  .content-header-copy h2 {
-    font-size: clamp(1.55rem, 8vw, 2.2rem);
+  .content-header-copy h1 {
+    max-width: 11ch;
+    font-size: clamp(1.7rem, 7vw, 2.05rem);
+    line-height: 0.98;
+    text-wrap: balance;
+  }
+
+  .content-header-copy .eyebrow {
+    letter-spacing: 0.14em;
   }
 
   .dashboard-summary {
@@ -2643,9 +2651,44 @@ button:disabled {
     max-height: min(100svh - 28px, 860px);
   }
 
+  .invoice-generation-preview-modal {
+    gap: 12px;
+    overflow: auto;
+  }
+
+  .invoice-generation-preview-frame iframe {
+    height: 62svh;
+    min-height: 430px;
+  }
+
   .expense-statement-modal {
     height: min(100svh - 28px, 860px);
     overflow: auto;
+    grid-template-rows: auto auto auto auto auto;
+    gap: 10px;
+  }
+
+  .expense-statement-modal .panel-heading,
+  .expense-statement-footer {
+    gap: 10px;
+  }
+
+  .expense-statement-summary {
+    gap: 8px;
+  }
+
+  .expense-statement-summary article {
+    padding: 9px 10px;
+  }
+
+  .expense-statement-summary span {
+    font-size: 1rem;
+  }
+
+  .expense-statement-options .checkbox-field {
+    min-height: 40px;
+    padding: 8px 10px;
+    border-radius: 14px;
   }
 
   .gig-imports-modal {
@@ -2662,6 +2705,7 @@ button:disabled {
   .expense-statement-body.without-preview {
     grid-template-columns: 1fr;
     overflow: visible;
+    gap: 10px;
   }
 
   .expense-statement-options {
@@ -2669,15 +2713,17 @@ button:disabled {
   }
 
   .expense-statement-gigs {
-    max-height: 38svh;
-  }
-
-  .expense-statement-preview iframe {
-    height: 55svh;
-    min-height: 320px;
+    max-height: 54svh;
   }
 
   .expense-statement-preview {
-    min-height: 0;
+    min-height: 360px;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .expense-statement-preview iframe {
+    height: 48svh;
+    min-height: 360px;
   }
 }
