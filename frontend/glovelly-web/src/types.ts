@@ -244,7 +244,7 @@ export type Gig = {
   expenses: GigExpense[]
 }
 
-export type GigSortKey = 'date' | 'title' | 'client' | 'venue' | 'fee' | 'status'
+export type GigSortKey = 'priority' | 'date' | 'title' | 'client' | 'venue' | 'fee' | 'status'
 export type GigSort = {
   key: GigSortKey
   direction: SortDirection
@@ -382,6 +382,7 @@ export type Invoice = {
 }
 
 export type InvoiceSortKey =
+  | 'priority'
   | 'invoiceDate'
   | 'dueDate'
   | 'invoiceNumber'

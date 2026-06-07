@@ -37,8 +37,8 @@ export function useInvoicesWorkspace({
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
   const [invoiceSort, setInvoiceSort] = useState<InvoiceSort>({
-    key: 'invoiceDate',
-    direction: 'desc',
+    key: 'priority',
+    direction: 'asc',
   })
   const [invoiceStatus, setInvoiceStatus] = useState(defaultInvoiceStatus)
   const [googleDrivePublishLink, setGoogleDrivePublishLink] =
@@ -59,6 +59,35 @@ export function useInvoicesWorkspace({
     const compareText = (left: string, right: string) => left.localeCompare(right)
     const compareNumber = (left: number, right: number) => left - right
     const getClientName = (invoice: Invoice) => clientNamesById.get(invoice.clientId) ?? ''
+    const getPriorityBucket = (invoice: Invoice) => {
+      switch (invoice.status) {
+        case 'Overdue':
+          return 0
+        case 'Issued':
+          return 1
+        case 'Draft':
+          return 2
+        case 'Paid':
+          return 4
+        case 'Cancelled':
+          return 5
+        default:
+          return 3
+      }
+    }
+    const comparePriority = (left: Invoice, right: Invoice) => {
+      const bucketComparison = getPriorityBucket(left) - getPriorityBucket(right)
+      if (bucketComparison !== 0) {
+        return bucketComparison
+      }
+
+      const bucket = getPriorityBucket(left)
+      if (bucket === 0 || bucket === 1) {
+        return compareText(left.dueDate, right.dueDate)
+      }
+
+      return compareText(right.invoiceDate, left.invoiceDate)
+    }
     const compareByKey = (left: Invoice, right: Invoice) => {
       switch (invoiceSort.key) {
         case 'client':
@@ -71,6 +100,8 @@ export function useInvoicesWorkspace({
           return compareText(left.status, right.status)
         case 'total':
           return compareNumber(left.total, right.total)
+        case 'priority':
+          return comparePriority(left, right)
         case 'invoiceDate':
         default:
           return compareText(left.invoiceDate, right.invoiceDate)
@@ -127,7 +158,7 @@ export function useInvoicesWorkspace({
     setSelectedInvoiceId('')
     setIsInvoiceEditorOpen(false)
     setInvoiceSearchQuery('')
-    setInvoiceSort({ key: 'invoiceDate', direction: 'desc' })
+    setInvoiceSort({ key: 'priority', direction: 'asc' })
     setInvoiceStatus(defaultInvoiceStatus)
     setGoogleDrivePublishLink(null)
     setIsInvoiceLoading(false)

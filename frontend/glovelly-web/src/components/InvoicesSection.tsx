@@ -85,6 +85,7 @@ export function InvoicesSection({
     (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
     'Unknown client'
   const invoiceSortOptions: { value: InvoiceSortKey; label: string }[] = [
+    { value: 'priority', label: 'Priority' },
     { value: 'invoiceDate', label: 'Date' },
     { value: 'dueDate', label: 'Due date' },
     { value: 'invoiceNumber', label: 'Invoice' },

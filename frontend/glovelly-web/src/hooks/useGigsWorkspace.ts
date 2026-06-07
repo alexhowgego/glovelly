@@ -60,7 +60,7 @@ export function useGigsWorkspace({
   const [selectedGigId, setSelectedGigId] = useState<string>('')
   const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
   const [gigSearchQuery, setGigSearchQuery] = useState('')
-  const [gigSort, setGigSort] = useState<GigSort>({ key: 'date', direction: 'desc' })
+  const [gigSort, setGigSort] = useState<GigSort>({ key: 'priority', direction: 'asc' })
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
@@ -75,10 +75,47 @@ export function useGigsWorkspace({
 
   const filteredGigs = useMemo(() => {
     const query = deferredGigSearchQuery.trim().toLowerCase()
+    const today = new Date().toISOString().slice(0, 10)
     const sortDirection = gigSort.direction === 'asc' ? 1 : -1
     const compareText = (left: string, right: string) => left.localeCompare(right)
     const compareNumber = (left: number, right: number) => left - right
     const getClientName = (gig: Gig) => clientNamesById.get(gig.clientId) ?? ''
+    const getPriorityBucket = (gig: Gig) => {
+      if (gig.status === 'Cancelled') {
+        return 5
+      }
+
+      if (gig.status === 'Confirmed' && gig.date >= today) {
+        return 0
+      }
+
+      if (gig.status === 'Completed' && !gig.isInvoiced && gig.date <= today) {
+        return 1
+      }
+
+      if (gig.status === 'Confirmed' && !gig.isInvoiced && gig.date < today) {
+        return 2
+      }
+
+      if (gig.status === 'Draft') {
+        return 3
+      }
+
+      return 4
+    }
+    const comparePriority = (left: Gig, right: Gig) => {
+      const bucketComparison = getPriorityBucket(left) - getPriorityBucket(right)
+      if (bucketComparison !== 0) {
+        return bucketComparison
+      }
+
+      const bucket = getPriorityBucket(left)
+      if (bucket === 0) {
+        return compareText(left.date, right.date)
+      }
+
+      return compareText(right.date, left.date)
+    }
     const compareByKey = (left: Gig, right: Gig) => {
       switch (gigSort.key) {
         case 'client':
@@ -91,6 +128,8 @@ export function useGigsWorkspace({
           return compareText(left.title, right.title)
         case 'venue':
           return compareText(left.venue, right.venue)
+        case 'priority':
+          return comparePriority(left, right)
         case 'date':
         default:
           return compareText(left.date, right.date)
@@ -211,7 +250,7 @@ export function useGigsWorkspace({
     setSelectedGigId('')
     setSelectedGigIds([])
     setGigSearchQuery('')
-    setGigSort({ key: 'date', direction: 'desc' })
+    setGigSort({ key: 'priority', direction: 'asc' })
     setIsGigEditorOpen(false)
     setGigMode('create')
     setGigForm(emptyGigForm())

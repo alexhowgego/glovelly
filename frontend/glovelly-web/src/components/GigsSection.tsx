@@ -129,6 +129,7 @@ export function GigsSection({
   const hasCrossClientSelection = new Set(selectedGigs.map((gig) => gig.clientId)).size > 1
   const hasInvoicedSelection = selectedGigs.some((gig) => gig.isInvoiced)
   const gigSortOptions: { value: GigSortKey; label: string }[] = [
+    { value: 'priority', label: 'Priority' },
     { value: 'date', label: 'Date' },
     { value: 'title', label: 'Gig' },
     { value: 'client', label: 'Client' },
