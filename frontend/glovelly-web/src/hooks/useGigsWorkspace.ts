@@ -25,6 +25,7 @@ import type {
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
+  GigQuickFilter,
   GigSort,
   Invoice,
 } from '../types'
@@ -60,6 +61,7 @@ export function useGigsWorkspace({
   const [selectedGigId, setSelectedGigId] = useState<string>('')
   const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
   const [gigSearchQuery, setGigSearchQuery] = useState('')
+  const [gigQuickFilter, setGigQuickFilter] = useState<GigQuickFilter>('all')
   const [gigSort, setGigSort] = useState<GigSort>({ key: 'priority', direction: 'asc' })
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
@@ -153,12 +155,27 @@ export function useGigsWorkspace({
 
       return left.id.localeCompare(right.id)
     })
+    const quickFilteredGigs = sortedGigs.filter((gig) => {
+      switch (gigQuickFilter) {
+        case 'completed':
+          return gig.status === 'Completed'
+        case 'drafts':
+          return gig.status === 'Draft'
+        case 'uninvoiced':
+          return !gig.isInvoiced && gig.status !== 'Cancelled'
+        case 'upcoming':
+          return gig.status !== 'Cancelled' && gig.date >= today
+        case 'all':
+        default:
+          return true
+      }
+    })
 
     if (!query) {
-      return sortedGigs
+      return quickFilteredGigs
     }
 
-    return sortedGigs.filter((gig) => {
+    return quickFilteredGigs.filter((gig) => {
       const clientName = clientNamesById.get(gig.clientId) ?? ''
 
       return [gig.title, gig.venue, gig.date, gig.status, clientName]
@@ -166,7 +183,7 @@ export function useGigsWorkspace({
         .toLowerCase()
         .includes(query)
     })
-  }, [clientNamesById, deferredGigSearchQuery, gigSort, gigs])
+  }, [clientNamesById, deferredGigSearchQuery, gigQuickFilter, gigSort, gigs])
 
   const selectedGig = gigsById.get(selectedGigId) ?? filteredGigs[0] ?? null
 
@@ -250,6 +267,7 @@ export function useGigsWorkspace({
     setSelectedGigId('')
     setSelectedGigIds([])
     setGigSearchQuery('')
+    setGigQuickFilter('all')
     setGigSort({ key: 'priority', direction: 'asc' })
     setIsGigEditorOpen(false)
     setGigMode('create')
@@ -1116,6 +1134,7 @@ export function useGigsWorkspace({
     gigExpenseDescription,
     gigForm,
     gigMode,
+    gigQuickFilter,
     gigSearchQuery,
     gigSort,
     gigStatus,
@@ -1144,6 +1163,7 @@ export function useGigsWorkspace({
     setGigExpenseAmount,
     setGigExpenseDescription,
     setGigs,
+    setGigQuickFilter,
     setGigSearchQuery,
     setGigSort,
     setGigStatus,

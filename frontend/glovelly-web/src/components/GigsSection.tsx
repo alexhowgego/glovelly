@@ -6,6 +6,7 @@ import type {
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
+  GigQuickFilter,
   GigSort,
   GigSortKey,
   GigStatus,
@@ -22,6 +23,7 @@ type GigsSectionProps = {
   gigForm: GigForm
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
+  gigQuickFilter: GigQuickFilter
   gigSearchQuery: string
   gigSort: GigSort
   gigStatus: string
@@ -46,6 +48,7 @@ type GigsSectionProps = {
   onDeleteExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
+  onQuickFilterChange: (filter: GigQuickFilter) => void
   onSearchQueryChange: (value: string) => void
   onSelectGig: (gigId: string) => void
   onSortChange: (sort: GigSort) => void
@@ -83,6 +86,7 @@ export function GigsSection({
   gigForm,
   isEditorOpen,
   gigMode,
+  gigQuickFilter,
   gigSearchQuery,
   gigSort,
   gigStatus,
@@ -107,6 +111,7 @@ export function GigsSection({
   onDeleteExpenseAttachment,
   onRemoveGigExpense,
   onResetForm,
+  onQuickFilterChange,
   onSearchQueryChange,
   onSelectGig,
   onSortChange,
@@ -137,6 +142,13 @@ export function GigsSection({
     { value: 'fee', label: 'Fee' },
     { value: 'status', label: 'Status' },
   ]
+  const gigFilterOptions: { value: GigQuickFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'upcoming', label: 'Upcoming' },
+    { value: 'uninvoiced', label: 'Uninvoiced' },
+    { value: 'drafts', label: 'Drafts' },
+    { value: 'completed', label: 'Completed' },
+  ]
 
   return (
     <section className="section-layout">
@@ -149,53 +161,6 @@ export function GigsSection({
             </div>
             <button className="ghost-button" data-testid="new-gig-button" onClick={onResetForm} type="button">
               New gig
-            </button>
-          </div>
-
-          <label className="search-field">
-            <span>Search</span>
-              <input
-                data-testid="gig-search-input"
-                type="search"
-              placeholder="Client, title, venue..."
-              value={gigSearchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-            />
-          </label>
-
-          <div className="compact-list-toolbar" aria-label="Gig list controls">
-            <label>
-              <span>Sort by</span>
-              <select
-                value={gigSort.key}
-                onChange={(event) =>
-                  onSortChange({ ...gigSort, key: event.target.value as GigSortKey })
-                }
-              >
-                {gigSortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="compact-sort-direction"
-              type="button"
-              aria-label={
-                gigSort.direction === 'asc'
-                  ? 'Sort ascending. Click to sort descending.'
-                  : 'Sort descending. Click to sort ascending.'
-              }
-              title={gigSort.direction === 'asc' ? 'Ascending' : 'Descending'}
-              onClick={() =>
-                onSortChange({
-                  ...gigSort,
-                  direction: gigSort.direction === 'asc' ? 'desc' : 'asc',
-                })
-              }
-            >
-              {gigSort.direction === 'asc' ? '↑' : '↓'}
             </button>
           </div>
 
@@ -212,6 +177,66 @@ export function GigsSection({
               <span>{completedGigCount}</span>
               <p>completed</p>
             </article>
+          </div>
+
+          <div className="compact-list-controls" aria-label="Gig list controls">
+            <div className="compact-list-main-controls">
+              <label className="search-field compact-search-field">
+                <span>Search</span>
+                <input
+                  data-testid="gig-search-input"
+                  type="search"
+                  placeholder="Client, title, venue..."
+                  value={gigSearchQuery}
+                  onChange={(event) => onSearchQueryChange(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Sort by</span>
+                <select
+                  value={gigSort.key}
+                  onChange={(event) =>
+                    onSortChange({ ...gigSort, key: event.target.value as GigSortKey })
+                  }
+                >
+                  {gigSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="compact-sort-direction"
+                type="button"
+                aria-label={
+                  gigSort.direction === 'asc'
+                    ? 'Sort ascending. Click to sort descending.'
+                    : 'Sort descending. Click to sort ascending.'
+                }
+                title={gigSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+                onClick={() =>
+                  onSortChange({
+                    ...gigSort,
+                    direction: gigSort.direction === 'asc' ? 'desc' : 'asc',
+                  })
+                }
+              >
+                {gigSort.direction === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+            <div className="compact-filter-chips" aria-label="Gig filters">
+              {gigFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={`compact-filter-chip ${gigQuickFilter === option.value ? 'selected' : ''}`}
+                  type="button"
+                  onClick={() => onQuickFilterChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="compact-record-list gig-record-list" aria-label="Gigs">

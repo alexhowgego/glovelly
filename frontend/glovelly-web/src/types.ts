@@ -249,6 +249,7 @@ export type GigSort = {
   key: GigSortKey
   direction: SortDirection
 }
+export type GigQuickFilter = 'all' | 'upcoming' | 'uninvoiced' | 'drafts' | 'completed'
 
 export type GigImportDraftConfidence = 'Low' | 'Medium' | 'High'
 export type GigImportDraftStatus = 'Pending' | 'Accepted' | 'Rejected' | 'Committed'
@@ -393,6 +394,7 @@ export type InvoiceSort = {
   key: InvoiceSortKey
   direction: SortDirection
 }
+export type InvoiceQuickFilter = 'all' | 'outstanding' | 'drafts' | 'overdue' | 'paid'
 
 export type GigForm = {
   clientId: string

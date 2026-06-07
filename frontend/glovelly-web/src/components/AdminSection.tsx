@@ -97,50 +97,51 @@ export function AdminSection({
             </button>
           </div>
 
-          <label className="search-field">
-            <span>Search</span>
-            <input
-              type="search"
-              placeholder="Name, email, role..."
-              value={adminSearchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-            />
-          </label>
-
-          <div className="compact-list-toolbar" aria-label="Admin user list controls">
-            <label>
-              <span>Sort by</span>
-              <select
-                value={adminSort.key}
-                onChange={(event) =>
-                  onSortChange({ ...adminSort, key: event.target.value as AdminSortKey })
+          <div className="compact-list-controls" aria-label="Admin user list controls">
+            <div className="compact-list-main-controls">
+              <label className="search-field compact-search-field">
+                <span>Search</span>
+                <input
+                  type="search"
+                  placeholder="Name, email, role..."
+                  value={adminSearchQuery}
+                  onChange={(event) => onSearchQueryChange(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Sort by</span>
+                <select
+                  value={adminSort.key}
+                  onChange={(event) =>
+                    onSortChange({ ...adminSort, key: event.target.value as AdminSortKey })
+                  }
+                >
+                  {adminSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="compact-sort-direction"
+                type="button"
+                aria-label={
+                  adminSort.direction === 'asc'
+                    ? 'Sort ascending. Click to sort descending.'
+                    : 'Sort descending. Click to sort ascending.'
+                }
+                title={adminSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+                onClick={() =>
+                  onSortChange({
+                    ...adminSort,
+                    direction: adminSort.direction === 'asc' ? 'desc' : 'asc',
+                  })
                 }
               >
-                {adminSortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="compact-sort-direction"
-              type="button"
-              aria-label={
-                adminSort.direction === 'asc'
-                  ? 'Sort ascending. Click to sort descending.'
-                  : 'Sort descending. Click to sort ascending.'
-              }
-              title={adminSort.direction === 'asc' ? 'Ascending' : 'Descending'}
-              onClick={() =>
-                onSortChange({
-                  ...adminSort,
-                  direction: adminSort.direction === 'asc' ? 'desc' : 'asc',
-                })
-              }
-            >
-              {adminSort.direction === 'asc' ? '↑' : '↓'}
-            </button>
+                {adminSort.direction === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
           </div>
 
           <div className="compact-record-list admin-record-list" aria-label="People with access">

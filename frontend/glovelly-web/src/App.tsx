@@ -187,6 +187,7 @@ function App({ appMetadata }: AppProps) {
     gigExpenseDescription,
     gigForm,
     gigMode,
+    gigQuickFilter,
     gigSearchQuery,
     gigSort,
     gigStatus,
@@ -217,6 +218,7 @@ function App({ appMetadata }: AppProps) {
     setGigExpenseAmount,
     setGigExpenseDescription,
     setGigs,
+    setGigQuickFilter,
     setGigSearchQuery,
     setGigSort,
     setGigStatus,
@@ -282,6 +284,7 @@ function App({ appMetadata }: AppProps) {
     handlePublishInvoiceGoogleDrive,
     handleSendInvoiceEmail,
     invoices,
+    invoiceQuickFilter,
     invoiceSearchQuery,
     invoiceSort,
     invoiceStatus,
@@ -295,6 +298,7 @@ function App({ appMetadata }: AppProps) {
     setInvoices,
     setInvoiceStatus,
     setIsInvoiceLoading,
+    setInvoiceQuickFilter,
     setSelectedInvoiceId,
     setInvoiceSearchQuery,
     setInvoiceSort,
@@ -1414,6 +1418,7 @@ function App({ appMetadata }: AppProps) {
         gigForm={gigForm}
         isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
+        gigQuickFilter={gigQuickFilter}
         gigSearchQuery={gigSearchQuery}
         gigSort={gigSort}
         gigStatus={gigStatus}
@@ -1438,6 +1443,7 @@ function App({ appMetadata }: AppProps) {
         onDeleteExpenseAttachment={deleteExpenseAttachment}
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
+        onQuickFilterChange={setGigQuickFilter}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={selectGig}
         onSortChange={setGigSort}
@@ -1462,6 +1468,7 @@ function App({ appMetadata }: AppProps) {
         draftInvoiceCount={draftInvoiceCount}
         filteredInvoices={filteredInvoices}
         isEditorOpen={isInvoiceEditorOpen}
+        invoiceQuickFilter={invoiceQuickFilter}
         invoiceSearchQuery={invoiceSearchQuery}
         invoiceSort={invoiceSort}
         invoiceStatus={invoiceStatus}
@@ -1487,6 +1494,7 @@ function App({ appMetadata }: AppProps) {
         onPublishGoogleDrive={handlePublishInvoiceGoogleDriveWithIssuePrompt}
         onReissue={handleInvoiceReissueWithPreview}
         onSendEmail={handleSendInvoiceEmailWithIssuePrompt}
+        onQuickFilterChange={setInvoiceQuickFilter}
         onSearchQueryChange={setInvoiceSearchQuery}
         onSelectInvoice={setSelectedInvoiceId}
         onSortChange={setInvoiceSort}

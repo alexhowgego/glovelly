@@ -1250,28 +1250,82 @@
   background: var(--surface-elevated);
 }
 
-.compact-list-toolbar {
+.compact-list-controls {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  gap: 12px;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-panel) 94%, var(--surface-elevated));
+  box-shadow: var(--surface-shadow-soft);
+}
+
+.compact-list-main-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.42fr) max-content;
+  gap: 10px;
   align-items: end;
 }
 
-.compact-list-toolbar label {
+.compact-list-controls label {
   display: grid;
   gap: 6px;
   min-width: 0;
 }
 
-.compact-list-toolbar span {
+.compact-list-controls span {
   color: var(--muted-strong);
   font-size: 0.78rem;
 }
 
-.compact-list-toolbar select {
+.compact-search-field {
+  min-width: 0;
+}
+
+.compact-list-controls select {
   height: 40px;
   min-height: 40px;
   border-radius: 12px;
+}
+
+.compact-filter-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.compact-filter-chip {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 90%, transparent);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.compact-filter-chip:hover,
+.compact-filter-chip:focus-visible,
+.compact-filter-chip.selected {
+  background: var(--surface-accent);
+  border-color: color-mix(in srgb, #f47d2a 42%, var(--surface-border));
+  color: var(--heading);
+}
+
+.compact-filter-chip:hover,
+.compact-filter-chip:focus-visible {
+  transform: translateY(-1px);
 }
 
 .compact-sort-direction {
@@ -2046,8 +2100,12 @@ button:disabled {
     border-radius: 16px;
   }
 
-  .compact-list-toolbar {
-    grid-template-columns: 1fr;
+  .compact-list-main-controls {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .compact-search-field {
+    grid-column: 1 / -1;
   }
 
   .compact-sort-direction {

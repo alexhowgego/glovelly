@@ -85,51 +85,52 @@ export function ClientsSection({
             </button>
           </div>
 
-          <label className="search-field">
-            <span>Search</span>
-            <input
-              data-testid="client-search-input"
-              type="search"
-              placeholder="Name, email, city..."
-              value={searchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-            />
-          </label>
-
-          <div className="compact-list-toolbar" aria-label="Client list controls">
-            <label>
-              <span>Sort by</span>
-              <select
-                value={clientSort.key}
-                onChange={(event) =>
-                  onSortChange({ ...clientSort, key: event.target.value as ClientSortKey })
+          <div className="compact-list-controls" aria-label="Client list controls">
+            <div className="compact-list-main-controls">
+              <label className="search-field compact-search-field">
+                <span>Search</span>
+                <input
+                  data-testid="client-search-input"
+                  type="search"
+                  placeholder="Name, email, city..."
+                  value={searchQuery}
+                  onChange={(event) => onSearchQueryChange(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Sort by</span>
+                <select
+                  value={clientSort.key}
+                  onChange={(event) =>
+                    onSortChange({ ...clientSort, key: event.target.value as ClientSortKey })
+                  }
+                >
+                  {clientSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="compact-sort-direction"
+                type="button"
+                aria-label={
+                  clientSort.direction === 'asc'
+                    ? 'Sort ascending. Click to sort descending.'
+                    : 'Sort descending. Click to sort ascending.'
+                }
+                title={clientSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+                onClick={() =>
+                  onSortChange({
+                    ...clientSort,
+                    direction: clientSort.direction === 'asc' ? 'desc' : 'asc',
+                  })
                 }
               >
-                {clientSortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="compact-sort-direction"
-              type="button"
-              aria-label={
-                clientSort.direction === 'asc'
-                  ? 'Sort ascending. Click to sort descending.'
-                  : 'Sort descending. Click to sort ascending.'
-              }
-              title={clientSort.direction === 'asc' ? 'Ascending' : 'Descending'}
-              onClick={() =>
-                onSortChange({
-                  ...clientSort,
-                  direction: clientSort.direction === 'asc' ? 'desc' : 'asc',
-                })
-              }
-            >
-              {clientSort.direction === 'asc' ? '↑' : '↓'}
-            </button>
+                {clientSort.direction === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
           </div>
 
           <div className="compact-record-list client-record-list" aria-label="Clients">

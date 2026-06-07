@@ -9,7 +9,7 @@ import {
 } from '../api'
 import { defaultInvoiceStatus } from '../forms'
 import { formatCurrency, formatDateTime } from '../formatters'
-import type { Invoice, InvoiceSort, InvoiceStatus } from '../types'
+import type { Invoice, InvoiceQuickFilter, InvoiceSort, InvoiceStatus } from '../types'
 
 type GoogleDrivePublishLink = {
   href: string
@@ -36,6 +36,8 @@ export function useInvoicesWorkspace({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('')
+  const [invoiceQuickFilter, setInvoiceQuickFilter] =
+    useState<InvoiceQuickFilter>('all')
   const [invoiceSort, setInvoiceSort] = useState<InvoiceSort>({
     key: 'priority',
     direction: 'asc',
@@ -125,12 +127,27 @@ export function useInvoicesWorkspace({
 
       return left.id.localeCompare(right.id)
     })
+    const quickFilteredInvoices = sortedInvoices.filter((invoice) => {
+      switch (invoiceQuickFilter) {
+        case 'drafts':
+          return invoice.status === 'Draft'
+        case 'outstanding':
+          return invoice.status !== 'Paid' && invoice.status !== 'Cancelled'
+        case 'overdue':
+          return invoice.status === 'Overdue'
+        case 'paid':
+          return invoice.status === 'Paid'
+        case 'all':
+        default:
+          return true
+      }
+    })
 
     if (!query) {
-      return sortedInvoices
+      return quickFilteredInvoices
     }
 
-    return sortedInvoices.filter((invoice) => {
+    return quickFilteredInvoices.filter((invoice) => {
       const clientName = clientNamesById.get(invoice.clientId) ?? ''
 
       return [
@@ -143,7 +160,7 @@ export function useInvoicesWorkspace({
         .toLowerCase()
         .includes(query)
     })
-  }, [clientNamesById, deferredInvoiceSearchQuery, invoiceSort, invoices])
+  }, [clientNamesById, deferredInvoiceSearchQuery, invoiceQuickFilter, invoiceSort, invoices])
 
   const selectedInvoice =
     invoicesById.get(selectedInvoiceId) ?? filteredInvoices[0] ?? null
@@ -158,6 +175,7 @@ export function useInvoicesWorkspace({
     setSelectedInvoiceId('')
     setIsInvoiceEditorOpen(false)
     setInvoiceSearchQuery('')
+    setInvoiceQuickFilter('all')
     setInvoiceSort({ key: 'priority', direction: 'asc' })
     setInvoiceStatus(defaultInvoiceStatus)
     setGoogleDrivePublishLink(null)
@@ -519,6 +537,7 @@ export function useInvoicesWorkspace({
     handlePublishInvoiceGoogleDrive,
     handleSendInvoiceEmail,
     invoices,
+    invoiceQuickFilter,
     invoiceSearchQuery,
     invoiceSort,
     invoiceStatus,
@@ -533,6 +552,7 @@ export function useInvoicesWorkspace({
     setInvoices,
     setInvoiceStatus,
     setIsInvoiceLoading,
+    setInvoiceQuickFilter,
     setSelectedInvoiceId,
     setInvoiceSearchQuery,
     setInvoiceSort,

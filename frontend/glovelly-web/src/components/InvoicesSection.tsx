@@ -4,7 +4,13 @@ import {
   formatDateTime,
   getAllowedInvoiceStatusTransitions,
 } from '../formatters'
-import type { Invoice, InvoiceSort, InvoiceSortKey, InvoiceStatus } from '../types'
+import type {
+  Invoice,
+  InvoiceQuickFilter,
+  InvoiceSort,
+  InvoiceSortKey,
+  InvoiceStatus,
+} from '../types'
 
 type InvoicesSectionProps = {
   adjustmentAmount: string
@@ -14,6 +20,7 @@ type InvoicesSectionProps = {
   filteredInvoices: Invoice[]
   googleDrivePublishLink: { href: string; fileName: string | null } | null
   isEditorOpen: boolean
+  invoiceQuickFilter: InvoiceQuickFilter
   invoiceSearchQuery: string
   invoiceSort: InvoiceSort
   invoiceStatus: string
@@ -36,6 +43,7 @@ type InvoicesSectionProps = {
   onPublishGoogleDrive: (invoice: Invoice) => Promise<Invoice | null>
   onReissue: (invoice: Invoice) => Promise<Invoice | null>
   onSendEmail: (invoice: Invoice) => Promise<Invoice | null>
+  onQuickFilterChange: (filter: InvoiceQuickFilter) => void
   onSearchQueryChange: (value: string) => void
   onSelectInvoice: (invoiceId: string) => void
   onSortChange: (sort: InvoiceSort) => void
@@ -52,6 +60,7 @@ export function InvoicesSection({
   filteredInvoices,
   googleDrivePublishLink,
   isEditorOpen,
+  invoiceQuickFilter,
   invoiceSearchQuery,
   invoiceSort,
   invoiceStatus,
@@ -74,6 +83,7 @@ export function InvoicesSection({
   onPublishGoogleDrive,
   onReissue,
   onSendEmail,
+  onQuickFilterChange,
   onSearchQueryChange,
   onSelectInvoice,
   onSortChange,
@@ -92,6 +102,13 @@ export function InvoicesSection({
     { value: 'client', label: 'Client' },
     { value: 'status', label: 'Status' },
     { value: 'total', label: 'Total' },
+  ]
+  const invoiceFilterOptions: { value: InvoiceQuickFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'outstanding', label: 'Outstanding' },
+    { value: 'drafts', label: 'Drafts' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'paid', label: 'Paid' },
   ]
 
   return (
@@ -122,53 +139,6 @@ export function InvoicesSection({
             </span>
           </div>
 
-          <label className="search-field">
-            <span>Search</span>
-            <input
-              data-testid="invoice-search-input"
-              type="search"
-              placeholder="Invoice number, client or description..."
-              value={invoiceSearchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-            />
-          </label>
-
-          <div className="compact-list-toolbar" aria-label="Invoice list controls">
-            <label>
-              <span>Sort by</span>
-              <select
-                value={invoiceSort.key}
-                onChange={(event) =>
-                  onSortChange({ ...invoiceSort, key: event.target.value as InvoiceSortKey })
-                }
-              >
-                {invoiceSortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="compact-sort-direction"
-              type="button"
-              aria-label={
-                invoiceSort.direction === 'asc'
-                  ? 'Sort ascending. Click to sort descending.'
-                  : 'Sort descending. Click to sort ascending.'
-              }
-              title={invoiceSort.direction === 'asc' ? 'Ascending' : 'Descending'}
-              onClick={() =>
-                onSortChange({
-                  ...invoiceSort,
-                  direction: invoiceSort.direction === 'asc' ? 'desc' : 'asc',
-                })
-              }
-            >
-              {invoiceSort.direction === 'asc' ? '↑' : '↓'}
-            </button>
-          </div>
-
           <div className="gig-summary-grid">
             <article>
               <span>{invoices.length}</span>
@@ -182,6 +152,66 @@ export function InvoicesSection({
               <span>{issuedInvoiceCount}</span>
               <p>issued</p>
             </article>
+          </div>
+
+          <div className="compact-list-controls" aria-label="Invoice list controls">
+            <div className="compact-list-main-controls">
+              <label className="search-field compact-search-field">
+                <span>Search</span>
+                <input
+                  data-testid="invoice-search-input"
+                  type="search"
+                  placeholder="Invoice number, client or description..."
+                  value={invoiceSearchQuery}
+                  onChange={(event) => onSearchQueryChange(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Sort by</span>
+                <select
+                  value={invoiceSort.key}
+                  onChange={(event) =>
+                    onSortChange({ ...invoiceSort, key: event.target.value as InvoiceSortKey })
+                  }
+                >
+                  {invoiceSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="compact-sort-direction"
+                type="button"
+                aria-label={
+                  invoiceSort.direction === 'asc'
+                    ? 'Sort ascending. Click to sort descending.'
+                    : 'Sort descending. Click to sort ascending.'
+                }
+                title={invoiceSort.direction === 'asc' ? 'Ascending' : 'Descending'}
+                onClick={() =>
+                  onSortChange({
+                    ...invoiceSort,
+                    direction: invoiceSort.direction === 'asc' ? 'desc' : 'asc',
+                  })
+                }
+              >
+                {invoiceSort.direction === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+            <div className="compact-filter-chips" aria-label="Invoice filters">
+              {invoiceFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={`compact-filter-chip ${invoiceQuickFilter === option.value ? 'selected' : ''}`}
+                  type="button"
+                  onClick={() => onQuickFilterChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="compact-record-list invoice-record-list" aria-label="Invoices">
