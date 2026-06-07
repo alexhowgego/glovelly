@@ -1738,6 +1738,7 @@ button.compact-record-row.selected {
   grid-column: 1 / -1;
   display: grid;
   gap: 6px;
+  min-width: 0;
   padding-top: 2px;
 }
 
@@ -1747,14 +1748,18 @@ button.compact-record-row.selected {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-width: 0;
 }
 
 .expense-attachment-list {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .expense-attachment-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   padding: 8px 10px;
   border-radius: 8px;
   background: var(--surface-soft);
@@ -1762,6 +1767,17 @@ button.compact-record-row.selected {
 
 .expense-attachment-item button {
   grid-column: auto;
+  min-width: 0;
+}
+
+.expense-attachment-item .link-button {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.expense-attachment-item .ghost-button {
+  white-space: nowrap;
 }
 
 .file-button {
