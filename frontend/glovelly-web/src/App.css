@@ -1140,6 +1140,10 @@
   max-width: 100%;
 }
 
+.panel:has(> .compact-record-list) {
+  min-height: min(680px, calc(100svh - 180px));
+}
+
 .editor-panel {
   animation: editor-panel-enter 220ms ease;
 }
@@ -1239,12 +1243,14 @@
 }
 
 .compact-record-list {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 320px;
   overflow-x: hidden;
   overflow-y: auto;
   min-width: 0;
-  max-height: min(62svh, 720px);
+  min-height: 260px;
+  max-height: min(58svh, 620px);
   border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
   border-radius: 18px;
   background: var(--surface-elevated);
@@ -1259,8 +1265,12 @@
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
   border-radius: 18px;
-  background: color-mix(in srgb, var(--surface-panel) 94%, var(--surface-elevated));
+  background: #fbf8f2;
   box-shadow: var(--surface-shadow-soft);
+}
+
+:root[data-theme='dark'] .compact-list-controls {
+  background: #18212d;
 }
 
 .compact-list-main-controls {
@@ -1359,6 +1369,7 @@
 }
 
 .compact-record-row {
+  flex: 0 0 auto;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -1419,6 +1430,7 @@
 .compact-record-header {
   position: sticky;
   top: 0;
+  flex: 0 0 auto;
   z-index: 2;
   display: grid;
   width: 100%;
@@ -1879,9 +1891,7 @@ button.compact-record-row.selected {
 
 .empty-state {
   padding: 22px;
-  border-radius: 20px;
-  border: 1px dashed color-mix(in srgb, var(--muted-strong) 30%, transparent);
-  background: var(--surface-soft);
+  text-align: center;
 }
 
 .roomy {
@@ -2062,13 +2072,28 @@ button:disabled {
 
 @media (max-width: 760px) {
   .app-shell {
-    padding: 16px;
+    padding: 10px;
+    gap: 12px;
   }
 
   .hero-panel,
   .panel {
-    padding: 20px;
-    border-radius: 22px;
+    padding: 14px;
+    border-radius: 18px;
+    gap: 14px;
+  }
+
+  .section-layout,
+  .content-shell,
+  .workspace,
+  .admin-workspace,
+  .gig-workspace,
+  .admin-zone {
+    gap: 14px;
+  }
+
+  .panel:has(> .compact-record-list) {
+    min-height: 0;
   }
 
   .dashboard-summary,
@@ -2096,12 +2121,20 @@ button:disabled {
   }
 
   .compact-record-list {
-    max-height: 52svh;
-    border-radius: 16px;
+    min-height: 220px;
+    max-height: 44svh;
+    border-radius: 14px;
+  }
+
+  .compact-list-controls {
+    gap: 8px;
+    padding: 10px;
+    border-radius: 14px;
   }
 
   .compact-list-main-controls {
     grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 8px;
   }
 
   .compact-search-field {
@@ -2121,13 +2154,127 @@ button:disabled {
   .invoice-record-row,
   .client-record-row,
   .admin-record-row {
-    grid-template-columns: 1fr;
-    gap: 5px;
+    gap: 3px 8px;
+    align-items: start;
+    line-height: 1.25;
   }
 
   button.compact-record-row {
-    min-height: 0;
-    padding: 12px 14px;
+    min-height: 44px;
+    padding: 9px 10px;
+  }
+
+  .gig-record-row {
+    grid-template-columns: 20px minmax(0, 1fr) max-content;
+  }
+
+  .gig-record-row .compact-select-toggle {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .gig-record-row .compact-primary-cell {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .gig-record-row > span:nth-of-type(1),
+  .gig-record-row > span:nth-of-type(5) {
+    display: none;
+  }
+
+  .gig-record-row > span:nth-of-type(2) {
+    grid-column: 3;
+    grid-row: 1;
+    text-align: right;
+  }
+
+  .gig-record-row > span:nth-of-type(3) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .gig-record-row > span:nth-of-type(4) {
+    grid-column: 3;
+    grid-row: 2;
+    text-align: right;
+  }
+
+  .invoice-record-row,
+  .client-record-row {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .invoice-record-row .compact-primary-cell,
+  .client-record-row .compact-primary-cell {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .invoice-record-row > span:nth-of-type(1),
+  .invoice-record-row > span:nth-of-type(3),
+  .client-record-row > span:nth-of-type(1) {
+    display: none;
+  }
+
+  .invoice-record-row > span:nth-of-type(2),
+  .client-record-row > span:nth-of-type(4) {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+
+  .invoice-record-row > span:nth-of-type(4),
+  .client-record-row > span:nth-of-type(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .invoice-record-row > span:nth-of-type(5),
+  .client-record-row > span:nth-of-type(3) {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: right;
+  }
+
+  .admin-record-row {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+  }
+
+  .admin-record-row .compact-primary-cell {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .admin-record-row > span:nth-of-type(1),
+  .admin-record-row > span:nth-of-type(5) {
+    display: none;
+  }
+
+  .admin-record-row > span:nth-of-type(2) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .admin-record-row > span:nth-of-type(3) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .admin-record-row > span:nth-of-type(4) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .compact-filter-chips {
+    gap: 6px;
+  }
+
+  .compact-filter-chip {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 0.78rem;
   }
 
   .compact-primary-cell span {
@@ -2144,6 +2291,7 @@ button:disabled {
 
   .content-header-top {
     flex-direction: column;
+    gap: 12px;
   }
 
   .header-actions {
@@ -2157,7 +2305,42 @@ button:disabled {
   }
 
   .content-header.panel {
-    padding: 16px;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .content-header-body {
+    gap: 12px;
+  }
+
+  .content-header-copy {
+    gap: 8px;
+  }
+
+  .content-header-copy .hero-text {
+    display: none;
+  }
+
+  .content-header-copy h2 {
+    font-size: clamp(1.55rem, 8vw, 2.2rem);
+  }
+
+  .dashboard-summary {
+    gap: 8px;
+  }
+
+  .dashboard-card {
+    padding: 12px;
+    border-radius: 16px;
+    gap: 5px;
+  }
+
+  .dashboard-card span:nth-of-type(n + 2) {
+    display: none;
+  }
+
+  .outstanding-card strong {
+    font-size: clamp(1.5rem, 9vw, 2.2rem);
   }
 
   .app-footer {
@@ -2170,16 +2353,16 @@ button:disabled {
   }
 
   .hero-mascot {
-    grid-template-columns: 64px minmax(0, 1fr);
-    gap: 12px;
-    padding: 12px;
-    border-radius: 18px;
+    display: none;
   }
 
-  .hero-mascot img {
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
+  .charm-bar {
+    gap: 8px;
+  }
+
+  .charm-item {
+    padding: 10px 12px;
+    border-radius: 14px;
   }
 
   .charm-item span:last-child {

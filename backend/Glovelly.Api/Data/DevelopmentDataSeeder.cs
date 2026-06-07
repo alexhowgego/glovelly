@@ -416,8 +416,228 @@ public static class DevelopmentDataSeeder
             }
         };
 
-        return new DevelopmentSeedFixture(clients, invoices, invoiceLines, gigs);
+        var additionalInvoices = BuildAdditionalDevelopmentInvoices(
+            seededAdminUserId,
+            foxAndFinchId,
+            northlightId,
+            riversideId);
+        var additionalInvoiceLines = BuildAdditionalDevelopmentInvoiceLines(additionalInvoices, seededAdminUserId);
+        var additionalGigs = BuildAdditionalDevelopmentGigs(
+            seededAdminUserId,
+            foxAndFinchId,
+            northlightId,
+            riversideId,
+            additionalInvoices);
+
+        return new DevelopmentSeedFixture(
+            clients,
+            invoices.Concat(additionalInvoices).ToArray(),
+            invoiceLines.Concat(additionalInvoiceLines).ToArray(),
+            gigs.Concat(additionalGigs).ToArray());
     }
+
+    private static Invoice[] BuildAdditionalDevelopmentInvoices(
+        Guid? seededAdminUserId,
+        Guid foxAndFinchId,
+        Guid northlightId,
+        Guid riversideId)
+    {
+        var clientIds = new[] { foxAndFinchId, northlightId, riversideId };
+        var statuses = new[]
+        {
+            InvoiceStatus.Overdue,
+            InvoiceStatus.Issued,
+            InvoiceStatus.Draft,
+            InvoiceStatus.Paid,
+            InvoiceStatus.Cancelled
+        };
+        var descriptions = new[]
+        {
+            "Autumn gala reception at The Whitworth Gallery.",
+            "Corporate awards evening at Leeds Civic Hall.",
+            "Chamber set for Northlight summer wedding showcase.",
+            "Community matinee series at Riverside Arts Centre.",
+            "Private salon concert for Fox & Finch guests.",
+            "Orchestral outreach workshop weekend.",
+            "Lakeside ceremony music and evening reception.",
+            "Product launch drinks reception in Manchester.",
+            "Heritage festival family performance day.",
+            "Christmas market brass and strings programme.",
+            "Charity auction dinner entertainment.",
+            "Open-air theatre interval performance.",
+            "New season preview event at The Lantern Room.",
+            "Wedding breakfast and first dance package.",
+            "Artist residency closing concert."
+        };
+
+        return Enumerable.Range(0, 15)
+            .Select(index =>
+            {
+                var invoiceDate = new DateOnly(2026, 3, 18).AddDays(index * 5);
+                var status = statuses[index % statuses.Length];
+                var issuedAt = status is InvoiceStatus.Issued or InvoiceStatus.Overdue or InvoiceStatus.Paid
+                    ? new DateTimeOffset(invoiceDate, new TimeOnly(9, 0), TimeSpan.Zero)
+                    : (DateTimeOffset?)null;
+
+                return new Invoice
+                {
+                    Id = DevelopmentGuid(2000 + index),
+                    InvoiceNumber = $"GLV-2026-{index + 4:000}",
+                    ClientId = clientIds[index % clientIds.Length],
+                    InvoiceDate = invoiceDate,
+                    DueDate = invoiceDate.AddDays(14),
+                    Status = status,
+                    StatusUpdatedUtc = issuedAt ?? SeededCreatedUtc.AddDays(index),
+                    FirstIssuedUtc = issuedAt,
+                    FirstIssuedByUserId = issuedAt.HasValue ? seededAdminUserId : null,
+                    DeliveryCount = issuedAt.HasValue ? 1 : 0,
+                    LastDeliveryChannel = issuedAt.HasValue ? "Email" : null,
+                    LastDeliveryRecipient = issuedAt.HasValue ? "seeded-client@example.com" : null,
+                    LastDeliveredUtc = issuedAt?.AddMinutes(10),
+                    LastDeliveredByUserId = issuedAt.HasValue ? seededAdminUserId : null,
+                    Description = descriptions[index],
+                    CreatedByUserId = seededAdminUserId,
+                    UpdatedByUserId = seededAdminUserId
+                };
+            })
+            .ToArray();
+    }
+
+    private static InvoiceLine[] BuildAdditionalDevelopmentInvoiceLines(
+        IReadOnlyList<Invoice> invoices,
+        Guid? seededAdminUserId)
+    {
+        var lineSubjects = new[]
+        {
+            "Autumn Gala Reception",
+            "Corporate Awards Evening",
+            "Summer Wedding Showcase",
+            "Community Matinee Series",
+            "Private Salon Concert",
+            "Outreach Workshop Weekend",
+            "Lakeside Ceremony Package",
+            "Manchester Product Launch",
+            "Heritage Festival Day",
+            "Christmas Market Programme",
+            "Charity Auction Dinner",
+            "Open-Air Theatre Interval",
+            "New Season Preview",
+            "Wedding Breakfast Package",
+            "Residency Closing Concert"
+        };
+
+        return invoices
+            .SelectMany((invoice, index) => new[]
+            {
+                new InvoiceLine
+                {
+                    Id = DevelopmentGuid(3000 + (index * 2)),
+                    InvoiceId = invoice.Id,
+                    SortOrder = 1,
+                    Type = InvoiceLineType.PerformanceFee,
+                    Description = $"Performance fee for {lineSubjects[index]}",
+                    Quantity = 1m,
+                    UnitPrice = 350m + (index * 35m),
+                    IsSystemGenerated = true,
+                    CreatedByUserId = seededAdminUserId,
+                    CreatedUtc = SeededCreatedUtc.AddDays(index)
+                },
+                new InvoiceLine
+                {
+                    Id = DevelopmentGuid(3001 + (index * 2)),
+                    InvoiceId = invoice.Id,
+                    SortOrder = 2,
+                    Type = InvoiceLineType.Mileage,
+                    Description = $"Mileage for {lineSubjects[index]}",
+                    Quantity = 10m + index,
+                    UnitPrice = 0.45m,
+                    CalculationNotes = "Generated development data for large-list testing.",
+                    IsSystemGenerated = true,
+                    CreatedByUserId = seededAdminUserId,
+                    CreatedUtc = SeededCreatedUtc.AddDays(index)
+                }
+            })
+            .ToArray();
+    }
+
+    private static Gig[] BuildAdditionalDevelopmentGigs(
+        Guid? seededAdminUserId,
+        Guid foxAndFinchId,
+        Guid northlightId,
+        Guid riversideId,
+        IReadOnlyList<Invoice> additionalInvoices)
+    {
+        var clients = new[] { foxAndFinchId, northlightId, riversideId };
+        var venues = new[]
+        {
+            "The Lantern Room, York",
+            "Assembly Hall, Sheffield",
+            "Botanical House, Liverpool",
+            "Old Market Theatre, Brighton",
+            "St George's Hall, Bristol",
+            "The Pump Rooms, Bath"
+        };
+        var statuses = new[]
+        {
+            GigStatus.Confirmed,
+            GigStatus.Completed,
+            GigStatus.Draft,
+            GigStatus.Cancelled,
+            GigStatus.Confirmed,
+            GigStatus.Completed
+        };
+        var titles = new[]
+        {
+            "Autumn Gala Reception",
+            "Corporate Awards Evening",
+            "Summer Wedding Showcase",
+            "Community Matinee Series",
+            "Private Salon Concert",
+            "Outreach Workshop Weekend",
+            "Lakeside Ceremony Package",
+            "Manchester Product Launch",
+            "Heritage Festival Day",
+            "Christmas Market Programme",
+            "Charity Auction Dinner",
+            "Open-Air Theatre Interval",
+            "New Season Preview",
+            "Wedding Breakfast Package",
+            "Residency Closing Concert",
+            "Botanical House Drinks Reception",
+            "Riverside Youth Ensemble Day",
+            "Northlight Anniversary Party"
+        };
+
+        return Enumerable.Range(0, 18)
+            .Select(index =>
+            {
+                var status = statuses[index % statuses.Length];
+                var date = new DateOnly(2026, 4, 10).AddDays(index * 4);
+                var invoice = index % 4 == 0 ? additionalInvoices[index % additionalInvoices.Count] : null;
+
+                return new Gig
+                {
+                    Id = DevelopmentGuid(4000 + index),
+                    ClientId = clients[index % clients.Length],
+                    InvoiceId = invoice?.Id,
+                    Title = titles[index],
+                    Date = date,
+                    Venue = venues[index % venues.Length],
+                    Fee = 275m + (index * 45m),
+                    TravelMiles = 8m + (index * 3m),
+                    PassengerCount = index % 3,
+                    Notes = "Development example for scrolling, filtering and priority sorting.",
+                    WasDriving = index % 2 == 0,
+                    Status = status,
+                    InvoicedAt = invoice is null ? null : new DateTimeOffset(invoice.InvoiceDate, new TimeOnly(9, 0), TimeSpan.Zero),
+                    CreatedByUserId = seededAdminUserId,
+                    UpdatedByUserId = seededAdminUserId
+                };
+            })
+            .ToArray();
+    }
+
+    private static Guid DevelopmentGuid(int value) => Guid.Parse($"00000000-0000-0000-0000-{value:000000000000}");
 
     private static async Task SaveFixtureAsync(
         DevelopmentDataSeedContext context,
