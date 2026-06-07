@@ -122,7 +122,8 @@ export function AppShell({
 
   useEffect(() => {
     const updateReturnToTopVisibility = () => {
-      setIsReturnToTopVisible(window.scrollY >= window.innerHeight / 2)
+      const isPhoneLayout = window.matchMedia('(max-width: 760px)').matches
+      setIsReturnToTopVisible(isPhoneLayout && window.scrollY >= window.innerHeight / 2)
     }
 
     updateReturnToTopVisibility()

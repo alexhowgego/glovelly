@@ -500,7 +500,7 @@ export function GigsSection({
         <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
           <form
             aria-hidden={!isEditorOpen}
-            className="editor-panel panel"
+            className="editor-panel panel gig-editor-panel"
             data-testid="gig-form"
             onSubmit={onSubmit}
           >

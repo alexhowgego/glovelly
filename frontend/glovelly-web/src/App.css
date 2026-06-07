@@ -26,7 +26,7 @@
   letter-spacing: 0.04em;
 }
 
-.return-to-top-button {
+.primary-button.return-to-top-button {
   display: none;
 }
 
@@ -1154,6 +1154,53 @@
   animation: editor-panel-enter 220ms ease;
 }
 
+.gig-editor-panel {
+  gap: 14px;
+}
+
+.gig-editor-panel .panel-heading {
+  gap: 10px;
+}
+
+.gig-editor-panel .form-grid {
+  gap: 10px;
+}
+
+.gig-editor-panel .form-grid label,
+.gig-editor-panel .invoice-adjustment-form label {
+  gap: 5px;
+}
+
+.gig-editor-panel input,
+.gig-editor-panel select {
+  min-height: 40px;
+  border-radius: 13px;
+  padding-inline: 12px;
+}
+
+.gig-editor-panel textarea {
+  min-height: 82px;
+  max-height: 120px;
+  border-radius: 13px;
+  padding: 10px 12px;
+}
+
+.gig-editor-panel .checkbox-field {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 14px;
+}
+
+.gig-editor-panel .gig-timeline-note {
+  padding: 10px 12px;
+  border-radius: 14px;
+}
+
+.gig-editor-panel .invoice-adjustment-form {
+  gap: 8px;
+  margin-top: 0;
+}
+
 .editor-slot {
   width: 0;
   min-width: 0;
@@ -1654,8 +1701,8 @@ button.compact-record-row.selected {
 .gig-expense-list {
   display: flex;
   flex-direction: column;
-  min-height: 180px;
-  max-height: clamp(220px, 34svh, 380px);
+  min-height: clamp(280px, 38svh, 380px);
+  max-height: clamp(360px, 58svh, 640px);
   overflow: auto;
   overscroll-behavior: contain;
   border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
@@ -1668,10 +1715,10 @@ button.compact-record-row.selected {
 .gig-expense-item {
   flex: 0 0 auto;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   grid-template-columns: minmax(0, 1fr) minmax(88px, 0.36fr) auto;
   align-items: end;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--surface-border) 74%, transparent);
   background: transparent;
 }
@@ -1690,15 +1737,15 @@ button.compact-record-row.selected {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .expense-status-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 3px 8px;
+  min-height: 22px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: var(--surface-subtle);
   border: 1px solid color-mix(in srgb, var(--surface-border) 85%, transparent);
@@ -1720,7 +1767,7 @@ button.compact-record-row.selected {
 
 .gig-expense-item label {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -1732,20 +1779,20 @@ button.compact-record-row.selected {
 .gig-expense-item button {
   justify-self: end;
   align-self: end;
-  min-height: 38px;
-  padding: 8px 12px;
+  min-height: 34px;
+  padding: 7px 10px;
 }
 
 .gig-expense-item input,
 .gig-expense-item select {
-  min-height: 38px;
+  min-height: 34px;
   border-radius: 12px;
 }
 
 .expense-attachments {
   grid-column: 1 / -1;
   display: grid;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
   padding-top: 2px;
 }
@@ -1768,7 +1815,7 @@ button.compact-record-row.selected {
 .expense-attachment-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  padding: 8px 10px;
+  padding: 7px 8px;
   border-radius: 8px;
   background: var(--surface-soft);
 }
@@ -2158,29 +2205,6 @@ button:disabled {
 }
 
 @media (max-width: 1180px) {
-  .return-to-top-button {
-    position: fixed;
-    right: max(14px, env(safe-area-inset-right));
-    bottom: max(14px, env(safe-area-inset-bottom));
-    z-index: 60;
-    display: inline-flex;
-    opacity: 0;
-    pointer-events: none;
-    box-shadow: var(--surface-shadow-strong);
-    transform: translateY(10px);
-    transition:
-      opacity 180ms ease,
-      transform 180ms ease,
-      box-shadow 180ms ease,
-      background 180ms ease;
-  }
-
-  .return-to-top-button.visible {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
-
   .hero-panel,
   .workspace,
   .admin-workspace,
@@ -2231,6 +2255,29 @@ button:disabled {
 }
 
 @media (max-width: 760px) {
+  .primary-button.return-to-top-button {
+    position: fixed;
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    z-index: 60;
+    display: inline-flex;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: var(--surface-shadow-strong);
+    transform: translateY(10px);
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease,
+      box-shadow 180ms ease,
+      background 180ms ease;
+  }
+
+  .primary-button.return-to-top-button.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
   .app-shell {
     padding: 10px;
     gap: 12px;
@@ -2543,13 +2590,9 @@ button:disabled {
   }
 
   .gig-expense-list {
-    max-height: 38svh;
+    min-height: min(360px, 50svh);
+    max-height: 54svh;
     border-radius: 14px;
-  }
-
-  .gig-expense-item {
-    gap: 7px;
-    padding: 10px;
   }
 
   .expense-status-select,
