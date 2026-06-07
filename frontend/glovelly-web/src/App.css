@@ -496,9 +496,9 @@
 
 .expense-statement-modal {
   display: grid;
-  gap: 18px;
-  width: min(100%, 1120px);
-  height: min(100svh - 48px, 860px);
+  gap: 14px;
+  width: min(100%, 1280px);
+  height: min(100svh - 32px, 920px);
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   overflow: hidden;
 }
@@ -510,7 +510,7 @@
 
 .expense-statement-summary {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -518,7 +518,7 @@
 .expense-statement-preview,
 .expense-statement-gig {
   border-radius: 8px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   background: var(--surface-subtle);
   border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
 }
@@ -526,6 +526,7 @@
 .expense-statement-preview {
   padding: 0;
   overflow: hidden;
+  min-height: 520px;
 }
 
 .expense-statement-preview iframe {
@@ -576,13 +577,17 @@
   gap: 10px;
 }
 
+.expense-statement-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .expense-statement-body {
   min-height: 0;
   overflow: hidden;
 }
 
 .expense-statement-body.has-preview {
-  grid-template-columns: minmax(320px, 0.95fr) minmax(420px, 1.05fr);
+  grid-template-columns: minmax(280px, 0.58fr) minmax(620px, 1.42fr);
   align-items: stretch;
 }
 
@@ -2659,6 +2664,10 @@ button:disabled {
     overflow: visible;
   }
 
+  .expense-statement-options {
+    grid-template-columns: 1fr;
+  }
+
   .expense-statement-gigs {
     max-height: 38svh;
   }
@@ -2666,5 +2675,9 @@ button:disabled {
   .expense-statement-preview iframe {
     height: 55svh;
     min-height: 320px;
+  }
+
+  .expense-statement-preview {
+    min-height: 0;
   }
 }
