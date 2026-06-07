@@ -26,6 +26,10 @@
   letter-spacing: 0.04em;
 }
 
+.return-to-top-button {
+  display: none;
+}
+
 .legal-links {
   display: inline-flex;
   align-items: center;
@@ -2154,6 +2158,29 @@ button:disabled {
 }
 
 @media (max-width: 1180px) {
+  .return-to-top-button {
+    position: fixed;
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    z-index: 60;
+    display: inline-flex;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: var(--surface-shadow-strong);
+    transform: translateY(10px);
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease,
+      box-shadow 180ms ease,
+      background 180ms ease;
+  }
+
+  .return-to-top-button.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
   .hero-panel,
   .workspace,
   .admin-workspace,

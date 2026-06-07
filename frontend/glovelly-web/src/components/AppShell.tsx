@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import type {
   AppMetadata,
@@ -101,6 +102,7 @@ export function AppShell({
   sellerProfile,
   themePreference,
 }: AppShellProps) {
+  const [isReturnToTopVisible, setIsReturnToTopVisible] = useState(false)
   const profileDisplayName = authUser?.name?.trim() || authUser?.email || 'User'
   const profileImageUrl = authUser?.profileImageUrl?.trim() || ''
   const profileInitials = profileDisplayName
@@ -109,6 +111,29 @@ export function AppShell({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
+  const returnToTop = () => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    window.scrollTo({
+      top: 0,
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    })
+  }
+
+  useEffect(() => {
+    const updateReturnToTopVisibility = () => {
+      setIsReturnToTopVisible(window.scrollY >= window.innerHeight / 2)
+    }
+
+    updateReturnToTopVisibility()
+    window.addEventListener('scroll', updateReturnToTopVisibility, { passive: true })
+    window.addEventListener('resize', updateReturnToTopVisibility)
+
+    return () => {
+      window.removeEventListener('scroll', updateReturnToTopVisibility)
+      window.removeEventListener('resize', updateReturnToTopVisibility)
+    }
+  }, [])
 
   return (
     <main className="app-shell">
@@ -372,6 +397,17 @@ export function AppShell({
           {formatBuildMetadata(appMetadata.commitId, appMetadata.buildTimestamp)}
         </p>
       </div>
+
+      <button
+        aria-label="Return to top"
+        aria-hidden={!isReturnToTopVisible}
+        className={`primary-button return-to-top-button ${isReturnToTopVisible ? 'visible' : ''}`}
+        onClick={returnToTop}
+        tabIndex={isReturnToTopVisible ? 0 : -1}
+        type="button"
+      >
+        Return to top
+      </button>
 
       {children}
     </main>
