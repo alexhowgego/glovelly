@@ -235,20 +235,11 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         try
         {
             var expenseRow = await ExpenseRowForDescriptionAsync(expenseDescription);
-            var redraftResponse = await Page.RunAndWaitForResponseAsync(
+            var redraftResponse = await RunAndWaitForInvoiceRedraftAsync(
                 async () => await expenseRow.GetByTestId("gig-expense-reimbursement-select")
-                    .SelectOptionAsync(new[] { status }),
-                response =>
-                {
-                    var path = new Uri(response.Url).AbsolutePath;
+                    .SelectOptionAsync(new[] { status }));
 
-                    return response.Request.Method == "POST" &&
-                        path.StartsWith("/invoices/", StringComparison.Ordinal) &&
-                        path.EndsWith("/redraft", StringComparison.Ordinal);
-                },
-                new PageRunAndWaitForResponseOptions { Timeout = 30_000 });
-
-            Assert.True(redraftResponse.Ok, $"Expected invoice redraft to succeed, got HTTP {redraftResponse.Status} for {redraftResponse.Url}.");
+            AssertRedraftSucceeded(redraftResponse);
             await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
         }
         finally
@@ -296,7 +287,10 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         Page.Dialog += AcceptLinkedRedraftDialog;
         try
         {
-            await Page.GetByTestId("gig-save-close-button").ClickAsync();
+            var redraftResponse = await RunAndWaitForInvoiceRedraftAsync(
+                async () => await Page.GetByTestId("gig-save-close-button").ClickAsync());
+
+            AssertRedraftSucceeded(redraftResponse);
             await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
         }
         finally
@@ -312,6 +306,24 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 _ => dialog.DismissAsync(),
             };
         }
+    }
+
+    private Task<IResponse> RunAndWaitForInvoiceRedraftAsync(Func<Task> action) =>
+        Page.RunAndWaitForResponseAsync(
+            action,
+            response =>
+            {
+                var path = new Uri(response.Url).AbsolutePath;
+
+                return response.Request.Method == "POST" &&
+                    path.StartsWith("/invoices/", StringComparison.Ordinal) &&
+                    path.EndsWith("/redraft", StringComparison.Ordinal);
+            },
+            new PageRunAndWaitForResponseOptions { Timeout = 30_000 });
+
+    private static void AssertRedraftSucceeded(IResponse redraftResponse)
+    {
+        Assert.True(redraftResponse.Ok, $"Expected invoice redraft to succeed, got HTTP {redraftResponse.Status} for {redraftResponse.Url}.");
     }
 
     private async Task SaveUserMileageSettingsViaUiAsync(string mileageRate, string passengerMileageRate, string travelOriginPostcode)
