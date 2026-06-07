@@ -1205,6 +1205,10 @@
   gap: 16px;
 }
 
+.panel-heading > div:first-child {
+  min-width: 0;
+}
+
 .search-field,
 .form-grid label {
   display: grid;
@@ -1872,8 +1876,18 @@ button.compact-record-row.selected {
 .actions,
 .form-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+.actions {
+  align-items: center;
+}
+
+.panel-heading .actions {
+  max-width: min(100%, 620px);
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .detail-grid {
@@ -1993,16 +2007,37 @@ button.compact-record-row.selected {
 .ghost-button,
 .danger-button {
   border-radius: 999px;
-  padding: 12px 18px;
+  padding: 10px 15px;
+  min-height: 40px;
   border: 1px solid transparent;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  font-size: 0.92rem;
+  line-height: 1.15;
+  white-space: nowrap;
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
     background 180ms ease;
+}
+
+.panel-heading .primary-button,
+.panel-heading .ghost-button,
+.panel-heading .danger-button {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 0.82rem;
+}
+
+.form-actions .primary-button,
+.form-actions .ghost-button,
+.form-actions .danger-button {
+  min-height: 44px;
+  padding: 12px 18px;
+  font-size: 0.95rem;
 }
 
 .primary-button {
@@ -2208,6 +2243,10 @@ button:disabled {
 
   .panel-heading {
     flex-direction: column;
+  }
+
+  .panel-heading .actions {
+    justify-content: flex-start;
   }
 
   .settings-header-actions {
