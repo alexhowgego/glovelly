@@ -30,7 +30,7 @@ public sealed class InvoiceAggregationWorkflowTests : InvoiceUatTestBase
 
             var otherClientCheckbox = GigCard(otherGigTitle).Locator("input[type=checkbox]");
             await Assertions.Expect(otherClientCheckbox).ToBeDisabledAsync();
-            await Assertions.Expect(GigCard(otherGigTitle)).ToContainTextAsync("Different client");
+            await Assertions.Expect(otherClientCheckbox).ToHaveAttributeAsync("aria-label", "Different client");
 
             await Page.GetByTestId("generate-invoice-button").ClickAsync();
             await WaitForInvoicePreviewAsync();

@@ -47,7 +47,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
             await AssertInvoiceLineCountAsync(adjustmentReason, 1);
 
             await OpenGigAsync(gigTitle);
-            await Page.GetByTestId("gig-edit-button").ClickAsync();
+            await EnsureGigEditorOpenAsync();
             await SetExpenseReimbursementAsync(0, "Reimbursed");
 
             await OpenLinkedInvoiceFromGigAsync();
@@ -58,7 +58,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
             await AssertInvoiceLineTypeCountAsync("PerformanceFee", 1);
 
             await OpenGigAsync(gigTitle);
-            await Page.GetByTestId("gig-edit-button").ClickAsync();
+            await EnsureGigEditorOpenAsync();
             await SetExpenseReimbursementAsync(0, "Unreimbursed");
 
             await OpenLinkedInvoiceFromGigAsync();
@@ -67,7 +67,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
             await AssertInvoiceLineCountAsync(adjustmentReason, 1);
 
             await OpenGigAsync(gigTitle);
-            await Page.GetByTestId("gig-edit-button").ClickAsync();
+            await EnsureGigEditorOpenAsync();
             await Page.GetByTestId("gig-driving-checkbox").UncheckAsync();
             await SaveGigAndAcceptLinkedRedraftAsync();
 
@@ -78,7 +78,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
             await AssertInvoiceLineTypeCountAsync("PerformanceFee", 1);
 
             await OpenGigAsync(gigTitle);
-            await Page.GetByTestId("gig-edit-button").ClickAsync();
+            await EnsureGigEditorOpenAsync();
             await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
             await Assertions.Expect(Page.GetByTestId("gig-travel-miles-input")).ToHaveValueAsync("18");
             await Assertions.Expect(Page.GetByTestId("gig-passenger-count-input")).ToHaveValueAsync("1");
@@ -136,7 +136,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                     DateTime.UtcNow.AddDays(51).ToString("yyyy-MM-dd"),
                     venue: "Bristol Beacon, Bristol");
                 await OpenGigAsync(estimatedGigTitle);
-                await Page.GetByTestId("gig-edit-button").ClickAsync();
+                await EnsureGigEditorOpenAsync();
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();
                 await Assertions.Expect(Page.GetByTestId("gig-travel-miles-input")).Not.ToHaveValueAsync(string.Empty, new LocatorAssertionsToHaveValueOptions
@@ -157,7 +157,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                     DateTime.UtcNow.AddDays(52).ToString("yyyy-MM-dd"),
                     venue: "The Moon");
                 await OpenGigAsync(fallbackGigTitle);
-                await Page.GetByTestId("gig-edit-button").ClickAsync();
+                await EnsureGigEditorOpenAsync();
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();
                 await ExpectGigStatusContainsAnyAsync("unable", "route", "estimate", "address not found");
@@ -176,7 +176,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                     DateTime.UtcNow.AddDays(53).ToString("yyyy-MM-dd"),
                     venue: "Bristol Beacon, Bristol");
                 await OpenGigAsync(originRequiredGigTitle);
-                await Page.GetByTestId("gig-edit-button").ClickAsync();
+                await EnsureGigEditorOpenAsync();
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-travel-miles-input").FillAsync("12");
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();

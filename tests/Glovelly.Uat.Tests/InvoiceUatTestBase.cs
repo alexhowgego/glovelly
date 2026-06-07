@@ -198,6 +198,21 @@ public abstract class InvoiceUatTestBase : UatTestBase
         await GigCard(gigTitle).ClickAsync();
     }
 
+    protected async Task EnsureGigEditorOpenAsync()
+    {
+        var editButton = Page.GetByTestId("gig-edit-button");
+        if (await editButton.GetAttributeAsync("aria-expanded") != "true")
+        {
+            await editButton.ClickAsync();
+        }
+
+        await Page.GetByTestId("gig-form").WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+    }
+
     protected async Task OpenLinkedInvoiceFromGigAsync()
     {
         await Page.GetByTestId("gig-open-linked-invoice-button").ClickAsync();
