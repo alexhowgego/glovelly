@@ -48,7 +48,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
 
             await OpenGigAsync(gigTitle);
             await EnsureGigEditorOpenAsync();
-            await SetExpenseReimbursementAsync(0, "Reimbursed");
+            await SetExpenseReimbursementAsync(reimbursedExpense, "Reimbursed");
 
             await OpenLinkedInvoiceFromGigAsync();
             await OpenInvoiceLinesAsync();
@@ -59,7 +59,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
 
             await OpenGigAsync(gigTitle);
             await EnsureGigEditorOpenAsync();
-            await SetExpenseReimbursementAsync(0, "Unreimbursed");
+            await SetExpenseReimbursementAsync(reimbursedExpense, "Unreimbursed");
 
             await OpenLinkedInvoiceFromGigAsync();
             await OpenInvoiceLinesAsync();
@@ -229,13 +229,13 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         Assert.Fail($"Expected gig status to contain one of [{string.Join(", ", expectedFragments)}], but was '{lastStatus}'.");
     }
 
-    private async Task SetExpenseReimbursementAsync(int expenseIndex, string status)
+    private async Task SetExpenseReimbursementAsync(string expenseDescription, string status)
     {
         Page.Dialog += AcceptReimbursementDialogs;
         try
         {
-            await ExpenseRowAt(expenseIndex)
-                .GetByTestId("gig-expense-reimbursement-select")
+            var expenseRow = await ExpenseRowForDescriptionAsync(expenseDescription);
+            await expenseRow.GetByTestId("gig-expense-reimbursement-select")
                 .SelectOptionAsync(new[] { status });
             await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
         }
@@ -254,6 +254,29 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 _ => dialog.DismissAsync(),
             };
         }
+    }
+
+    private async Task<ILocator> ExpenseRowForDescriptionAsync(string expenseDescription)
+    {
+        var rows = Page.GetByTestId("gig-expense-item");
+        await Assertions.Expect(rows.First).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
+        {
+            Timeout = 30_000,
+        });
+
+        var rowCount = await rows.CountAsync();
+        for (var index = 0; index < rowCount; index++)
+        {
+            var row = rows.Nth(index);
+            var descriptionInput = row.Locator("input").First;
+            if (await descriptionInput.InputValueAsync() == expenseDescription)
+            {
+                return row;
+            }
+        }
+
+        Assert.Fail($"Expected to find gig expense row with description '{expenseDescription}'.");
+        throw new InvalidOperationException($"Expected to find gig expense row with description '{expenseDescription}'.");
     }
 
     private async Task SaveGigAndAcceptLinkedRedraftAsync()
