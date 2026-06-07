@@ -235,8 +235,20 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         try
         {
             var expenseRow = await ExpenseRowForDescriptionAsync(expenseDescription);
-            await expenseRow.GetByTestId("gig-expense-reimbursement-select")
-                .SelectOptionAsync(new[] { status });
+            var redraftResponse = await Page.RunAndWaitForResponseAsync(
+                async () => await expenseRow.GetByTestId("gig-expense-reimbursement-select")
+                    .SelectOptionAsync(new[] { status }),
+                response =>
+                {
+                    var path = new Uri(response.Url).AbsolutePath;
+
+                    return response.Request.Method == "POST" &&
+                        path.StartsWith("/invoices/", StringComparison.Ordinal) &&
+                        path.EndsWith("/redraft", StringComparison.Ordinal);
+                },
+                new PageRunAndWaitForResponseOptions { Timeout = 30_000 });
+
+            Assert.True(redraftResponse.Ok, $"Expected invoice redraft to succeed, got HTTP {redraftResponse.Status} for {redraftResponse.Url}.");
             await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
         }
         finally
