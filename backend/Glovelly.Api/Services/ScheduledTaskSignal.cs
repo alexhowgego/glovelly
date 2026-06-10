@@ -29,6 +29,11 @@ public sealed class ScheduledTaskSignal(
                 TaskName = taskName
             };
 
+        if (envelope.State.HasPendingCalendarChanges)
+        {
+            return;
+        }
+
         envelope.TaskName = taskName;
         envelope.State.HasPendingCalendarChanges = true;
         envelope.State.LastMarkedStaleUtc = now;

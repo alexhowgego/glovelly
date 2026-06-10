@@ -334,6 +334,14 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         using var scope = _factory.Services.CreateScope();
         var queue = scope.ServiceProvider.GetRequiredService<ICalendarSyncWorkQueue>();
         var stateStore = scope.ServiceProvider.GetRequiredService<IScheduledTaskStateStore>();
+        await stateStore.WriteAsync(new ScheduledTaskStateEnvelope<GoogleCalendarPropagationTaskState>
+        {
+            TaskName = ScheduledTaskNames.GoogleCalendarPropagation,
+            State = new GoogleCalendarPropagationTaskState
+            {
+                HasPendingCalendarChanges = false
+            }
+        }, TestContext.Current.CancellationToken);
 
         await queue.EnqueueGigAsync(
             TestAuthContext.UserId,
@@ -348,6 +356,30 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         Assert.NotNull(envelope);
         Assert.True(envelope.State.HasPendingCalendarChanges);
         Assert.Equal(CalendarSyncWorkItemReason.GigUpdated.ToString(), envelope.State.LastMarkedStaleReason);
+    }
+
+    [Fact]
+    public async Task ScheduledTaskSignal_WhenCalendarPropagationIsAlreadyStale_DoesNotRewriteState()
+    {
+        var stateStore = new CountingScheduledTaskStateStore();
+        var signal = new ScheduledTaskSignal(stateStore, TimeProvider.System);
+
+        await signal.MarkStaleAsync(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            "GigUpdated",
+            TestContext.Current.CancellationToken);
+        await signal.MarkStaleAsync(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            "CalendarRecreated",
+            TestContext.Current.CancellationToken);
+
+        var envelope = await stateStore.ReadAsync<GoogleCalendarPropagationTaskState>(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(1, stateStore.WriteCount);
+        Assert.NotNull(envelope);
+        Assert.True(envelope.State.HasPendingCalendarChanges);
+        Assert.Equal("GigUpdated", envelope.State.LastMarkedStaleReason);
     }
 
     [Fact]
@@ -1065,6 +1097,31 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             {
                 throw ExceptionToThrow;
             }
+        }
+    }
+
+    private sealed class CountingScheduledTaskStateStore : IScheduledTaskStateStore
+    {
+        private object? _envelope;
+
+        public int WriteCount { get; private set; }
+
+        public Task<ScheduledTaskStateEnvelope<TState>?> ReadAsync<TState>(
+            string taskName,
+            CancellationToken cancellationToken = default)
+            where TState : class, new()
+        {
+            return Task.FromResult(_envelope as ScheduledTaskStateEnvelope<TState>);
+        }
+
+        public Task WriteAsync<TState>(
+            ScheduledTaskStateEnvelope<TState> envelope,
+            CancellationToken cancellationToken = default)
+            where TState : class, new()
+        {
+            WriteCount += 1;
+            _envelope = envelope;
+            return Task.CompletedTask;
         }
     }
 }
