@@ -30,10 +30,22 @@ public sealed class CalendarSyncQueueDrainer(
         var succeeded = 0;
         var retried = 0;
         var failed = 0;
+        var completionReason = CalendarSyncDrainCompletionReason.QueueFullyDrained;
 
-        while (processed < maxItems &&
-               (!stopAt.HasValue || DateTimeOffset.UtcNow < stopAt.Value))
+        while (true)
         {
+            if (processed >= maxItems)
+            {
+                completionReason = CalendarSyncDrainCompletionReason.MaxItemsReached;
+                break;
+            }
+
+            if (stopAt.HasValue && DateTimeOffset.UtcNow >= stopAt.Value)
+            {
+                completionReason = CalendarSyncDrainCompletionReason.MaxDurationReached;
+                break;
+            }
+
             var outcome = await ProcessNextAsync(ownerId, cancellationToken);
             if (outcome == CalendarSyncDrainItemOutcome.None)
             {
@@ -55,7 +67,7 @@ public sealed class CalendarSyncQueueDrainer(
             }
         }
 
-        return new CalendarSyncDrainResult(processed, succeeded, retried, failed, Skipped: 0, recovered);
+        return new CalendarSyncDrainResult(processed, succeeded, retried, failed, Skipped: 0, recovered, completionReason);
     }
 
     private async Task<int> RecoverStaleProcessingItemsAsync(

@@ -31,6 +31,10 @@ Trigger the Calendar sync job with Cloud Scheduler on a fixed cadence.
 
 Use the same runtime configuration model as the web app: Secret Manager bindings, deployment environment variables, runtime service account, EF Core models, and application services.
 
+Scheduled worker commands use task-level wake gates before opening Postgres-backed services. The Calendar sync wake gate reads small task-state JSON from the existing GCS bucket under `worker/scheduled-tasks/` and skips the drain command when the task is not stale and the safety interval has not elapsed. Wake gates must not resolve `AppDbContext` or other EF-backed services; the cheap state file is only an execution hint, while Postgres remains the source of truth.
+
+The Calendar sync stale flag is cleared only after a drain run can conclusively say the queue is fully drained. If a run stops because of max items, max duration, retry, failure, cancellation, or an exception, the stale flag remains set so the next scheduled execution will check Postgres again. Failures to update the stale flag are logged as warnings and do not fail user-visible gig mutations because the database queue remains authoritative and the safety interval self-heals lost wake hints.
+
 ## Consequences
 
 Background execution is decoupled from the web request lifecycle and does not depend on a warm Cloud Run service instance.
