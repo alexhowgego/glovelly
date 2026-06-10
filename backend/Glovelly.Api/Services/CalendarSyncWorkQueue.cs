@@ -4,7 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Glovelly.Api.Services;
 
-public sealed class CalendarSyncWorkQueue(AppDbContext dbContext) : ICalendarSyncWorkQueue
+public sealed class CalendarSyncWorkQueue(
+    AppDbContext dbContext,
+    IScheduledTaskSignal scheduledTaskSignal,
+    ILogger<CalendarSyncWorkQueue> logger) : ICalendarSyncWorkQueue
 {
     public async Task EnqueueGigAsync(
         Guid userId,
@@ -51,6 +54,7 @@ public sealed class CalendarSyncWorkQueue(AppDbContext dbContext) : ICalendarSyn
 
             existingWorkItem.UpdatedAtUtc = now;
             await dbContext.SaveChangesAsync(cancellationToken);
+            await TryMarkCalendarPropagationStaleAsync(reason, cancellationToken);
             return;
         }
 
@@ -69,5 +73,26 @@ public sealed class CalendarSyncWorkQueue(AppDbContext dbContext) : ICalendarSyn
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await TryMarkCalendarPropagationStaleAsync(reason, cancellationToken);
+    }
+
+    private async Task TryMarkCalendarPropagationStaleAsync(
+        CalendarSyncWorkItemReason reason,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await scheduledTaskSignal.MarkStaleAsync(
+                ScheduledTaskNames.GoogleCalendarPropagation,
+                reason.ToString(),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                exception,
+                "Failed to mark scheduled task {TaskName} stale after queuing calendar sync work. Calendar sync work remains queued in Postgres.",
+                ScheduledTaskNames.GoogleCalendarPropagation);
+        }
     }
 }

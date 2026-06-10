@@ -7,4 +7,8 @@ public interface IGoogleCalendarIntegrationService
     Task<GoogleCalendarIntegrationSettings> EnsureCalendarAsync(
         Guid userId,
         CancellationToken cancellationToken);
+
+    Task InvalidateSyncHashesAsync(
+        Guid userId,
+        CancellationToken cancellationToken);
 }

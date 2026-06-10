@@ -328,6 +328,211 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
     }
 
     [Fact]
+    public async Task CalendarSyncWorkQueue_MarksCalendarPropagationTaskStale()
+    {
+        _ = _factory.CreateClient();
+        using var scope = _factory.Services.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<ICalendarSyncWorkQueue>();
+        var stateStore = scope.ServiceProvider.GetRequiredService<IScheduledTaskStateStore>();
+        await stateStore.WriteAsync(new ScheduledTaskStateEnvelope<GoogleCalendarPropagationTaskState>
+        {
+            TaskName = ScheduledTaskNames.GoogleCalendarPropagation,
+            State = new GoogleCalendarPropagationTaskState
+            {
+                HasPendingCalendarChanges = false
+            }
+        }, TestContext.Current.CancellationToken);
+
+        await queue.EnqueueGigAsync(
+            TestAuthContext.UserId,
+            Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            CalendarSyncWorkItemReason.GigUpdated,
+            TestContext.Current.CancellationToken);
+
+        var envelope = await stateStore.ReadAsync<GoogleCalendarPropagationTaskState>(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(envelope);
+        Assert.True(envelope.State.HasPendingCalendarChanges);
+        Assert.Equal(CalendarSyncWorkItemReason.GigUpdated.ToString(), envelope.State.LastMarkedStaleReason);
+    }
+
+    [Fact]
+    public async Task ScheduledTaskSignal_WhenCalendarPropagationIsAlreadyStale_DoesNotRewriteState()
+    {
+        var stateStore = new CountingScheduledTaskStateStore();
+        var signal = new ScheduledTaskSignal(stateStore, TimeProvider.System);
+
+        await signal.MarkStaleAsync(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            "GigUpdated",
+            TestContext.Current.CancellationToken);
+        await signal.MarkStaleAsync(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            "CalendarRecreated",
+            TestContext.Current.CancellationToken);
+
+        var envelope = await stateStore.ReadAsync<GoogleCalendarPropagationTaskState>(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(1, stateStore.WriteCount);
+        Assert.NotNull(envelope);
+        Assert.True(envelope.State.HasPendingCalendarChanges);
+        Assert.Equal("GigUpdated", envelope.State.LastMarkedStaleReason);
+    }
+
+    [Fact]
+    public async Task CalendarPropagationTask_WhenRecentSuccessfulStateIsNotStale_Skips()
+    {
+        _ = _factory.CreateClient();
+        using var scope = _factory.Services.CreateScope();
+        var stateStore = scope.ServiceProvider.GetRequiredService<IScheduledTaskStateStore>();
+        var task = scope.ServiceProvider.GetRequiredService<GoogleCalendarPropagationScheduledTask>();
+        var now = DateTimeOffset.UtcNow;
+        await stateStore.WriteAsync(new ScheduledTaskStateEnvelope<GoogleCalendarPropagationTaskState>
+        {
+            TaskName = ScheduledTaskNames.GoogleCalendarPropagation,
+            LastDecisionUtc = now,
+            LastSuccessfulRunUtc = now,
+            State = new GoogleCalendarPropagationTaskState
+            {
+                HasPendingCalendarChanges = false,
+                LastSuccessfulPropagationUtc = now
+            }
+        }, TestContext.Current.CancellationToken);
+
+        var decision = await task.ShouldRunAsync(
+            new ScheduledTaskContext(now),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(decision.ShouldRun);
+    }
+
+    [Fact]
+    public async Task CalendarPropagationTask_WhenStale_RunsAndClearsStaleAfterFullDrain()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        using var scope = factory.Services.CreateScope();
+        var signal = scope.ServiceProvider.GetRequiredService<IScheduledTaskSignal>();
+        var stateStore = scope.ServiceProvider.GetRequiredService<IScheduledTaskStateStore>();
+        var task = scope.ServiceProvider.GetRequiredService<GoogleCalendarPropagationScheduledTask>();
+        var now = DateTimeOffset.UtcNow;
+
+        await signal.MarkStaleAsync(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            "GigUpdated",
+            TestContext.Current.CancellationToken);
+
+        var decision = await task.ShouldRunAsync(
+            new ScheduledTaskContext(now),
+            TestContext.Current.CancellationToken);
+        var result = await task.ExecuteAsync(
+            new CalendarSyncDrainOptions(MaxItems: 5),
+            new ScheduledTaskContext(now),
+            TestContext.Current.CancellationToken);
+
+        var envelope = await stateStore.ReadAsync<GoogleCalendarPropagationTaskState>(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            TestContext.Current.CancellationToken);
+        Assert.True(decision.ShouldRun);
+        Assert.True(result.CanConcludeQueueIsFullyDrained);
+        Assert.NotNull(envelope);
+        Assert.False(envelope.State.HasPendingCalendarChanges);
+        Assert.Equal(now, envelope.State.LastSuccessfulPropagationUtc);
+    }
+
+    [Fact]
+    public async Task CalendarPropagationTask_WhenDrainHitsMaxItems_LeavesStale()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        _ = factory.CreateClient();
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.ConnectionChanged);
+        await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.GigUpdated, Guid.NewGuid());
+        using var scope = factory.Services.CreateScope();
+        var signal = scope.ServiceProvider.GetRequiredService<IScheduledTaskSignal>();
+        var stateStore = scope.ServiceProvider.GetRequiredService<IScheduledTaskStateStore>();
+        var task = scope.ServiceProvider.GetRequiredService<GoogleCalendarPropagationScheduledTask>();
+
+        await signal.MarkStaleAsync(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            "GigUpdated",
+            TestContext.Current.CancellationToken);
+
+        var result = await task.ExecuteAsync(
+            new CalendarSyncDrainOptions(MaxItems: 1),
+            new ScheduledTaskContext(DateTimeOffset.UtcNow),
+            TestContext.Current.CancellationToken);
+
+        var envelope = await stateStore.ReadAsync<GoogleCalendarPropagationTaskState>(
+            ScheduledTaskNames.GoogleCalendarPropagation,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(CalendarSyncDrainCompletionReason.MaxItemsReached, result.CompletionReason);
+        Assert.NotNull(envelope);
+        Assert.True(envelope.State.HasPendingCalendarChanges);
+    }
+
+    [Fact]
+    public async Task CalendarIntegrationService_InvalidateSyncHashes_ClearsHashesWithoutClearingProviderIdentity()
+    {
+        var calendarClient = new FakeGoogleCalendarApiClient();
+        using var factory = CreateFactory(calendarClient);
+        _ = factory.CreateClient();
+        var connectionId = await SeedCalendarConnectionAsync(factory);
+        var currentGigId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        var deletedGigId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            var dbContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var deletedState = CreateSyncState(
+                deletedGigId,
+                "deleted-hash",
+                "deleted-event-id");
+            deletedState.DeletedAtUtc = DateTimeOffset.UtcNow;
+            dbContext.GoogleCalendarIntegrationSettings.Add(new GoogleCalendarIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                IsEnabled = true,
+                GoogleCalendarId = "calendar-id",
+                CalendarName = "Glovelly Gigs",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            dbContext.GigCalendarSyncStates.Add(CreateSyncState(
+                currentGigId,
+                "current-hash",
+                "current-event-id"));
+            dbContext.GigCalendarSyncStates.Add(deletedState);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IGoogleCalendarIntegrationService>();
+        await service.InvalidateSyncHashesAsync(TestAuthContext.UserId, TestContext.Current.CancellationToken);
+
+        var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var currentState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(
+            state => state.GigId == currentGigId,
+            TestContext.Current.CancellationToken);
+        var assertionDeletedState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(
+            state => state.GigId == deletedGigId,
+            TestContext.Current.CancellationToken);
+        Assert.Null(currentState.LastSyncHash);
+        Assert.Equal("calendar-id", currentState.ProviderCalendarId);
+        Assert.Equal("current-event-id", currentState.ProviderEventId);
+        Assert.Null(assertionDeletedState.LastSyncHash);
+        Assert.Equal("calendar-id", assertionDeletedState.ProviderCalendarId);
+        Assert.Equal("deleted-event-id", assertionDeletedState.ProviderEventId);
+        Assert.NotNull(assertionDeletedState.DeletedAtUtc);
+    }
+
+    [Fact]
     public async Task SyncProcessor_CreatesEventAndStoresSyncState()
     {
         var calendarClient = new FakeGoogleCalendarApiClient();
@@ -592,7 +797,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
         var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 1), TestContext.Current.CancellationToken);
 
-        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 0), result);
+        Assert.Equal(new CalendarSyncDrainResult(1, 1, 0, 0, 0, 0, CalendarSyncDrainCompletionReason.MaxItemsReached), result);
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Equal(1, await dbContext.CalendarSyncWorkItems.CountAsync(item => item.Status == CalendarSyncWorkItemStatus.Succeeded, TestContext.Current.CancellationToken));
@@ -949,6 +1154,31 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             {
                 throw ExceptionToThrow;
             }
+        }
+    }
+
+    private sealed class CountingScheduledTaskStateStore : IScheduledTaskStateStore
+    {
+        private object? _envelope;
+
+        public int WriteCount { get; private set; }
+
+        public Task<ScheduledTaskStateEnvelope<TState>?> ReadAsync<TState>(
+            string taskName,
+            CancellationToken cancellationToken = default)
+            where TState : class, new()
+        {
+            return Task.FromResult(_envelope as ScheduledTaskStateEnvelope<TState>);
+        }
+
+        public Task WriteAsync<TState>(
+            ScheduledTaskStateEnvelope<TState> envelope,
+            CancellationToken cancellationToken = default)
+            where TState : class, new()
+        {
+            WriteCount += 1;
+            _envelope = envelope;
+            return Task.CompletedTask;
         }
     }
 }

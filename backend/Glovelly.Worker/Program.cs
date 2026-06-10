@@ -69,21 +69,38 @@ static async Task<int> RunCalendarSyncDrainAsync(
     IServiceProvider services,
     CancellationToken cancellationToken)
 {
-    using var scope = services.CreateScope();
-    var logger = scope.ServiceProvider
+    var logger = services
         .GetRequiredService<ILoggerFactory>()
         .CreateLogger("Glovelly.Worker.CalendarSync");
-    var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+    var timeProvider = services.GetRequiredService<TimeProvider>();
+    var scheduledTask = services.GetRequiredService<GoogleCalendarPropagationScheduledTask>();
+    var context = new ScheduledTaskContext(timeProvider.GetUtcNow());
+    var decision = await scheduledTask.ShouldRunAsync(context, cancellationToken);
 
-    var result = await drainer.DrainAsync(options, cancellationToken);
+    if (!decision.ShouldRun)
+    {
+        logger.LogInformation(
+            "Scheduled task {TaskName} skipped: {Reason}",
+            scheduledTask.Name,
+            decision.Reason);
+        return 0;
+    }
+
     logger.LogInformation(
-        "Calendar sync drain complete: {Processed} processed, {Succeeded} succeeded, {Retried} retried, {Failed} failed, {Skipped} skipped, {Recovered} recovered.",
+        "Scheduled task {TaskName} running: {Reason}",
+        scheduledTask.Name,
+        decision.Reason);
+
+    var result = await scheduledTask.ExecuteAsync(options, context, cancellationToken);
+    logger.LogInformation(
+        "Calendar sync drain complete: {Processed} processed, {Succeeded} succeeded, {Retried} retried, {Failed} failed, {Skipped} skipped, {Recovered} recovered, completion reason {CompletionReason}.",
         result.Processed,
         result.Succeeded,
         result.Retried,
         result.Failed,
         result.Skipped,
-        result.Recovered);
+        result.Recovered,
+        result.CompletionReason);
 
     return 0;
 }

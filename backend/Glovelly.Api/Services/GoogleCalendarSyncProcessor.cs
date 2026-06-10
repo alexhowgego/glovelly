@@ -15,27 +15,43 @@ public sealed class GoogleCalendarSyncProcessor(
 {
     public async Task ProcessAsync(CalendarSyncWorkItem workItem, CancellationToken cancellationToken)
     {
+        logger.LogInformation(
+            "Processing Google Calendar sync work item {WorkItemId}. User: {UserId}; Gig: {GigId}; Reason: {Reason}.",
+            workItem.Id,
+            workItem.UserId,
+            workItem.GigId,
+            workItem.Reason);
+
         if (workItem.GigId is null)
         {
-            await ProcessFullSyncAsync(workItem.UserId, workItem.Reason, cancellationToken);
+            await ProcessFullSyncAsync(workItem, cancellationToken);
             return;
         }
 
-        await ProcessGigSyncAsync(workItem.UserId, workItem.GigId.Value, cancellationToken);
+        await ProcessGigSyncAsync(workItem, cancellationToken);
     }
 
     private async Task ProcessFullSyncAsync(
-        Guid userId,
-        CalendarSyncWorkItemReason reason,
+        CalendarSyncWorkItem workItem,
         CancellationToken cancellationToken)
     {
+        var userId = workItem.UserId;
         var settings = await GetEnabledSettingsAsync(userId, cancellationToken);
         if (settings is null)
         {
+            logger.LogInformation(
+                "Google Calendar full sync work item {WorkItemId} skipped because enabled calendar settings were not found for user {UserId}.",
+                workItem.Id,
+                userId);
             return;
         }
 
-        _ = await calendarIntegrationService.EnsureCalendarAsync(userId, cancellationToken);
+        settings = await calendarIntegrationService.EnsureCalendarAsync(userId, cancellationToken);
+        logger.LogInformation(
+            "Google Calendar full sync work item {WorkItemId} using calendar {CalendarId} for user {UserId}.",
+            workItem.Id,
+            settings.GoogleCalendarId,
+            userId);
 
         var gigIds = await dbContext.Gigs
             .AsNoTracking()
@@ -47,21 +63,34 @@ public sealed class GoogleCalendarSyncProcessor(
             .Where(state => state.UserId == userId && state.Provider == CalendarProvider.GoogleCalendar && state.GigId != null)
             .Select(state => state.GigId!.Value)
             .ToListAsync(cancellationToken);
+        var enqueuedGigIds = gigIds.Concat(stateGigIds).Distinct().ToList();
+        logger.LogInformation(
+            "Google Calendar full sync work item {WorkItemId} queued {GigCount} gig sync items. User: {UserId}; Reason: {Reason}.",
+            workItem.Id,
+            enqueuedGigIds.Count,
+            userId,
+            workItem.Reason);
 
-        foreach (var gigId in gigIds.Concat(stateGigIds).Distinct())
+        foreach (var gigId in enqueuedGigIds)
         {
-            await workQueue.EnqueueGigAsync(userId, gigId, reason, cancellationToken);
+            await workQueue.EnqueueGigAsync(userId, gigId, workItem.Reason, cancellationToken);
         }
     }
 
     private async Task ProcessGigSyncAsync(
-        Guid userId,
-        Guid gigId,
+        CalendarSyncWorkItem workItem,
         CancellationToken cancellationToken)
     {
+        var userId = workItem.UserId;
+        var gigId = workItem.GigId!.Value;
         var settings = await GetEnabledSettingsAsync(userId, cancellationToken);
         if (settings is null)
         {
+            logger.LogInformation(
+                "Google Calendar gig sync work item {WorkItemId} skipped because enabled calendar settings were not found. User: {UserId}; Gig: {GigId}.",
+                workItem.Id,
+                userId,
+                gigId);
             return;
         }
 
@@ -82,6 +111,14 @@ public sealed class GoogleCalendarSyncProcessor(
 
         if (gig is null)
         {
+            logger.LogInformation(
+                "Google Calendar gig sync work item {WorkItemId} found no local gig. User: {UserId}; Gig: {GigId}; HasSyncState: {HasSyncState}; ProviderCalendar: {ProviderCalendarId}; ProviderEvent: {ProviderEventId}.",
+                workItem.Id,
+                userId,
+                gigId,
+                syncState is not null,
+                syncState?.ProviderCalendarId,
+                syncState?.ProviderEventId);
             if (syncState is not null)
             {
                 await DeleteProviderEventAsync(userId, settings, syncState, cancellationToken);
@@ -96,6 +133,19 @@ public sealed class GoogleCalendarSyncProcessor(
         }
 
         var plan = syncPlanner.Plan(gig, gig.Client, settings, syncState);
+        logger.LogInformation(
+            "Google Calendar gig sync work item {WorkItemId} planned {Operation}. User: {UserId}; Gig: {GigId}; Status: {Status}; Calendar: {CalendarId}; HasSyncState: {HasSyncState}; ProviderCalendar: {ProviderCalendarId}; ProviderEvent: {ProviderEventId}; HasLastSyncHash: {HasLastSyncHash}; PayloadHashChanged: {PayloadHashChanged}.",
+            workItem.Id,
+            plan.Operation,
+            userId,
+            gigId,
+            gig.Status,
+            settings.GoogleCalendarId,
+            syncState is not null,
+            syncState?.ProviderCalendarId,
+            syncState?.ProviderEventId,
+            !string.IsNullOrWhiteSpace(syncState?.LastSyncHash),
+            plan.PayloadHash is not null && !string.Equals(syncState?.LastSyncHash, plan.PayloadHash, StringComparison.Ordinal));
         switch (plan.Operation)
         {
             case CalendarSyncOperation.None:
@@ -175,6 +225,12 @@ public sealed class GoogleCalendarSyncProcessor(
         var payloadHash = plan.PayloadHash ?? throw new InvalidOperationException("Calendar create hash is missing.");
         var eventId = GoogleCalendarApiClient.BuildDeterministicEventId(gigId);
         var accessToken = await GetAccessTokenAsync(userId, cancellationToken);
+        logger.LogInformation(
+            "Creating Google Calendar event {EventId} in calendar {CalendarId}. User: {UserId}; Gig: {GigId}.",
+            eventId,
+            settings.GoogleCalendarId,
+            userId,
+            gigId);
         var createdEvent = await CreateEventWithCalendarRecoveryAsync(
             userId,
             settings,
@@ -214,6 +270,12 @@ public sealed class GoogleCalendarSyncProcessor(
             ? GoogleCalendarApiClient.BuildDeterministicEventId(gigId)
             : syncState.ProviderEventId;
         var accessToken = await GetAccessTokenAsync(userId, cancellationToken);
+        logger.LogInformation(
+            "Updating Google Calendar event {EventId} in calendar {CalendarId}. User: {UserId}; Gig: {GigId}.",
+            eventId,
+            settings.GoogleCalendarId,
+            userId,
+            gigId);
         var updatedEvent = await UpdateEventWithCalendarRecoveryAsync(
             userId,
             settings,
@@ -237,6 +299,12 @@ public sealed class GoogleCalendarSyncProcessor(
             !string.IsNullOrWhiteSpace(syncState.ProviderCalendarId))
         {
             var accessToken = await GetAccessTokenAsync(userId, cancellationToken);
+            logger.LogInformation(
+                "Deleting Google Calendar event {EventId} from calendar {CalendarId}. User: {UserId}; Gig: {GigId}.",
+                syncState.ProviderEventId,
+                syncState.ProviderCalendarId,
+                userId,
+                syncState.GigId);
             await calendarApiClient.DeleteEventAsync(
                 accessToken,
                 syncState.ProviderCalendarId,
@@ -294,8 +362,19 @@ public sealed class GoogleCalendarSyncProcessor(
         }
         catch (GoogleCalendarApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
+            logger.LogWarning(
+                exception,
+                "Google Calendar event create returned 404 for event {EventId} in calendar {CalendarId}; recreating calendar. User: {UserId}.",
+                eventId,
+                settings.GoogleCalendarId,
+                userId);
             await RecreateMissingCalendarAsync(userId, settings, cancellationToken);
             accessToken = await GetAccessTokenAsync(userId, cancellationToken);
+            logger.LogInformation(
+                "Retrying Google Calendar event create for event {EventId} in replacement calendar {CalendarId}. User: {UserId}.",
+                eventId,
+                settings.GoogleCalendarId,
+                userId);
             return await calendarApiClient.CreateEventAsync(
                 accessToken,
                 settings.GoogleCalendarId!,
@@ -324,6 +403,12 @@ public sealed class GoogleCalendarSyncProcessor(
         }
         catch (GoogleCalendarApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
+            logger.LogWarning(
+                exception,
+                "Google Calendar event update returned 404 for event {EventId} in calendar {CalendarId}; trying create before calendar recreation. User: {UserId}.",
+                eventId,
+                settings.GoogleCalendarId,
+                userId);
             try
             {
                 return await calendarApiClient.CreateEventAsync(
@@ -335,8 +420,19 @@ public sealed class GoogleCalendarSyncProcessor(
             }
             catch (GoogleCalendarApiException createException) when (createException.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
+                logger.LogWarning(
+                    createException,
+                    "Google Calendar event create-after-update returned 404 for event {EventId} in calendar {CalendarId}; recreating calendar. User: {UserId}.",
+                    eventId,
+                    settings.GoogleCalendarId,
+                    userId);
                 await RecreateMissingCalendarAsync(userId, settings, cancellationToken);
                 accessToken = await GetAccessTokenAsync(userId, cancellationToken);
+                logger.LogInformation(
+                    "Retrying Google Calendar event create for event {EventId} in replacement calendar {CalendarId}. User: {UserId}.",
+                    eventId,
+                    settings.GoogleCalendarId,
+                    userId);
                 return await calendarApiClient.CreateEventAsync(
                     accessToken,
                     settings.GoogleCalendarId!,

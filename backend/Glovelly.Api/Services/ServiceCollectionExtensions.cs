@@ -29,6 +29,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICalendarSyncWorkQueue, CalendarSyncWorkQueue>();
         services.AddScoped<IGoogleCalendarSyncProcessor, GoogleCalendarSyncProcessor>();
         services.AddScoped<ICalendarSyncQueueDrainer, CalendarSyncQueueDrainer>();
+        services.AddSingleton<IScheduledTaskStateStore, BlobScheduledTaskStateStore>();
+        services.AddSingleton<IScheduledTaskSignal, ScheduledTaskSignal>();
+        services.AddSingleton<GoogleCalendarPropagationScheduledTask>();
         services.AddOptions<GoogleRoutesMileageSettings>()
             .BindConfiguration(GoogleRoutesMileageSettings.SectionName);
         services.AddHttpClient<GoogleRoutesMileageEstimationService>();

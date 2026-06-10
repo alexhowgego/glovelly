@@ -46,7 +46,7 @@ public sealed class GcsBlobStore(
         {
             await storageClient.DeleteObjectAsync(_bucketName, key, cancellationToken: cancellationToken);
         }
-        catch (GoogleApiException exception) when (exception.Error?.Code == StatusCodes.Status404NotFound)
+        catch (GoogleApiException exception) when (GoogleApiExceptionSupport.IsNotFound(exception))
         {
         }
     }
