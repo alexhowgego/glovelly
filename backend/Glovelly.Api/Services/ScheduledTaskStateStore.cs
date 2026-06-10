@@ -40,7 +40,7 @@ public sealed class BlobScheduledTaskStateStore(IBlobStore blobStore) : ISchedul
         {
             return null;
         }
-        catch (GoogleApiException exception) when (exception.Error?.Code == StatusCodes.Status404NotFound)
+        catch (GoogleApiException exception) when (GoogleApiExceptionSupport.IsNotFound(exception))
         {
             return null;
         }
