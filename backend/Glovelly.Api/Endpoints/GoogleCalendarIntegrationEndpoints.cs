@@ -142,6 +142,7 @@ internal static class GoogleCalendarIntegrationEndpoints
                 tokenResponse.TokenResponse,
                 cancellationToken);
             _ = await calendarIntegrationService.EnsureCalendarAsync(currentUserId.Value, cancellationToken);
+            await calendarIntegrationService.InvalidateSyncHashesAsync(currentUserId.Value, cancellationToken);
             await workQueue.EnqueueFullSyncAsync(
                 currentUserId.Value,
                 CalendarSyncWorkItemReason.ConnectionChanged,

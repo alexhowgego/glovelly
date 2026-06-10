@@ -72,4 +72,28 @@ public sealed class GoogleCalendarIntegrationService(
 
         return settings;
     }
+
+    public async Task InvalidateSyncHashesAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var syncStates = await dbContext.GigCalendarSyncStates
+            .Where(state =>
+                state.UserId == userId &&
+                state.Provider == CalendarProvider.GoogleCalendar &&
+                state.LastSyncHash != null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var state in syncStates)
+        {
+            state.LastSyncHash = null;
+            state.UpdatedAtUtc = now;
+        }
+
+        if (syncStates.Count > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
 }

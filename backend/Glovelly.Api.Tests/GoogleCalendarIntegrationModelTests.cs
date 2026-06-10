@@ -476,6 +476,63 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
     }
 
     [Fact]
+    public async Task CalendarIntegrationService_InvalidateSyncHashes_ClearsHashesWithoutClearingProviderIdentity()
+    {
+        var calendarClient = new FakeGoogleCalendarApiClient();
+        using var factory = CreateFactory(calendarClient);
+        _ = factory.CreateClient();
+        var connectionId = await SeedCalendarConnectionAsync(factory);
+        var currentGigId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        var deletedGigId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            var dbContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var deletedState = CreateSyncState(
+                deletedGigId,
+                "deleted-hash",
+                "deleted-event-id");
+            deletedState.DeletedAtUtc = DateTimeOffset.UtcNow;
+            dbContext.GoogleCalendarIntegrationSettings.Add(new GoogleCalendarIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                IsEnabled = true,
+                GoogleCalendarId = "calendar-id",
+                CalendarName = "Glovelly Gigs",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            dbContext.GigCalendarSyncStates.Add(CreateSyncState(
+                currentGigId,
+                "current-hash",
+                "current-event-id"));
+            dbContext.GigCalendarSyncStates.Add(deletedState);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IGoogleCalendarIntegrationService>();
+        await service.InvalidateSyncHashesAsync(TestAuthContext.UserId, TestContext.Current.CancellationToken);
+
+        var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var currentState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(
+            state => state.GigId == currentGigId,
+            TestContext.Current.CancellationToken);
+        var assertionDeletedState = await assertionDbContext.GigCalendarSyncStates.SingleAsync(
+            state => state.GigId == deletedGigId,
+            TestContext.Current.CancellationToken);
+        Assert.Null(currentState.LastSyncHash);
+        Assert.Equal("calendar-id", currentState.ProviderCalendarId);
+        Assert.Equal("current-event-id", currentState.ProviderEventId);
+        Assert.Null(assertionDeletedState.LastSyncHash);
+        Assert.Equal("calendar-id", assertionDeletedState.ProviderCalendarId);
+        Assert.Equal("deleted-event-id", assertionDeletedState.ProviderEventId);
+        Assert.NotNull(assertionDeletedState.DeletedAtUtc);
+    }
+
+    [Fact]
     public async Task SyncProcessor_CreatesEventAndStoresSyncState()
     {
         var calendarClient = new FakeGoogleCalendarApiClient();
