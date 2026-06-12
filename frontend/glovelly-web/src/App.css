@@ -1421,16 +1421,8 @@
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
   border-radius: 18px;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, #f47d2a 8%, transparent), transparent 58%),
-    #fbf8f2;
+  background: var(--compact-control-background);
   box-shadow: var(--surface-shadow-soft);
-}
-
-:root[data-theme='dark'] .compact-list-controls {
-  background:
-    linear-gradient(135deg, color-mix(in srgb, #f47d2a 10%, transparent), transparent 58%),
-    #18212d;
 }
 
 .compact-list-main-controls {
@@ -1489,9 +1481,9 @@
 .compact-filter-chip:focus-visible,
 .compact-filter-chip.selected {
   background:
-    linear-gradient(135deg, color-mix(in srgb, #f47d2a 14%, transparent), transparent 62%),
+    linear-gradient(135deg, color-mix(in srgb, var(--compact-control-accent) 14%, transparent), transparent 62%),
     var(--surface-accent);
-  border-color: color-mix(in srgb, #f47d2a 42%, var(--surface-border));
+  border-color: color-mix(in srgb, var(--compact-control-accent) 42%, var(--surface-border));
   color: var(--heading);
 }
 

@@ -232,6 +232,15 @@ export function AppShell({
                           <option value="system">System</option>
                           <option value="light">Light</option>
                           <option value="dark">Dark</option>
+                          <option value="neon">Neon</option>
+                          <option value="mahogany">Mahogany</option>
+                          <option value="candy">Candy</option>
+                          <option value="blue-note">Blue Note</option>
+                          <option value="parchment">Parchment</option>
+                          <option value="studio-tape">Studio Tape</option>
+                          <option value="synthwave">Synthwave</option>
+                          <option value="sunset-soundcheck">Sunset Soundcheck</option>
+                          <option value="velvet-rope">Velvet Rope</option>
                         </select>
                       </label>
                       <button
