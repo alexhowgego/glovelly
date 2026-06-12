@@ -79,6 +79,8 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
                 settings.AccessRequests.FromDisplayName = "Glovelly Access";
                 settings.Invoices.FromAddress = "invoices@glovelly.test";
                 settings.Invoices.FromDisplayName = "Glovelly Invoices";
+                settings.UserInvitations.FromAddress = "invitations@glovelly.test";
+                settings.UserInvitations.FromDisplayName = "Glovelly Invitations";
             });
 
             services.AddDbContext<AppDbContext>(options =>

@@ -6,6 +6,7 @@ public sealed class EmailSettings
     public long MaxTotalAttachmentBytes { get; set; } = 25 * 1024 * 1024;
     public EmailSenderIdentitySettings AccessRequests { get; set; } = new();
     public EmailSenderIdentitySettings Invoices { get; set; } = new();
+    public EmailSenderIdentitySettings UserInvitations { get; set; } = new();
     public ResendEmailSettings Resend { get; set; } = new();
 }
 

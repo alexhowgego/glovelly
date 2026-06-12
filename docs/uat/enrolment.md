@@ -66,14 +66,19 @@ Saved defaults are reused in later client, gig, or invoice workflows where expec
 ### Steps
 
 1. Open Admin as an administrator.
-2. Create or edit a user record.
-3. Toggle active state or role.
-4. Save.
-5. Confirm the user list updates.
+2. Create a user record and leave `Email this user an invitation to sign in` checked.
+3. Save.
+4. Confirm the user list updates and the status confirms the invitation was sent.
+5. Create another user record and clear `Email this user an invitation to sign in`.
+6. Save.
+7. Confirm the user list updates without an invitation-sent status.
+8. Edit a user record.
+9. Toggle active state or role.
+10. Save.
 
 ### Expected Results
 
-Admin changes persist and non-admin users cannot access admin workflows.
+Admin changes persist and non-admin users cannot access admin workflows. New users can be invited by email during enrolment, and admins can choose not to send the invitation when needed.
 
 ## Inactive User Deletion
 

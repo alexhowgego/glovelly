@@ -30,6 +30,7 @@ function toEditableAdminForm(user: AdminUser): AdminUserForm {
     googleSubject: user.googleSubject ?? '',
     role: user.role === 'Admin' ? 'Admin' : 'User',
     isActive: user.isActive,
+    sendInvitationEmail: false,
   }
 }
 
@@ -247,6 +248,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
       googleSubject: adminForm.googleSubject.trim(),
       role: adminForm.role,
       isActive: adminForm.isActive,
+      sendInvitationEmail: adminForm.sendInvitationEmail,
     }
 
     if (!payload.email) {
@@ -306,9 +308,43 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
         googleSubject: savedUser.googleSubject ?? '',
         role: savedUser.role === 'Admin' ? 'Admin' : 'User',
         isActive: savedUser.isActive,
+        sendInvitationEmail: false,
       })
-      setAdminStatus(isEdit ? 'User updated.' : 'User added.')
       setIsAdminEditorOpen(!closeAfterSave)
+
+      if (!isEdit && payload.sendInvitationEmail) {
+        try {
+          const invitationResponse = await fetchWithSession(
+            buildApiUrl(`/admin/users/${savedUser.id}/invitation-email`),
+            { method: 'POST' }
+          )
+
+          if (
+            handleSessionExpired(
+              invitationResponse,
+              onSessionExpired,
+              'Your session expired. Sign in again to keep managing access.'
+            )
+          ) {
+            return
+          }
+
+          if (!invitationResponse.ok) {
+            throw new Error(
+              await getResponseErrorMessage(
+                invitationResponse,
+                'Unable to send invitation email.'
+              )
+            )
+          }
+
+          setAdminStatus('User added and invitation sent.')
+        } catch {
+          setAdminStatus('User added, but the invitation email could not be sent.')
+        }
+      } else {
+        setAdminStatus(isEdit ? 'User updated.' : 'User added.')
+      }
     } catch (error) {
       setAdminStatus(
         error instanceof Error ? error.message : 'Unable to save right now.'
