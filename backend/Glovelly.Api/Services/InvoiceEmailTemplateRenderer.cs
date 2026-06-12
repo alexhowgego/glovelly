@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using Glovelly.Api.Models;
@@ -128,69 +127,33 @@ public static partial class InvoiceEmailTemplateRenderer
         string? additionalMessage,
         bool includeReceipts)
     {
-        var bodyHtml = PlainTextToHtml(resolvedBody);
+        var bodyHtml = EmailHtmlRenderer.PlainTextToHtml(resolvedBody);
         var additionalMessageHtml = string.IsNullOrWhiteSpace(additionalMessage)
             ? string.Empty
             : $"""
                 <div class="additional-message">
                   <p class="section-label">Additional message</p>
-                  {PlainTextToHtml(additionalMessage.Trim())}
+                  {EmailHtmlRenderer.PlainTextToHtml(additionalMessage.Trim())}
                 </div>
                 """;
         var receiptNote = includeReceipts
             ? "<p>Expense receipts are attached in a separate ZIP file.</p>"
             : string.Empty;
 
-        return $$"""
-            <!doctype html>
-            <html lang="en">
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <style>
-                body { margin: 0; padding: 0; background: #f6f3ee; color: #202020; font-family: Arial, sans-serif; }
-                .wrap { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
-                .card { background: #ffffff; border: 1px solid #e5ded2; border-radius: 16px; padding: 28px; }
-                .content p { margin: 0 0 16px; line-height: 1.55; }
-                .attachment-note, .additional-message { margin-top: 24px; padding: 16px; background: #fbf8f2; border-radius: 12px; }
-                .section-label { margin: 0 0 8px; color: #6c5f50; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-                .footer { margin-top: 18px; color: #746b61; font-size: 12px; text-align: center; }
-                .footer a { color: #746b61; font-weight: 700; }
-              </style>
-            </head>
-            <body>
-              <div class="wrap">
-                <div class="card">
-                  <div class="content">
+        return EmailHtmlRenderer.RenderDocument(
+            $"Invoice {invoice.InvoiceNumber}",
+            "Your invoice is attached as a PDF.",
+            $$"""
+                  <div class="message-copy">
                     {{bodyHtml}}
                   </div>
                   <div class="attachment-note">
                     <p class="section-label">Attachment</p>
-                    <p>Invoice {{WebUtility.HtmlEncode(invoice.InvoiceNumber)}} is attached as a PDF.</p>
+                    <p>Invoice {{EmailHtmlRenderer.Encode(invoice.InvoiceNumber)}} is attached as a PDF.</p>
                     {{receiptNote}}
                   </div>
                   {{additionalMessageHtml}}
-                </div>
-                <div class="footer">Sent with <a href="https://glovelly.net">Glovelly</a></div>
-              </div>
-            </body>
-            </html>
-            """;
-    }
-
-    private static string PlainTextToHtml(string text)
-    {
-        var normalized = text.ReplaceLineEndings("\n").Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return string.Empty;
-        }
-
-        var paragraphs = normalized.Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return string.Join(
-            Environment.NewLine,
-            paragraphs.Select(paragraph =>
-                $"<p>{WebUtility.HtmlEncode(paragraph).Replace("\n", "<br>", StringComparison.Ordinal)}</p>"));
+            """);
     }
 
     private static string ResolveTokens(

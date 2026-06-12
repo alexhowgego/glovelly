@@ -5,7 +5,6 @@ using Glovelly.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -184,55 +183,43 @@ internal static class AccessEndpoints
 
     private static string BuildHtmlBody(AccessRequestEmailRequest requester, string environmentLabel)
     {
-        var encodedEmail = WebUtility.HtmlEncode(requester.Email);
-        var encodedDisplayName = WebUtility.HtmlEncode(requester.DisplayName ?? "Not provided");
-        var encodedEnvironment = WebUtility.HtmlEncode(environmentLabel);
-        var encodedTimestamp = WebUtility.HtmlEncode(
+        var encodedEmail = EmailHtmlRenderer.Encode(requester.Email);
+        var encodedDisplayName = EmailHtmlRenderer.Encode(requester.DisplayName ?? "Not provided");
+        var encodedEnvironment = EmailHtmlRenderer.Encode(environmentLabel);
+        var encodedTimestamp = EmailHtmlRenderer.Encode(
             requester.RequestedAtUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'"));
-        var encodedSubject = WebUtility.HtmlEncode(requester.Subject ?? "Not provided");
+        var encodedSubject = EmailHtmlRenderer.Encode(requester.Subject ?? "Not provided");
 
-        return $$"""
-            <!DOCTYPE html>
-            <html lang="en">
-            <body style="margin:0;padding:24px;background:#f5efe7;font-family:'Avenir Next','Segoe UI',sans-serif;color:#21313c;">
-                <div style="max-width:640px;margin:0 auto;background:#fffdf9;border:1px solid #e5d8ca;border-radius:24px;overflow:hidden;box-shadow:0 18px 45px rgba(39,31,24,0.08);">
-                    <div style="padding:24px 28px;background:linear-gradient(135deg,#17324d,#255a7a);color:#ffffff;">
-                        <div style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.82;">Glovelly</div>
-                        <h1 style="margin:12px 0 0;font-size:28px;line-height:1.05;font-family:Georgia,serif;">Access Request</h1>
-                        <p style="margin:12px 0 0;font-size:15px;line-height:1.6;color:rgba(255,255,255,0.88);">
-                            A user has successfully authenticated and is asking to be enrolled in Glovelly.
-                        </p>
-                    </div>
-                    <div style="padding:28px;">
-                        <div style="display:inline-block;padding:8px 12px;border-radius:999px;background:#efe4d7;color:#8c4920;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
-                            {{encodedEnvironment}}
-                        </div>
-                        <table style="width:100%;margin-top:20px;border-collapse:collapse;">
-                            <tr>
-                                <td style="padding:12px 0;border-bottom:1px solid #efe3d6;font-weight:700;width:180px;">User email</td>
-                                <td style="padding:12px 0;border-bottom:1px solid #efe3d6;">{{encodedEmail}}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:12px 0;border-bottom:1px solid #efe3d6;font-weight:700;">Display name</td>
-                                <td style="padding:12px 0;border-bottom:1px solid #efe3d6;">{{encodedDisplayName}}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:12px 0;border-bottom:1px solid #efe3d6;font-weight:700;">Timestamp</td>
-                                <td style="padding:12px 0;border-bottom:1px solid #efe3d6;">{{encodedTimestamp}}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:12px 0;font-weight:700;">Identity subject</td>
-                                <td style="padding:12px 0;">{{encodedSubject}}</td>
-                            </tr>
-                        </table>
-                        <p style="margin:24px 0 0;font-size:14px;line-height:1.7;color:#52606b;">
-                            Review this user in the target environment and grant access if appropriate.
-                        </p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """;
+        return EmailHtmlRenderer.RenderDocument(
+            "Access Request",
+            "A user has successfully authenticated and is asking to be enrolled in Glovelly.",
+            $$"""
+                  <div class="info-note">
+                    <p class="section-label">Environment</p>
+                    <p>{{encodedEnvironment}}</p>
+                  </div>
+                  <table class="details">
+                    <tr>
+                      <th>User email</th>
+                      <td>{{encodedEmail}}</td>
+                    </tr>
+                    <tr>
+                      <th>Display name</th>
+                      <td>{{encodedDisplayName}}</td>
+                    </tr>
+                    <tr>
+                      <th>Timestamp</th>
+                      <td>{{encodedTimestamp}}</td>
+                    </tr>
+                    <tr>
+                      <th>Identity subject</th>
+                      <td>{{encodedSubject}}</td>
+                    </tr>
+                  </table>
+                  <div class="message-copy">
+                    <p>Review this user in the target environment and grant access if appropriate.</p>
+                  </div>
+            """);
     }
 
     private static string ResolveEnvironmentLabel(StartupSettings settings)

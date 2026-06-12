@@ -4,7 +4,6 @@ using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using System.Net;
 using System.Security.Claims;
 
 namespace Glovelly.Api.Endpoints;
@@ -304,39 +303,24 @@ public static class AdminEndpoints
 
     private static string BuildInvitationHtmlBody(User user, string loginUrl)
     {
-        var encodedDisplayName = WebUtility.HtmlEncode(
-            string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName);
-        var encodedEmail = WebUtility.HtmlEncode(user.Email);
-        var encodedLoginUrl = WebUtility.HtmlEncode(loginUrl);
+        var displayName = string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName;
+        var encodedDisplayName = EmailHtmlRenderer.Encode(displayName);
+        var encodedEmail = EmailHtmlRenderer.Encode(user.Email);
+        var encodedLoginUrl = EmailHtmlRenderer.Encode(loginUrl);
 
-        return $$"""
-            <!DOCTYPE html>
-            <html lang="en">
-            <body style="margin:0;padding:24px;background:#f5efe7;font-family:'Avenir Next','Segoe UI',sans-serif;color:#21313c;">
-                <div style="max-width:640px;margin:0 auto;background:#fffdf9;border:1px solid #e5d8ca;border-radius:24px;overflow:hidden;box-shadow:0 18px 45px rgba(39,31,24,0.08);">
-                    <div style="padding:24px 28px;background:linear-gradient(135deg,#17324d,#255a7a);color:#ffffff;">
-                        <div style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.82;">Glovelly</div>
-                        <h1 style="margin:12px 0 0;font-size:28px;line-height:1.05;font-family:Georgia,serif;">You're invited</h1>
-                        <p style="margin:12px 0 0;font-size:15px;line-height:1.6;color:rgba(255,255,255,0.88);">
-                            Your Glovelly account is ready for you to sign in.
-                        </p>
-                    </div>
-                    <div style="padding:28px;">
-                        <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Hi {{encodedDisplayName}},</p>
-                        <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#52606b;">
-                            You have been invited to use Glovelly. Sign in with Google using <strong>{{encodedEmail}}</strong>.
-                        </p>
-                        <p style="margin:28px 0;">
-                            <a href="{{encodedLoginUrl}}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#17324d;color:#ffffff;text-decoration:none;font-weight:700;">Open Glovelly</a>
-                        </p>
-                        <p style="margin:0;font-size:13px;line-height:1.7;color:#6b7280;">
-                            If you were not expecting this invitation, you can ignore this email.
-                        </p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """;
+        return EmailHtmlRenderer.RenderDocument(
+            "You're invited",
+            "Your Glovelly account is ready for you to sign in.",
+            $$"""
+                  <div class="message-copy">
+                    <p>Hi {{encodedDisplayName}},</p>
+                    <p>You have been invited to use Glovelly. Sign in with Google using <strong>{{encodedEmail}}</strong>.</p>
+                    <p><a class="button" href="{{encodedLoginUrl}}">Open Glovelly</a></p>
+                  </div>
+                  <div class="info-note">
+                    <p>If you were not expecting this invitation, you can ignore this email.</p>
+                  </div>
+            """);
     }
 
     private sealed record AdminUserRequest(
