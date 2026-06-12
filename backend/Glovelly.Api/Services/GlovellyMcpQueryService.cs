@@ -20,7 +20,9 @@ public interface IGlovellyMcpQueryService
     Task<GigImportDraftBulkAddResult> AddGigImportDraftsAsync(Guid userId, GigImportDraftBulkAddRequest request, CancellationToken cancellationToken);
 }
 
-public sealed class GlovellyMcpQueryService(AppDbContext db) : IGlovellyMcpQueryService
+public sealed class GlovellyMcpQueryService(
+    AppDbContext db,
+    IWorkspaceEventPublisher workspaceEventPublisher) : IGlovellyMcpQueryService
 {
     private const string DefaultCurrency = "GBP";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -215,6 +217,7 @@ public sealed class GlovellyMcpQueryService(AppDbContext db) : IGlovellyMcpQuery
 
         db.GigImportBatches.Add(batch);
         await db.SaveChangesAsync(cancellationToken);
+        await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "created", batch.Id, DateTimeOffset.UtcNow), cancellationToken);
 
         return new GigImportBatchCreateResult(true, [], ToGigImportBatchSummary(batch, 0));
     }
@@ -275,7 +278,13 @@ public sealed class GlovellyMcpQueryService(AppDbContext db) : IGlovellyMcpQuery
         GigImportDraftAddRequest request,
         CancellationToken cancellationToken)
     {
-        return await AddGigImportDraftCoreAsync(userId, request, 0, cancellationToken);
+        var result = await AddGigImportDraftCoreAsync(userId, request, 0, cancellationToken);
+        if (result.Created)
+        {
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", request.BatchId, DateTimeOffset.UtcNow), cancellationToken);
+        }
+
+        return result;
     }
 
     public async Task<GigImportDraftBulkAddResult> AddGigImportDraftsAsync(
@@ -303,6 +312,11 @@ public sealed class GlovellyMcpQueryService(AppDbContext db) : IGlovellyMcpQuery
         {
             var draftRequest = drafts[index] with { BatchId = request.BatchId };
             results.Add(await AddGigImportDraftCoreAsync(userId, draftRequest, index, cancellationToken));
+        }
+
+        if (results.Any(result => result.Created))
+        {
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", request.BatchId, DateTimeOffset.UtcNow), cancellationToken);
         }
 
         return new GigImportDraftBulkAddResult(

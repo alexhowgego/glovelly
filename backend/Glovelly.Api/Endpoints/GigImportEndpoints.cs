@@ -65,6 +65,7 @@ internal static class GigImportEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             IGigImportDuplicateDetectionService duplicateDetectionService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -126,6 +127,7 @@ internal static class GigImportEndpoints
                 JsonOptions);
 
             await db.SaveChangesAsync();
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", batchId, DateTimeOffset.UtcNow));
 
             var duplicateWarnings = await duplicateDetectionService.FindWarningsAsync(
                 userId,
@@ -187,6 +189,7 @@ internal static class GigImportEndpoints
                 UpdateBatchStatusAfterCommittedDecisions(batch);
 
                 await db.SaveChangesAsync();
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", batch.Id, DateTimeOffset.UtcNow));
 
                 var duplicateWarnings = await duplicateDetectionService.FindWarningsAsync(
                     userId,
@@ -218,6 +221,7 @@ internal static class GigImportEndpoints
 
             await db.SaveChangesAsync();
             await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "created", null, DateTimeOffset.UtcNow));
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", batch.Id, DateTimeOffset.UtcNow));
 
             var remainingDuplicateWarnings = await duplicateDetectionService.FindWarningsAsync(
                 userId,

@@ -461,6 +461,13 @@ function App({ appMetadata }: AppProps) {
         void refreshGigsFromServer('realtime')
         void refreshInvoicesFromServer('realtime')
       }
+
+      if (event.scope === 'gig-imports') {
+        void loadGigImportBatches(true)
+        if (selectedGigImportBatchId) {
+          void loadGigImportBatch(selectedGigImportBatchId)
+        }
+      }
     },
   })
 
@@ -637,18 +644,6 @@ function App({ appMetadata }: AppProps) {
     resetSellerProfile,
     resetUserSettings,
   ])
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return
-    }
-
-    const intervalId = window.setInterval(() => {
-      void loadGigImportBatches(true)
-    }, 30000)
-
-    return () => window.clearInterval(intervalId)
-  }, [isAuthenticated, loadGigImportBatches])
 
   useEffect(() => {
     if (!isAuthenticated) {
