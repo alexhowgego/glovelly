@@ -26,8 +26,10 @@ import {
   jsonRequestInit,
 } from './api'
 import {
+  buildInvoiceEmailBodyPreview,
   buildInvoiceEmailSubjectPreview,
   buildInvoiceFilenamePreview,
+  invoiceEmailBodyTokens,
   invoiceFilenameTokens,
 } from './invoicePreview'
 import { formatCurrency, formatDate } from './formatters'
@@ -1591,6 +1593,11 @@ function App({ appMetadata }: AppProps) {
 
       <UserSettingsModal
         form={userSettingsForm}
+        invoiceEmailBodyPreview={buildInvoiceEmailBodyPreview(
+          userSettingsForm.invoiceEmailBodyTemplate,
+          sellerProfile.sellerName
+        )}
+        invoiceEmailBodyTokens={invoiceEmailBodyTokens}
         invoiceEmailSubjectPreview={buildInvoiceEmailSubjectPreview(
           userSettingsForm.invoiceEmailSubjectPattern,
           null

@@ -56,6 +56,10 @@ export default defineConfig({
         target: 'http://localhost:5153',
         changeOrigin: true,
       },
+      '/invoice-email-template': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
       '/integrations': {
         target: 'http://localhost:5153',
         changeOrigin: true,

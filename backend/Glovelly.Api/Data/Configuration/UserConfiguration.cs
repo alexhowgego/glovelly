@@ -27,6 +27,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(200);
         entity.Property(user => user.InvoiceEmailSubjectPattern)
             .HasMaxLength(200);
+        entity.Property(user => user.InvoiceEmailBodyTemplate)
+            .HasMaxLength(4000);
         entity.Property(user => user.InvoiceReplyToEmail)
             .HasMaxLength(320);
         entity.Property(user => user.Role)

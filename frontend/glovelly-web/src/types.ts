@@ -44,6 +44,7 @@ export type AuthUser = {
   defaultPaymentWindowDays: number | null
   invoiceFilenamePattern: string | null
   invoiceEmailSubjectPattern: string | null
+  invoiceEmailBodyTemplate: string | null
   invoiceReplyToEmail: string | null
   invoiceUploadFolderId: string | null
   isGoogleDriveConnected: boolean
@@ -100,6 +101,7 @@ export type UserSettingsForm = {
   defaultPaymentWindowDays: string
   invoiceFilenamePattern: string
   invoiceEmailSubjectPattern: string
+  invoiceEmailBodyTemplate: string
   invoiceReplyToEmail: string
   invoiceUploadFolderId: string
 }

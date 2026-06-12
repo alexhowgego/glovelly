@@ -8,6 +8,8 @@ public sealed record InvoiceDeliveryRequest(
     Guid? UserId,
     string? Message,
     string EmailSubject,
+    string? EmailBodyTemplate,
+    string? BusinessName,
     string AttachmentFileName,
     InvoiceEmailSenderIdentity SenderIdentity,
     IReadOnlyList<InvoiceExpenseReceiptAttachment> ExpenseReceiptAttachments);

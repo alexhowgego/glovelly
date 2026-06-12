@@ -31,11 +31,19 @@ public sealed class InvoiceEmailDeliveryChannel(
             EmailUseCase.Invoices);
         var attachments = await BuildAttachmentsAsync(request, cancellationToken);
 
+        var renderedEmail = InvoiceEmailTemplateRenderer.Render(
+            invoice,
+            client,
+            request.EmailBodyTemplate,
+            request.BusinessName,
+            request.Message,
+            request.ExpenseReceiptAttachments.Count > 0);
+
         await emailSender.SendAsync(
             new EmailMessage(
                 To: [new EmailAddress(client.Email.Trim(), client.Name.Trim())],
                 Subject: request.EmailSubject,
-                PlainTextBody: BuildPlainTextBody(invoice, request.Message),
+                PlainTextBody: renderedEmail.PlainTextBody,
                 From: new EmailAddress(
                     configuredFrom.Address,
                     request.SenderIdentity.FromDisplayName),
@@ -44,6 +52,7 @@ public sealed class InvoiceEmailDeliveryChannel(
                     : new EmailAddress(
                         request.SenderIdentity.ReplyToEmail!,
                         request.SenderIdentity.ReplyToDisplayName),
+                HtmlBody: renderedEmail.HtmlBody,
                 Attachments: attachments),
             cancellationToken);
 
@@ -165,24 +174,6 @@ public sealed class InvoiceEmailDeliveryChannel(
             : value[..maxLength].Trim(' ', '.', '-');
     }
 
-    private static string BuildPlainTextBody(Invoice invoice, string? message)
-    {
-        var builder = new StringBuilder()
-            .AppendLine($"Please find invoice {invoice.InvoiceNumber} attached.")
-            .AppendLine()
-            .AppendLine("Many thanks,")
-            .AppendLine("Glovelly");
-
-        if (!string.IsNullOrWhiteSpace(message))
-        {
-            builder
-                .AppendLine()
-                .AppendLine("Message:")
-                .AppendLine(message.Trim());
-        }
-
-        return builder.ToString();
-    }
 }
 
 public sealed class InvoiceEmailAttachmentLimitExceededException(
