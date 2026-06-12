@@ -116,8 +116,17 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected async Task OpenInvoiceLinesAsync()
     {
-        await Page.GetByTestId("invoice-line-items-button").ClickAsync();
-        await Page.GetByTestId("invoice-line-item").First.WaitForAsync(new LocatorWaitForOptions
+        var lineItemsButton = Page.GetByTestId("invoice-line-items-button");
+        if (await lineItemsButton.GetAttributeAsync("aria-expanded") != "true")
+        {
+            await lineItemsButton.ClickAsync();
+        }
+
+        await Assertions.Expect(lineItemsButton).ToHaveAttributeAsync("aria-expanded", "true", new LocatorAssertionsToHaveAttributeOptions
+        {
+            Timeout = 30_000,
+        });
+        await VisibleInvoiceLines().First.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 30_000,
@@ -151,7 +160,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected async Task AssertInvoiceLineTypeCountAsync(string expectedType, int expectedCount)
     {
-        await Assertions.Expect(Page.GetByTestId("invoice-line-type").Filter(new LocatorFilterOptions
+        await Assertions.Expect(Page.Locator("[data-testid=\"invoice-line-type\"]:visible").Filter(new LocatorFilterOptions
         {
             HasTextRegex = new System.Text.RegularExpressions.Regex($"^{System.Text.RegularExpressions.Regex.Escape(expectedType)}$")
         })).ToHaveCountAsync(expectedCount, new LocatorAssertionsToHaveCountOptions
@@ -283,7 +292,9 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected ILocator ExpenseRowAt(int index) => Page.GetByTestId("gig-expense-item").Nth(index);
 
-    private ILocator InvoiceLine(string expectedText) => Page.GetByTestId("invoice-line-item").Filter(new LocatorFilterOptions
+    private ILocator VisibleInvoiceLines() => Page.Locator("[data-testid=\"invoice-line-item\"]:visible");
+
+    private ILocator InvoiceLine(string expectedText) => VisibleInvoiceLines().Filter(new LocatorFilterOptions
     {
         HasText = expectedText,
     });
