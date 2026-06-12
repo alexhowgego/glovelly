@@ -344,6 +344,19 @@ export function AdminSection({
                 />
                 <span>Account is active and allowed to sign in</span>
               </label>
+
+              {adminMode === 'create' ? (
+                <label className="checkbox-field full-width">
+                  <input
+                    type="checkbox"
+                    checked={adminForm.sendInvitationEmail}
+                    onChange={(event) =>
+                      onUpdateField('sendInvitationEmail', event.target.checked)
+                    }
+                  />
+                  <span>Email this user an invitation to sign in</span>
+                </label>
+              ) : null}
             </div>
 
             <div className="form-actions">

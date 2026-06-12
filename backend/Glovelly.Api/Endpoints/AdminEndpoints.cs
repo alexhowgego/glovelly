@@ -1,7 +1,9 @@
 using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
 namespace Glovelly.Api.Endpoints;
@@ -52,6 +54,61 @@ public static class AdminEndpoints
             await db.SaveChangesAsync();
 
             return Results.Created($"/admin/users/{user.Id}", user);
+        });
+
+        users.MapPost("/{id:guid}/invitation-email", async (
+            Guid id,
+            AppDbContext db,
+            IEmailSender emailSender,
+            IOptions<EmailSettings> emailSettingsAccessor,
+            HttpContext httpContext,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
+        {
+            var user = await db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == id, cancellationToken);
+            if (user is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (!user.IsActive)
+            {
+                return EndpointSupport.ValidationProblem("isActive", "Only active users can be invited to sign in.");
+            }
+
+            var loginUrl = BuildLoginUrl(httpContext);
+            var logger = loggerFactory.CreateLogger("Glovelly.UserInvitations");
+
+            try
+            {
+                await emailSender.SendAsync(
+                    new EmailMessage(
+                        To: [new EmailAddress(user.Email, user.DisplayName)],
+                        Subject: "You have been invited to Glovelly",
+                        PlainTextBody: BuildInvitationPlainTextBody(user, loginUrl),
+                        From: EmailSenderSupport.ResolveConfiguredFromAddress(
+                            emailSettingsAccessor.Value,
+                            EmailUseCase.UserInvitations),
+                        HtmlBody: BuildInvitationHtmlBody(user, loginUrl)),
+                    cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(
+                    exception,
+                    "Failed to dispatch user invitation email for user {UserId}.",
+                    user.Id);
+                return Results.Problem(
+                    title: "Unable to send invitation email",
+                    detail: "The user was saved, but the invitation email could not be sent right now.",
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            logger.LogInformation("User invitation email sent for user {UserId}.", user.Id);
+
+            return Results.NoContent();
         });
 
         users.MapPut("/{id:guid}", async (
@@ -207,6 +264,63 @@ public static class AdminEndpoints
             request.PassengerMileageRate,
             role,
             request.IsActive);
+    }
+
+    private static string BuildLoginUrl(HttpContext httpContext)
+    {
+        var request = httpContext.Request;
+        var baseUri = new UriBuilder(request.Scheme, request.Host.Host)
+        {
+            Path = request.PathBase.Add("/auth/login").Value,
+        };
+
+        if (request.Host.Port.HasValue)
+        {
+            baseUri.Port = request.Host.Port.Value;
+        }
+
+        return baseUri.Uri.ToString();
+    }
+
+    private static string BuildInvitationPlainTextBody(User user, string loginUrl)
+    {
+        var displayName = string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName;
+
+        return string.Join(Environment.NewLine, [
+            $"Hi {displayName},",
+            string.Empty,
+            "You have been invited to use Glovelly.",
+            string.Empty,
+            "Sign in with Google using this email address:",
+            user.Email,
+            string.Empty,
+            "Open Glovelly:",
+            loginUrl,
+            string.Empty,
+            "If you were not expecting this invitation, you can ignore this email.",
+        ]);
+    }
+
+    private static string BuildInvitationHtmlBody(User user, string loginUrl)
+    {
+        var displayName = string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName;
+        var encodedDisplayName = EmailHtmlRenderer.Encode(displayName);
+        var encodedEmail = EmailHtmlRenderer.Encode(user.Email);
+        var encodedLoginUrl = EmailHtmlRenderer.Encode(loginUrl);
+
+        return EmailHtmlRenderer.RenderDocument(
+            "You're invited",
+            "Your Glovelly account is ready for you to sign in.",
+            $$"""
+                  <div class="message-copy">
+                    <p>Hi {{encodedDisplayName}},</p>
+                    <p>You have been invited to use Glovelly. Sign in with Google using <strong>{{encodedEmail}}</strong>.</p>
+                    <p><a class="button" href="{{encodedLoginUrl}}">Open Glovelly</a></p>
+                  </div>
+                  <div class="info-note">
+                    <p>If you were not expecting this invitation, you can ignore this email.</p>
+                  </div>
+            """);
     }
 
     private sealed record AdminUserRequest(

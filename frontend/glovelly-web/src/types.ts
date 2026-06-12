@@ -80,6 +80,7 @@ export type AdminUserForm = {
   googleSubject: string
   role: 'Admin' | 'User'
   isActive: boolean
+  sendInvitationEmail: boolean
 }
 
 export type AdminSortKey =

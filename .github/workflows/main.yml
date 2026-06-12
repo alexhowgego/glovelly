@@ -203,6 +203,7 @@ jobs:
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly
             Email__Invoices__FromDisplayName=Glovelly
+            Email__UserInvitations__FromDisplayName=Glovelly
             ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
             Mcp__OAuth__Issuer=${{ vars.DEPLOYMENT_URL }}
             Mcp__OAuth__Resource=${{ vars.DEPLOYMENT_URL }}/mcp
@@ -215,6 +216,7 @@ jobs:
             Email__Resend__ApiKey=glovelly-resend-api-key:latest
             Email__AccessRequests__FromAddress=glovelly-access-requests-from-address:latest
             Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
+            Email__UserInvitations__FromAddress=glovelly-access-requests-from-address:latest
             Mileage__GoogleRoutes__ApiKey=glovelly-routes-api-key:latest
             Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
             Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest
@@ -331,6 +333,7 @@ jobs:
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly
             Email__Invoices__FromDisplayName=Glovelly
+            Email__UserInvitations__FromDisplayName=Glovelly
             ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
             Mcp__OAuth__Issuer=${{ vars.DEPLOYMENT_URL }}
             Mcp__OAuth__Resource=${{ vars.DEPLOYMENT_URL }}/mcp
@@ -343,6 +346,7 @@ jobs:
             Email__Resend__ApiKey=glovelly-resend-api-key:latest
             Email__AccessRequests__FromAddress=glovelly-access-requests-from-address:latest
             Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
+            Email__UserInvitations__FromAddress=glovelly-access-requests-from-address:latest
             Mileage__GoogleRoutes__ApiKey=glovelly-routes-api-key:latest
             Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
             Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest

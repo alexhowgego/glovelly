@@ -26,6 +26,7 @@ export const emptyAdminForm = (): AdminUserForm => ({
   googleSubject: '',
   role: 'User',
   isActive: true,
+  sendInvitationEmail: true,
 })
 
 export const emptyUserSettingsForm = (): UserSettingsForm => ({

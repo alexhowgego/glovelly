@@ -6,6 +6,7 @@ export Email__AccessRequests__FromAddress="access@example.com"
 export Email__AccessRequests__FromDisplayName="Glovelly Access"
 export Email__Invoices__FromAddress="invoices@example.com"
 export Email__Invoices__FromDisplayName="Glovelly Invoices"
+export Email__UserInvitations__FromAddress="onboarding@example.net"
 export Mcp__DevelopmentAuth__AllowAnonymous="false"
 # Optional: configure an OAuth client for staging/local MCP OAuth testing.
 # export Mcp__OAuth__Issuer="https://your-public-glovelly-host.example"

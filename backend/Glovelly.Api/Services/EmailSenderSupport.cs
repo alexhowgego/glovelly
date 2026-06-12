@@ -4,6 +4,7 @@ internal enum EmailUseCase
 {
     AccessRequests,
     Invoices,
+    UserInvitations,
 }
 
 internal static class EmailSenderSupport
@@ -67,6 +68,7 @@ internal static class EmailSenderSupport
         {
             EmailUseCase.AccessRequests => settings.AccessRequests,
             EmailUseCase.Invoices => settings.Invoices,
+            EmailUseCase.UserInvitations => settings.UserInvitations,
             _ => throw new ArgumentOutOfRangeException(nameof(useCase)),
         };
     }
