@@ -155,6 +155,7 @@ public static partial class InvoiceEmailTemplateRenderer
                 .attachment-note, .additional-message { margin-top: 24px; padding: 16px; background: #fbf8f2; border-radius: 12px; }
                 .section-label { margin: 0 0 8px; color: #6c5f50; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
                 .footer { margin-top: 18px; color: #746b61; font-size: 12px; text-align: center; }
+                .footer a { color: #746b61; font-weight: 700; }
               </style>
             </head>
             <body>
@@ -170,7 +171,7 @@ public static partial class InvoiceEmailTemplateRenderer
                   </div>
                   {{additionalMessageHtml}}
                 </div>
-                <div class="footer">Sent with Glovelly</div>
+                <div class="footer">Sent with <a href="https://glovelly.net">Glovelly</a></div>
               </div>
             </body>
             </html>

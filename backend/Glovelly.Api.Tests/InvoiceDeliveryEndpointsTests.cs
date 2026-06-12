@@ -314,6 +314,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.NotNull(message.HtmlBody);
         Assert.Contains("Hello Fox &amp; Finch Events,", message.HtmlBody);
         Assert.Contains("&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;", message.HtmlBody);
+        Assert.Contains("Sent with <a href=\"https://glovelly.net\">Glovelly</a>", message.HtmlBody);
         Assert.DoesNotContain("<script>alert('x')</script>", message.HtmlBody);
     }
 
