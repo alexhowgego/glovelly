@@ -280,7 +280,10 @@ export function useGigsWorkspace({
   }, [resetExpenseStatementWorkspace])
 
   const mergeSavedGig = useCallback((savedGig: Gig) => {
-    setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
+    setGigs((current) => [
+      savedGig,
+      ...current.filter((gig) => gig.id !== savedGig.id),
+    ])
     setGigForm((current) => ({
       ...current,
       expenses: toEditableGigExpenses(savedGig),
@@ -385,7 +388,10 @@ export function useGigsWorkspace({
       }
 
       const savedGig = (await response.json()) as Gig
-      setGigs((current) => [savedGig, ...current])
+      setGigs((current) => [
+        savedGig,
+        ...current.filter((gig) => gig.id !== savedGig.id),
+      ])
       setSelectedGigId(savedGig.id)
       setSelectedGigIds([])
       setGigMode('edit')
@@ -1070,7 +1076,10 @@ export function useGigsWorkspace({
           return current.map((gig) => (gig.id === savedGig.id ? savedGig : gig))
         }
 
-        return [savedGig, ...current]
+        return [
+          savedGig,
+          ...current.filter((gig) => gig.id !== savedGig.id),
+        ]
       })
 
       setSelectedGigId(savedGig.id)
