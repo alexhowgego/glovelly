@@ -45,7 +45,7 @@ The import review modal opens from the profile menu. Imported gigs are not a pri
 
 ## Review And Autosave Rows
 
-> **Automation:** Manual UAT
+> **Automation:** Backend automated for duplicate warning refresh; manual UAT for modal autosave behavior.
 
 ### Steps
 
@@ -59,6 +59,24 @@ The import review modal opens from the profile menu. Imported gigs are not a pri
 ### Expected Results
 
 Draft edits autosave. There is no row-level `Save` button. Accepting or rejecting a row updates the batch counts immediately, but rejected rows do not jump to the bottom before commit.
+
+## Duplicate Warning Review
+
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigImportEndpointsTests` covers duplicate warning rules and non-blocking commit behavior; modal presentation remains manual.
+
+### Steps
+
+1. Create or identify an existing gig on a known date and venue, such as `2026-12-08` at `Bath Forum`.
+2. Stage an import row with the same date and venue.
+3. Open `Imported gigs` and select the staged batch.
+4. Confirm the row shows a possible duplicate warning before commit.
+5. Edit the row to remove the duplicate signal, such as changing the date or venue, then wait for autosave or reload the batch.
+6. Change the row back to the duplicate date and venue.
+7. Accept the row and click `Commit decisions`.
+
+### Expected Results
+
+Duplicate rows show warning text in the review modal. Editing date, title, client, or venue refreshes the warning after autosave or reload. Duplicate warnings do not disable accepting the row and do not block commit; accepted rows still become real gigs when committed.
 
 ## Commit Decisions
 
