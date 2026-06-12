@@ -19,6 +19,7 @@ const API_PREFIXES = [
   '/oauth',
   '/seller-profile',
   '/test-auth',
+  '/workspace-events',
 ]
 
 self.addEventListener('install', (event) => {

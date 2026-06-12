@@ -161,12 +161,18 @@ public sealed class InvoiceLineGenerationService(
 
     private async Task<int> GetNextSortOrderAsync(Guid invoiceId, CancellationToken cancellationToken)
     {
-        var currentMax = await dbContext.InvoiceLines
+        var persistedMax = await dbContext.InvoiceLines
             .Where(line => line.InvoiceId == invoiceId)
             .Select(line => (int?)line.SortOrder)
             .MaxAsync(cancellationToken);
+        var trackedMax = dbContext.ChangeTracker
+            .Entries<InvoiceLine>()
+            .Where(entry => entry.State is not EntityState.Deleted and not EntityState.Detached)
+            .Where(entry => entry.Entity.InvoiceId == invoiceId)
+            .Select(entry => (int?)entry.Entity.SortOrder)
+            .Max();
 
-        return (currentMax ?? 0) + 1;
+        return Math.Max(persistedMax ?? 0, trackedMax ?? 0) + 1;
     }
 
     private async Task<(decimal? MileageRate, decimal? PassengerMileageRate)> ResolveMileageRatesAsync(

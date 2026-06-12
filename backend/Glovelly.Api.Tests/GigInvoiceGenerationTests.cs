@@ -315,6 +315,8 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 
         var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
         Assert.Equal(2, lines.Length);
+        Assert.Equal(1, lines[0].GetProperty("sortOrder").GetInt32());
+        Assert.Equal(2, lines[1].GetProperty("sortOrder").GetInt32());
         Assert.Contains("First date gig (2026-05-10)", lines[0].GetProperty("description").GetString());
         Assert.Contains("Second date gig (2026-05-20)", lines[1].GetProperty("description").GetString());
 

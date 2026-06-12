@@ -398,6 +398,7 @@ public static class InvoiceEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoicePdfService invoicePdfService,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
@@ -440,6 +441,10 @@ public static class InvoiceEndpoints
 
             db.Invoices.Remove(invoice);
             await db.SaveChangesAsync();
+            foreach (var gig in linkedGigs)
+            {
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
+            }
 
             return Results.NoContent();
         });

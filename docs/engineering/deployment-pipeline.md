@@ -72,6 +72,8 @@ Avoid duplicating secret ownership unnecessarily. Runtime secrets should general
 
 Cloud Run receives non-secret environment variables for values such as deployment name, bucket names, email mode/display names, MCP issuer/resource URLs, and client display/scopes.
 
+The app uses SignalR for authenticated workspace invalidation events at `/workspace-events`. Cloud Run supports these WebSocket connections, but deployments should use a timeout long enough for active browser sessions and reconnects. While the default in-memory SignalR hub has no distributed backplane, keep the service on a single instance or treat events as best-effort with the frontend focus/visibility refresh as a fallback.
+
 Secrets are bound from Secret Manager for values such as:
 
 - Google OAuth client ID and client secret

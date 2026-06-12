@@ -35,6 +35,7 @@ internal static class GigAttachmentEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IExpenseAttachmentStore attachmentStore,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             IOptions<ExpenseAttachmentSettings> attachmentOptions) =>
         {
             if (!request.HasFormContentType)
@@ -80,7 +81,12 @@ internal static class GigAttachmentEndpoints
             };
 
             db.ExpenseAttachments.Add(attachment);
+            if (expense.Gig is not null)
+            {
+                EndpointSupport.StampUpdate(expense.Gig, userId);
+            }
             await db.SaveChangesAsync();
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gigId, DateTimeOffset.UtcNow));
 
             return Results.Created($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachment.Id}", attachment);
         });
@@ -123,6 +129,7 @@ internal static class GigAttachmentEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             IExpenseAttachmentStore attachmentStore) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -133,8 +140,13 @@ internal static class GigAttachmentEndpoints
             }
 
             await attachmentStore.DeleteAsync(attachment.StorageKey);
+            if (attachment.Expense?.Gig is not null)
+            {
+                EndpointSupport.StampUpdate(attachment.Expense.Gig, userId);
+            }
             db.ExpenseAttachments.Remove(attachment);
             await db.SaveChangesAsync();
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gigId, DateTimeOffset.UtcNow));
 
             return Results.NoContent();
         });

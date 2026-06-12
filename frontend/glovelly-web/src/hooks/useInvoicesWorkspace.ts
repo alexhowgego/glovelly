@@ -162,8 +162,9 @@ export function useInvoicesWorkspace({
     })
   }, [clientNamesById, deferredInvoiceSearchQuery, invoiceQuickFilter, invoiceSort, invoices])
 
-  const selectedInvoice =
-    invoicesById.get(selectedInvoiceId) ?? filteredInvoices[0] ?? null
+  const selectedInvoice = selectedInvoiceId
+    ? invoicesById.get(selectedInvoiceId) ?? null
+    : filteredInvoices[0] ?? null
 
   const applyInvoices = useCallback((nextInvoices: Invoice[]) => {
     setInvoices(nextInvoices)

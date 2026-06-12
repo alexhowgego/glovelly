@@ -14,10 +14,19 @@ internal static class GigInvoiceEndpoints
             GenerateInvoiceFromGigSelectionRequest request,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             IInvoiceWorkflowService invoiceWorkflowService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var result = await invoiceWorkflowService.GenerateInvoiceFromGigSelectionAsync(request.GigIds, userId);
+
+            if (result.Status is GenerateInvoiceFromGigSelectionStatus.Created)
+            {
+                foreach (var gigId in request.GigIds.Where(value => value != Guid.Empty).Distinct())
+                {
+                    await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gigId, DateTimeOffset.UtcNow));
+                }
+            }
 
             return result.Status switch
             {
@@ -39,6 +48,7 @@ internal static class GigInvoiceEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             IInvoiceWorkflowService invoiceWorkflowService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -70,6 +80,7 @@ internal static class GigInvoiceEndpoints
 
             var invoice = await invoiceWorkflowService.GenerateInvoiceForGigAsync(gig, client, userId);
             await db.SaveChangesAsync();
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
 
             return Results.Created($"/invoices/{invoice.Id}", invoice);
         });
