@@ -35,6 +35,7 @@ export const emptyUserSettingsForm = (): UserSettingsForm => ({
   defaultPaymentWindowDays: '',
   invoiceFilenamePattern: '',
   invoiceEmailSubjectPattern: '',
+  invoiceEmailBodyTemplate: '',
   invoiceReplyToEmail: '',
   invoiceUploadFolderId: '',
 })

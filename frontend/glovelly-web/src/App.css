@@ -933,6 +933,14 @@
   border: 1px solid color-mix(in srgb, #f47d2a 34%, var(--surface-border));
 }
 
+.full-span {
+  grid-column: 1 / -1;
+}
+
+.email-body-preview-text {
+  white-space: pre-wrap;
+}
+
 .hero-mascot {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);

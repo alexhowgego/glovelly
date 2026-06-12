@@ -23,6 +23,7 @@ app.MapGoogleDriveIntegrationEndpoints(startupSettings);
 app.MapGoogleCalendarIntegrationEndpoints(startupSettings);
 app.MapMcpOAuthEndpoints();
 app.MapMcpEndpoints();
+app.MapInvoiceEmailTemplateEndpoints();
 app.MapCrudEndpoints();
 app.MapExpenseStatementEndpoints();
 app.MapAdminEndpoints();

@@ -18,6 +18,7 @@ internal static class InvoiceDeliveryEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceDeliveryService invoiceDeliveryService,
+            IInvoiceProfileDefaultsService invoiceProfileDefaultsService,
             IInvoicePdfService invoicePdfService,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
@@ -78,6 +79,8 @@ internal static class InvoiceDeliveryEndpoints
                 sendingUser?.InvoiceEmailSubjectPattern,
                 periodDate);
             var senderIdentity = InvoiceEmailSenderIdentityBuilder.Build(sendingUser);
+            var sellerProfile = await invoiceProfileDefaultsService.ResolveSellerProfileAsync(userId, cancellationToken);
+            var businessName = sellerProfile?.SellerName ?? sendingUser?.DisplayName;
             IReadOnlyList<InvoiceExpenseReceiptAttachment> receiptAttachments = request?.IncludeReceipts is true
                 ? await BuildInvoiceReceiptAttachmentsAsync(db, invoice, cancellationToken)
                 : [];
@@ -91,6 +94,8 @@ internal static class InvoiceDeliveryEndpoints
                     userId,
                     request?.Message,
                     emailSubject,
+                    sendingUser?.InvoiceEmailBodyTemplate,
+                    businessName,
                     attachmentFileName,
                     senderIdentity,
                     cancellationToken,
@@ -193,6 +198,8 @@ internal static class InvoiceDeliveryEndpoints
                     userId,
                     null,
                     emailSubject,
+                    null,
+                    null,
                     attachmentFileName,
                     InvoiceEmailSenderIdentityBuilder.Build(null),
                     cancellationToken);

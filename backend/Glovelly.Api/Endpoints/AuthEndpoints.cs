@@ -90,6 +90,7 @@ internal static class AuthEndpoints
                 defaultPaymentWindowDays = localUser.DefaultPaymentWindowDays,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceEmailSubjectPattern = localUser.InvoiceEmailSubjectPattern,
+                invoiceEmailBodyTemplate = localUser.InvoiceEmailBodyTemplate,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
                 invoiceUploadFolderId = googleDriveSettings?.InvoiceUploadFolderId,
                 isGoogleDriveConnected,
@@ -126,6 +127,7 @@ internal static class AuthEndpoints
             localUser.DefaultPaymentWindowDays = request.DefaultPaymentWindowDays;
             localUser.InvoiceFilenamePattern = request.InvoiceFilenamePattern?.Trim();
             localUser.InvoiceEmailSubjectPattern = request.InvoiceEmailSubjectPattern?.Trim();
+            localUser.InvoiceEmailBodyTemplate = request.InvoiceEmailBodyTemplate?.Trim();
             localUser.InvoiceReplyToEmail = request.InvoiceReplyToEmail?.Trim();
 
             var invoiceUploadFolderId = request.InvoiceUploadFolderId?.Trim();
@@ -180,6 +182,7 @@ internal static class AuthEndpoints
                 defaultPaymentWindowDays = localUser.DefaultPaymentWindowDays,
                 invoiceFilenamePattern = localUser.InvoiceFilenamePattern,
                 invoiceEmailSubjectPattern = localUser.InvoiceEmailSubjectPattern,
+                invoiceEmailBodyTemplate = localUser.InvoiceEmailBodyTemplate,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
                 invoiceUploadFolderId = googleDriveSettings?.InvoiceUploadFolderId,
             });
@@ -246,6 +249,13 @@ internal static class AuthEndpoints
             return subjectErrors;
         }
 
+        if (InvoiceEmailTemplateRenderer.TryValidateBodyTemplate(
+                request.InvoiceEmailBodyTemplate,
+                out var bodyTemplateErrors))
+        {
+            return bodyTemplateErrors;
+        }
+
         if (request.InvoiceReplyToEmail is not null && string.IsNullOrWhiteSpace(request.InvoiceReplyToEmail))
         {
             return new Dictionary<string, string[]>
@@ -303,6 +313,7 @@ internal static class AuthEndpoints
         int? DefaultPaymentWindowDays,
         string? InvoiceFilenamePattern,
         string? InvoiceEmailSubjectPattern,
+        string? InvoiceEmailBodyTemplate,
         [property: EmailAddress(ErrorMessage = "Reply-to email must be a valid email address.")]
         string? InvoiceReplyToEmail,
         [property: StringLength(200, ErrorMessage = "Google Drive folder ID must be 200 characters or fewer.")]

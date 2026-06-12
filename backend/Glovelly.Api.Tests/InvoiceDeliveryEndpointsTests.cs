@@ -277,6 +277,68 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     }
 
     [Fact]
+    public async Task SendEmail_WithUserBodyTemplate_RendersTokensAndEscapesHtmlBody()
+    {
+        var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            invoiceFilenamePattern = (string?)null,
+            invoiceEmailSubjectPattern = (string?)null,
+            invoiceEmailBodyTemplate = "Hello {{CustomerName}},\n\nInvoice {{InvoiceNumber}} is due on {{DueDate}}. <script>alert('x')</script>\n\nThanks,\n{{BusinessName}}",
+            invoiceReplyToEmail = (string?)null,
+        }, TestContext.Current.CancellationToken);
+        updateSettingsResponse.EnsureSuccessStatusCode();
+
+        var invoice = await CreateInvoiceWithPdfAsync(
+            _factory,
+            _client,
+            "GLV-BODY-001",
+            TestData.FoxAndFinchId,
+            "Body template test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{invoice.GetProperty("id").GetGuid()}/send-email", new
+        {
+            message = "One-off note.",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var message = Assert.Single(_factory.Emails.SentEmails);
+        Assert.Contains("Hello Fox & Finch Events,", message.PlainTextBody);
+        Assert.Contains("Invoice GLV-BODY-001 is due on 2026-06-26.", message.PlainTextBody);
+        Assert.Contains("Test Admin", message.PlainTextBody);
+        Assert.Contains("Additional message:", message.PlainTextBody);
+        Assert.Contains("One-off note.", message.PlainTextBody);
+        Assert.NotNull(message.HtmlBody);
+        Assert.Contains("Hello Fox &amp; Finch Events,", message.HtmlBody);
+        Assert.Contains("&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;", message.HtmlBody);
+        Assert.DoesNotContain("<script>alert('x')</script>", message.HtmlBody);
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WithUnsupportedInvoiceEmailBodyToken_ReturnsValidationProblem()
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            invoiceFilenamePattern = (string?)null,
+            invoiceEmailSubjectPattern = (string?)null,
+            invoiceEmailBodyTemplate = "Hello {{UnknownToken}}",
+            invoiceReplyToEmail = (string?)null,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Contains(
+            "Unsupported invoice email token",
+            problem.GetProperty("errors").GetProperty("invoiceEmailBodyTemplate")[0].GetString());
+    }
+
+    [Fact]
     public async Task SendEmail_WhenBodyOmitted_SendsStandardMessage()
     {
         var invoice = await CreateInvoiceWithPdfAsync(

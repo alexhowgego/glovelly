@@ -17,6 +17,7 @@ type SavedUserSettings = {
   defaultPaymentWindowDays: number | null
   invoiceFilenamePattern: string | null
   invoiceEmailSubjectPattern: string | null
+  invoiceEmailBodyTemplate: string | null
   invoiceReplyToEmail: string | null
   invoiceUploadFolderId: string | null
 }
@@ -45,6 +46,7 @@ function toUserSettingsForm(settings: SavedUserSettings): UserSettingsForm {
         : String(settings.defaultPaymentWindowDays),
     invoiceFilenamePattern: settings.invoiceFilenamePattern ?? '',
     invoiceEmailSubjectPattern: settings.invoiceEmailSubjectPattern ?? '',
+    invoiceEmailBodyTemplate: settings.invoiceEmailBodyTemplate ?? '',
     invoiceReplyToEmail: settings.invoiceReplyToEmail ?? '',
     invoiceUploadFolderId: settings.invoiceUploadFolderId ?? '',
   }
@@ -121,6 +123,7 @@ export function useUserSettings({
         defaultPaymentWindowDays: authUser?.defaultPaymentWindowDays ?? null,
         invoiceFilenamePattern: authUser?.invoiceFilenamePattern ?? null,
         invoiceEmailSubjectPattern: authUser?.invoiceEmailSubjectPattern ?? null,
+        invoiceEmailBodyTemplate: authUser?.invoiceEmailBodyTemplate ?? null,
         invoiceReplyToEmail: authUser?.invoiceReplyToEmail ?? null,
         invoiceUploadFolderId: authUser?.invoiceUploadFolderId ?? null,
       })
@@ -200,6 +203,7 @@ export function useUserSettings({
     const invoiceFilenamePattern = userSettingsForm.invoiceFilenamePattern.trim()
     const invoiceEmailSubjectPattern =
       userSettingsForm.invoiceEmailSubjectPattern.trim()
+    const invoiceEmailBodyTemplate = userSettingsForm.invoiceEmailBodyTemplate.trim()
     const invoiceReplyToEmail = userSettingsForm.invoiceReplyToEmail.trim()
     const invoiceUploadFolderId = userSettingsForm.invoiceUploadFolderId.trim()
 
@@ -231,6 +235,7 @@ export function useUserSettings({
           defaultPaymentWindowDays,
           invoiceFilenamePattern: invoiceFilenamePattern || null,
           invoiceEmailSubjectPattern: invoiceEmailSubjectPattern || null,
+          invoiceEmailBodyTemplate: invoiceEmailBodyTemplate || null,
           invoiceReplyToEmail: invoiceReplyToEmail || null,
           invoiceUploadFolderId: invoiceUploadFolderId || null,
         })
@@ -264,6 +269,7 @@ export function useUserSettings({
               defaultPaymentWindowDays: savedSettings.defaultPaymentWindowDays,
               invoiceFilenamePattern: savedSettings.invoiceFilenamePattern,
               invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern,
+              invoiceEmailBodyTemplate: savedSettings.invoiceEmailBodyTemplate,
               invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
               invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
             }

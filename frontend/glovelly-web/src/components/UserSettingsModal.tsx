@@ -4,6 +4,8 @@ import type { GoogleCalendarStatus, UserSettingsForm } from '../types'
 
 type UserSettingsModalProps = {
   form: UserSettingsForm
+  invoiceEmailBodyPreview: string
+  invoiceEmailBodyTokens: string[]
   invoiceEmailSubjectPreview: string
   invoiceFilenamePreview: string
   invoiceFilenameTokens: string[]
@@ -25,6 +27,8 @@ type UserSettingsModalProps = {
 
 export function UserSettingsModal({
   form,
+  invoiceEmailBodyPreview,
+  invoiceEmailBodyTokens,
   invoiceEmailSubjectPreview,
   invoiceFilenamePreview,
   invoiceFilenameTokens,
@@ -66,11 +70,13 @@ export function UserSettingsModal({
               ? `Available filename tokens: ${invoiceFilenameTokens.join(', ')}.`
               : focusedField === 'invoiceEmailSubjectPattern'
                 ? `Available subject tokens: ${invoiceFilenameTokens.join(', ')}.`
-                : focusedField === 'invoiceReplyToEmail'
-                  ? 'Leave blank if replies should not be directed to a personal mailbox.'
-                  : focusedField === 'invoiceUploadFolderId'
-                    ? "Leave blank to use Google Drive's default upload destination."
-                    : 'Choose a setting to see a short note here.'
+                : focusedField === 'invoiceEmailBodyTemplate'
+                  ? `Use plain text. Available body tokens: ${invoiceEmailBodyTokens.join(', ')}.`
+                  : focusedField === 'invoiceReplyToEmail'
+                    ? 'Leave blank if replies should not be directed to a personal mailbox.'
+                    : focusedField === 'invoiceUploadFolderId'
+                      ? "Leave blank to use Google Drive's default upload destination."
+                      : 'Choose a setting to see a short note here.'
   const handleFocus = (field: keyof UserSettingsForm) => {
     setFocusedField(field)
   }
@@ -320,6 +326,19 @@ export function UserSettingsModal({
                 />
               </label>
 
+              <label className="full-span">
+                <span>Default invoice email body</span>
+                <textarea
+                  placeholder={`Hi {{CustomerName}},\n\nPlease find invoice {{InvoiceNumber}} attached.\n\nMany thanks,\n{{BusinessName}}`}
+                  rows={7}
+                  value={form.invoiceEmailBodyTemplate}
+                  onFocus={() => handleFocus('invoiceEmailBodyTemplate')}
+                  onChange={(event) =>
+                    onUpdateField('invoiceEmailBodyTemplate', event.target.value)
+                  }
+                />
+              </label>
+
               {focusedField === 'invoiceFilenamePattern' ? (
                 <article className="setting-card override invoice-filename-preview">
                   <p className="detail-label">Preview</p>
@@ -333,6 +352,14 @@ export function UserSettingsModal({
                   <p className="detail-label">Preview</p>
                   <strong>{invoiceEmailSubjectPreview}</strong>
                   <span>Using today's date and a sample invoice number.</span>
+                </article>
+              ) : null}
+
+              {focusedField === 'invoiceEmailBodyTemplate' ? (
+                <article className="setting-card override invoice-filename-preview full-span">
+                  <p className="detail-label">Preview</p>
+                  <span className="email-body-preview-text">{invoiceEmailBodyPreview}</span>
+                  <span>Glovelly will wrap this plain text in the standard email layout.</span>
                 </article>
               ) : null}
             </div>

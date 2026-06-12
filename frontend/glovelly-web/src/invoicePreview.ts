@@ -8,6 +8,15 @@ export const invoiceFilenameTokens = [
   '{InvoiceDate}',
 ]
 
+export const invoiceEmailBodyTokens = [
+  '{{CustomerName}}',
+  '{{InvoiceNumber}}',
+  '{{InvoiceDate}}',
+  '{{DueDate}}',
+  '{{BusinessName}}',
+  '{{AmountDue}}',
+]
+
 const previewInvoiceNumber = 'INV-2026-001'
 const previewInvoiceId = '11111111-1111-1111-1111-111111111111'
 
@@ -87,4 +96,21 @@ export function buildInvoiceEmailSubjectPreview(
     .trim()
 
   return resolved || 'Invoice INV-2026-001 from Glovelly'
+}
+
+export function buildInvoiceEmailBodyPreview(
+  template: string | null | undefined,
+  businessName: string | null | undefined
+) {
+  const effectiveTemplate =
+    template?.trim() ||
+    `Hi {{CustomerName}},\n\nPlease find invoice {{InvoiceNumber}} attached.\n\nLet me know if you have any questions.\n\nMany thanks,\n{{BusinessName}}`
+
+  return effectiveTemplate
+    .replaceAll('{{CustomerName}}', 'Fox & Finch Events')
+    .replaceAll('{{InvoiceNumber}}', 'GLV-0001')
+    .replaceAll('{{InvoiceDate}}', '2026-06-12')
+    .replaceAll('{{DueDate}}', '2026-06-26')
+    .replaceAll('{{BusinessName}}', businessName?.trim() || 'Glovelly')
+    .replaceAll('{{AmountDue}}', '£450.00')
 }

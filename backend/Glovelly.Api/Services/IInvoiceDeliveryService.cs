@@ -11,6 +11,8 @@ public interface IInvoiceDeliveryService
         Guid? userId,
         string? message,
         string emailSubject,
+        string? emailBodyTemplate,
+        string? businessName,
         string attachmentFileName,
         InvoiceEmailSenderIdentity senderIdentity,
         CancellationToken cancellationToken = default,

@@ -14,6 +14,7 @@ const API_PREFIXES = [
   '/integrations',
   '/invoices',
   '/invoice-lines',
+  '/invoice-email-template',
   '/mcp',
   '/oauth',
   '/seller-profile',
