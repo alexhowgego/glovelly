@@ -279,7 +279,7 @@ Expected result: the app blocks generation and explains that selected gigs must 
 
 ## Imported Gig Review Smoke Check
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigImportEndpointsTests` covers commit rules; modal entry, autosave, and notification dots remain manual.
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigImportEndpointsTests` covers commit rules and duplicate warnings; modal entry, autosave, warning presentation, and notification dots remain manual.
 
 Run the focused [Imported gigs](gig-imports.md) journey when the change touches MCP, gigs, or profile-menu workflows. For broad pre-merge smoke, at minimum:
 
@@ -287,9 +287,10 @@ Run the focused [Imported gigs](gig-imports.md) journey when the change touches 
 2. Open `Imported gigs`.
 3. If staged imports exist, select a batch and confirm rows load in the modal.
 4. If there are pending rows, edit a harmless field and confirm there is no row-level save button.
-5. Close the modal and reopen it.
+5. If a row resembles an existing gig, confirm it shows a possible duplicate warning without disabling commit.
+6. Close the modal and reopen it.
 
-Expected result: imported gigs stay in a modal launched from the profile menu, row edits autosave, and the main Clients/Gigs/Invoices navigation is unchanged.
+Expected result: imported gigs stay in a modal launched from the profile menu, row edits autosave, duplicate warnings are advisory only, and the main Clients/Gigs/Invoices navigation is unchanged.
 
 ## Monthly Invoice Journey
 

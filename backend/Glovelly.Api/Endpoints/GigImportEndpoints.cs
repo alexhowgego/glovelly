@@ -2,6 +2,7 @@ using System.Text.Json;
 using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -34,7 +35,8 @@ internal static class GigImportEndpoints
             Guid batchId,
             AppDbContext db,
             ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor) =>
+            ICurrentUserAccessor currentUserAccessor,
+            IGigImportDuplicateDetectionService duplicateDetectionService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var batch = await db.GigImportBatches
@@ -43,7 +45,17 @@ internal static class GigImportEndpoints
                 .Include(value => value.Drafts)
                 .FirstOrDefaultAsync(value => value.Id == batchId);
 
-            return batch is null ? Results.NotFound() : Results.Ok(ToDetail(batch));
+            if (batch is null)
+            {
+                return Results.NotFound();
+            }
+
+            var duplicateWarnings = await duplicateDetectionService.FindWarningsAsync(
+                userId,
+                batch,
+                batch.Drafts.ToList());
+
+            return Results.Ok(ToDetail(batch, duplicateWarnings));
         });
 
         group.MapPut("/{batchId:guid}/drafts/{draftId:guid}", async (
@@ -52,7 +64,9 @@ internal static class GigImportEndpoints
             GigImportDraftUpdateRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor) =>
+            ICurrentUserAccessor currentUserAccessor,
+            IWorkspaceEventPublisher workspaceEventPublisher,
+            IGigImportDuplicateDetectionService duplicateDetectionService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var draft = await db.GigImportDrafts
@@ -108,11 +122,19 @@ internal static class GigImportEndpoints
             draft.TravelNotes = Normalize(request.TravelNotes);
             draft.SourceReference = Normalize(request.SourceReference);
             draft.Confidence = request.Confidence ?? draft.Confidence;
-            draft.WarningsJson = JsonSerializer.Serialize(request.Warnings ?? ReadWarnings(draft.WarningsJson), JsonOptions);
+            draft.WarningsJson = JsonSerializer.Serialize(
+                PersistedWarnings(request.Warnings ?? ReadWarnings(draft.WarningsJson)),
+                JsonOptions);
 
             await db.SaveChangesAsync();
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", batchId, DateTimeOffset.UtcNow));
 
-            return Results.Ok(ToDraftDetail(draft));
+            var duplicateWarnings = await duplicateDetectionService.FindWarningsAsync(
+                userId,
+                draft.Batch,
+                [draft]);
+
+            return Results.Ok(ToDraftDetail(draft, duplicateWarnings));
         });
 
         group.MapPost("/{batchId:guid}/commit", async (
@@ -120,7 +142,9 @@ internal static class GigImportEndpoints
             GigImportCommitRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor) =>
+            ICurrentUserAccessor currentUserAccessor,
+            IWorkspaceEventPublisher workspaceEventPublisher,
+            IGigImportDuplicateDetectionService duplicateDetectionService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var batch = await db.GigImportBatches
@@ -165,11 +189,17 @@ internal static class GigImportEndpoints
                 UpdateBatchStatusAfterCommittedDecisions(batch);
 
                 await db.SaveChangesAsync();
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", batch.Id, DateTimeOffset.UtcNow));
+
+                var duplicateWarnings = await duplicateDetectionService.FindWarningsAsync(
+                    userId,
+                    batch,
+                    batch.Drafts.ToList());
 
                 return Results.Ok(new GigImportCommitResult(
                     0,
                     [],
-                    ToDetail(batch)));
+                    ToDetail(batch, duplicateWarnings)));
             }
 
             var errors = await ValidateCommitDraftsAsync(db, userId, draftsToCommit);
@@ -190,11 +220,18 @@ internal static class GigImportEndpoints
             UpdateBatchStatusAfterCommittedDecisions(batch);
 
             await db.SaveChangesAsync();
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "created", null, DateTimeOffset.UtcNow));
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", batch.Id, DateTimeOffset.UtcNow));
+
+            var remainingDuplicateWarnings = await duplicateDetectionService.FindWarningsAsync(
+                userId,
+                batch,
+                batch.Drafts.ToList());
 
             return Results.Ok(new GigImportCommitResult(
                 gigs.Count,
                 gigs.Select(gig => gig.Id).ToList(),
-                ToDetail(batch)));
+                ToDetail(batch, remainingDuplicateWarnings)));
         });
 
         return app;
@@ -403,7 +440,9 @@ internal static class GigImportEndpoints
             batch.Drafts.Count(draft => draft.Confidence == GigImportDraftConfidence.High));
     }
 
-    private static GigImportBatchDetailDto ToDetail(GigImportBatch batch)
+    private static GigImportBatchDetailDto ToDetail(
+        GigImportBatch batch,
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? duplicateWarnings = null)
     {
         return new GigImportBatchDetailDto(
             ToSummary(batch),
@@ -411,7 +450,7 @@ internal static class GigImportEndpoints
                 .OrderBy(draft => IsHandledForOrdering(batch, draft))
                 .ThenBy(draft => draft.ProposedDate ?? DateOnly.MaxValue)
                 .ThenBy(draft => draft.ProposedTitle)
-                .Select(ToDraftDetail)
+                .Select(draft => ToDraftDetail(draft, duplicateWarnings))
                 .ToList());
     }
 
@@ -421,8 +460,12 @@ internal static class GigImportEndpoints
             (batch.Status != GigImportBatchStatus.Draft && draft.Status == GigImportDraftStatus.Rejected);
     }
 
-    private static GigImportDraftDetailDto ToDraftDetail(GigImportDraft draft)
+    private static GigImportDraftDetailDto ToDraftDetail(
+        GigImportDraft draft,
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? duplicateWarnings = null)
     {
+        var warnings = CombinedWarnings(draft, duplicateWarnings);
+
         return new GigImportDraftDetailDto(
             draft.Id,
             draft.BatchId,
@@ -448,9 +491,28 @@ internal static class GigImportEndpoints
             draft.TravelNotes,
             draft.SourceReference,
             draft.Confidence.ToString(),
-            ReadWarnings(draft.WarningsJson),
+            warnings,
             draft.Status.ToString(),
             MissingFields(draft));
+    }
+
+    private static IReadOnlyList<string> CombinedWarnings(
+        GigImportDraft draft,
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? duplicateWarnings)
+    {
+        var warnings = PersistedWarnings(ReadWarnings(draft.WarningsJson)).ToList();
+        if (duplicateWarnings?.TryGetValue(draft.Id, out var generatedWarnings) == true)
+        {
+            foreach (var warning in generatedWarnings)
+            {
+                if (!warnings.Contains(warning, StringComparer.Ordinal))
+                {
+                    warnings.Add(warning);
+                }
+            }
+        }
+
+        return warnings;
     }
 
     private static IReadOnlyList<string> MissingFields(GigImportDraft draft)
@@ -489,6 +551,15 @@ internal static class GigImportEndpoints
         {
             return [];
         }
+    }
+
+    private static IReadOnlyList<string> PersistedWarnings(IReadOnlyList<string> warnings)
+    {
+        return warnings
+            .Where(warning => !warning.StartsWith(GigImportDuplicateDetectionService.GeneratedWarningPrefix, StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .Take(25)
+            .ToList();
     }
 
     private static bool CanSee(GigImportBatch batch, Guid? userId)

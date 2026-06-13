@@ -306,8 +306,9 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var message = Assert.Single(_factory.Emails.SentEmails);
+        var dueDate = invoice.GetProperty("dueDate").GetString();
         Assert.Contains("Hello Fox & Finch Events,", message.PlainTextBody);
-        Assert.Contains("Invoice GLV-BODY-001 is due on 2026-06-26.", message.PlainTextBody);
+        Assert.Contains($"Invoice GLV-BODY-001 is due on {dueDate}.", message.PlainTextBody);
         Assert.Contains("Test Admin", message.PlainTextBody);
         Assert.Contains("Additional message:", message.PlainTextBody);
         Assert.Contains("One-off note.", message.PlainTextBody);

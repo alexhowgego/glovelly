@@ -24,6 +24,7 @@ internal static class InfrastructureServiceCollectionExtensions
         services.AddSingleton(settings);
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
+        services.AddSignalR();
         services.AddOptions<EmailSettings>()
             .Bind(configuration.GetSection("Email"));
         services.AddOptions<AccessRequestProtectionSettings>()
@@ -46,6 +47,7 @@ internal static class InfrastructureServiceCollectionExtensions
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
         });
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+        services.AddScoped<IWorkspaceEventPublisher, WorkspaceEventPublisher>();
         services.AddScoped<IGlovellyMcpQueryService, GlovellyMcpQueryService>();
         services.AddScoped<IMcpOAuthService, McpOAuthService>();
         services.AddScoped<IClaimsTransformation, GoogleOidcClaimsTransformation>();

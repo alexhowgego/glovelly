@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AdminSection,
   AppShell,
@@ -44,6 +44,7 @@ import { useQuickReceipt } from './hooks/useQuickReceipt'
 import { useSellerProfile } from './hooks/useSellerProfile'
 import { useThemePreference } from './hooks/useThemePreference'
 import { useUserSettings } from './hooks/useUserSettings'
+import { useWorkspaceEvents } from './hooks/useWorkspaceEvents'
 import type {
   AppMetadata,
   AppSection,
@@ -78,6 +79,7 @@ function App({ appMetadata }: AppProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const lastWorkspaceRefreshAtRef = useRef(0)
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
   const {
     closeProfileMenu,
@@ -397,6 +399,78 @@ function App({ appMetadata }: AppProps) {
     onDownloaded: setInvoiceStatus,
   })
 
+  const refreshGigsFromServer = useCallback(async (reason: 'focus' | 'realtime') => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    const now = Date.now()
+    if (reason === 'focus' && now - lastWorkspaceRefreshAtRef.current < 5000) {
+      return
+    }
+
+    lastWorkspaceRefreshAtRef.current = now
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/gigs'))
+      if (isSessionExpiredResponse(response)) {
+        expireSession('Your session expired. Sign in again to keep working.')
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error('Unable to refresh gigs.')
+      }
+
+      setGigs((await response.json()) as Gig[])
+    } catch {
+      if (reason === 'focus') {
+        setStatus('We could not refresh your workspace right now.')
+      }
+    }
+  }, [expireSession, isAuthenticated, setGigs])
+
+  const refreshInvoicesFromServer = useCallback(async (reason: 'focus' | 'realtime') => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/invoices'))
+      if (isSessionExpiredResponse(response)) {
+        expireSession('Your session expired. Sign in again to keep working.')
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error('Unable to refresh invoices.')
+      }
+
+      setInvoices((await response.json()) as Invoice[])
+    } catch {
+      if (reason === 'focus') {
+        setStatus('We could not refresh your invoices right now.')
+      }
+    }
+  }, [expireSession, isAuthenticated, setInvoices])
+
+  useWorkspaceEvents({
+    enabled: isAuthenticated,
+    onWorkspaceChanged: (event) => {
+      if (event.scope === 'gigs') {
+        void refreshGigsFromServer('realtime')
+        void refreshInvoicesFromServer('realtime')
+      }
+
+      if (event.scope === 'gig-imports') {
+        void loadGigImportBatches(true)
+        if (selectedGigImportBatchId) {
+          void loadGigImportBatch(selectedGigImportBatchId)
+        }
+      }
+    },
+  })
+
   useEffect(() => {
     if (!isAdmin && activeSection === 'admin') {
       setActiveSection('gigs')
@@ -576,12 +650,21 @@ function App({ appMetadata }: AppProps) {
       return
     }
 
-    const intervalId = window.setInterval(() => {
-      void loadGigImportBatches(true)
-    }, 30000)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshGigsFromServer('focus')
+        void refreshInvoicesFromServer('focus')
+      }
+    }
 
-    return () => window.clearInterval(intervalId)
-  }, [isAuthenticated, loadGigImportBatches])
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [isAuthenticated, refreshGigsFromServer, refreshInvoicesFromServer])
 
   const monthlyInvoiceEligibleGigs = useMemo(() => {
     if (!selectedClient || !monthlyInvoiceMonth) {
@@ -670,12 +753,36 @@ function App({ appMetadata }: AppProps) {
     void handleDelete()
   }
 
-  const openSelectedGigInvoice = () => {
+  const openSelectedGigInvoice = async () => {
     if (!selectedGig?.invoiceId) {
       return
     }
 
-    setSelectedInvoiceId(selectedGig.invoiceId)
+    const invoiceId = selectedGig.invoiceId
+    if (!invoices.some((invoice) => invoice.id === invoiceId)) {
+      try {
+        const response = await fetchWithSession(buildApiUrl(`/invoices/${invoiceId}`))
+        if (isSessionExpiredResponse(response)) {
+          expireSession('Your session expired. Sign in again to keep working.')
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error('Unable to open linked invoice.')
+        }
+
+        const invoice = (await response.json()) as Invoice
+        setInvoices((current) => [
+          invoice,
+          ...current.filter((value) => value.id !== invoice.id),
+        ])
+      } catch (error) {
+        setGigStatus(error instanceof Error ? error.message : 'Unable to open linked invoice.')
+        return
+      }
+    }
+
+    setSelectedInvoiceId(invoiceId)
     setActiveSection('invoices')
   }
 
@@ -878,6 +985,10 @@ function App({ appMetadata }: AppProps) {
 
   const openPreviewedInvoice = () => {
     if (invoicePreviewInvoice) {
+      setInvoices((current) => [
+        invoicePreviewInvoice,
+        ...current.filter((invoice) => invoice.id !== invoicePreviewInvoice.id),
+      ])
       setSelectedInvoiceId(invoicePreviewInvoice.id)
     }
 

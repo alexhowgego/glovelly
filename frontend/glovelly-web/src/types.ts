@@ -414,7 +414,19 @@ export type GigForm = {
 }
 
 export type AppSection = 'clients' | 'admin' | 'gigs' | 'invoices'
-export type ThemePreference = 'system' | 'light' | 'dark'
+export type ThemePreference =
+  | 'system'
+  | 'light'
+  | 'dark'
+  | 'neon'
+  | 'mahogany'
+  | 'candy'
+  | 'blue-note'
+  | 'parchment'
+  | 'studio-tape'
+  | 'synthwave'
+  | 'sunset-soundcheck'
+  | 'velvet-rope'
 export type AppMetadata = {
   title: string
   deploymentName: string | null

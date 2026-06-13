@@ -28,6 +28,11 @@ export default defineConfig({
         target: 'http://localhost:5153',
         changeOrigin: true,
       },
+      '/workspace-events': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+        ws: true,
+      },
       '/clients': {
         target: 'http://localhost:5153',
         changeOrigin: true,

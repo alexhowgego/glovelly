@@ -3,15 +3,11 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { loadAppMetadata } from './api'
-
-const THEME_STORAGE_KEY = 'glovelly.theme-preference'
+import { isThemePreference, themeStorageKey } from './theme'
 
 const applyInitialTheme = () => {
-  const rawPreference = window.localStorage.getItem(THEME_STORAGE_KEY)
-  const preference =
-    rawPreference === 'light' || rawPreference === 'dark' || rawPreference === 'system'
-      ? rawPreference
-      : 'system'
+  const rawPreference = window.localStorage.getItem(themeStorageKey)
+  const preference = isThemePreference(rawPreference) ? rawPreference : 'system'
 
   const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'

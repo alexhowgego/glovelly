@@ -45,6 +45,7 @@ internal static class GigCrudEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -69,6 +70,7 @@ internal static class GigCrudEndpoints
             await db.SaveChangesAsync();
             if (userId.HasValue)
             {
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
                 await calendarSyncWorkQueue.EnqueueGigAsync(
                     userId.Value,
                     gig.Id,
@@ -86,6 +88,7 @@ internal static class GigCrudEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceWorkflowService invoiceWorkflowService,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -135,6 +138,7 @@ internal static class GigCrudEndpoints
             await db.SaveChangesAsync();
             if (userId.HasValue)
             {
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "created", gig.Id, DateTimeOffset.UtcNow));
                 await calendarSyncWorkQueue.EnqueueGigAsync(
                     userId.Value,
                     gig.Id,
@@ -152,6 +156,7 @@ internal static class GigCrudEndpoints
             ICurrentUserAccessor currentUserAccessor,
             IExpenseAttachmentStore attachmentStore,
             IInvoiceWorkflowService invoiceWorkflowService,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -259,6 +264,7 @@ internal static class GigCrudEndpoints
                 .FirstAsync(value => value.Id == id);
             if (userId.HasValue)
             {
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
                 await calendarSyncWorkQueue.EnqueueGigAsync(
                     userId.Value,
                     gig.Id,
@@ -277,6 +283,7 @@ internal static class GigCrudEndpoints
             ICurrentUserAccessor currentUserAccessor,
             IExpenseAttachmentStore attachmentStore,
             IInvoiceWorkflowService invoiceWorkflowService,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -310,6 +317,7 @@ internal static class GigCrudEndpoints
             await db.SaveChangesAsync();
             if (userId.HasValue)
             {
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "deleted", id, DateTimeOffset.UtcNow));
                 await calendarSyncWorkQueue.EnqueueGigAsync(
                     userId.Value,
                     id,

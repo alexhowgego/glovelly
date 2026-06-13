@@ -1,6 +1,7 @@
 using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -15,6 +16,7 @@ internal static class GigExpenseEndpoints
             GigExpenseReimbursementUpdateRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             ICurrentUserAccessor currentUserAccessor) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -92,6 +94,7 @@ internal static class GigExpenseEndpoints
 
             EndpointSupport.StampUpdate(gig, userId);
             await db.SaveChangesAsync();
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gigId, DateTimeOffset.UtcNow));
 
             var savedGig = await db.Gigs
                 .WhereVisibleTo(userId)

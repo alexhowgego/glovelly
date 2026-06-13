@@ -18,6 +18,7 @@ internal static class GigReceiptEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IExpenseAttachmentStore attachmentStore,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             IOptions<ExpenseAttachmentSettings> attachmentOptions,
             IOptions<QuickReceiptCaptureSettings> quickReceiptOptions,
             TimeProvider timeProvider) =>
@@ -111,6 +112,7 @@ internal static class GigReceiptEndpoints
             db.GigExpenses.Add(expense);
             EndpointSupport.StampUpdate(gig, userId);
             await db.SaveChangesAsync();
+            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
 
             var savedGig = await db.Gigs
                 .WhereVisibleTo(userId)
@@ -138,6 +140,7 @@ internal static class GigReceiptEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             IInvoiceWorkflowService invoiceWorkflowService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -214,6 +217,10 @@ internal static class GigReceiptEndpoints
             }
 
             await db.SaveChangesAsync();
+            foreach (var affectedGigId in affectedGigIds)
+            {
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", affectedGigId, DateTimeOffset.UtcNow));
+            }
 
             var savedGigs = await db.Gigs
                 .WhereVisibleTo(userId)

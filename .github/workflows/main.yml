@@ -226,6 +226,8 @@ jobs:
           flags: >-
             --allow-unauthenticated
             --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            --timeout=3600s
+            --max-instances=1
 
       - name: Show staging URL
         run: echo "Deployed staging to ${{ steps.deploy_staging.outputs.url }}"
@@ -355,6 +357,8 @@ jobs:
           flags: >-
             --allow-unauthenticated
             --service-account=glovelly-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            --timeout=3600s
+            --max-instances=1
 
       - name: Show production URL
         run: echo "Deployed production to ${{ steps.deploy_production.outputs.url }}"

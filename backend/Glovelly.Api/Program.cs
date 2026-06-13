@@ -1,5 +1,6 @@
 using Glovelly.Api.Configuration;
 using Glovelly.Api.Endpoints;
+using Glovelly.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 var startupSettings = StartupSettings.From(builder.Configuration, builder.Environment);
@@ -27,6 +28,7 @@ app.MapInvoiceEmailTemplateEndpoints();
 app.MapCrudEndpoints();
 app.MapExpenseStatementEndpoints();
 app.MapAdminEndpoints();
+app.MapHub<WorkspaceEventsHub>("/workspace-events");
 app.MapFallbackToFile("index.html");
 
 app.Run();

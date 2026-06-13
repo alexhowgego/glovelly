@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
+        services.AddScoped<IGigImportDuplicateDetectionService, GigImportDuplicateDetectionService>();
         services.AddScoped<IGoogleConnectionService, GoogleConnectionService>();
         services.AddSingleton<ICalendarEventPayloadHasher, CalendarEventPayloadHasher>();
         services.AddScoped<IGigCalendarEventMapper, GigCalendarEventMapper>();
