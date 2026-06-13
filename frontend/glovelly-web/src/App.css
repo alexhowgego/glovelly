@@ -1749,6 +1749,193 @@ button.compact-record-row.selected {
   color: var(--muted);
 }
 
+.associated-items-heading,
+.external-resource-actions,
+.inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.associated-items-heading {
+  justify-content: space-between;
+}
+
+.associated-item-list {
+  display: grid;
+  gap: 0;
+  max-height: clamp(180px, 26svh, 320px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+  border-radius: 18px;
+  background: var(--surface-elevated);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.associated-item-row {
+  display: grid;
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-border) 72%, transparent);
+  background: transparent;
+}
+
+.associated-item-row:last-child {
+  border-bottom: 0;
+}
+
+.associated-item-row.expanded {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--heading) 8%, transparent), transparent 64%),
+    transparent;
+}
+
+.associated-item-summary {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.associated-item-summary:hover,
+.associated-item-summary:focus-visible {
+  background: color-mix(in srgb, var(--heading) 6%, transparent);
+}
+
+.associated-item-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.associated-item-main strong {
+  color: var(--heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.associated-item-main span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.associated-item-chips {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.associated-item-expand-indicator {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+  color: var(--heading) !important;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.associated-item-expansion {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 180ms ease;
+}
+
+.associated-item-row.expanded .associated-item-expansion {
+  grid-template-rows: 1fr;
+}
+
+.associated-item-expansion-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  gap: 10px;
+  padding: 0 12px;
+  transition: padding 180ms ease;
+}
+
+.associated-item-row.expanded .associated-item-expansion-inner {
+  padding: 0 12px 12px;
+}
+
+.associated-item-expansion-inner p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.external-resource-actions {
+  justify-content: flex-end;
+}
+
+.resource-attachments {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.resource-primary-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--heading) 10%, var(--surface-subtle));
+  border: 1px solid color-mix(in srgb, var(--heading) 24%, var(--surface-border));
+  color: var(--heading) !important;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.resource-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+  color: var(--muted-strong) !important;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.external-resource-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.external-resource-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.external-resource-form textarea {
+  min-height: 82px;
+}
+
+.resource-primary-toggle {
+  display: flex !important;
+}
+
 .invoice-line-list {
   display: grid;
   gap: 10px;
@@ -1861,6 +2048,22 @@ button.compact-record-row.selected {
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
+}
+
+.expense-attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.file-upload-button {
+  cursor: pointer;
+}
+
+.file-upload-button input {
+  display: none;
 }
 
 .expense-attachment-list {

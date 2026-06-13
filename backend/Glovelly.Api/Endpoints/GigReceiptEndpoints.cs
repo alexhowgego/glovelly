@@ -116,8 +116,7 @@ internal static class GigReceiptEndpoints
 
             var savedGig = await db.Gigs
                 .WhereVisibleTo(userId)
-                .Include(value => value.Expenses)
-                    .ThenInclude(value => value.Attachments)
+                .IncludeGigDetails()
                 .FirstAsync(value => value.Id == gig.Id);
 
             return Results.Created($"/gigs/{savedGig.Id}", new
@@ -225,8 +224,7 @@ internal static class GigReceiptEndpoints
             var savedGigs = await db.Gigs
                 .WhereVisibleTo(userId)
                 .AsNoTracking()
-                .Include(value => value.Expenses)
-                    .ThenInclude(value => value.Attachments)
+                .IncludeGigDetails()
                 .Where(value => affectedGigIds.Contains(value.Id))
                 .ToListAsync();
 

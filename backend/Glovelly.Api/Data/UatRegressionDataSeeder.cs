@@ -5,13 +5,14 @@ namespace Glovelly.Api.Data;
 
 public sealed record UatRegressionSeedContext(AppDbContext DbContext);
 
-public sealed record UatRegressionSeedFixture(User User, Client Client, SellerProfile SellerProfile);
+public sealed record UatRegressionSeedFixture(User User, Client Client, SellerProfile SellerProfile, Gig Gig);
 
 public static class UatRegressionDataSeeder
 {
     public static readonly Guid UserId = Guid.Parse("a1111111-1111-4111-8111-111111111111");
     public static readonly Guid ClientId = Guid.Parse("a2222222-2222-4222-8222-222222222222");
     public static readonly Guid SellerProfileId = Guid.Parse("a3333333-3333-4333-8333-333333333333");
+    public static readonly Guid GigId = Guid.Parse("a4444444-4444-4444-8444-444444444444");
     public const string GoogleSubject = "glovelly-uat-regression-user";
     public const string Email = "regression@glovelly.net";
     public const string DisplayName = "Glovelly UAT Regression User";
@@ -93,6 +94,49 @@ public static class UatRegressionDataSeeder
                 UpdatedUtc = SeededCreatedUtc,
                 CreatedByUserId = UserId,
                 UpdatedByUserId = UserId,
+            },
+            new Gig
+            {
+                Id = GigId,
+                ClientId = ClientId,
+                Title = "UAT Linked Resources Gig",
+                Date = new DateOnly(2026, 6, 20),
+                Venue = "Regression Hall, Bristol",
+                Fee = 250m,
+                TravelMiles = 6m,
+                PassengerCount = 0,
+                Notes = "Seeded UAT gig for linked external resource checks.",
+                WasDriving = true,
+                Status = GigStatus.Confirmed,
+                CreatedByUserId = UserId,
+                UpdatedByUserId = UserId,
+                ExternalResources =
+                [
+                    new GigExternalResource
+                    {
+                        Id = Guid.Parse("a5555555-5555-4555-8555-555555555555"),
+                        ResourceType = GigExternalResourceType.GoogleSheet,
+                        Purpose = GigExternalResourcePurpose.SetList,
+                        Title = "UAT primary set list",
+                        Url = "https://docs.google.com/spreadsheets/d/uat-primary-set-list",
+                        Notes = "Seeded primary set list for staging smoke checks.",
+                        IsPrimary = true,
+                        CreatedAt = SeededCreatedUtc,
+                        UpdatedAt = SeededCreatedUtc,
+                    },
+                    new GigExternalResource
+                    {
+                        Id = Guid.Parse("a6666666-6666-4666-8666-666666666666"),
+                        ResourceType = GigExternalResourceType.GoogleDoc,
+                        Purpose = GigExternalResourcePurpose.GigPlan,
+                        Title = "UAT gig plan",
+                        Url = "https://docs.google.com/document/d/uat-gig-plan",
+                        Notes = "Seeded gig plan link for staging smoke checks.",
+                        IsPrimary = true,
+                        CreatedAt = SeededCreatedUtc,
+                        UpdatedAt = SeededCreatedUtc,
+                    }
+                ]
             });
     }
 
@@ -133,6 +177,22 @@ public static class UatRegressionDataSeeder
         else
         {
             ApplySellerProfileFixture(sellerProfile, fixture.SellerProfile);
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var gig = await dbContext.Gigs
+            .Include(value => value.ExternalResources)
+            .FirstOrDefaultAsync(value => value.Id == GigId);
+        if (gig is null)
+        {
+            gig = fixture.Gig;
+            dbContext.Gigs.Add(gig);
+        }
+        else
+        {
+            ApplyGigFixture(gig, fixture.Gig);
+            UpsertExternalResources(gig, fixture.Gig.ExternalResources);
         }
 
         await dbContext.SaveChangesAsync();
@@ -178,5 +238,41 @@ public static class UatRegressionDataSeeder
         target.Address = fixture.Address;
         target.UpdatedUtc = fixture.UpdatedUtc;
         target.UpdatedByUserId = fixture.UpdatedByUserId;
+    }
+
+    private static void ApplyGigFixture(Gig target, Gig fixture)
+    {
+        target.ClientId = fixture.ClientId;
+        target.Title = fixture.Title;
+        target.Date = fixture.Date;
+        target.Venue = fixture.Venue;
+        target.Fee = fixture.Fee;
+        target.TravelMiles = fixture.TravelMiles;
+        target.PassengerCount = fixture.PassengerCount;
+        target.Notes = fixture.Notes;
+        target.WasDriving = fixture.WasDriving;
+        target.Status = fixture.Status;
+        target.UpdatedByUserId = fixture.UpdatedByUserId;
+    }
+
+    private static void UpsertExternalResources(Gig target, IEnumerable<GigExternalResource> fixtures)
+    {
+        foreach (var fixture in fixtures)
+        {
+            var resource = target.ExternalResources.FirstOrDefault(value => value.Id == fixture.Id);
+            if (resource is null)
+            {
+                target.ExternalResources.Add(fixture);
+                continue;
+            }
+
+            resource.ResourceType = fixture.ResourceType;
+            resource.Purpose = fixture.Purpose;
+            resource.Title = fixture.Title;
+            resource.Url = fixture.Url;
+            resource.Notes = fixture.Notes;
+            resource.IsPrimary = fixture.IsPrimary;
+            resource.UpdatedAt = fixture.UpdatedAt;
+        }
     }
 }

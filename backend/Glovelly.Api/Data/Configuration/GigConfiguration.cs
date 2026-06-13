@@ -52,6 +52,10 @@ internal sealed class GigConfiguration : IEntityTypeConfiguration<Gig>
             .WithOne(expense => expense.Gig)
             .HasForeignKey(expense => expense.GigId)
             .OnDelete(DeleteBehavior.Cascade);
+        entity.HasMany(gig => gig.ExternalResources)
+            .WithOne(resource => resource.Gig)
+            .HasForeignKey(resource => resource.GigId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         entity.HasIndex(gig => gig.SourceImportBatchId);
         entity.HasIndex(gig => gig.SourceImportDraftId)

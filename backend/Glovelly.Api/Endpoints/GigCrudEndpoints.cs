@@ -17,8 +17,7 @@ internal static class GigCrudEndpoints
             var gigs = await db.Gigs
                 .WhereVisibleTo(userId)
                 .AsNoTracking()
-                .Include(gig => gig.Expenses)
-                    .ThenInclude(expense => expense.Attachments)
+                .IncludeGigDetails()
                 .OrderBy(gig => gig.Date)
                 .ThenBy(gig => gig.Title)
                 .ToListAsync();
@@ -32,8 +31,7 @@ internal static class GigCrudEndpoints
             var gig = await db.Gigs
                 .WhereVisibleTo(userId)
                 .AsNoTracking()
-                .Include(value => value.Expenses)
-                    .ThenInclude(expense => expense.Attachments)
+                .IncludeGigDetails()
                 .FirstOrDefaultAsync(gig => gig.Id == id);
 
             return gig is null ? Results.NotFound() : Results.Ok(gig);
@@ -51,8 +49,7 @@ internal static class GigCrudEndpoints
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
                 .WhereVisibleTo(userId)
-                .Include(value => value.Expenses)
-                    .ThenInclude(expense => expense.Attachments)
+                .IncludeGigDetails()
                 .FirstOrDefaultAsync(value => value.Id == id);
 
             if (gig is null)
@@ -129,6 +126,7 @@ internal static class GigCrudEndpoints
             gig.Notes = gig.Notes?.Trim();
             gig.Client = null;
             gig.Invoice = null;
+            gig.ExternalResources = [];
             gig.Expenses = EndpointSupport.NormalizeGigExpenses(gig.Expenses);
             gig.InvoicedAt = EndpointSupport.ResolveInvoicedAt(gig.InvoiceId, null, null, gig.InvoicedAt);
             EndpointSupport.StampCreate(gig, userId);
@@ -162,8 +160,7 @@ internal static class GigCrudEndpoints
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
                 .WhereVisibleTo(userId)
-                .Include(value => value.Expenses)
-                    .ThenInclude(expense => expense.Attachments)
+                .IncludeGigDetails()
                 .FirstOrDefaultAsync(value => value.Id == id);
 
             if (gig is null)
@@ -259,8 +256,7 @@ internal static class GigCrudEndpoints
             await db.SaveChangesAsync();
 
             gig = await db.Gigs
-                .Include(value => value.Expenses)
-                    .ThenInclude(expense => expense.Attachments)
+                .IncludeGigDetails()
                 .FirstAsync(value => value.Id == id);
             if (userId.HasValue)
             {
@@ -289,8 +285,7 @@ internal static class GigCrudEndpoints
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
                 .WhereVisibleTo(userId)
-                .Include(value => value.Expenses)
-                    .ThenInclude(expense => expense.Attachments)
+                .IncludeGigDetails()
                 .FirstOrDefaultAsync(gig => gig.Id == id);
             if (gig is null)
             {

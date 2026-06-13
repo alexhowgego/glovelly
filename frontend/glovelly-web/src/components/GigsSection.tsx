@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
@@ -6,6 +6,11 @@ import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Client,
   Gig,
+  GigExternalResource,
+  GigExternalResourceAttachment,
+  GigExternalResourceForm,
+  GigExternalResourcePurpose,
+  GigExternalResourceType,
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
@@ -23,6 +28,8 @@ type GigsSectionProps = {
   filteredGigs: Gig[]
   gigExpenseAmount: string
   gigExpenseDescription: string
+  externalResourceForm: GigExternalResourceForm
+  externalResourceMode: 'create' | 'edit'
   gigForm: GigForm
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
@@ -34,8 +41,19 @@ type GigsSectionProps = {
   isGigLoading: boolean
   isInvoiceLoading: boolean
   isMileageEstimating: boolean
+  isExternalResourceEditorOpen: boolean
   onAddGigExpense: () => void
+  onCancelExternalResourceEdit: () => void
   onCloseEditor: () => void
+  onDeleteExternalResource: (resource: GigExternalResource) => void
+  onDeleteExternalResourceAttachment: (
+    resource: GigExternalResource,
+    attachment: GigExternalResourceAttachment
+  ) => void
+  onDownloadExternalResourceAttachment: (
+    resource: GigExternalResource,
+    attachment: GigExternalResourceAttachment
+  ) => void
   onExpenseAmountChange: (value: string) => void
   onExpenseDescriptionChange: (value: string) => void
   onGenerateExpenseStatement: () => void
@@ -48,6 +66,7 @@ type GigsSectionProps = {
   onOpenLinkedInvoice: () => void
   onOpenSellerProfile: () => void
   onUploadExpenseAttachment: (index: number, file: File) => void
+  onUploadExternalResourceAttachment: (resource: GigExternalResource, file: File) => void
   onDeleteExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
@@ -57,7 +76,10 @@ type GigsSectionProps = {
   onSortChange: (sort: GigSort) => void
   onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
+  onStartExternalResourceCreate: () => void
+  onStartExternalResourceEdit: (resource: GigExternalResource) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onSubmitExternalResource: (event: FormEvent<HTMLFormElement>) => void
   onUpdateExpenseReimbursement: (
     expense: GigExpenseForm,
     status: GigExpenseReimbursementStatus
@@ -70,6 +92,10 @@ type GigsSectionProps = {
   onUpdateGigField: (
     field: keyof GigForm,
     value: string | boolean | GigExpenseForm[]
+  ) => void
+  onUpdateExternalResourceField: (
+    field: keyof GigExternalResourceForm,
+    value: string | boolean
   ) => void
   plannedGigCount: number
   sellerProfile: SellerProfile
@@ -86,6 +112,8 @@ export function GigsSection({
   filteredGigs,
   gigExpenseAmount,
   gigExpenseDescription,
+  externalResourceForm,
+  externalResourceMode,
   gigForm,
   isEditorOpen,
   gigMode,
@@ -97,8 +125,13 @@ export function GigsSection({
   isGigLoading,
   isInvoiceLoading,
   isMileageEstimating,
+  isExternalResourceEditorOpen,
   onAddGigExpense,
+  onCancelExternalResourceEdit,
   onCloseEditor,
+  onDeleteExternalResource,
+  onDeleteExternalResourceAttachment,
+  onDownloadExternalResourceAttachment,
   onExpenseAmountChange,
   onExpenseDescriptionChange,
   onGenerateExpenseStatement,
@@ -111,6 +144,7 @@ export function GigsSection({
   onOpenLinkedInvoice,
   onOpenSellerProfile,
   onUploadExpenseAttachment,
+  onUploadExternalResourceAttachment,
   onDeleteExpenseAttachment,
   onRemoveGigExpense,
   onResetForm,
@@ -120,9 +154,13 @@ export function GigsSection({
   onSortChange,
   onToggleGigSelection,
   onStartEditing,
+  onStartExternalResourceCreate,
+  onStartExternalResourceEdit,
   onSubmit,
+  onSubmitExternalResource,
   onUpdateExpenseReimbursement,
   onUpdateGigExpenseField,
+  onUpdateExternalResourceField,
   onUpdateGigField,
   plannedGigCount,
   sellerProfile,
@@ -132,6 +170,7 @@ export function GigsSection({
   selectedGigs,
 }: GigsSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const [expandedResourceId, setExpandedResourceId] = useState<string>('')
   const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
   const workspaceStyle = detailPanelBlockSize > 0
     ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
@@ -157,6 +196,34 @@ export function GigsSection({
     { value: 'drafts', label: 'Drafts' },
     { value: 'completed', label: 'Completed' },
   ]
+  const resourceTypeOptions: { value: GigExternalResourceType; label: string }[] = [
+    { value: 'GoogleSheet', label: 'Google Sheet' },
+    { value: 'GoogleDoc', label: 'Google Doc' },
+    { value: 'Url', label: 'URL' },
+    { value: 'Email', label: 'Email' },
+    { value: 'File', label: 'File' },
+    { value: 'Other', label: 'Other' },
+  ]
+  const resourcePurposeOptions: { value: GigExternalResourcePurpose; label: string }[] = [
+    { value: 'SetList', label: 'Set list' },
+    { value: 'GigPlan', label: 'Gig plan' },
+    { value: 'Contract', label: 'Contract' },
+    { value: 'Travel', label: 'Travel' },
+    { value: 'Other', label: 'Other' },
+  ]
+  const formatResourceType = (value: GigExternalResourceType) =>
+    resourceTypeOptions.find((option) => option.value === value)?.label ?? value
+  const formatResourcePurpose = (value: GigExternalResourcePurpose) =>
+    resourcePurposeOptions.find((option) => option.value === value)?.label ?? value
+  const sortedExternalResources = (selectedGig?.externalResources ?? [])
+    .slice()
+    .sort((left, right) => {
+      if (left.isPrimary !== right.isPrimary) {
+        return left.isPrimary ? -1 : 1
+      }
+
+      return left.title.localeCompare(right.title)
+    })
 
   useEffect(() => {
     if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
@@ -167,6 +234,13 @@ export function GigsSection({
       editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
   }, [isEditorOpen])
+
+  useEffect(() => {
+    setExpandedResourceId('')
+  }, [selectedGig?.id])
+
+  const externalResourceEditorTitle =
+    externalResourceMode === 'edit' ? 'Edit external resource' : 'Link external resource'
 
   return (
     <section className="section-layout">
@@ -461,6 +535,160 @@ export function GigsSection({
                   <p className="detail-label">Notes</p>
                   <span>{selectedGig.notes?.trim() || 'No notes yet.'}</span>
                 </article>
+              </div>
+
+              <div className="gig-timeline-note">
+                <div className="associated-items-heading">
+                  <div>
+                    <p className="detail-label">External resources</p>
+                    <span>Links and documents attached to this gig.</span>
+                  </div>
+                  <button
+                    className="ghost-button"
+                    onClick={onStartExternalResourceCreate}
+                    type="button"
+                    disabled={isGigLoading}
+                  >
+                    Link resource
+                  </button>
+                </div>
+
+                {sortedExternalResources.length > 0 ? (
+                  <div className="associated-item-list external-resource-list">
+                    {sortedExternalResources.map((resource) => {
+                      const isExpanded = expandedResourceId === resource.id
+                      const purposeLabel = formatResourcePurpose(resource.purpose)
+                      const typeLabel = formatResourceType(resource.resourceType)
+                      const fileCount = resource.attachments.length
+
+                      return (
+                        <article
+                          key={resource.id}
+                          className={`associated-item-row external-resource-item ${isExpanded ? 'expanded' : ''}`}
+                        >
+                          <button
+                            className="associated-item-summary"
+                            type="button"
+                            aria-expanded={isExpanded}
+                            onClick={() =>
+                              setExpandedResourceId((current) =>
+                                current === resource.id ? '' : resource.id
+                              )
+                            }
+                          >
+                            <div className="associated-item-main">
+                              <strong>{resource.title}</strong>
+                              <span>{purposeLabel} · {typeLabel}</span>
+                            </div>
+                            <div className="associated-item-chips">
+                              {resource.isPrimary && (
+                                <span className="resource-primary-badge">
+                                  Primary {purposeLabel.toLowerCase()}
+                                </span>
+                              )}
+                              {resource.url && <span className="resource-meta-chip">Link</span>}
+                              <span className="resource-meta-chip">
+                                {fileCount} file{fileCount === 1 ? '' : 's'}
+                              </span>
+                              <span className="associated-item-expand-indicator" aria-hidden="true">
+                                {isExpanded ? '−' : '+'}
+                              </span>
+                            </div>
+                          </button>
+
+                          <div className="associated-item-expansion" inert={!isExpanded}>
+                            <div className="associated-item-expansion-inner">
+                              {resource.notes?.trim() && <p>{resource.notes}</p>}
+                              <div className="external-resource-actions">
+                                {resource.url && (
+                                  <a
+                                    className="ghost-button"
+                                    href={resource.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    Open
+                                  </a>
+                                )}
+                                <button
+                                  className="ghost-button"
+                                  onClick={() => onStartExternalResourceEdit(resource)}
+                                  type="button"
+                                  disabled={isGigLoading}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  className="danger-button"
+                                  onClick={() => onDeleteExternalResource(resource)}
+                                  type="button"
+                                  disabled={isGigLoading}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                              <div className="resource-attachments">
+                                <div className="expense-attachment-header">
+                                  <span>Files</span>
+                                  <label className="ghost-button file-upload-button">
+                                    Upload
+                                    <input
+                                      type="file"
+                                      onChange={(event) => {
+                                        const file = event.target.files?.[0]
+                                        if (file) {
+                                          onUploadExternalResourceAttachment(resource, file)
+                                        }
+                                        event.currentTarget.value = ''
+                                      }}
+                                      disabled={isGigLoading}
+                                    />
+                                  </label>
+                                </div>
+                                {resource.attachments.length > 0 ? (
+                                  <div className="expense-attachment-list">
+                                    {resource.attachments.map((attachment) => (
+                                      <div key={attachment.id} className="expense-attachment-item">
+                                        <span>{attachment.fileName}</span>
+                                        <div className="expense-attachment-actions">
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() =>
+                                              onDownloadExternalResourceAttachment(resource, attachment)
+                                            }
+                                            type="button"
+                                            disabled={isGigLoading}
+                                          >
+                                            Download
+                                          </button>
+                                          <button
+                                            className="danger-button"
+                                            onClick={() =>
+                                              onDeleteExternalResourceAttachment(resource, attachment)
+                                            }
+                                            type="button"
+                                            disabled={isGigLoading}
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span>No files attached.</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <span>No external resources attached yet.</span>
+                )}
+
               </div>
 
               <div className="gig-timeline-note">
@@ -855,6 +1083,128 @@ export function GigsSection({
           </form>
         </div>
       </div>
+
+      {isExternalResourceEditorOpen && (
+        <div className="settings-overlay" role="presentation">
+          <section
+            aria-labelledby="external-resource-editor-title"
+            className="settings-modal external-resource-modal panel"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">External resources</p>
+                <h2 id="external-resource-editor-title">{externalResourceEditorTitle}</h2>
+              </div>
+              <button
+                className="ghost-button"
+                onClick={onCancelExternalResourceEdit}
+                type="button"
+                disabled={isGigLoading}
+              >
+                Close
+              </button>
+            </div>
+
+            <form className="external-resource-form" onSubmit={onSubmitExternalResource}>
+              <div className="compact-form-grid">
+                <label>
+                  <span>Type</span>
+                  <select
+                    value={externalResourceForm.resourceType}
+                    onChange={(event) =>
+                      onUpdateExternalResourceField(
+                        'resourceType',
+                        event.target.value as GigExternalResourceType
+                      )
+                    }
+                  >
+                    {resourceTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Purpose</span>
+                  <select
+                    value={externalResourceForm.purpose}
+                    onChange={(event) =>
+                      onUpdateExternalResourceField(
+                        'purpose',
+                        event.target.value as GigExternalResourcePurpose
+                      )
+                    }
+                  >
+                    {resourcePurposeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Title</span>
+                  <input
+                    required
+                    value={externalResourceForm.title}
+                    onChange={(event) =>
+                      onUpdateExternalResourceField('title', event.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  <span>URL</span>
+                  <input
+                    type="url"
+                    placeholder="Optional link"
+                    value={externalResourceForm.url}
+                    onChange={(event) =>
+                      onUpdateExternalResourceField('url', event.target.value)
+                    }
+                  />
+                </label>
+              </div>
+              <label>
+                <span>Notes</span>
+                <textarea
+                  rows={3}
+                  value={externalResourceForm.notes}
+                  onChange={(event) =>
+                    onUpdateExternalResourceField('notes', event.target.value)
+                  }
+                />
+              </label>
+              <label className="checkbox-field resource-primary-toggle">
+                <input
+                  type="checkbox"
+                  checked={externalResourceForm.isPrimary}
+                  onChange={(event) =>
+                    onUpdateExternalResourceField('isPrimary', event.target.checked)
+                  }
+                />
+                <span>Make this the primary resource for its purpose</span>
+              </label>
+              <div className="form-actions">
+                <button className="primary-button" type="submit" disabled={isGigLoading}>
+                  {externalResourceMode === 'edit' ? 'Update resource' : 'Link resource'}
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={onCancelExternalResourceEdit}
+                  type="button"
+                  disabled={isGigLoading}
+                >
+                  Cancel
+                </button>
+                <span className="status-pill">{gigStatus}</span>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </section>
   )
 }

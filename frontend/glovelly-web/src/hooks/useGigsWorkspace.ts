@@ -2,12 +2,13 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'rea
 import type { FormEvent } from 'react'
 import {
   buildApiUrl,
+  downloadResponseBlob,
   fetchWithSession,
   getResponseErrorMessage,
   handleSessionExpired,
   jsonRequestInit,
 } from '../api'
-import { defaultGigStatus, emptyGigForm } from '../forms'
+import { defaultGigStatus, emptyGigExternalResourceForm, emptyGigForm } from '../forms'
 import {
   canCancelInvoice,
   formatEditableNumber,
@@ -22,6 +23,9 @@ import type { NormalizedGigExpensePayload } from './gigWorkspaceHelpers'
 import type {
   Client,
   Gig,
+  GigExternalResource,
+  GigExternalResourceAttachment,
+  GigExternalResourceForm,
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
@@ -71,6 +75,12 @@ export function useGigsWorkspace({
   const [isMileageEstimating, setIsMileageEstimating] = useState(false)
   const [gigExpenseAmount, setGigExpenseAmount] = useState('')
   const [gigExpenseDescription, setGigExpenseDescription] = useState('')
+  const [isExternalResourceEditorOpen, setIsExternalResourceEditorOpen] = useState(false)
+  const [externalResourceMode, setExternalResourceMode] = useState<'create' | 'edit'>('create')
+  const [editingExternalResourceId, setEditingExternalResourceId] = useState<string>('')
+  const [externalResourceForm, setExternalResourceForm] = useState<GigExternalResourceForm>(
+    emptyGigExternalResourceForm()
+  )
   const deferredGigSearchQuery = useDeferredValue(gigSearchQuery)
 
   const gigsById = useMemo(() => new Map(gigs.map((gig) => [gig.id, gig])), [gigs])
@@ -276,6 +286,10 @@ export function useGigsWorkspace({
     setIsGigLoading(false)
     setGigExpenseAmount('')
     setGigExpenseDescription('')
+    setIsExternalResourceEditorOpen(false)
+    setExternalResourceMode('create')
+    setEditingExternalResourceId('')
+    setExternalResourceForm(emptyGigExternalResourceForm())
     resetExpenseStatementWorkspace()
   }, [resetExpenseStatementWorkspace])
 
@@ -289,6 +303,322 @@ export function useGigsWorkspace({
       expenses: toEditableGigExpenses(savedGig),
     }))
   }, [])
+
+  const replaceSavedGig = useCallback((savedGig: Gig) => {
+    setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
+    setSelectedGigId(savedGig.id)
+  }, [])
+
+  const startExternalResourceCreate = () => {
+    if (!selectedGig) {
+      setGigStatus('Select a gig before linking an external resource.')
+      return
+    }
+
+    setExternalResourceMode('create')
+    setEditingExternalResourceId('')
+    setExternalResourceForm(emptyGigExternalResourceForm())
+    setIsExternalResourceEditorOpen(true)
+  }
+
+  const startExternalResourceEdit = (resource: GigExternalResource) => {
+    setExternalResourceMode('edit')
+    setEditingExternalResourceId(resource.id)
+    setExternalResourceForm({
+      resourceType: resource.resourceType,
+      purpose: resource.purpose,
+      title: resource.title,
+      url: resource.url ?? '',
+      notes: resource.notes ?? '',
+      isPrimary: resource.isPrimary,
+    })
+    setIsExternalResourceEditorOpen(true)
+  }
+
+  const cancelExternalResourceEdit = () => {
+    setIsExternalResourceEditorOpen(false)
+    setExternalResourceMode('create')
+    setEditingExternalResourceId('')
+    setExternalResourceForm(emptyGigExternalResourceForm())
+  }
+
+  const updateExternalResourceField = (
+    field: keyof GigExternalResourceForm,
+    value: string | boolean
+  ) => {
+    setExternalResourceForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  const submitExternalResource = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!selectedGig) {
+      setGigStatus('Select a gig before saving an external resource.')
+      return
+    }
+
+    const title = externalResourceForm.title.trim()
+    const url = externalResourceForm.url.trim()
+    if (!title) {
+      setGigStatus('External resource title is required.')
+      return
+    }
+
+    setIsGigLoading(true)
+    setGigStatus('Saving external resource link...')
+
+    try {
+      const isEdit = externalResourceMode === 'edit' && editingExternalResourceId
+      const endpoint = isEdit
+        ? buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${editingExternalResourceId}`)
+        : buildApiUrl(`/gigs/${selectedGig.id}/external-resources`)
+      const response = await fetchWithSession(
+        endpoint,
+        jsonRequestInit(isEdit ? 'PUT' : 'POST', {
+          resourceType: externalResourceForm.resourceType,
+          purpose: externalResourceForm.purpose,
+          title,
+          url,
+          notes: externalResourceForm.notes.trim() || null,
+          isPrimary: externalResourceForm.isPrimary,
+        })
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save external resource.')
+        )
+      }
+
+      const savedGig = (await response.json()) as Gig
+      replaceSavedGig(savedGig)
+      setExternalResourceForm(emptyGigExternalResourceForm())
+      setEditingExternalResourceId('')
+      setExternalResourceMode('create')
+      setIsExternalResourceEditorOpen(false)
+      setGigStatus(isEdit ? 'External resource updated.' : 'External resource linked.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save external resource right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const deleteExternalResource = async (resource: GigExternalResource) => {
+    if (!selectedGig) {
+      return
+    }
+
+    if (!window.confirm(`Delete external resource ${resource.title}?`)) {
+      return
+    }
+
+    setIsGigLoading(true)
+    setGigStatus('Deleting external resource...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${resource.id}`),
+        { method: 'DELETE' }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to delete external resource.')
+        )
+      }
+
+      const savedGig = (await response.json()) as Gig
+      replaceSavedGig(savedGig)
+      if (editingExternalResourceId === resource.id) {
+        cancelExternalResourceEdit()
+      }
+      setGigStatus('External resource deleted.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to delete external resource right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const uploadExternalResourceAttachment = async (
+    resource: GigExternalResource,
+    file: File
+  ) => {
+    if (!selectedGig) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+    setIsGigLoading(true)
+    setGigStatus('Uploading resource file...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${resource.id}/attachments`),
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to upload resource file.')
+        )
+      }
+
+      const savedGig = (await response.json()) as Gig
+      replaceSavedGig(savedGig)
+      setGigStatus('Resource file uploaded.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to upload resource file right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const downloadExternalResourceAttachment = async (
+    resource: GigExternalResource,
+    attachment: GigExternalResourceAttachment
+  ) => {
+    if (!selectedGig) {
+      return
+    }
+
+    setIsGigLoading(true)
+    setGigStatus('Downloading resource file...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${resource.id}/attachments/${attachment.id}`)
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to download resource file.')
+        )
+      }
+
+      const fileName = await downloadResponseBlob(response, attachment.fileName)
+      setGigStatus(`Downloaded ${fileName}.`)
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to download resource file right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const deleteExternalResourceAttachment = async (
+    resource: GigExternalResource,
+    attachment: GigExternalResourceAttachment
+  ) => {
+    if (!selectedGig) {
+      return
+    }
+
+    if (!window.confirm(`Delete resource file ${attachment.fileName}?`)) {
+      return
+    }
+
+    setIsGigLoading(true)
+    setGigStatus('Deleting resource file...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${resource.id}/attachments/${attachment.id}`),
+        { method: 'DELETE' }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to delete resource file.')
+        )
+      }
+
+      const savedGig = (await response.json()) as Gig
+      replaceSavedGig(savedGig)
+      setGigStatus('Resource file deleted.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to delete resource file right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
 
   const startGigCreate = () => {
     if (
@@ -431,6 +761,8 @@ export function useGigsWorkspace({
       setGigExpenseAmount('')
       setGigExpenseDescription('')
     }
+
+    cancelExternalResourceEdit()
 
     setSelectedGigId(gigId)
   }
@@ -1133,10 +1465,14 @@ export function useGigsWorkspace({
     applyGigs,
     cloneSelectedGig,
     closeGigEditor,
+    cancelExternalResourceEdit,
     completedGigCount: gigs.filter((gig) => gig.status === 'Completed').length,
     deleteGig,
+    deleteExternalResource,
+    deleteExternalResourceAttachment,
     deleteExpenseAttachment,
     downloadExpenseAttachment,
+    downloadExternalResourceAttachment,
     filteredGigs,
     closeExpenseStatement,
     downloadExpenseStatementPdf,
@@ -1148,6 +1484,8 @@ export function useGigsWorkspace({
     expenseStatementTotal,
     gigExpenseAmount,
     gigExpenseDescription,
+    externalResourceForm,
+    externalResourceMode,
     gigForm,
     gigMode,
     gigQuickFilter,
@@ -1161,6 +1499,7 @@ export function useGigsWorkspace({
     handleGigSubmit,
     handleToggleGigSelection,
     isGigEditorOpen,
+    isExternalResourceEditorOpen,
     isExpenseStatementLoading,
     isExpenseStatementOpen,
     isGigLoading,
@@ -1189,12 +1528,17 @@ export function useGigsWorkspace({
     setSelectedGigIds,
     startGigCreate,
     startGigEdit,
+    startExternalResourceCreate,
+    startExternalResourceEdit,
+    submitExternalResource,
     uninvoicedGigCount: gigs.filter((gig) => !gig.isInvoiced && gig.status !== 'Cancelled').length,
     upcomingGigCount: gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length,
     updateGigExpenseField,
+    updateExternalResourceField,
     updateGigField,
     updateExpenseReimbursement,
     uploadExpenseAttachment,
+    uploadExternalResourceAttachment,
     includeStatementReceiptAppendix,
     includeStatementReceiptAttachments,
     toggleExpenseStatementExpense,

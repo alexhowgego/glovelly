@@ -172,13 +172,17 @@ function App({ appMetadata }: AppProps) {
   })
   const {
     applyGigs,
+    cancelExternalResourceEdit,
     cloneSelectedGig,
     closeGigEditor,
     closeExpenseStatement,
     completedGigCount,
+    deleteExternalResource,
+    deleteExternalResourceAttachment,
     deleteGig,
     deleteExpenseAttachment,
     downloadExpenseAttachment,
+    downloadExternalResourceAttachment,
     downloadExpenseStatementPdf,
     expenseStatementExpenseIds,
     expenseStatementGigs,
@@ -186,6 +190,8 @@ function App({ appMetadata }: AppProps) {
     expenseStatementReceiptCount,
     expenseStatementStatus,
     expenseStatementTotal,
+    externalResourceForm,
+    externalResourceMode,
     filteredGigs,
     gigExpenseAmount,
     gigExpenseDescription,
@@ -205,6 +211,7 @@ function App({ appMetadata }: AppProps) {
     includeStatementReceiptAttachments,
     isExpenseStatementLoading,
     isExpenseStatementOpen,
+    isExternalResourceEditorOpen,
     isGigEditorOpen,
     isGigLoading,
     isMileageEstimating,
@@ -230,12 +237,17 @@ function App({ appMetadata }: AppProps) {
     setIncludeStatementReceiptAttachments,
     setSelectedGigId,
     setSelectedGigIds,
+    startExternalResourceCreate,
+    startExternalResourceEdit,
     startGigCreate,
     startGigEdit,
+    submitExternalResource,
+    updateExternalResourceField,
     updateGigExpenseField,
     updateGigField,
     updateExpenseReimbursement,
     uploadExpenseAttachment,
+    uploadExternalResourceAttachment,
     toggleExpenseStatementExpense,
   } = useGigsWorkspace({
     clientNamesById,
@@ -1526,6 +1538,8 @@ function App({ appMetadata }: AppProps) {
         clients={clients}
         completedGigCount={completedGigCount}
         filteredGigs={filteredGigs}
+        externalResourceForm={externalResourceForm}
+        externalResourceMode={externalResourceMode}
         gigExpenseAmount={gigExpenseAmount}
         gigExpenseDescription={gigExpenseDescription}
         gigForm={gigForm}
@@ -1539,8 +1553,12 @@ function App({ appMetadata }: AppProps) {
         isGigLoading={isGigLoading}
         isInvoiceLoading={isInvoiceLoading}
         isMileageEstimating={isMileageEstimating}
+        isExternalResourceEditorOpen={isExternalResourceEditorOpen}
         onAddGigExpense={handleAddGigExpense}
+        onCancelExternalResourceEdit={cancelExternalResourceEdit}
         onCloseEditor={closeGigEditor}
+        onDeleteExternalResource={deleteExternalResource}
+        onDeleteExternalResourceAttachment={deleteExternalResourceAttachment}
         onExpenseAmountChange={setGigExpenseAmount}
         onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateExpenseStatement={openExpenseStatement}
@@ -1548,11 +1566,13 @@ function App({ appMetadata }: AppProps) {
         onEstimateMileage={estimateGigMileage}
         onDeleteGig={deleteGig}
         onDownloadExpenseAttachment={downloadExpenseAttachment}
+        onDownloadExternalResourceAttachment={downloadExternalResourceAttachment}
         onCloneGig={cloneSelectedGig}
         onOpenClient={openClientShortcut}
         onOpenLinkedInvoice={openSelectedGigInvoice}
         onOpenSellerProfile={openSellerProfile}
         onUploadExpenseAttachment={uploadExpenseAttachment}
+        onUploadExternalResourceAttachment={uploadExternalResourceAttachment}
         onDeleteExpenseAttachment={deleteExpenseAttachment}
         onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
@@ -1562,7 +1582,11 @@ function App({ appMetadata }: AppProps) {
         onSortChange={setGigSort}
         onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
+        onStartExternalResourceCreate={startExternalResourceCreate}
+        onStartExternalResourceEdit={startExternalResourceEdit}
         onSubmit={handleGigSubmit}
+        onSubmitExternalResource={submitExternalResource}
+        onUpdateExternalResourceField={updateExternalResourceField}
         onUpdateGigExpenseField={updateGigExpenseField}
         onUpdateGigField={updateGigField}
         onUpdateExpenseReimbursement={updateExpenseReimbursement}

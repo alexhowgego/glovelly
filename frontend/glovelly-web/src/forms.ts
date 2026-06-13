@@ -3,6 +3,7 @@ import type {
   ClientForm,
   ClientSettingsForm,
   GigForm,
+  GigExternalResourceForm,
   SellerProfileForm,
   UserSettingsForm,
 } from './types'
@@ -76,6 +77,15 @@ export const emptyGigForm = (): GigForm => ({
   wasDriving: true,
   status: 'Confirmed',
   expenses: [],
+})
+
+export const emptyGigExternalResourceForm = (): GigExternalResourceForm => ({
+  resourceType: 'Url',
+  purpose: 'Other',
+  title: '',
+  url: '',
+  notes: '',
+  isPrimary: false,
 })
 
 export const defaultAdminStatus = 'User enrolment tools ready.'

@@ -254,6 +254,22 @@ Expected result: cloning creates a separate gig record, opens it for editing str
 
 Expected result: expenses are copied only when accepted, receipt attachments are not copied, and any invoice generated from the clone is a new invoice linked only to the cloned gig.
 
+## Linked Gig Resources
+
+> **Automation:** Backend automated; manual UAT: focused checks live in [Gig external resources](gig-external-resources.md).
+
+### Steps
+
+1. Open Gigs and select a saved gig.
+2. Confirm existing linked resources, if any, appear in the `External resources` area.
+3. Click `Link resource` and save a resource with a title, purpose, type, and URL.
+4. Link or edit a second resource for the same purpose and mark it primary.
+5. Upload a small file to one resource, download it, then delete the file.
+
+### Expected Results
+
+Linked resources stay scoped to the selected gig, the resource editor opens as a modal, only one resource per purpose is primary, URL-less file resources are allowed, and file actions do not affect expenses or invoice state.
+
 ## Combined Invoice Journey
 
 > **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceAggregationWorkflowTests.CanGenerateCombinedInvoiceForSameClientGigs`
@@ -315,6 +331,7 @@ Run the focused pages when the change touches those areas, or when the pre-merge
 
 - [Invoices](invoices.md)
 - [Expenses](expenses.md)
+- [Gig external resources](gig-external-resources.md)
 - [Imported gigs](gig-imports.md)
 - [Enrolment and access](enrolment.md)
 

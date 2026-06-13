@@ -99,8 +99,7 @@ internal static class GigExpenseEndpoints
             var savedGig = await db.Gigs
                 .WhereVisibleTo(userId)
                 .AsNoTracking()
-                .Include(value => value.Expenses)
-                    .ThenInclude(expense => expense.Attachments)
+                .IncludeGigDetails()
                 .FirstAsync(value => value.Id == gigId);
 
             return Results.Ok(savedGig);
