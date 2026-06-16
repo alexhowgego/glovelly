@@ -1,19 +1,23 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
+import { GigAttachmentsPanel } from './GigAttachmentsPanel'
+import { GigEditorPanel } from './GigEditorPanel'
+import { GigExpensesPanel } from './GigExpensesPanel'
 import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
 import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Client,
   Gig,
+  GigExternalResource,
+  GigExternalResourceAttachment,
+  GigExternalResourceForm,
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
   GigQuickFilter,
   GigSort,
   GigSortKey,
-  GigStatus,
-  SellerProfile,
 } from '../types'
 
 type GigsSectionProps = {
@@ -21,8 +25,8 @@ type GigsSectionProps = {
   clients: Client[]
   completedGigCount: number
   filteredGigs: Gig[]
-  gigExpenseAmount: string
-  gigExpenseDescription: string
+  externalResourceForm: GigExternalResourceForm
+  externalResourceMode: 'create' | 'edit'
   gigForm: GigForm
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
@@ -34,10 +38,19 @@ type GigsSectionProps = {
   isGigLoading: boolean
   isInvoiceLoading: boolean
   isMileageEstimating: boolean
-  onAddGigExpense: () => void
+  isExternalResourceEditorOpen: boolean
+  onCancelExternalResourceEdit: () => void
   onCloseEditor: () => void
-  onExpenseAmountChange: (value: string) => void
-  onExpenseDescriptionChange: (value: string) => void
+  onDeleteExpenseDraft: (index: number) => Promise<boolean>
+  onDeleteExternalResource: (resource: GigExternalResource) => void
+  onDeleteExternalResourceAttachment: (
+    resource: GigExternalResource,
+    attachment: GigExternalResourceAttachment
+  ) => void
+  onDownloadExternalResourceAttachment: (
+    resource: GigExternalResource,
+    attachment: GigExternalResourceAttachment
+  ) => void
   onGenerateExpenseStatement: () => void
   onGenerateInvoice: () => void
   onEstimateMileage: () => void
@@ -46,10 +59,9 @@ type GigsSectionProps = {
   onCloneGig: () => void
   onOpenClient: (clientId: string) => void
   onOpenLinkedInvoice: () => void
-  onOpenSellerProfile: () => void
   onUploadExpenseAttachment: (index: number, file: File) => void
+  onUploadExternalResourceAttachment: (resource: GigExternalResource, file: File) => void
   onDeleteExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
-  onRemoveGigExpense: (index: number) => void
   onResetForm: () => void
   onQuickFilterChange: (filter: GigQuickFilter) => void
   onSearchQueryChange: (value: string) => void
@@ -57,23 +69,27 @@ type GigsSectionProps = {
   onSortChange: (sort: GigSort) => void
   onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
+  onStartExternalResourceCreate: () => void
+  onStartExternalResourceEdit: (resource: GigExternalResource) => void
+  onSaveExpenseDraft: (
+    index: number | null,
+    draft: { description: string; amount: string }
+  ) => Promise<boolean>
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onSubmitExternalResource: (event: FormEvent<HTMLFormElement>) => void
   onUpdateExpenseReimbursement: (
     expense: GigExpenseForm,
     status: GigExpenseReimbursementStatus
-  ) => void
-  onUpdateGigExpenseField: (
-    index: number,
-    field: keyof Pick<GigExpenseForm, 'description' | 'amount'>,
-    value: string
   ) => void
   onUpdateGigField: (
     field: keyof GigForm,
     value: string | boolean | GigExpenseForm[]
   ) => void
+  onUpdateExternalResourceField: (
+    field: keyof GigExternalResourceForm,
+    value: string | boolean
+  ) => void
   plannedGigCount: number
-  sellerProfile: SellerProfile
-  sellerProfileNotice: string
   selectedGig: Gig | null
   selectedGigIds: string[]
   selectedGigs: Gig[]
@@ -84,8 +100,8 @@ export function GigsSection({
   clients,
   completedGigCount,
   filteredGigs,
-  gigExpenseAmount,
-  gigExpenseDescription,
+  externalResourceForm,
+  externalResourceMode,
   gigForm,
   isEditorOpen,
   gigMode,
@@ -97,10 +113,13 @@ export function GigsSection({
   isGigLoading,
   isInvoiceLoading,
   isMileageEstimating,
-  onAddGigExpense,
+  isExternalResourceEditorOpen,
+  onCancelExternalResourceEdit,
   onCloseEditor,
-  onExpenseAmountChange,
-  onExpenseDescriptionChange,
+  onDeleteExpenseDraft,
+  onDeleteExternalResource,
+  onDeleteExternalResourceAttachment,
+  onDownloadExternalResourceAttachment,
   onGenerateExpenseStatement,
   onGenerateInvoice,
   onEstimateMileage,
@@ -109,10 +128,9 @@ export function GigsSection({
   onCloneGig,
   onOpenClient,
   onOpenLinkedInvoice,
-  onOpenSellerProfile,
   onUploadExpenseAttachment,
+  onUploadExternalResourceAttachment,
   onDeleteExpenseAttachment,
-  onRemoveGigExpense,
   onResetForm,
   onQuickFilterChange,
   onSearchQueryChange,
@@ -120,13 +138,15 @@ export function GigsSection({
   onSortChange,
   onToggleGigSelection,
   onStartEditing,
+  onStartExternalResourceCreate,
+  onStartExternalResourceEdit,
+  onSaveExpenseDraft,
   onSubmit,
+  onSubmitExternalResource,
   onUpdateExpenseReimbursement,
-  onUpdateGigExpenseField,
+  onUpdateExternalResourceField,
   onUpdateGigField,
   plannedGigCount,
-  sellerProfile,
-  sellerProfileNotice,
   selectedGig,
   selectedGigIds,
   selectedGigs,
@@ -157,7 +177,6 @@ export function GigsSection({
     { value: 'drafts', label: 'Drafts' },
     { value: 'completed', label: 'Completed' },
   ]
-
   useEffect(() => {
     if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
       return
@@ -463,31 +482,36 @@ export function GigsSection({
                 </article>
               </div>
 
-              <div className="gig-timeline-note">
-                <p className="detail-label">Invoice workflow</p>
-                <span>
-                  {selectedGig.isInvoiced
-                    ? 'This gig is already linked to an invoice. Open Invoices to review or download it.'
-                    : 'This gig has everything needed to create an invoice when you are ready.'}
-                </span>
-                <span>{sellerProfileNotice}</span>
-                {selectedGigIds.length > 0 && (
-                  <span>
-                    {hasCrossClientSelection
-                      ? ' Selected gigs need to belong to the same client before they can be invoiced together.'
-                      : hasInvoicedSelection
-                        ? ` ${selectedGigIds.length} gig(s) selected. Invoiced gigs can be used for expense statements, but not new invoices.`
-                        : ` ${selectedGigIds.length} gig(s) selected for a combined invoice or expense statement.`}
-                  </span>
-                )}
-                <button
-                  className="ghost-button"
-                  onClick={onOpenSellerProfile}
-                  type="button"
-                >
-                  {sellerProfile.isConfigured ? 'Review seller profile' : 'Set up seller profile'}
-                </button>
-              </div>
+              <GigAttachmentsPanel
+                selectedGig={selectedGig}
+                externalResourceForm={externalResourceForm}
+                externalResourceMode={externalResourceMode}
+                gigStatus={gigStatus}
+                isGigLoading={isGigLoading}
+                isExternalResourceEditorOpen={isExternalResourceEditorOpen}
+                onCancelExternalResourceEdit={onCancelExternalResourceEdit}
+                onDeleteExternalResource={onDeleteExternalResource}
+                onDeleteExternalResourceAttachment={onDeleteExternalResourceAttachment}
+                onDownloadExternalResourceAttachment={onDownloadExternalResourceAttachment}
+                onStartExternalResourceCreate={onStartExternalResourceCreate}
+                onStartExternalResourceEdit={onStartExternalResourceEdit}
+                onSubmitExternalResource={onSubmitExternalResource}
+                onUpdateExternalResourceField={onUpdateExternalResourceField}
+                onUploadExternalResourceAttachment={onUploadExternalResourceAttachment}
+              />
+
+              <GigExpensesPanel
+                expenses={gigForm.expenses}
+                gigStatus={gigStatus}
+                isGigLoading={isGigLoading}
+                selectedGig={selectedGig}
+                onDeleteExpenseAttachment={onDeleteExpenseAttachment}
+                onDeleteExpenseDraft={onDeleteExpenseDraft}
+                onDownloadExpenseAttachment={onDownloadExpenseAttachment}
+                onSaveExpenseDraft={onSaveExpenseDraft}
+                onUpdateExpenseReimbursement={onUpdateExpenseReimbursement}
+                onUploadExpenseAttachment={onUploadExpenseAttachment}
+              />
             </>
           ) : (
             <div className="empty-state roomy">
@@ -498,374 +522,21 @@ export function GigsSection({
         </div>
 
         <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
-          <form
-            aria-hidden={!isEditorOpen}
-            className="editor-panel panel gig-editor-panel"
-            data-testid="gig-form"
+          <GigEditorPanel
+            clients={clients}
+            gigForm={gigForm}
+            gigMode={gigMode}
+            gigStatus={gigStatus}
+            isEditorOpen={isEditorOpen}
+            isGigLoading={isGigLoading}
+            isMileageEstimating={isMileageEstimating}
+            onCloseEditor={onCloseEditor}
+            onEstimateMileage={onEstimateMileage}
             onSubmit={onSubmit}
-          >
-            <div className="panel-heading">
-              <div>
-                <p className="section-label">Management Pane</p>
-                <h2>{gigMode === 'create' ? 'Create gig' : 'Update gig'}</h2>
-              </div>
-              <span className="status-pill" data-testid="gig-status">{gigStatus}</span>
-            </div>
-
-            <div className="form-grid">
-              <label>
-                <span>Client</span>
-                <select
-                  data-testid="gig-client-select"
-                  required
-                  value={gigForm.clientId}
-                  onChange={(event) => onUpdateGigField('clientId', event.target.value)}
-                >
-                  <option value="">Select a client</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Date</span>
-                <input
-                  data-testid="gig-date-input"
-                  required
-                  type="date"
-                  value={gigForm.date}
-                  onChange={(event) => onUpdateGigField('date', event.target.value)}
-                />
-              </label>
-
-              <label className="full-width">
-                <span>Title / description</span>
-                <input
-                  data-testid="gig-title-input"
-                  required
-                  value={gigForm.title}
-                  onChange={(event) => onUpdateGigField('title', event.target.value)}
-                  placeholder="Spring product launch"
-                />
-              </label>
-
-              <label className="full-width">
-                <span>Location / venue</span>
-                <input
-                  data-testid="gig-venue-input"
-                  required
-                  value={gigForm.venue}
-                  onChange={(event) => onUpdateGigField('venue', event.target.value)}
-                  placeholder="Albert Hall, Manchester"
-                />
-              </label>
-
-              <label>
-                <span>Fee</span>
-                <input
-                  data-testid="gig-fee-input"
-                  required
-                  inputMode="decimal"
-                  value={gigForm.fee}
-                  onChange={(event) => onUpdateGigField('fee', event.target.value)}
-                  placeholder="650"
-                />
-              </label>
-
-              <label>
-                <span>Status</span>
-                <select
-                  data-testid="gig-status-select"
-                  value={gigForm.status}
-                  onChange={(event) =>
-                    onUpdateGigField('status', event.target.value as GigStatus)
-                  }
-                >
-                  <option value="Confirmed">Planned</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                  <option value="Draft">Draft</option>
-                </select>
-              </label>
-
-              <label className="checkbox-field full-width">
-                <input
-                  data-testid="gig-driving-checkbox"
-                  type="checkbox"
-                  checked={gigForm.wasDriving}
-                  onChange={(event) => onUpdateGigField('wasDriving', event.target.checked)}
-                />
-                <span>I was driving for this gig</span>
-              </label>
-
-              {gigForm.wasDriving && (
-                <>
-                  <label>
-                    <span>Travel miles</span>
-                    <input
-                      data-testid="gig-travel-miles-input"
-                      inputMode="decimal"
-                      value={gigForm.travelMiles}
-                      onChange={(event) => onUpdateGigField('travelMiles', event.target.value)}
-                      placeholder="24"
-                    />
-                  </label>
-
-                  <div className="mileage-estimate-action">
-                    <button
-                      className="ghost-button"
-                      data-testid="gig-estimate-mileage-button"
-                      disabled={gigMode !== 'edit' || isMileageEstimating}
-                      onClick={onEstimateMileage}
-                      type="button"
-                    >
-                      {isMileageEstimating ? 'Estimating...' : 'Estimate mileage'}
-                    </button>
-                  </div>
-
-                  <label>
-                    <span>Passengers</span>
-                    <input
-                      data-testid="gig-passenger-count-input"
-                      inputMode="numeric"
-                      value={gigForm.passengerCount}
-                      onChange={(event) => onUpdateGigField('passengerCount', event.target.value)}
-                      placeholder="0"
-                    />
-                  </label>
-                </>
-              )}
-
-              <label className="full-width">
-                <span>Notes</span>
-                <textarea
-                  rows={5}
-                  value={gigForm.notes}
-                  onChange={(event) => onUpdateGigField('notes', event.target.value)}
-                  placeholder="Optional commercial or logistics notes"
-                />
-              </label>
-            </div>
-
-            <div className="gig-timeline-note">
-              <p className="detail-label">Expenses</p>
-              <span>
-                Add chargeable out-of-pocket costs here and they will flow through when the gig is invoiced.
-              </span>
-            </div>
-
-            <div className="invoice-adjustment-form">
-              <label>
-                Amount
-                <input
-                  data-testid="gig-expense-amount-input"
-                  inputMode="decimal"
-                  value={gigExpenseAmount}
-                  onChange={(event) => onExpenseAmountChange(event.target.value)}
-                  placeholder="45.00"
-                  disabled={isGigLoading}
-                />
-              </label>
-              <label>
-                Description
-                <input
-                  data-testid="gig-expense-description-input"
-                  value={gigExpenseDescription}
-                  onChange={(event) => onExpenseDescriptionChange(event.target.value)}
-                  placeholder="Parking, hotel, equipment hire..."
-                  disabled={isGigLoading}
-                />
-              </label>
-              <button
-                className="ghost-button"
-                data-testid="add-gig-expense-button"
-                onClick={onAddGigExpense}
-                type="button"
-                disabled={isGigLoading}
-              >
-                Add expense
-              </button>
-            </div>
-
-            {gigForm.expenses.length > 0 ? (
-              <div className="gig-expense-list">
-                {gigForm.expenses.map((expense, index) => {
-                  const isReimbursed = expense.reimbursementStatus === 'Reimbursed'
-                  const statusLabel = formatExpenseReimbursementStatus(expense.reimbursementStatus)
-
-                  return (
-                  <div
-                    className={`gig-expense-item ${isReimbursed ? 'is-reimbursed' : ''}`}
-                    data-testid="gig-expense-item"
-                    key={`${expense.id || 'new'}-${index}`}
-                  >
-                    <div className="expense-reimbursement-state">
-                      <span className={`expense-status-badge ${isReimbursed ? 'reimbursed' : ''}`}>
-                        {statusLabel}
-                      </span>
-                      {isReimbursed && (
-                        <span>
-                          {expense.reimbursementMethod || expense.reimbursementNote || 'Recorded'}
-                        </span>
-                      )}
-                    </div>
-                    <label>
-                      <span>Description</span>
-                      <input
-                        value={expense.description}
-                        onChange={(event) =>
-                          onUpdateGigExpenseField(index, 'description', event.target.value)
-                        }
-                        disabled={isGigLoading}
-                      />
-                    </label>
-                    <label>
-                      <span>Amount</span>
-                      <input
-                        inputMode="decimal"
-                        value={expense.amount}
-                        onChange={(event) =>
-                          onUpdateGigExpenseField(index, 'amount', event.target.value)
-                        }
-                        disabled={isGigLoading}
-                      />
-                    </label>
-                    <button
-                      className="ghost-button"
-                      onClick={() => onRemoveGigExpense(index)}
-                      type="button"
-                      disabled={isGigLoading}
-                    >
-                      Remove
-                    </button>
-                    {expense.id && (
-                      <label className="expense-status-select">
-                        <span>Reimbursement</span>
-                        <select
-                          data-testid="gig-expense-reimbursement-select"
-                          value={expense.reimbursementStatus}
-                          onChange={(event) =>
-                            onUpdateExpenseReimbursement(
-                              expense,
-                              event.target.value as GigExpenseReimbursementStatus
-                            )
-                          }
-                          disabled={isGigLoading}
-                        >
-                          <option value="Unreimbursed">Claimable</option>
-                          <option value="Reimbursed">Reimbursed</option>
-                          <option value="NotClaimable">Not claimable</option>
-                        </select>
-                      </label>
-                    )}
-                    <div className="expense-attachments">
-                      <div className="expense-attachment-header">
-                        <span>
-                          {expense.attachments.length === 1
-                            ? '1 receipt'
-                            : `${expense.attachments.length} receipts`}
-                        </span>
-                        <label className="ghost-button file-button">
-                          Add receipt
-                          <input
-                            type="file"
-                            accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
-                            disabled={isGigLoading || !expense.id}
-                            onChange={(event) => {
-                              const file = event.target.files?.[0]
-                              event.target.value = ''
-                              if (file) {
-                                onUploadExpenseAttachment(index, file)
-                              }
-                            }}
-                          />
-                        </label>
-                      </div>
-                      {expense.id ? (
-                        expense.attachments.length > 0 ? (
-                          <div className="expense-attachment-list">
-                            {expense.attachments.map((attachment) => (
-                              <div className="expense-attachment-item" key={attachment.id}>
-                                <button
-                                  className="link-button"
-                                  type="button"
-                                  onClick={() => onDownloadExpenseAttachment(expense, attachment.id)}
-                                  disabled={isGigLoading}
-                                >
-                                  {attachment.fileName}
-                                </button>
-                                <button
-                                  className="ghost-button"
-                                  type="button"
-                                  onClick={() => onDeleteExpenseAttachment(expense, attachment.id)}
-                                  disabled={isGigLoading}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null
-                      ) : (
-                        <p className="attachment-helper">Save the gig before adding receipts.</p>
-                      )}
-                    </div>
-                  </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <strong>No expenses added yet.</strong>
-                <p>Use the fields above to add chargeable costs to this gig.</p>
-              </div>
-            )}
-
-            <div className="form-actions">
-              <button
-                className="primary-button"
-                data-close-after-save="true"
-                data-testid="gig-save-close-button"
-                type="submit"
-                disabled={isGigLoading || clients.length === 0}
-              >
-                Save and close
-              </button>
-              <button
-                className="ghost-button"
-                data-close-after-save="false"
-                type="submit"
-                disabled={isGigLoading || clients.length === 0}
-              >
-                Save
-              </button>
-              <button className="ghost-button" onClick={onCloseEditor} type="button">
-                Discard changes
-              </button>
-            </div>
-
-            {clients.length === 0 && (
-              <p className="auth-note">
-                Add a client first so this gig can be linked to the right account.
-              </p>
-            )}
-          </form>
+            onUpdateGigField={onUpdateGigField}
+          />
         </div>
       </div>
     </section>
   )
-}
-
-function formatExpenseReimbursementStatus(status: GigExpenseReimbursementStatus) {
-  switch (status) {
-    case 'Unreimbursed':
-      return 'Claimable'
-    case 'NotClaimable':
-      return 'Not claimable'
-    default:
-      return status
-  }
 }

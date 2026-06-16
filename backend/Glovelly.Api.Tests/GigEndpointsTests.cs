@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using Glovelly.Api.Tests.Infrastructure;
 using Xunit;
@@ -1207,5 +1208,383 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         var getResponse = await _client.GetAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateGigExternalResource_AddsResourceToGig()
+    {
+        var gig = await CreateGigAsync(_client, "Gig resource host");
+        var gigId = gig.GetProperty("id").GetGuid();
+
+        var response = await _client.PostAsJsonAsync($"/gigs/{gigId}/external-resources", new
+        {
+            resourceType = "GoogleSheet",
+            purpose = "SetList",
+            title = "  Main set list  ",
+            url = "  https://docs.google.com/spreadsheets/d/example  ",
+            notes = "  Shared by MD  ",
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var savedGig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var resource = Assert.Single(savedGig.GetProperty("externalResources").EnumerateArray());
+        Assert.Equal("GoogleSheet", resource.GetProperty("resourceType").GetString());
+        Assert.Equal("SetList", resource.GetProperty("purpose").GetString());
+        Assert.Equal("Main set list", resource.GetProperty("title").GetString());
+        Assert.Equal("https://docs.google.com/spreadsheets/d/example", resource.GetProperty("url").GetString());
+        Assert.Equal("Shared by MD", resource.GetProperty("notes").GetString());
+        Assert.True(resource.GetProperty("isPrimary").GetBoolean());
+        Assert.False(string.IsNullOrWhiteSpace(resource.GetProperty("createdAt").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(resource.GetProperty("updatedAt").GetString()));
+    }
+
+    [Fact]
+    public async Task CreateGigExternalResource_WithInvalidUrl_ReturnsValidationProblem()
+    {
+        var gig = await CreateGigAsync(_client, "Bad resource host");
+        var gigId = gig.GetProperty("id").GetGuid();
+
+        var response = await _client.PostAsJsonAsync($"/gigs/{gigId}/external-resources", new
+        {
+            resourceType = "Url",
+            purpose = "Other",
+            title = "Bad URL",
+            url = "not-a-url",
+            notes = (string?)null,
+            isPrimary = false,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            "URL must be an absolute http or https URL.",
+            problem.GetProperty("errors").GetProperty("url")[0].GetString());
+    }
+
+    [Fact]
+    public async Task CreateGigExternalResource_WithoutUrl_CreatesFileOnlyResourceShell()
+    {
+        var gig = await CreateGigAsync(_client, "File resource host");
+        var gigId = gig.GetProperty("id").GetGuid();
+
+        var response = await _client.PostAsJsonAsync($"/gigs/{gigId}/external-resources", new
+        {
+            resourceType = "File",
+            purpose = "Contract",
+            title = "Signed contract",
+            url = (string?)null,
+            notes = "Upload follows",
+            isPrimary = false,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var savedGig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var resource = Assert.Single(savedGig.GetProperty("externalResources").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, resource.GetProperty("url").ValueKind);
+        Assert.Empty(resource.GetProperty("attachments").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task UploadGigExternalResourceAttachment_AddsDownloadableAttachment()
+    {
+        var gig = await CreateGigAsync(_client, "Attachment resource host");
+        var gigId = gig.GetProperty("id").GetGuid();
+        var createResponse = await _client.PostAsJsonAsync($"/gigs/{gigId}/external-resources", new
+        {
+            resourceType = "File",
+            purpose = "Contract",
+            title = "Contract",
+            url = (string?)null,
+            notes = (string?)null,
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var resourceId = Assert.Single(createdGig.GetProperty("externalResources").EnumerateArray()).GetProperty("id").GetGuid();
+
+        using var content = new MultipartFormDataContent();
+        content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("# Set list"))
+        {
+            Headers =
+            {
+                ContentType = new MediaTypeHeaderValue("text/markdown"),
+            },
+        }, "file", "set-list.md");
+
+        var uploadResponse = await _client.PostAsync($"/gigs/{gigId}/external-resources/{resourceId}/attachments", content, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, uploadResponse.StatusCode);
+
+        var savedGig = await uploadResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var resource = Assert.Single(savedGig.GetProperty("externalResources").EnumerateArray());
+        var attachment = Assert.Single(resource.GetProperty("attachments").EnumerateArray());
+        Assert.Equal("set-list.md", attachment.GetProperty("fileName").GetString());
+        Assert.Equal("text/markdown", attachment.GetProperty("contentType").GetString());
+
+        var attachmentId = attachment.GetProperty("id").GetGuid();
+        var downloadResponse = await _client.GetAsync($"/gigs/{gigId}/external-resources/{resourceId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
+        Assert.Equal("text/markdown", downloadResponse.Content.Headers.ContentType?.MediaType);
+
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}/external-resources/{resourceId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+        var gigAfterDelete = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Empty(Assert.Single(gigAfterDelete.GetProperty("externalResources").EnumerateArray()).GetProperty("attachments").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task UpdateGigExternalResource_UpdatesFieldsAndPrimaryForPurposeOnly()
+    {
+        var gig = await CreateGigAsync(_client, "Primary resource host");
+        var gigId = gig.GetProperty("id").GetGuid();
+
+        var firstResponse = await _client.PostAsJsonAsync($"/gigs/{gigId}/external-resources", new
+        {
+            resourceType = "GoogleSheet",
+            purpose = "SetList",
+            title = "First set list",
+            url = "https://example.test/setlist-1",
+            notes = (string?)null,
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+        firstResponse.EnsureSuccessStatusCode();
+        var firstGig = await firstResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var firstResourceId = Assert.Single(firstGig.GetProperty("externalResources").EnumerateArray()).GetProperty("id").GetGuid();
+
+        var planResponse = await _client.PostAsJsonAsync($"/gigs/{gigId}/external-resources", new
+        {
+            resourceType = "GoogleDoc",
+            purpose = "GigPlan",
+            title = "Gig plan",
+            url = "https://example.test/plan",
+            notes = (string?)null,
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+        planResponse.EnsureSuccessStatusCode();
+
+        var secondResponse = await _client.PostAsJsonAsync($"/gigs/{gigId}/external-resources", new
+        {
+            resourceType = "Url",
+            purpose = "SetList",
+            title = "Second set list",
+            url = "https://example.test/setlist-2",
+            notes = "New",
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+        secondResponse.EnsureSuccessStatusCode();
+        var secondGig = await secondResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var secondResourceId = secondGig
+            .GetProperty("externalResources")
+            .EnumerateArray()
+            .First(resource => resource.GetProperty("title").GetString() == "Second set list")
+            .GetProperty("id")
+            .GetGuid();
+
+        var updateResponse = await _client.PutAsJsonAsync($"/gigs/{gigId}/external-resources/{secondResourceId}", new
+        {
+            resourceType = "GoogleDoc",
+            purpose = "SetList",
+            title = "Updated set list",
+            url = "https://example.test/setlist-2-updated",
+            notes = "Updated notes",
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var savedGig = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var resources = savedGig.GetProperty("externalResources").EnumerateArray().ToArray();
+        Assert.Equal(3, resources.Length);
+
+        var firstSetList = resources.First(resource => resource.GetProperty("id").GetGuid() == firstResourceId);
+        var updatedSetList = resources.First(resource => resource.GetProperty("id").GetGuid() == secondResourceId);
+        var gigPlan = resources.First(resource => resource.GetProperty("purpose").GetString() == "GigPlan");
+
+        Assert.False(firstSetList.GetProperty("isPrimary").GetBoolean());
+        Assert.True(updatedSetList.GetProperty("isPrimary").GetBoolean());
+        Assert.True(gigPlan.GetProperty("isPrimary").GetBoolean());
+        Assert.Equal("Updated set list", updatedSetList.GetProperty("title").GetString());
+        Assert.Equal("GoogleDoc", updatedSetList.GetProperty("resourceType").GetString());
+    }
+
+    [Fact]
+    public async Task QuickExternalResourceDraftFile_WithNearbyGig_CreatesDraftResourceAndAttachment()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var gig = await CreateGigAsync(_client, "Attachment quick match", today.AddDays(-1).ToString("yyyy-MM-dd"));
+        var gigId = gig.GetProperty("id").GetGuid();
+
+        using var form = BuildReceiptDraftForm("# Contract notes"u8.ToArray(), "contract.md", "text/markdown");
+
+        var response = await _client.PostAsync("/gigs/external-resource-drafts/file", form, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.True(result.GetProperty("inferredGig").GetBoolean());
+        Assert.Equal(gigId, result.GetProperty("gig").GetProperty("id").GetGuid());
+
+        var resource = Assert.Single(result.GetProperty("gig").GetProperty("externalResources").EnumerateArray());
+        Assert.Equal("contract", resource.GetProperty("title").GetString());
+        Assert.Equal("File", resource.GetProperty("resourceType").GetString());
+        Assert.Equal("Other", resource.GetProperty("purpose").GetString());
+
+        var attachment = Assert.Single(resource.GetProperty("attachments").EnumerateArray());
+        Assert.Equal("contract.md", attachment.GetProperty("fileName").GetString());
+        Assert.Equal(result.GetProperty("attachmentId").GetGuid(), attachment.GetProperty("id").GetGuid());
+    }
+
+    [Fact]
+    public async Task QuickExternalResourceDraftLink_WithExplicitGig_InfersGoogleDocType()
+    {
+        var gig = await CreateGigAsync(_client, "Attachment link target");
+        var gigId = gig.GetProperty("id").GetGuid();
+
+        var response = await _client.PostAsJsonAsync("/gigs/external-resource-drafts/link", new
+        {
+            gigId,
+            url = "https://docs.google.com/document/d/example/edit",
+            title = "Gig plan",
+            purpose = "GigPlan",
+            notes = "Shared planning doc",
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.False(result.GetProperty("inferredGig").GetBoolean());
+
+        var resource = Assert.Single(result.GetProperty("gig").GetProperty("externalResources").EnumerateArray());
+        Assert.Equal("GoogleDoc", resource.GetProperty("resourceType").GetString());
+        Assert.Equal("GigPlan", resource.GetProperty("purpose").GetString());
+        Assert.Equal("Gig plan", resource.GetProperty("title").GetString());
+        Assert.Equal("https://docs.google.com/document/d/example/edit", resource.GetProperty("url").GetString());
+        Assert.True(resource.GetProperty("isPrimary").GetBoolean());
+        Assert.Empty(resource.GetProperty("attachments").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task QuickExternalResourceDraftFile_WithNoCandidateInsideWindow_ReturnsEmptyCandidates()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        _ = await CreateGigAsync(_client, "Old attachment show", today.AddDays(-45).ToString("yyyy-MM-dd"));
+        _ = await CreateGigAsync(_client, "Future attachment show", today.AddDays(60).ToString("yyyy-MM-dd"));
+
+        using var form = BuildReceiptDraftForm("plan"u8.ToArray(), "plan.pdf", "application/pdf");
+
+        var response = await _client.PostAsync("/gigs/external-resource-drafts/file", form, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("No gig was within 30 days. Choose a gig before saving this attachment draft.", result.GetProperty("message").GetString());
+        Assert.Empty(result.GetProperty("candidates").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task UpdateQuickExternalResourceDraft_SavesDetailsMovesGigAndUpdatesPrimary()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var firstGig = await CreateGigAsync(_client, "Attachment first target", today.ToString("yyyy-MM-dd"));
+        var firstGigId = firstGig.GetProperty("id").GetGuid();
+        var secondGig = await CreateGigAsync(_client, "Attachment corrected target", today.AddDays(2).ToString("yyyy-MM-dd"));
+        var secondGigId = secondGig.GetProperty("id").GetGuid();
+
+        var existingPrimaryResponse = await _client.PostAsJsonAsync($"/gigs/{secondGigId}/external-resources", new
+        {
+            resourceType = "GoogleSheet",
+            purpose = "SetList",
+            title = "Existing set list",
+            url = "https://example.test/existing",
+            notes = (string?)null,
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+        existingPrimaryResponse.EnsureSuccessStatusCode();
+
+        using var form = BuildReceiptDraftForm("setlist"u8.ToArray(), "setlist.pdf", "application/pdf");
+        var quickResponse = await _client.PostAsync("/gigs/external-resource-drafts/file", form, TestContext.Current.CancellationToken);
+        quickResponse.EnsureSuccessStatusCode();
+
+        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(firstGigId, quickDraft.GetProperty("gig").GetProperty("id").GetGuid());
+        var resourceId = quickDraft.GetProperty("resourceId").GetGuid();
+
+        var updateResponse = await _client.PatchAsJsonAsync($"/gigs/external-resource-drafts/{resourceId}", new
+        {
+            gigId = secondGigId,
+            resourceType = "GoogleSheet",
+            purpose = "SetList",
+            title = "Final set list",
+            url = "https://docs.google.com/spreadsheets/d/example/edit",
+            notes = "Final version",
+            isPrimary = true,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var result = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.True(result.GetProperty("moved").GetBoolean());
+        Assert.Empty(result.GetProperty("previousGig").GetProperty("externalResources").EnumerateArray());
+
+        var resources = result.GetProperty("gig").GetProperty("externalResources").EnumerateArray().ToArray();
+        Assert.Equal(2, resources.Length);
+
+        var updated = resources.First(resource => resource.GetProperty("id").GetGuid() == resourceId);
+        var existing = resources.First(resource => resource.GetProperty("id").GetGuid() != resourceId);
+        Assert.Equal("Final set list", updated.GetProperty("title").GetString());
+        Assert.Equal("GoogleSheet", updated.GetProperty("resourceType").GetString());
+        Assert.True(updated.GetProperty("isPrimary").GetBoolean());
+        Assert.False(existing.GetProperty("isPrimary").GetBoolean());
+        Assert.Single(updated.GetProperty("attachments").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task DeleteGigExternalResource_RemovesResourceFromGig()
+    {
+        var gig = await CreateGigAsync(_client, "Delete resource host");
+        var gigId = gig.GetProperty("id").GetGuid();
+
+        var createResponse = await _client.PostAsJsonAsync($"/gigs/{gigId}/external-resources", new
+        {
+            resourceType = "Url",
+            purpose = "Other",
+            title = "Temporary resource",
+            url = "https://example.test/temp",
+            notes = (string?)null,
+            isPrimary = false,
+        }, TestContext.Current.CancellationToken);
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var resourceId = Assert.Single(createdGig.GetProperty("externalResources").EnumerateArray()).GetProperty("id").GetGuid();
+
+        var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}/external-resources/{resourceId}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+        var savedGig = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Empty(savedGig.GetProperty("externalResources").EnumerateArray());
+    }
+
+    private static async Task<JsonElement> CreateGigAsync(HttpClient client, string title, string date = "2026-08-01")
+    {
+        var createResponse = await client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title,
+            date,
+            venue = "Resource Test Venue",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = "Confirmed",
+        }, TestContext.Current.CancellationToken);
+        createResponse.EnsureSuccessStatusCode();
+
+        return await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
     }
 }

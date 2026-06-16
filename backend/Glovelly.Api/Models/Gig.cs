@@ -28,6 +28,7 @@ public sealed class Gig
     [JsonIgnore]
     public Invoice? Invoice { get; set; }
     public ICollection<GigExpense> Expenses { get; set; } = new List<GigExpense>();
+    public ICollection<GigExternalResource> ExternalResources { get; set; } = new List<GigExternalResource>();
     [JsonIgnore]
     public User? CreatedByUser { get; set; }
     [JsonIgnore]

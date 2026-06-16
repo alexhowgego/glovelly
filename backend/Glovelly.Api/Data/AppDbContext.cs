@@ -14,6 +14,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<GigImportBatch> GigImportBatches => Set<GigImportBatch>();
     public DbSet<GigImportDraft> GigImportDrafts => Set<GigImportDraft>();
     public DbSet<GigExpense> GigExpenses => Set<GigExpense>();
+    public DbSet<GigExternalResource> GigExternalResources => Set<GigExternalResource>();
+    public DbSet<GigExternalResourceAttachment> GigExternalResourceAttachments => Set<GigExternalResourceAttachment>();
     public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();

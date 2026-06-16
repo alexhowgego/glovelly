@@ -55,25 +55,26 @@ public sealed class ExpenseStatementTests : UatTestBase
         await Page.GetByTestId("gig-title-input").FillAsync(gigTitle);
         await Page.GetByTestId("gig-venue-input").FillAsync("UAT Expense Hall");
         await Page.GetByTestId("gig-fee-input").FillAsync("100.00");
-        await Page.GetByTestId("gig-expense-amount-input").FillAsync("62.50");
-        await Page.GetByTestId("gig-expense-description-input").FillAsync(expenseDescription);
-        await Page.GetByTestId("add-gig-expense-button").ClickAsync();
-        await Page.GetByTestId("gig-expense-item").WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
-        await Assertions.Expect(Page.GetByTestId("gig-expense-item").Locator("input").First).ToHaveValueAsync(
-            expenseDescription,
-            new LocatorAssertionsToHaveValueOptions
-        {
-            Timeout = 30_000,
-        });
-
         await Page.GetByTestId("gig-save-close-button").ClickAsync();
 
         await GigCard(gigTitle).WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
+        });
+
+        await Page.GetByTestId("open-gig-expense-dialog-button").ClickAsync();
+        await Page.GetByTestId("gig-expense-amount-input").WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+        });
+        await Page.GetByTestId("gig-expense-amount-input").FillAsync("62.50");
+        await Page.GetByTestId("gig-expense-description-input").FillAsync(expenseDescription);
+        await Page.GetByTestId("add-gig-expense-button").ClickAsync();
+        await Assertions.Expect(Page.GetByTestId("gig-expense-item").Locator("strong").First).ToContainTextAsync(
+            expenseDescription,
+            new LocatorAssertionsToContainTextOptions
+        {
+            Timeout = 30_000,
         });
     }
 

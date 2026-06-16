@@ -151,6 +151,19 @@ export type SellerProfileForm = {
 }
 
 export type GigStatus = 'Draft' | 'Confirmed' | 'Completed' | 'Cancelled'
+export type GigExternalResourceType =
+  | 'GoogleSheet'
+  | 'GoogleDoc'
+  | 'Url'
+  | 'Email'
+  | 'File'
+  | 'Other'
+export type GigExternalResourcePurpose =
+  | 'SetList'
+  | 'GigPlan'
+  | 'Contract'
+  | 'Travel'
+  | 'Other'
 export type GigExpenseReimbursementStatus =
   | 'Unreimbursed'
   | 'Reimbursed'
@@ -176,6 +189,29 @@ export type GigExpense = {
   reimbursementMethod: string | null
   reimbursementNote: string | null
   attachments: ExpenseAttachment[]
+}
+
+export type GigExternalResource = {
+  id: string
+  gigId: string
+  resourceType: GigExternalResourceType
+  purpose: GigExternalResourcePurpose
+  title: string
+  url: string | null
+  notes: string | null
+  isPrimary: boolean
+  createdAt: string
+  updatedAt: string
+  attachments: GigExternalResourceAttachment[]
+}
+
+export type GigExternalResourceAttachment = {
+  id: string
+  gigExternalResourceId: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+  createdAt: string
 }
 
 export type ExpenseStatementGig = {
@@ -245,6 +281,7 @@ export type Gig = {
   invoicedAt: string | null
   isInvoiced: boolean
   expenses: GigExpense[]
+  externalResources: GigExternalResource[]
 }
 
 export type GigSortKey = 'priority' | 'date' | 'title' | 'client' | 'venue' | 'fee' | 'status'
@@ -316,13 +353,15 @@ export type GigImportCommitResult = {
   batch: GigImportBatchDetail
 }
 
-export type QuickReceiptCandidate = Pick<
+export type QuickGigCandidate = Pick<
   Gig,
   'id' | 'clientId' | 'title' | 'date' | 'venue' | 'status'
 > & {
   daysFromToday: number
   isSelected: boolean
 }
+
+export type QuickReceiptCandidate = QuickGigCandidate
 
 export type QuickReceiptDraftResponse = {
   gig: Gig
@@ -338,6 +377,23 @@ export type QuickReceiptDraftUpdateResponse = {
   gig: Gig
   previousGig: Gig | null
   expenseId: string
+  moved: boolean
+}
+
+export type QuickExternalResourceDraftResponse = {
+  gig: Gig
+  resourceId: string
+  attachmentId: string | null
+  inferredGig: boolean
+  candidates: QuickGigCandidate[]
+  autoAttachWindowDays: number
+  hasNearbyCandidates: boolean
+}
+
+export type QuickExternalResourceDraftUpdateResponse = {
+  gig: Gig
+  previousGig: Gig | null
+  resourceId: string
   moved: boolean
 }
 
@@ -411,6 +467,15 @@ export type GigForm = {
   wasDriving: boolean
   status: GigStatus
   expenses: GigExpenseForm[]
+}
+
+export type GigExternalResourceForm = {
+  resourceType: GigExternalResourceType
+  purpose: GigExternalResourcePurpose
+  title: string
+  url: string
+  notes: string
+  isPrimary: boolean
 }
 
 export type AppSection = 'clients' | 'admin' | 'gigs' | 'invoices'

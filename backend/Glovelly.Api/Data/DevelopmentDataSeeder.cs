@@ -327,6 +327,33 @@ public static class DevelopmentDataSeeder
                             }
                         ]
                     }
+                ],
+                ExternalResources =
+                [
+                    new GigExternalResource
+                    {
+                        Id = DevelopmentGuid(6000),
+                        ResourceType = GigExternalResourceType.GoogleSheet,
+                        Purpose = GigExternalResourcePurpose.SetList,
+                        Title = "Spring launch primary set list",
+                        Url = "https://docs.google.com/spreadsheets/d/example-spring-set-list",
+                        Notes = "Seeded primary set list for import workflow exploration.",
+                        IsPrimary = true,
+                        CreatedAt = new DateTimeOffset(2026, 3, 28, 12, 0, 0, TimeSpan.Zero),
+                        UpdatedAt = new DateTimeOffset(2026, 3, 28, 12, 0, 0, TimeSpan.Zero)
+                    },
+                    new GigExternalResource
+                    {
+                        Id = DevelopmentGuid(6001),
+                        ResourceType = GigExternalResourceType.GoogleDoc,
+                        Purpose = GigExternalResourcePurpose.GigPlan,
+                        Title = "Production running order",
+                        Url = "https://docs.google.com/document/d/example-spring-running-order",
+                        Notes = "Load-in, speeches, and performance windows.",
+                        IsPrimary = true,
+                        CreatedAt = new DateTimeOffset(2026, 3, 29, 9, 30, 0, TimeSpan.Zero),
+                        UpdatedAt = new DateTimeOffset(2026, 3, 29, 9, 30, 0, TimeSpan.Zero)
+                    }
                 ]
             },
             new Gig
@@ -356,6 +383,21 @@ public static class DevelopmentDataSeeder
                         ReimbursementUpdatedByUserId = seededAdminUserId,
                         ReimbursementUpdatedAt = new DateTimeOffset(2026, 4, 20, 14, 0, 0, TimeSpan.Zero),
                         ReimbursementNote = "Personal consumables, not billed to the client."
+                    }
+                ],
+                ExternalResources =
+                [
+                    new GigExternalResource
+                    {
+                        Id = DevelopmentGuid(6002),
+                        ResourceType = GigExternalResourceType.Url,
+                        Purpose = GigExternalResourcePurpose.Travel,
+                        Title = "Venue access notes",
+                        Url = "https://example.com/northlight-venue-access",
+                        Notes = "Parking and artist entrance information.",
+                        IsPrimary = true,
+                        CreatedAt = new DateTimeOffset(2026, 4, 18, 16, 0, 0, TimeSpan.Zero),
+                        UpdatedAt = new DateTimeOffset(2026, 4, 18, 16, 0, 0, TimeSpan.Zero)
                     }
                 ]
             },
@@ -452,6 +494,32 @@ public static class DevelopmentDataSeeder
                         ReimbursementUpdatedAt = new DateTimeOffset(2026, 4, 8, 10, 30, 0, TimeSpan.Zero),
                         ReimbursementMethod = "Invoice GLV-2026-002",
                         ReimbursementNote = "Venue reimbursed accommodation directly."
+                    }
+                ],
+                ExternalResources =
+                [
+                    new GigExternalResource
+                    {
+                        Id = DevelopmentGuid(6003),
+                        ResourceType = GigExternalResourceType.File,
+                        Purpose = GigExternalResourcePurpose.Contract,
+                        Title = "Residency agreement",
+                        Notes = "Seeded file-only resource with an attached placeholder PDF.",
+                        IsPrimary = true,
+                        CreatedAt = new DateTimeOffset(2026, 4, 8, 11, 0, 0, TimeSpan.Zero),
+                        UpdatedAt = new DateTimeOffset(2026, 4, 8, 11, 0, 0, TimeSpan.Zero),
+                        Attachments =
+                        [
+                            new GigExternalResourceAttachment
+                            {
+                                Id = DevelopmentGuid(6100),
+                                FileName = "riverside-residency-agreement.pdf",
+                                ContentType = "application/pdf",
+                                SizeBytes = 12984,
+                                StorageKey = "development/resources/riverside-residency-agreement.pdf",
+                                CreatedAt = new DateTimeOffset(2026, 4, 8, 11, 2, 0, TimeSpan.Zero)
+                            }
+                        ]
                     }
                 ]
             }
@@ -701,7 +769,7 @@ public static class DevelopmentDataSeeder
 
         if (context.AttachmentStore is not null)
         {
-            await SeedExpenseAttachmentBlobsAsync(fixture.Gigs, context.AttachmentStore);
+            await SeedAttachmentBlobsAsync(fixture.Gigs, context.AttachmentStore);
         }
     }
 
@@ -811,7 +879,7 @@ public static class DevelopmentDataSeeder
         await dbContext.SaveChangesAsync();
     }
 
-    private static async Task SeedExpenseAttachmentBlobsAsync(
+    private static async Task SeedAttachmentBlobsAsync(
         IEnumerable<Gig> gigs,
         IExpenseAttachmentStore attachmentStore)
     {
@@ -820,6 +888,15 @@ public static class DevelopmentDataSeeder
                      .SelectMany(expense => expense.Attachments))
         {
             var content = Encoding.UTF8.GetBytes($"Development receipt placeholder for {attachment.FileName}");
+            await using var stream = new MemoryStream(content);
+            await attachmentStore.SaveAsync(attachment.StorageKey, stream, attachment.ContentType);
+        }
+
+        foreach (var attachment in gigs
+                     .SelectMany(gig => gig.ExternalResources)
+                     .SelectMany(resource => resource.Attachments))
+        {
+            var content = Encoding.UTF8.GetBytes($"Development external resource placeholder for {attachment.FileName}");
             await using var stream = new MemoryStream(content);
             await attachmentStore.SaveAsync(attachment.StorageKey, stream, attachment.ContentType);
         }

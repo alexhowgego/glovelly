@@ -2,12 +2,13 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'rea
 import type { FormEvent } from 'react'
 import {
   buildApiUrl,
+  downloadResponseBlob,
   fetchWithSession,
   getResponseErrorMessage,
   handleSessionExpired,
   jsonRequestInit,
 } from '../api'
-import { defaultGigStatus, emptyGigForm } from '../forms'
+import { defaultGigStatus, emptyGigExternalResourceForm, emptyGigForm } from '../forms'
 import {
   canCancelInvoice,
   formatEditableNumber,
@@ -22,6 +23,9 @@ import type { NormalizedGigExpensePayload } from './gigWorkspaceHelpers'
 import type {
   Client,
   Gig,
+  GigExternalResource,
+  GigExternalResourceAttachment,
+  GigExternalResourceForm,
   GigExpenseForm,
   GigExpenseReimbursementStatus,
   GigForm,
@@ -69,8 +73,12 @@ export function useGigsWorkspace({
   const [gigStatus, setGigStatus] = useState(defaultGigStatus)
   const [isGigLoading, setIsGigLoading] = useState(false)
   const [isMileageEstimating, setIsMileageEstimating] = useState(false)
-  const [gigExpenseAmount, setGigExpenseAmount] = useState('')
-  const [gigExpenseDescription, setGigExpenseDescription] = useState('')
+  const [isExternalResourceEditorOpen, setIsExternalResourceEditorOpen] = useState(false)
+  const [externalResourceMode, setExternalResourceMode] = useState<'create' | 'edit'>('create')
+  const [editingExternalResourceId, setEditingExternalResourceId] = useState<string>('')
+  const [externalResourceForm, setExternalResourceForm] = useState<GigExternalResourceForm>(
+    emptyGigExternalResourceForm()
+  )
   const deferredGigSearchQuery = useDeferredValue(gigSearchQuery)
 
   const gigsById = useMemo(() => new Map(gigs.map((gig) => [gig.id, gig])), [gigs])
@@ -234,9 +242,7 @@ export function useGigsWorkspace({
         : toCreateGigForm(clients)
 
     return (
-      JSON.stringify(gigForm) !== JSON.stringify(baseline) ||
-      gigExpenseAmount.trim().length > 0 ||
-      gigExpenseDescription.trim().length > 0
+      JSON.stringify(gigForm) !== JSON.stringify(baseline)
     )
   }
 
@@ -257,6 +263,15 @@ export function useGigsWorkspace({
     }))
   }, [clients, gigForm.clientId])
 
+  useEffect(() => {
+    if (isGigEditorOpen || !selectedGig) {
+      return
+    }
+
+    setGigMode('edit')
+    setGigForm(toEditableGigForm(selectedGig))
+  }, [isGigEditorOpen, selectedGig])
+
   const applyGigs = useCallback((nextGigs: Gig[]) => {
     setGigs(nextGigs)
     setSelectedGigId(nextGigs[0]?.id ?? '')
@@ -274,8 +289,10 @@ export function useGigsWorkspace({
     setGigForm(emptyGigForm())
     setGigStatus(defaultGigStatus)
     setIsGigLoading(false)
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
+    setIsExternalResourceEditorOpen(false)
+    setExternalResourceMode('create')
+    setEditingExternalResourceId('')
+    setExternalResourceForm(emptyGigExternalResourceForm())
     resetExpenseStatementWorkspace()
   }, [resetExpenseStatementWorkspace])
 
@@ -289,6 +306,322 @@ export function useGigsWorkspace({
       expenses: toEditableGigExpenses(savedGig),
     }))
   }, [])
+
+  const replaceSavedGig = useCallback((savedGig: Gig) => {
+    setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
+    setSelectedGigId(savedGig.id)
+  }, [])
+
+  const startExternalResourceCreate = () => {
+    if (!selectedGig) {
+      setGigStatus('Select a gig before adding an attachment.')
+      return
+    }
+
+    setExternalResourceMode('create')
+    setEditingExternalResourceId('')
+    setExternalResourceForm(emptyGigExternalResourceForm())
+    setIsExternalResourceEditorOpen(true)
+  }
+
+  const startExternalResourceEdit = (resource: GigExternalResource) => {
+    setExternalResourceMode('edit')
+    setEditingExternalResourceId(resource.id)
+    setExternalResourceForm({
+      resourceType: resource.resourceType,
+      purpose: resource.purpose,
+      title: resource.title,
+      url: resource.url ?? '',
+      notes: resource.notes ?? '',
+      isPrimary: resource.isPrimary,
+    })
+    setIsExternalResourceEditorOpen(true)
+  }
+
+  const cancelExternalResourceEdit = () => {
+    setIsExternalResourceEditorOpen(false)
+    setExternalResourceMode('create')
+    setEditingExternalResourceId('')
+    setExternalResourceForm(emptyGigExternalResourceForm())
+  }
+
+  const updateExternalResourceField = (
+    field: keyof GigExternalResourceForm,
+    value: string | boolean
+  ) => {
+    setExternalResourceForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  const submitExternalResource = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!selectedGig) {
+      setGigStatus('Select a gig before saving an attachment.')
+      return
+    }
+
+    const title = externalResourceForm.title.trim()
+    const url = externalResourceForm.url.trim()
+    if (!title) {
+      setGigStatus('Attachment title is required.')
+      return
+    }
+
+    setIsGigLoading(true)
+    setGigStatus('Saving attachment...')
+
+    try {
+      const isEdit = externalResourceMode === 'edit' && editingExternalResourceId
+      const endpoint = isEdit
+        ? buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${editingExternalResourceId}`)
+        : buildApiUrl(`/gigs/${selectedGig.id}/external-resources`)
+      const response = await fetchWithSession(
+        endpoint,
+        jsonRequestInit(isEdit ? 'PUT' : 'POST', {
+          resourceType: externalResourceForm.resourceType,
+          purpose: externalResourceForm.purpose,
+          title,
+          url,
+          notes: externalResourceForm.notes.trim() || null,
+          isPrimary: externalResourceForm.isPrimary,
+        })
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save attachment.')
+        )
+      }
+
+      const savedGig = (await response.json()) as Gig
+      replaceSavedGig(savedGig)
+      setExternalResourceForm(emptyGigExternalResourceForm())
+      setEditingExternalResourceId('')
+      setExternalResourceMode('create')
+      setIsExternalResourceEditorOpen(false)
+      setGigStatus(isEdit ? 'Attachment updated.' : 'Attachment added.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save attachment right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const deleteExternalResource = async (resource: GigExternalResource) => {
+    if (!selectedGig) {
+      return
+    }
+
+    if (!window.confirm(`Delete attachment ${resource.title}?`)) {
+      return
+    }
+
+    setIsGigLoading(true)
+    setGigStatus('Deleting attachment...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${resource.id}`),
+        { method: 'DELETE' }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to delete attachment.')
+        )
+      }
+
+      const savedGig = (await response.json()) as Gig
+      replaceSavedGig(savedGig)
+      if (editingExternalResourceId === resource.id) {
+        cancelExternalResourceEdit()
+      }
+      setGigStatus('Attachment deleted.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to delete attachment right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const uploadExternalResourceAttachment = async (
+    resource: GigExternalResource,
+    file: File
+  ) => {
+    if (!selectedGig) {
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+    setIsGigLoading(true)
+    setGigStatus('Uploading attachment file...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${resource.id}/attachments`),
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to upload attachment file.')
+        )
+      }
+
+      const savedGig = (await response.json()) as Gig
+      replaceSavedGig(savedGig)
+      setGigStatus('Attachment file uploaded.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to upload attachment file right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const downloadExternalResourceAttachment = async (
+    resource: GigExternalResource,
+    attachment: GigExternalResourceAttachment
+  ) => {
+    if (!selectedGig) {
+      return
+    }
+
+    setIsGigLoading(true)
+    setGigStatus('Downloading attachment file...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${resource.id}/attachments/${attachment.id}`)
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to download attachment file.')
+        )
+      }
+
+      const fileName = await downloadResponseBlob(response, attachment.fileName)
+      setGigStatus(`Downloaded ${fileName}.`)
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to download attachment file right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
+
+  const deleteExternalResourceAttachment = async (
+    resource: GigExternalResource,
+    attachment: GigExternalResourceAttachment
+  ) => {
+    if (!selectedGig) {
+      return
+    }
+
+    if (!window.confirm(`Delete attachment file ${attachment.fileName}?`)) {
+      return
+    }
+
+    setIsGigLoading(true)
+    setGigStatus('Deleting attachment file...')
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/external-resources/${resource.id}/attachments/${attachment.id}`),
+        { method: 'DELETE' }
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to delete attachment file.')
+        )
+      }
+
+      const savedGig = (await response.json()) as Gig
+      replaceSavedGig(savedGig)
+      setGigStatus('Attachment file deleted.')
+    } catch (error) {
+      setGigStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to delete attachment file right now.'
+      )
+    } finally {
+      setIsGigLoading(false)
+    }
+  }
 
   const startGigCreate = () => {
     if (
@@ -305,8 +638,6 @@ export function useGigsWorkspace({
         ? 'Capture the essentials now and we can build invoicing on top later.'
         : 'Create a client first so the gig can be linked correctly.'
     )
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
     setSelectedGigIds([])
     setIsGigEditorOpen(true)
   }
@@ -319,8 +650,6 @@ export function useGigsWorkspace({
     setGigMode('edit')
     setGigForm(toEditableGigForm(selectedGig))
     setGigStatus('Editing the selected gig.')
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
     setIsGigEditorOpen(true)
   }
 
@@ -396,8 +725,6 @@ export function useGigsWorkspace({
       setSelectedGigIds([])
       setGigMode('edit')
       setGigForm(toEditableGigForm(savedGig))
-      setGigExpenseAmount('')
-      setGigExpenseDescription('')
       setGigStatus('Gig cloned. Update any details before saving.')
       setIsGigEditorOpen(true)
     } catch (error) {
@@ -428,9 +755,9 @@ export function useGigsWorkspace({
       setGigMode('edit')
       setGigForm(toEditableGigForm(nextGig))
       setGigStatus('Editing the selected gig.')
-      setGigExpenseAmount('')
-      setGigExpenseDescription('')
     }
+
+    cancelExternalResourceEdit()
 
     setSelectedGigId(gigId)
   }
@@ -446,8 +773,6 @@ export function useGigsWorkspace({
     setIsGigEditorOpen(false)
     setGigMode('create')
     setGigForm(toCreateGigForm(clients))
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
     setGigStatus(defaultGigStatus)
   }
 
@@ -518,73 +843,6 @@ export function useGigsWorkspace({
     } finally {
       setIsMileageEstimating(false)
     }
-  }
-
-  const handleAddGigExpense = () => {
-    const description = gigExpenseDescription.trim()
-    const amount = Number(gigExpenseAmount)
-
-    if (!description) {
-      setGigStatus('Add an expense description before saving it to the gig.')
-      return
-    }
-
-    if (!Number.isFinite(amount) || amount < 0) {
-      setGigStatus('Expense amount must be a valid non-negative number.')
-      return
-    }
-
-    setGigForm((current) => ({
-      ...current,
-      expenses: [
-        ...current.expenses,
-        {
-          id: '',
-          sortOrder: current.expenses.length + 1,
-          description,
-          amount: gigExpenseAmount,
-          reimbursementStatus: 'Unreimbursed',
-          reimbursedAt: null,
-          reimbursementUpdatedAt: null,
-          reimbursementMethod: null,
-          reimbursementNote: null,
-          attachments: [],
-        },
-      ],
-    }))
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
-    setGigStatus('Expense added to the gig form. Save the gig to persist it.')
-  }
-
-  const updateGigExpenseField = (
-    index: number,
-    field: keyof Pick<GigExpenseForm, 'description' | 'amount'>,
-    value: string
-  ) => {
-    setGigForm((current) => ({
-      ...current,
-      expenses: current.expenses.map((expense, expenseIndex) =>
-        expenseIndex === index
-          ? {
-              ...expense,
-              [field]: value,
-            }
-          : expense
-      ),
-    }))
-  }
-
-  const removeGigExpense = (index: number) => {
-    setGigForm((current) => ({
-      ...current,
-      expenses: current.expenses
-        .filter((_, expenseIndex) => expenseIndex !== index)
-        .map((expense, expenseIndex) => ({
-          ...expense,
-          sortOrder: expenseIndex + 1,
-        })),
-    }))
   }
 
   const refreshGig = async (gigId: string) => {
@@ -756,8 +1014,6 @@ export function useGigsWorkspace({
       setIsGigEditorOpen(false)
       setGigMode('create')
       setGigForm(toCreateGigForm(clients))
-      setGigExpenseAmount('')
-      setGigExpenseDescription('')
       setGigStatus('Gig deleted.')
     } catch (error) {
       setGigStatus(error instanceof Error ? error.message : 'Unable to delete gig.')
@@ -853,8 +1109,6 @@ export function useGigsWorkspace({
     onOpenSection('gigs')
     setGigMode('edit')
     setGigForm(toEditableGigForm(savedGig))
-    setGigExpenseAmount('')
-    setGigExpenseDescription('')
     setIsGigEditorOpen(true)
   }
 
@@ -958,10 +1212,11 @@ export function useGigsWorkspace({
     setGigStatus(`Gig updated. Linked invoice ${cancelledInvoice.invoiceNumber} cancelled.`)
   }
 
-  const handleGigSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const closeAfterSave = shouldCloseAfterSave(event)
-
+  const saveGigForm = async (
+    closeAfterSave: boolean,
+    expensesOverride?: GigExpenseForm[],
+    successMessage?: string
+  ) => {
     const payload = {
       clientId: gigForm.clientId,
       title: gigForm.title.trim(),
@@ -973,7 +1228,7 @@ export function useGigsWorkspace({
       travelMiles: gigForm.travelMiles.trim(),
       passengerCount: gigForm.passengerCount.trim(),
       status: gigForm.status,
-      expenses: gigForm.expenses,
+      expenses: expensesOverride ?? gigForm.expenses,
     }
 
     if (!payload.clientId || !payload.title || !payload.date || !payload.venue) {
@@ -1085,9 +1340,7 @@ export function useGigsWorkspace({
       setSelectedGigId(savedGig.id)
       setGigMode('edit')
       setGigForm(toEditableGigForm(savedGig))
-      setGigExpenseAmount('')
-      setGigExpenseDescription('')
-      setGigStatus(isEdit ? 'Gig updated.' : 'Gig created.')
+      setGigStatus(successMessage ?? (isEdit ? 'Gig updated.' : 'Gig created.'))
       setIsGigEditorOpen(!closeAfterSave)
       if (previousGig) {
         await handleLinkedInvoiceAfterGigSave(
@@ -1103,6 +1356,97 @@ export function useGigsWorkspace({
     } finally {
       setIsGigLoading(false)
     }
+  }
+
+  const handleGigSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    await saveGigForm(shouldCloseAfterSave(event))
+  }
+
+  const saveExpenseDraft = async (
+    expenseIndex: number | null,
+    draft: { description: string; amount: string }
+  ) => {
+    if (!selectedGig) {
+      setGigStatus('Select a gig before saving expenses.')
+      return false
+    }
+
+    const description = draft.description.trim()
+    const amount = draft.amount.trim()
+    const numericAmount = Number(amount)
+
+    if (!description) {
+      setGigStatus('Expense description is required.')
+      return false
+    }
+
+    if (!Number.isFinite(numericAmount) || numericAmount < 0) {
+      setGigStatus('Expense amount must be a valid non-negative number.')
+      return false
+    }
+
+    const nextExpenses = [...gigForm.expenses]
+    if (expenseIndex === null) {
+      nextExpenses.push({
+        id: '',
+        sortOrder: nextExpenses.length + 1,
+        description,
+        amount,
+        reimbursementStatus: 'Unreimbursed',
+        reimbursedAt: null,
+        reimbursementUpdatedAt: null,
+        reimbursementMethod: null,
+        reimbursementNote: null,
+        attachments: [],
+      })
+    } else {
+      const existing = nextExpenses[expenseIndex]
+      if (!existing) {
+        setGigStatus('Expense no longer exists.')
+        return false
+      }
+
+      nextExpenses[expenseIndex] = {
+        ...existing,
+        description,
+        amount,
+      }
+    }
+
+    await saveGigForm(
+      false,
+      nextExpenses,
+      expenseIndex === null ? 'Expense added.' : 'Expense updated.'
+    )
+    return true
+  }
+
+  const deleteExpenseDraft = async (expenseIndex: number) => {
+    if (!selectedGig) {
+      setGigStatus('Select a gig before deleting expenses.')
+      return false
+    }
+
+    const expense = gigForm.expenses[expenseIndex]
+    if (!expense) {
+      setGigStatus('Expense no longer exists.')
+      return false
+    }
+
+    if (!window.confirm(`Remove expense ${expense.description || expenseIndex + 1}?`)) {
+      return false
+    }
+
+    const nextExpenses = gigForm.expenses
+      .filter((_, index) => index !== expenseIndex)
+      .map((expense, index) => ({
+        ...expense,
+        sortOrder: index + 1,
+      }))
+
+    await saveGigForm(false, nextExpenses, 'Expense removed.')
+    return true
   }
 
   const handleToggleGigSelection = (gigId: string) => {
@@ -1133,10 +1477,15 @@ export function useGigsWorkspace({
     applyGigs,
     cloneSelectedGig,
     closeGigEditor,
+    cancelExternalResourceEdit,
     completedGigCount: gigs.filter((gig) => gig.status === 'Completed').length,
     deleteGig,
+    deleteExternalResource,
+    deleteExternalResourceAttachment,
+    deleteExpenseDraft,
     deleteExpenseAttachment,
     downloadExpenseAttachment,
+    downloadExternalResourceAttachment,
     filteredGigs,
     closeExpenseStatement,
     downloadExpenseStatementPdf,
@@ -1146,8 +1495,8 @@ export function useGigsWorkspace({
     expenseStatementReceiptCount,
     expenseStatementStatus,
     expenseStatementTotal,
-    gigExpenseAmount,
-    gigExpenseDescription,
+    externalResourceForm,
+    externalResourceMode,
     gigForm,
     gigMode,
     gigQuickFilter,
@@ -1157,10 +1506,10 @@ export function useGigsWorkspace({
     gigs,
     gigsById,
     estimateGigMileage,
-    handleAddGigExpense,
     handleGigSubmit,
     handleToggleGigSelection,
     isGigEditorOpen,
+    isExternalResourceEditorOpen,
     isExpenseStatementLoading,
     isExpenseStatementOpen,
     isGigLoading,
@@ -1170,14 +1519,11 @@ export function useGigsWorkspace({
     openExpenseStatement,
     plannedGigCount: gigs.filter((gig) => gig.status === 'Confirmed').length,
     previewExpenseStatement,
-    removeGigExpense,
     resetGigsWorkspace,
     selectedGig,
     selectedGigIds,
     selectedGigs,
     selectGig,
-    setGigExpenseAmount,
-    setGigExpenseDescription,
     setGigs,
     setGigQuickFilter,
     setGigSearchQuery,
@@ -1187,14 +1533,19 @@ export function useGigsWorkspace({
     setIncludeStatementReceiptAttachments,
     setSelectedGigId,
     setSelectedGigIds,
+    saveExpenseDraft,
     startGigCreate,
     startGigEdit,
+    startExternalResourceCreate,
+    startExternalResourceEdit,
+    submitExternalResource,
     uninvoicedGigCount: gigs.filter((gig) => !gig.isInvoiced && gig.status !== 'Cancelled').length,
     upcomingGigCount: gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length,
-    updateGigExpenseField,
+    updateExternalResourceField,
     updateGigField,
     updateExpenseReimbursement,
     uploadExpenseAttachment,
+    uploadExternalResourceAttachment,
     includeStatementReceiptAppendix,
     includeStatementReceiptAttachments,
     toggleExpenseStatementExpense,
