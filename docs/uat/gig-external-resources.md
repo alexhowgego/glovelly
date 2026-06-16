@@ -28,6 +28,23 @@ Use these journeys when a change may affect gig attachments such as set lists, g
 
 The attachment is added to the selected gig only, appears without refreshing, preserves type and purpose, and opens external links in a separate tab.
 
+## Quick Add Attachment Journey
+
+> **Automation:** Backend automated; manual UAT: `QuickExternalResourceDraftFile_WithNearbyGig_CreatesDraftResourceAndAttachment`, `QuickExternalResourceDraftLink_WithExplicitGig_InfersGoogleDocType`, `QuickExternalResourceDraftFile_WithNoCandidateInsideWindow_ReturnsEmptyCandidates`, and `UpdateQuickExternalResourceDraft_SavesDetailsMovesGigAndUpdatesPrimary` cover server-side quick capture rules; browser floating button and modal flow remain manual.
+
+### Steps
+
+1. Scroll on a phone-sized viewport and confirm the `+` quick attachment button floats beside `Scan receipt`.
+2. Click `+` and choose `Upload file`.
+3. Upload a PDF or image when a gig exists within the quick capture window.
+4. Confirm the attachment is saved to the nearest gig and the modal shows editable title, type, purpose, URL, notes, and primary fields.
+5. Save details, then click `Go to gig` and confirm the attachment appears in the gig detail panel.
+6. Click `+` again, choose `Add link`, paste a Google Doc or Google Sheet URL, and save.
+
+### Expected Results
+
+The quick add journey uses the same gig matching behaviour as quick receipts, supports both uploaded files and URLs, infers Google Doc/Sheet types where possible, and preserves user-facing attachment terminology.
+
 ## File-Only Attachment Journey
 
 > **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.UploadGigExternalResourceAttachment_AddsDownloadableAttachment` covers upload, download, and delete through the API; browser file-picker flow remains manual.

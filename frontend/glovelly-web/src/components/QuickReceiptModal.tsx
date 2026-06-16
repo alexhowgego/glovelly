@@ -2,7 +2,7 @@ import type {
   QuickReceiptCandidate,
   QuickReceiptDraftResponse,
 } from '../types'
-import { formatDate } from '../formatters'
+import { QuickCaptureGigSelect } from './QuickCaptureGigSelect'
 
 type QuickReceiptModalProps = {
   candidates: QuickReceiptCandidate[]
@@ -96,31 +96,14 @@ export function QuickReceiptModal({
           </div>
         ) : null}
 
-        {candidates.length > 0 ? (
-          <label className="quick-receipt-select">
-            <span>Gig</span>
-            <select
-              value={selectedGigId}
-              onChange={(event) => onSelectedGigChange(event.target.value)}
-              disabled={isSaving}
-            >
-              {candidates.map((gig) => (
-                <option key={gig.id} value={gig.id}>
-                  {gig.title} · {formatDate(gig.date)} · {gig.venue} ·{' '}
-                  {clientNamesById.get(gig.clientId) ?? 'Unknown client'} ·{' '}
-                  {gig.daysFromToday === 0
-                    ? 'today'
-                    : `${gig.daysFromToday} day${gig.daysFromToday === 1 ? '' : 's'} away`}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : isSaving && !draft ? null : (
-          <div className="empty-state">
-            <strong>No candidate gigs are available.</strong>
-            <p>Create or update a gig near this receipt date, then try again.</p>
-          </div>
-        )}
+        <QuickCaptureGigSelect
+          candidates={candidates}
+          clientNamesById={clientNamesById}
+          emptyMessage="Create or update a gig near this receipt date, then try again."
+          isSaving={isSaving && !draft}
+          onSelectedGigChange={onSelectedGigChange}
+          selectedGigId={selectedGigId}
+        />
 
         {draft ? (
           <div className="form-grid quick-receipt-details">

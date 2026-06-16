@@ -52,7 +52,7 @@ internal static class GigAttachmentEndpoints
 
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
-            var validation = GigEndpointSupport.ValidateAttachmentFile(file, attachmentOptions.Value);
+            var validation = GigEndpointSupport.ValidateReceiptAttachmentFile(file, attachmentOptions.Value);
             if (validation is not null)
             {
                 return validation;

@@ -353,13 +353,15 @@ export type GigImportCommitResult = {
   batch: GigImportBatchDetail
 }
 
-export type QuickReceiptCandidate = Pick<
+export type QuickGigCandidate = Pick<
   Gig,
   'id' | 'clientId' | 'title' | 'date' | 'venue' | 'status'
 > & {
   daysFromToday: number
   isSelected: boolean
 }
+
+export type QuickReceiptCandidate = QuickGigCandidate
 
 export type QuickReceiptDraftResponse = {
   gig: Gig
@@ -375,6 +377,23 @@ export type QuickReceiptDraftUpdateResponse = {
   gig: Gig
   previousGig: Gig | null
   expenseId: string
+  moved: boolean
+}
+
+export type QuickExternalResourceDraftResponse = {
+  gig: Gig
+  resourceId: string
+  attachmentId: string | null
+  inferredGig: boolean
+  candidates: QuickGigCandidate[]
+  autoAttachWindowDays: number
+  hasNearbyCandidates: boolean
+}
+
+export type QuickExternalResourceDraftUpdateResponse = {
+  gig: Gig
+  previousGig: Gig | null
+  resourceId: string
   moved: boolean
 }
 

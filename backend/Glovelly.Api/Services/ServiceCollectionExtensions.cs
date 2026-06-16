@@ -59,8 +59,8 @@ public static class ServiceCollectionExtensions
             });
         services.AddOptions<ExpenseAttachmentSettings>()
             .BindConfiguration(ExpenseAttachmentSettings.SectionName);
-        services.AddOptions<QuickReceiptCaptureSettings>()
-            .BindConfiguration(QuickReceiptCaptureSettings.SectionName);
+        services.AddOptions<QuickCaptureSettings>()
+            .BindConfiguration(QuickCaptureSettings.SectionName);
         services.AddSingleton<IBlobStore>(provider =>
         {
             var settings = provider.GetRequiredService<IOptions<BlobStorageSettings>>().Value;

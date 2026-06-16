@@ -265,10 +265,11 @@ Expected result: expenses are copied only when accepted, receipt attachments are
 3. Click `Add attachment` and save an attachment with a title, purpose, type, and URL.
 4. Add or edit a second attachment for the same purpose and mark it primary.
 5. Upload a small file to one attachment, download it, then delete the file.
+6. Use the floating `+` button to quick add a file or link attachment and confirm the matched gig can be changed before saving details.
 
 ### Expected Results
 
-Attachments stay scoped to the selected gig, the attachment editor opens as a modal, only one attachment per purpose is primary, URL-less file attachments are allowed, and file actions do not affect expenses or invoice state.
+Attachments stay scoped to the selected gig, the attachment editor opens as a modal, quick add uses the same gig matching behaviour as quick receipts, only one attachment per purpose is primary, URL-less file attachments are allowed, and file actions do not affect expenses or invoice state.
 
 ## Combined Invoice Journey
 

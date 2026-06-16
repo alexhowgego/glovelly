@@ -9,6 +9,7 @@ import {
   GigsSection,
   InvoiceGenerationPreviewModal,
   InvoicesSection,
+  QuickAttachmentModal,
   QuickReceiptModal,
   SellerProfileModal,
   SessionCheckingScreen,
@@ -40,6 +41,7 @@ import { useGigImportsWorkspace } from './hooks/useGigImportsWorkspace'
 import { useInvoicePreview } from './hooks/useInvoicePreview'
 import { useInvoicesWorkspace } from './hooks/useInvoicesWorkspace'
 import { useProfileMenu } from './hooks/useProfileMenu'
+import { useQuickAttachment } from './hooks/useQuickAttachment'
 import { useQuickReceipt } from './hooks/useQuickReceipt'
 import { useSellerProfile } from './hooks/useSellerProfile'
 import { useThemePreference } from './hooks/useThemePreference'
@@ -357,6 +359,81 @@ function App({ appMetadata }: AppProps) {
     onSessionExpired: expireSession,
     setGigStatus,
   })
+  const getQuickCaptureCandidates = useCallback(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return gigs
+      .filter((gig) => gig.status !== 'Cancelled')
+      .map((gig) => {
+        const gigDate = new Date(`${gig.date}T00:00:00`)
+        gigDate.setHours(0, 0, 0, 0)
+        const daysFromToday = Number.isNaN(gigDate.getTime())
+          ? 0
+          : Math.abs(Math.round((gigDate.getTime() - today.getTime()) / 86_400_000))
+
+        return {
+          id: gig.id,
+          clientId: gig.clientId,
+          title: gig.title,
+          date: gig.date,
+          venue: gig.venue,
+          status: gig.status,
+          daysFromToday,
+          isSelected: false,
+        }
+      })
+      .filter((candidate) => candidate.daysFromToday <= 30)
+      .sort((left, right) =>
+        left.daysFromToday - right.daysFromToday ||
+        left.date.localeCompare(right.date) ||
+        left.title.localeCompare(right.title)
+      )
+      .slice(0, 5)
+      .map((candidate, index) => ({
+        ...candidate,
+        isSelected: index === 0,
+      }))
+  }, [gigs])
+  const {
+    clearQuickAttachmentDialog,
+    closeQuickAttachmentPrompt,
+    goToQuickAttachmentGig,
+    handleQuickAttachmentFile,
+    isQuickAttachmentSaving,
+    openQuickAttachmentDialog,
+    pendingAttachmentFile,
+    quickAttachmentCandidates,
+    quickAttachmentDraft,
+    quickAttachmentIsPrimary,
+    quickAttachmentMode,
+    quickAttachmentNotes,
+    quickAttachmentPurpose,
+    quickAttachmentResourceType,
+    quickAttachmentSelectedGigId,
+    quickAttachmentStatus,
+    quickAttachmentTitle,
+    quickAttachmentUrl,
+    savePendingAttachmentToSelectedGig,
+    saveQuickAttachmentDetails,
+    saveQuickAttachmentLinkDraft,
+    setQuickAttachmentIsPrimary,
+    setQuickAttachmentNotes,
+    setQuickAttachmentPurpose,
+    setQuickAttachmentResourceType,
+    setQuickAttachmentSelectedGigId,
+    setQuickAttachmentTitle,
+    startQuickAttachmentLinkMode,
+    updateQuickAttachmentUrl,
+  } = useQuickAttachment({
+    getGigById: (gigId) => gigsById.get(gigId),
+    getQuickCaptureCandidates,
+    onMergeSavedGig: (gig) => mergeSavedGig(gig),
+    onOpenAttachmentDraft: (gig) => openGigReceiptDraft(gig),
+    onSelectGig: setSelectedGigId,
+    onSessionExpired: expireSession,
+    setGigStatus,
+  })
   const {
     closeUserSettings,
     connectGoogleCalendar,
@@ -496,6 +573,7 @@ function App({ appMetadata }: AppProps) {
       setMonthlyInvoiceStatus('')
       resetInvoicesWorkspace()
       clearQuickReceiptDialog()
+      clearQuickAttachmentDialog()
       resetUserSettings()
       resetSellerProfile()
       resetAdminWorkspace()
@@ -638,6 +716,7 @@ function App({ appMetadata }: AppProps) {
     applyGigs,
     applyInvoices,
     applySellerProfile,
+    clearQuickAttachmentDialog,
     clearQuickReceiptDialog,
     expireSession,
     loadAdminUsers,
@@ -1642,6 +1721,7 @@ function App({ appMetadata }: AppProps) {
       isInvoiceLoading={isInvoiceLoading}
       isLoading={isLoading}
       isProfileMenuOpen={isProfileMenuOpen}
+      isQuickAttachmentSaving={isQuickAttachmentSaving}
       isQuickReceiptSaving={isQuickReceiptSaving}
       isSellerProfileSaving={isSellerProfileSaving}
       isUserSettingsSaving={isUserSettingsSaving}
@@ -1653,6 +1733,7 @@ function App({ appMetadata }: AppProps) {
       onOpenSellerProfile={openSellerProfile}
       onOpenUserSettings={openUserSettings}
       onProfileMenuToggle={toggleProfileMenu}
+      onQuickAttachmentOpen={openQuickAttachmentDialog}
       onQuickReceiptFile={handleQuickReceiptFile}
       onSectionChange={setActiveSection}
       onSignOut={signOut}
@@ -1754,6 +1835,37 @@ function App({ appMetadata }: AppProps) {
         onUpdateField={updateSellerProfileField}
         profile={sellerProfile}
         status={sellerProfileStatus}
+      />
+
+      <QuickAttachmentModal
+        candidates={quickAttachmentCandidates}
+        clientNamesById={clientNamesById}
+        draft={quickAttachmentDraft}
+        isPrimary={quickAttachmentIsPrimary}
+        isSaving={isQuickAttachmentSaving}
+        mode={quickAttachmentMode}
+        notes={quickAttachmentNotes}
+        onClose={closeQuickAttachmentPrompt}
+        onFileChange={handleQuickAttachmentFile}
+        onGoToGig={goToQuickAttachmentGig}
+        onIsPrimaryChange={setQuickAttachmentIsPrimary}
+        onModeLink={startQuickAttachmentLinkMode}
+        onNotesChange={setQuickAttachmentNotes}
+        onPurposeChange={setQuickAttachmentPurpose}
+        onResourceTypeChange={setQuickAttachmentResourceType}
+        onSaveDetails={saveQuickAttachmentDetails}
+        onSaveDraft={savePendingAttachmentToSelectedGig}
+        onSaveLink={saveQuickAttachmentLinkDraft}
+        onSelectedGigChange={setQuickAttachmentSelectedGigId}
+        onTitleChange={setQuickAttachmentTitle}
+        onUrlChange={updateQuickAttachmentUrl}
+        pendingFile={pendingAttachmentFile}
+        purpose={quickAttachmentPurpose}
+        resourceType={quickAttachmentResourceType}
+        selectedGigId={quickAttachmentSelectedGigId}
+        status={quickAttachmentStatus}
+        title={quickAttachmentTitle}
+        url={quickAttachmentUrl}
       />
 
       <QuickReceiptModal

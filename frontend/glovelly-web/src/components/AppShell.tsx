@@ -49,6 +49,7 @@ type AppShellProps = {
   isInvoiceLoading: boolean
   isLoading: boolean
   isProfileMenuOpen: boolean
+  isQuickAttachmentSaving: boolean
   isQuickReceiptSaving: boolean
   isSellerProfileSaving: boolean
   isUserSettingsSaving: boolean
@@ -60,6 +61,7 @@ type AppShellProps = {
   onGenerateDashboardInvoice: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
+  onQuickAttachmentOpen: () => void
   onQuickReceiptFile: (file: File) => void
   onSectionChange: (section: AppSection) => void
   onSignOut: () => void
@@ -83,6 +85,7 @@ export function AppShell({
   isInvoiceLoading,
   isLoading,
   isProfileMenuOpen,
+  isQuickAttachmentSaving,
   isQuickReceiptSaving,
   isSellerProfileSaving,
   isUserSettingsSaving,
@@ -94,6 +97,7 @@ export function AppShell({
   onGenerateDashboardInvoice,
   onOpenUserSettings,
   onProfileMenuToggle,
+  onQuickAttachmentOpen,
   onQuickReceiptFile,
   onSectionChange,
   onSignOut,
@@ -151,15 +155,15 @@ export function AppShell({
               </div>
 
               <div className="header-actions">
-                <label className={`primary-button quick-receipt-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}>
-                  <span className="quick-receipt-icon" aria-hidden="true">
+                <label className={`primary-button quick-capture-button quick-receipt-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}>
+                  <span className="quick-capture-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" focusable="false">
                       <path d="M8.4 6.5 9.7 4h4.6l1.3 2.5H19a3 3 0 0 1 3 3V17a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V9.5a3 3 0 0 1 3-3h3.4Z" />
                       <path d="M12 16.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
                       <path d="M18 10h.01" />
                     </svg>
                   </span>
-                  <span className="quick-receipt-label">Scan receipt</span>
+                  <span className="quick-capture-label">Scan receipt</span>
                   <input
                     type="file"
                     accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
@@ -173,6 +177,18 @@ export function AppShell({
                     }}
                   />
                 </label>
+
+                <button
+                  className={`primary-button quick-capture-button quick-attachment-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}
+                  onClick={onQuickAttachmentOpen}
+                  type="button"
+                  disabled={isLoading || isGigLoading || isQuickAttachmentSaving}
+                >
+                  <span className="quick-capture-icon quick-attachment-icon" aria-hidden="true">
+                    +
+                  </span>
+                  <span className="quick-capture-label">Add attachment</span>
+                </button>
 
                 <div className="profile-menu" ref={profileMenuRef}>
                   <button

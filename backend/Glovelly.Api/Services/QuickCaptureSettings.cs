@@ -1,8 +1,8 @@
 namespace Glovelly.Api.Services;
 
-public sealed class QuickReceiptCaptureSettings
+public sealed class QuickCaptureSettings
 {
-    public const string SectionName = "QuickReceiptCapture";
+    public const string SectionName = "QuickCapture";
 
     public int CandidateCount { get; set; } = 5;
     public int AutoAttachWindowDays { get; set; } = 30;

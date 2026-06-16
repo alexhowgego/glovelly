@@ -114,7 +114,7 @@ internal static class GigEndpointSupport
         return query.FirstOrDefaultAsync();
     }
 
-    public static IResult? ValidateAttachmentFile(IFormFile? file, ExpenseAttachmentSettings settings)
+    public static IResult? ValidateReceiptAttachmentFile(IFormFile? file, ExpenseAttachmentSettings settings)
     {
         if (file is null || file.Length == 0)
         {
@@ -129,6 +129,21 @@ internal static class GigEndpointSupport
         if (!settings.AllowedContentTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
         {
             return EndpointSupport.ValidationProblem("file", "Receipt files must be PDF, JPG, PNG, WebP or HEIC.");
+        }
+
+        return null;
+    }
+
+    public static IResult? ValidateExternalResourceAttachmentFile(IFormFile? file, ExpenseAttachmentSettings settings)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return EndpointSupport.ValidationProblem("file", "Upload an attachment file.");
+        }
+
+        if (file.Length > settings.MaxFileSizeBytes)
+        {
+            return EndpointSupport.ValidationProblem("file", $"Attachment files must be {settings.MaxFileSizeBytes / 1024 / 1024} MB or smaller.");
         }
 
         return null;

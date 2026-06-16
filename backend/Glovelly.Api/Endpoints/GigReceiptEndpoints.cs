@@ -20,7 +20,7 @@ internal static class GigReceiptEndpoints
             IExpenseAttachmentStore attachmentStore,
             IWorkspaceEventPublisher workspaceEventPublisher,
             IOptions<ExpenseAttachmentSettings> attachmentOptions,
-            IOptions<QuickReceiptCaptureSettings> quickReceiptOptions,
+            IOptions<QuickCaptureSettings> quickCaptureOptions,
             TimeProvider timeProvider) =>
         {
             if (!request.HasFormContentType)
@@ -31,21 +31,20 @@ internal static class GigReceiptEndpoints
             var userId = currentUserAccessor.TryGetUserId(user);
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
-            var validation = GigEndpointSupport.ValidateAttachmentFile(file, attachmentOptions.Value);
+            var validation = GigEndpointSupport.ValidateReceiptAttachmentFile(file, attachmentOptions.Value);
             if (validation is not null)
             {
                 return validation;
             }
 
-            var gigId = TryReadGigId(form);
+            var gigId = GigQuickCaptureSupport.TryReadGigId(form);
             var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
-            var settings = NormalizeQuickReceiptSettings(quickReceiptOptions.Value);
-            var candidates = await FindReceiptCandidatesAsync(
+            var settings = GigQuickCaptureSupport.NormalizeSettings(quickCaptureOptions.Value);
+            var candidates = await GigQuickCaptureSupport.FindCandidatesAsync(
                 db,
                 userId,
                 today,
-                settings.CandidateCount,
-                settings.AutoAttachWindowDays);
+                settings);
             Gig? gig;
             if (gigId.HasValue)
             {
@@ -67,7 +66,7 @@ internal static class GigReceiptEndpoints
                     return Results.Conflict(new
                     {
                         message = $"No gig was within {settings.AutoAttachWindowDays} days. Choose a gig before saving this receipt draft.",
-                        candidates = candidates.Select(candidate => ToReceiptGigCandidate(candidate, nearestCandidate?.Id)),
+                        candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, nearestCandidate?.Id),
                         autoAttachWindowDays = settings.AutoAttachWindowDays,
                     });
                 }
@@ -125,11 +124,9 @@ internal static class GigReceiptEndpoints
                 expenseId = expense.Id,
                 attachmentId,
                 inferredGig = !gigId.HasValue,
-                candidates = candidates.Select(candidate => ToReceiptGigCandidate(candidate, gig.Id)),
+                candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, gig.Id),
                 autoAttachWindowDays = settings.AutoAttachWindowDays,
-                hasNearbyCandidates = candidates.Any(candidate =>
-                    candidate.Id != gig.Id &&
-                    candidate.DaysFromToday <= settings.AmbiguityWindowDays),
+                hasNearbyCandidates = GigQuickCaptureSupport.HasNearbyCandidates(candidates, gig.Id, settings),
             });
         });
 
@@ -245,75 +242,5 @@ internal static class GigReceiptEndpoints
         return group;
     }
 
-    private static Guid? TryReadGigId(IFormCollection form)
-    {
-        var rawValue = form["gigId"].FirstOrDefault();
-        return Guid.TryParse(rawValue, out var gigId) && gigId != Guid.Empty ? gigId : null;
-    }
-
-    private static async Task<List<ReceiptGigCandidate>> FindReceiptCandidatesAsync(
-        AppDbContext db,
-        Guid? userId,
-        DateOnly today,
-        int candidateCount,
-        int autoAttachWindowDays)
-    {
-        var gigs = await db.Gigs
-            .WhereVisibleTo(userId)
-            .AsNoTracking()
-            .Where(value => value.Status != GigStatus.Cancelled)
-            .ToListAsync();
-
-        return gigs
-            .Select(gig => new ReceiptGigCandidate(
-                gig.Id,
-                gig.ClientId,
-                gig.Title,
-                gig.Date,
-                gig.Venue,
-                gig.Status,
-                Math.Abs(gig.Date.DayNumber - today.DayNumber)))
-            .Where(candidate => candidate.DaysFromToday <= autoAttachWindowDays)
-            .OrderBy(candidate => candidate.DaysFromToday)
-            .ThenBy(candidate => candidate.Date)
-            .ThenBy(candidate => candidate.Title)
-            .Take(candidateCount)
-            .ToList();
-    }
-
-    private static QuickReceiptCaptureSettings NormalizeQuickReceiptSettings(QuickReceiptCaptureSettings settings)
-    {
-        return new QuickReceiptCaptureSettings
-        {
-            CandidateCount = Math.Clamp(settings.CandidateCount, 1, 20),
-            AutoAttachWindowDays = Math.Clamp(settings.AutoAttachWindowDays, 0, 365),
-            AmbiguityWindowDays = Math.Clamp(settings.AmbiguityWindowDays, 0, 365),
-        };
-    }
-
-    private static object ToReceiptGigCandidate(ReceiptGigCandidate candidate, Guid? selectedGigId)
-    {
-        return new
-        {
-            candidate.Id,
-            candidate.ClientId,
-            candidate.Title,
-            candidate.Date,
-            candidate.Venue,
-            candidate.Status,
-            candidate.DaysFromToday,
-            IsSelected = candidate.Id == selectedGigId,
-        };
-    }
-
     private sealed record QuickReceiptDraftUpdateRequest(Guid GigId, string Description, decimal Amount);
-
-    private sealed record ReceiptGigCandidate(
-        Guid Id,
-        Guid ClientId,
-        string Title,
-        DateOnly Date,
-        string Venue,
-        GigStatus Status,
-        int DaysFromToday);
 }

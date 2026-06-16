@@ -120,11 +120,11 @@
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
   min-width: fit-content;
 }
 
-.primary-button.quick-receipt-button {
+.primary-button.quick-capture-button {
   width: 52px;
   min-width: 52px;
   height: 52px;
@@ -139,13 +139,13 @@
   cursor: pointer;
 }
 
-.primary-button.quick-receipt-button:hover,
-.primary-button.quick-receipt-button:focus-visible {
+.primary-button.quick-capture-button:hover,
+.primary-button.quick-capture-button:focus-visible {
   background: transparent;
   box-shadow: none;
 }
 
-.quick-receipt-icon {
+.quick-capture-icon {
   width: 38px;
   height: 38px;
   border-radius: 14px;
@@ -163,13 +163,13 @@
     box-shadow 180ms ease;
 }
 
-.quick-receipt-button:hover .quick-receipt-icon,
-.quick-receipt-button:focus-visible .quick-receipt-icon {
+.quick-capture-button:hover .quick-capture-icon,
+.quick-capture-button:focus-visible .quick-capture-icon {
   transform: translateY(-1px);
   box-shadow: var(--surface-shadow-soft);
 }
 
-.quick-receipt-icon svg {
+.quick-capture-icon svg {
   width: 21px;
   height: 21px;
   fill: none;
@@ -179,7 +179,12 @@
   stroke-width: 1.8;
 }
 
-.quick-receipt-button input,
+.quick-attachment-icon {
+  font-size: 1.55rem;
+  font-weight: 500;
+}
+
+.quick-capture-button input,
 .file-button input {
   position: absolute;
   inline-size: 1px;
@@ -188,7 +193,29 @@
   pointer-events: none;
 }
 
-.quick-receipt-label {
+.quick-attachment-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quick-attachment-choice,
+.quick-attachment-file-pick {
+  justify-content: center;
+  min-height: 48px;
+  position: relative;
+}
+
+.quick-attachment-choice input,
+.quick-attachment-file-pick input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.quick-capture-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2836,10 +2863,9 @@ button:disabled {
     justify-content: space-between;
   }
 
-  .primary-button.quick-receipt-button {
+  .primary-button.quick-capture-button {
     position: fixed;
     top: max(10px, env(safe-area-inset-top));
-    left: max(10px, env(safe-area-inset-left));
     z-index: 70;
     width: 52px;
     min-width: 52px;
@@ -2853,19 +2879,27 @@ button:disabled {
     justify-content: center;
   }
 
-  .primary-button.quick-receipt-button:hover,
-  .primary-button.quick-receipt-button:focus-visible {
+  .primary-button.quick-receipt-button {
+    left: max(10px, env(safe-area-inset-left));
+  }
+
+  .primary-button.quick-attachment-button {
+    left: calc(max(10px, env(safe-area-inset-left)) + 54px);
+  }
+
+  .primary-button.quick-capture-button:hover,
+  .primary-button.quick-capture-button:focus-visible {
     background: transparent;
     box-shadow: none;
   }
 
-  .quick-receipt-button .quick-receipt-icon {
+  .quick-capture-button .quick-capture-icon {
     opacity: 0.62;
   }
 
-  .quick-receipt-button.mobile-scrolled .quick-receipt-icon,
-  .quick-receipt-button:hover .quick-receipt-icon,
-  .quick-receipt-button:focus-visible .quick-receipt-icon {
+  .quick-capture-button.mobile-scrolled .quick-capture-icon,
+  .quick-capture-button:hover .quick-capture-icon,
+  .quick-capture-button:focus-visible .quick-capture-icon {
     opacity: 1;
   }
 

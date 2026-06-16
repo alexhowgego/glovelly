@@ -8,6 +8,7 @@ export {
   GigsSection,
   InvoiceGenerationPreviewModal,
   InvoicesSection,
+  QuickAttachmentModal,
   QuickReceiptModal,
   SellerProfileModal,
   SessionCheckingScreen,
