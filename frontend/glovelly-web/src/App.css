@@ -1732,6 +1732,8 @@ button.compact-record-row.selected {
 
 .gig-summary-grid article,
 .gig-timeline-note {
+  display: grid;
+  gap: 14px;
   border-radius: 20px;
   padding: 18px;
   background: var(--surface-subtle);
@@ -1760,6 +1762,29 @@ button.compact-record-row.selected {
 
 .associated-items-heading {
   justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.associated-item-add-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.35fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.associated-item-add-row label,
+.associated-item-edit-grid label,
+.expense-action-grid label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.associated-item-add-row span,
+.associated-item-edit-grid span,
+.expense-action-grid span {
+  font-size: 0.78rem;
+  color: var(--muted-strong);
 }
 
 .associated-item-list {
@@ -1881,8 +1906,37 @@ button.compact-record-row.selected {
   color: var(--muted);
 }
 
+.associated-item-actions {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.associated-item-actions .ghost-button,
+.associated-item-actions .danger-button,
+.expense-attachment-actions .ghost-button,
+.expense-attachment-actions .danger-button,
+.file-upload-button,
+.file-button {
+  min-height: 30px;
+  padding: 5px 9px;
+  border-radius: 10px;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
 .external-resource-actions {
-  justify-content: flex-end;
+  justify-content: flex-start;
+}
+
+.expense-action-grid {
+  justify-content: flex-start;
+}
+
+.expense-action-grid label {
+  flex: 0 1 180px;
 }
 
 .resource-attachments {
@@ -2054,7 +2108,7 @@ button.compact-record-row.selected {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
 }
 
@@ -2075,6 +2129,7 @@ button.compact-record-row.selected {
 .expense-attachment-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   padding: 7px 8px;
   border-radius: 8px;
   background: var(--surface-soft);
@@ -2089,6 +2144,9 @@ button.compact-record-row.selected {
   overflow-wrap: anywhere;
   white-space: normal;
   word-break: break-word;
+  min-height: 30px;
+  padding: 4px 0;
+  font-size: 0.82rem;
 }
 
 .expense-attachment-item .ghost-button {

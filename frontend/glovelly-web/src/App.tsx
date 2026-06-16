@@ -193,8 +193,6 @@ function App({ appMetadata }: AppProps) {
     externalResourceForm,
     externalResourceMode,
     filteredGigs,
-    gigExpenseAmount,
-    gigExpenseDescription,
     gigForm,
     gigMode,
     gigQuickFilter,
@@ -203,8 +201,8 @@ function App({ appMetadata }: AppProps) {
     gigStatus,
     gigs,
     gigsById,
+    deleteExpenseDraft,
     estimateGigMileage,
-    handleAddGigExpense,
     handleGigSubmit,
     handleToggleGigSelection,
     includeStatementReceiptAppendix,
@@ -220,14 +218,12 @@ function App({ appMetadata }: AppProps) {
     openGigReceiptDraft,
     plannedGigCount,
     previewExpenseStatement,
-    removeGigExpense,
     resetGigsWorkspace,
+    saveExpenseDraft,
     selectedGig,
     selectedGigIds,
     selectedGigs,
     selectGig,
-    setGigExpenseAmount,
-    setGigExpenseDescription,
     setGigs,
     setGigQuickFilter,
     setGigSearchQuery,
@@ -243,7 +239,6 @@ function App({ appMetadata }: AppProps) {
     startGigEdit,
     submitExternalResource,
     updateExternalResourceField,
-    updateGigExpenseField,
     updateGigField,
     updateExpenseReimbursement,
     uploadExpenseAttachment,
@@ -1540,8 +1535,6 @@ function App({ appMetadata }: AppProps) {
         filteredGigs={filteredGigs}
         externalResourceForm={externalResourceForm}
         externalResourceMode={externalResourceMode}
-        gigExpenseAmount={gigExpenseAmount}
-        gigExpenseDescription={gigExpenseDescription}
         gigForm={gigForm}
         isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
@@ -1554,13 +1547,11 @@ function App({ appMetadata }: AppProps) {
         isInvoiceLoading={isInvoiceLoading}
         isMileageEstimating={isMileageEstimating}
         isExternalResourceEditorOpen={isExternalResourceEditorOpen}
-        onAddGigExpense={handleAddGigExpense}
         onCancelExternalResourceEdit={cancelExternalResourceEdit}
         onCloseEditor={closeGigEditor}
+        onDeleteExpenseDraft={deleteExpenseDraft}
         onDeleteExternalResource={deleteExternalResource}
         onDeleteExternalResourceAttachment={deleteExternalResourceAttachment}
-        onExpenseAmountChange={setGigExpenseAmount}
-        onExpenseDescriptionChange={setGigExpenseDescription}
         onGenerateExpenseStatement={openExpenseStatement}
         onGenerateInvoice={() => void handleGenerateInvoice()}
         onEstimateMileage={estimateGigMileage}
@@ -1570,11 +1561,9 @@ function App({ appMetadata }: AppProps) {
         onCloneGig={cloneSelectedGig}
         onOpenClient={openClientShortcut}
         onOpenLinkedInvoice={openSelectedGigInvoice}
-        onOpenSellerProfile={openSellerProfile}
         onUploadExpenseAttachment={uploadExpenseAttachment}
         onUploadExternalResourceAttachment={uploadExternalResourceAttachment}
         onDeleteExpenseAttachment={deleteExpenseAttachment}
-        onRemoveGigExpense={removeGigExpense}
         onResetForm={startGigCreate}
         onQuickFilterChange={setGigQuickFilter}
         onSearchQueryChange={setGigSearchQuery}
@@ -1584,15 +1573,13 @@ function App({ appMetadata }: AppProps) {
         onStartEditing={startGigEdit}
         onStartExternalResourceCreate={startExternalResourceCreate}
         onStartExternalResourceEdit={startExternalResourceEdit}
+        onSaveExpenseDraft={saveExpenseDraft}
         onSubmit={handleGigSubmit}
         onSubmitExternalResource={submitExternalResource}
         onUpdateExternalResourceField={updateExternalResourceField}
-        onUpdateGigExpenseField={updateGigExpenseField}
         onUpdateGigField={updateGigField}
         onUpdateExpenseReimbursement={updateExpenseReimbursement}
         plannedGigCount={plannedGigCount}
-        sellerProfile={sellerProfile}
-        sellerProfileNotice={sellerProfileNotice}
         selectedGig={selectedGig}
         selectedGigIds={selectedGigIds}
         selectedGigs={selectedGigs}
