@@ -235,6 +235,12 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         try
         {
             var expenseRow = await ExpenseRowForDescriptionAsync(expenseDescription);
+            var summaryButton = expenseRow.Locator(".associated-item-summary");
+            if (await summaryButton.GetAttributeAsync("aria-expanded") != "true")
+            {
+                await summaryButton.ClickAsync();
+            }
+
             var redraftResponse = await RunAndWaitForInvoiceRedraftAsync(
                 async () => await expenseRow.GetByTestId("gig-expense-reimbursement-select")
                     .SelectOptionAsync(new[] { status }));
@@ -271,8 +277,8 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         for (var index = 0; index < rowCount; index++)
         {
             var row = rows.Nth(index);
-            var descriptionInput = row.Locator("input").First;
-            if (await descriptionInput.InputValueAsync() == expenseDescription)
+            var description = await row.Locator("strong").First.InnerTextAsync();
+            if (description.Trim() == expenseDescription)
             {
                 return row;
             }

@@ -62,9 +62,20 @@ public abstract class InvoiceUatTestBase : UatTestBase
             await Page.GetByTestId("gig-passenger-count-input").FillAsync(passengerCount);
         }
 
+        await SaveGigAndWaitForResponseAsync();
+        await GigCard(gigTitle).WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+        });
+
         foreach (var expense in expenses)
         {
             var expenseIndex = await Page.GetByTestId("gig-expense-item").CountAsync();
+            await Page.GetByTestId("open-gig-expense-dialog-button").ClickAsync();
+            await Page.GetByTestId("gig-expense-amount-input").WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+            });
             await Page.GetByTestId("gig-expense-amount-input").FillAsync(expense.Amount);
             await Page.GetByTestId("gig-expense-description-input").FillAsync(expense.Description);
             await Page.GetByTestId("add-gig-expense-button").ClickAsync();
@@ -73,17 +84,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
             {
                 Timeout = 30_000,
             });
-            await Assertions.Expect(ExpenseRowAt(expenseIndex).Locator("input").First).ToHaveValueAsync(expense.Description, new LocatorAssertionsToHaveValueOptions
-            {
-                Timeout = 30_000,
-            });
         }
-
-        await SaveGigAndWaitForResponseAsync();
-        await GigCard(gigTitle).WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
     }
 
     protected async Task GenerateInvoiceAndWaitForPreviewAsync()

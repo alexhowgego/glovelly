@@ -80,6 +80,7 @@ export function GigExpensesPanel({
           </div>
           <button
             className="ghost-button"
+            data-testid="open-gig-expense-dialog-button"
             onClick={openExpenseCreate}
             type="button"
             disabled={isGigLoading || !selectedGig}
