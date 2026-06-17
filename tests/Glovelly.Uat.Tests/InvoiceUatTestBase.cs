@@ -166,7 +166,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected async Task AssertInvoiceLineTypeCountAsync(string expectedType, int expectedCount)
     {
-        await Assertions.Expect(Page.Locator("[data-testid=\"invoice-line-type\"]:visible").Filter(new LocatorFilterOptions
+        await Assertions.Expect(Page.GetByTestId("invoice-line-type").Filter(new LocatorFilterOptions
         {
             HasTextRegex = new System.Text.RegularExpressions.Regex($"^{System.Text.RegularExpressions.Regex.Escape(expectedType)}$")
         })).ToHaveCountAsync(expectedCount, new LocatorAssertionsToHaveCountOptions
@@ -298,7 +298,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected ILocator ExpenseRowAt(int index) => Page.GetByTestId("gig-expense-item").Nth(index);
 
-    private ILocator VisibleInvoiceLines() => Page.Locator("[data-testid=\"invoice-line-item\"]:visible");
+    private ILocator VisibleInvoiceLines() => Page.GetByTestId("invoice-line-item");
 
     private ILocator InvoiceLine(string expectedText) => VisibleInvoiceLines().Filter(new LocatorFilterOptions
     {

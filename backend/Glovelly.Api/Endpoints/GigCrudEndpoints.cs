@@ -45,7 +45,8 @@ internal static class GigCrudEndpoints
             ICurrentUserAccessor currentUserAccessor,
             IWorkspaceEventPublisher workspaceEventPublisher,
             ICalendarSyncWorkQueue calendarSyncWorkQueue,
-            IBusinessLifecycleSignal businessLifecycleSignal) =>
+            IBusinessLifecycleSignal businessLifecycleSignal,
+            TimeProvider timeProvider) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -61,6 +62,15 @@ internal static class GigCrudEndpoints
             if (!Enum.IsDefined(request.Status))
             {
                 return EndpointSupport.ValidationProblem("status", "Status is invalid.");
+            }
+
+            var statusValidation = EndpointSupport.ValidateGigLifecycleStatus(
+                request.Status,
+                gig.Date,
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime));
+            if (statusValidation is not null)
+            {
+                return statusValidation;
             }
 
             gig.Status = request.Status;
@@ -89,10 +99,13 @@ internal static class GigCrudEndpoints
             IInvoiceWorkflowService invoiceWorkflowService,
             IWorkspaceEventPublisher workspaceEventPublisher,
             ICalendarSyncWorkQueue calendarSyncWorkQueue,
-            IBusinessLifecycleSignal businessLifecycleSignal) =>
+            IBusinessLifecycleSignal businessLifecycleSignal,
+            TimeProvider timeProvider) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
-            var gigValidation = EndpointSupport.ValidateGigRequest(gig);
+            var gigValidation = EndpointSupport.ValidateGigRequest(
+                gig,
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime));
             if (gigValidation is not null)
             {
                 return gigValidation;
@@ -160,7 +173,8 @@ internal static class GigCrudEndpoints
             IInvoiceWorkflowService invoiceWorkflowService,
             IWorkspaceEventPublisher workspaceEventPublisher,
             ICalendarSyncWorkQueue calendarSyncWorkQueue,
-            IBusinessLifecycleSignal businessLifecycleSignal) =>
+            IBusinessLifecycleSignal businessLifecycleSignal,
+            TimeProvider timeProvider) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -173,7 +187,9 @@ internal static class GigCrudEndpoints
                 return Results.NotFound();
             }
 
-            var gigValidation = EndpointSupport.ValidateGigRequest(request);
+            var gigValidation = EndpointSupport.ValidateGigRequest(
+                request,
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime));
             if (gigValidation is not null)
             {
                 return gigValidation;

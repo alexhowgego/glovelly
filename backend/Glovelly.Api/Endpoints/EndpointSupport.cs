@@ -178,7 +178,7 @@ internal static class EndpointSupport
         profile.UpdatedUtc = DateTimeOffset.UtcNow;
     }
 
-    public static IResult? ValidateGigRequest(Gig gig)
+    public static IResult? ValidateGigRequest(Gig gig, DateOnly today)
     {
         var errors = new Dictionary<string, string[]>();
 
@@ -216,6 +216,10 @@ internal static class EndpointSupport
         {
             errors["status"] = ["Status is invalid."];
         }
+        else if (IsPastPlannedGig(gig.Status, gig.Date, today))
+        {
+            errors["status"] = ["Planned gigs cannot be in the past."];
+        }
 
         if (gig.PassengerCount.HasValue && gig.PassengerCount.Value < 0)
         {
@@ -238,6 +242,18 @@ internal static class EndpointSupport
         }
 
         return errors.Count > 0 ? Results.ValidationProblem(errors) : null;
+    }
+
+    public static IResult? ValidateGigLifecycleStatus(GigStatus status, DateOnly date, DateOnly today)
+    {
+        return IsPastPlannedGig(status, date, today)
+            ? ValidationProblem("status", "Planned gigs cannot be in the past.")
+            : null;
+    }
+
+    public static bool IsPastPlannedGig(GigStatus status, DateOnly date, DateOnly today)
+    {
+        return status == GigStatus.Confirmed && date < today;
     }
 
     public static List<GigExpense> NormalizeGigExpenses(ICollection<GigExpense>? expenses, bool preserveIds = true)
