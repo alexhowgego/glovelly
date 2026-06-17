@@ -4,6 +4,7 @@ import type { FormEvent } from 'react'
 import { formatDateTime } from '../formatters'
 import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type { AdminSort, AdminSortKey, AdminUser, AdminUserForm } from '../types'
+import { TrashIcon } from './TrashIcon'
 
 type AdminSectionProps = {
   adminForm: AdminUserForm
@@ -234,6 +235,7 @@ export function AdminSection({
                     : 'Delete inactive user'
                 }
               >
+                <TrashIcon />
                 Delete user
               </button>
             </div>

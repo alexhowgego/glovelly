@@ -2017,10 +2017,28 @@ button.compact-record-row.selected {
   display: flex !important;
 }
 
+.invoice-line-editor-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
 .invoice-line-list {
   display: grid;
-  gap: 10px;
-  margin-top: 12px;
+  flex: 1 1 auto;
+  gap: 0;
+  align-content: start;
+  grid-auto-rows: max-content;
+  min-height: 180px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
+  border-radius: 18px;
+  background: var(--surface-elevated);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
 
 .gig-expense-list {
@@ -2238,17 +2256,17 @@ button.compact-record-row.selected {
 .invoice-line-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: var(--surface-elevated);
-  border: 1px solid color-mix(in srgb, var(--surface-border) 85%, transparent);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-border) 72%, transparent);
+  background: transparent;
 }
 
-.invoice-line-item div {
+.invoice-line-content {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .invoice-line-item strong {
@@ -2263,6 +2281,43 @@ button.compact-record-row.selected {
 .invoice-line-link:hover,
 .invoice-line-link:focus-visible {
   color: var(--heading);
+}
+
+.invoice-line-link [data-testid="invoice-line-description"] {
+  color: inherit;
+}
+
+.invoice-line-end {
+  display: grid;
+  align-items: center;
+  justify-content: flex-end;
+  justify-items: end;
+  gap: 6px;
+  min-width: max-content;
+}
+
+.icon-delete-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--danger-text) 38%, var(--surface-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger-text) 9%, var(--surface-elevated));
+  color: var(--danger-text);
+  cursor: pointer;
+}
+
+.icon-delete-button:hover,
+.icon-delete-button:focus-visible {
+  background: color-mix(in srgb, var(--danger-text) 16%, var(--surface-elevated));
+  color: var(--heading);
+}
+
+.icon-delete-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .invoice-line-item span {
@@ -2465,6 +2520,13 @@ button.compact-record-row.selected {
 .danger-button {
   background: color-mix(in srgb, #a12828 22%, transparent);
   color: var(--danger-text);
+}
+
+.danger-button svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  flex: 0 0 auto;
 }
 
 .primary-button:hover,

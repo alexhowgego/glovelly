@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type { Client, ClientForm, ClientSort, ClientSortKey } from '../types'
+import { TrashIcon } from './TrashIcon'
 
 type ClientsSectionProps = {
   filteredClients: Client[]
@@ -224,6 +225,7 @@ export function ClientsSection({
                 disabled={!canDeleteSelectedClient || isLoading}
                 title={clientDeleteHelperText}
               >
+                <TrashIcon />
                 Delete
               </button>
             </div>

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Playwright;
 using Xunit;
 
@@ -241,11 +242,23 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 await summaryButton.ClickAsync();
             }
 
-            var redraftResponse = await RunAndWaitForInvoiceRedraftAsync(
-                async () => await expenseRow.GetByTestId("gig-expense-reimbursement-select")
-                    .SelectOptionAsync(new[] { status }));
+            var reimbursementSelect = expenseRow.GetByTestId("gig-expense-reimbursement-select");
+            var reimbursementResponseTask = WaitForExpenseReimbursementUpdateAsync();
+            var redraftResponseTask = WaitForInvoiceRedraftAsync();
+
+            await reimbursementSelect.SelectOptionAsync(new[] { status });
+
+            var reimbursementResponse = await reimbursementResponseTask;
+            Assert.True(reimbursementResponse.Ok, $"Expected expense reimbursement update to succeed, got HTTP {reimbursementResponse.Status} for {reimbursementResponse.Url}.");
+            await Assertions.Expect(reimbursementSelect).ToHaveValueAsync(status, new LocatorAssertionsToHaveValueOptions
+            {
+                Timeout = 30_000,
+            });
+
+            var redraftResponse = await redraftResponseTask;
 
             AssertRedraftSucceeded(redraftResponse);
+            await AssertRedraftedInvoiceLinePresenceAsync(redraftResponse, expenseDescription, status != "Reimbursed");
             await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
         }
         finally
@@ -326,6 +339,42 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                     path.EndsWith("/redraft", StringComparison.Ordinal);
             },
             new PageRunAndWaitForResponseOptions { Timeout = 30_000 });
+
+    private Task<IResponse> WaitForExpenseReimbursementUpdateAsync() =>
+        Page.WaitForResponseAsync(
+            response =>
+            {
+                var path = new Uri(response.Url).AbsolutePath;
+
+                return response.Request.Method == "PATCH" &&
+                    path.StartsWith("/gigs/", StringComparison.Ordinal) &&
+                    path.EndsWith("/expenses/reimbursement", StringComparison.Ordinal);
+            },
+            new PageWaitForResponseOptions { Timeout = 30_000 });
+
+    private Task<IResponse> WaitForInvoiceRedraftAsync() =>
+        Page.WaitForResponseAsync(
+            response =>
+            {
+                var path = new Uri(response.Url).AbsolutePath;
+
+                return response.Request.Method == "POST" &&
+                    path.StartsWith("/invoices/", StringComparison.Ordinal) &&
+                    path.EndsWith("/redraft", StringComparison.Ordinal);
+            },
+            new PageWaitForResponseOptions { Timeout = 30_000 });
+
+    private static async Task AssertRedraftedInvoiceLinePresenceAsync(IResponse redraftResponse, string expenseDescription, bool shouldBePresent)
+    {
+        var body = await redraftResponse.BodyAsync();
+        using var document = JsonDocument.Parse(body);
+        var lines = document.RootElement.GetProperty("lines");
+        var lineExists = lines.EnumerateArray().Any(line =>
+            line.TryGetProperty("description", out var description) &&
+            description.GetString() == expenseDescription);
+
+        Assert.Equal(shouldBePresent, lineExists);
+    }
 
     private static void AssertRedraftSucceeded(IResponse redraftResponse)
     {

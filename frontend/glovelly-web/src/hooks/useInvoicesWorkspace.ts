@@ -9,7 +9,7 @@ import {
 } from '../api'
 import { defaultInvoiceStatus } from '../forms'
 import { formatCurrency, formatDateTime } from '../formatters'
-import type { Invoice, InvoiceQuickFilter, InvoiceSort, InvoiceStatus } from '../types'
+import type { Invoice, InvoiceLine, InvoiceQuickFilter, InvoiceSort, InvoiceStatus } from '../types'
 
 type GoogleDrivePublishLink = {
   href: string
@@ -478,9 +478,48 @@ export function useInvoicesWorkspace({
       setAdjustmentAmount('')
       setAdjustmentReason('')
       setInvoiceStatus(`Adjustment saved. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`)
-      setIsInvoiceEditorOpen(false)
     } catch (error) {
       setInvoiceStatus(error instanceof Error ? error.message : 'Unable to add invoice adjustment.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
+  const handleDeleteInvoiceAdjustment = async (invoice: Invoice, line: InvoiceLine) => {
+    if (line.type !== 'ManualAdjustment') {
+      setInvoiceStatus('Only manual adjustments can be removed from here.')
+      return
+    }
+
+    if (!window.confirm(`Remove adjustment "${line.description}" from ${invoice.invoiceNumber}?`)) {
+      return
+    }
+
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Removing adjustment from ${invoice.invoiceNumber}...`)
+
+    try {
+      const deleteResponse = await fetchWithSession(
+        buildApiUrl(`/invoice-lines/${line.id}`),
+        { method: 'DELETE' }
+      )
+
+      if (!deleteResponse.ok) {
+        throw new Error('Unable to remove invoice adjustment.')
+      }
+
+      const invoiceResponse = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}`))
+      if (!invoiceResponse.ok) {
+        throw new Error('Adjustment removed, but the invoice could not be refreshed.')
+      }
+
+      const updatedInvoice = (await invoiceResponse.json()) as Invoice
+      setInvoices((current) =>
+        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
+      )
+      setInvoiceStatus(`Adjustment removed. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`)
+    } catch (error) {
+      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to remove invoice adjustment.')
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -538,6 +577,7 @@ export function useInvoicesWorkspace({
     filteredInvoices,
     googleDrivePublishLink,
     handleAddInvoiceAdjustment,
+    handleDeleteInvoiceAdjustment,
     handleDeleteInvoice,
     handleDownloadInvoicePdf,
     handleInvoiceReissue,

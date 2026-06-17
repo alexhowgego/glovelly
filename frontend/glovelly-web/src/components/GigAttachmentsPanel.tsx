@@ -8,6 +8,7 @@ import type {
   GigExternalResourcePurpose,
   GigExternalResourceType,
 } from '../types'
+import { TrashIcon } from './TrashIcon'
 
 type GigAttachmentsPanelProps = {
   selectedGig: Gig | null
@@ -175,12 +176,14 @@ export function GigAttachmentsPanel({
                           Edit
                         </button>
                         <button
-                          className="danger-button"
+                          aria-label={`Delete attachment ${resource.title || 'Untitled attachment'}`}
+                          className="icon-delete-button"
                           onClick={() => onDeleteExternalResource(resource)}
                           type="button"
                           disabled={isGigLoading}
+                          title="Delete attachment"
                         >
-                          Delete
+                          <TrashIcon />
                         </button>
                       </div>
                       <div className="resource-attachments">
@@ -218,14 +221,16 @@ export function GigAttachmentsPanel({
                                     Download
                                   </button>
                                   <button
-                                    className="danger-button"
+                                    aria-label={`Delete file ${attachment.fileName}`}
+                                    className="icon-delete-button"
                                     onClick={() =>
                                       onDeleteExternalResourceAttachment(resource, attachment)
                                     }
                                     type="button"
                                     disabled={isGigLoading}
+                                    title="Delete file"
                                   >
-                                    Delete
+                                    <TrashIcon />
                                   </button>
                                 </div>
                               </div>
