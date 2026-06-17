@@ -44,7 +44,8 @@ internal static class GigCrudEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IWorkspaceEventPublisher workspaceEventPublisher,
-            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
+            ICalendarSyncWorkQueue calendarSyncWorkQueue,
+            IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -65,6 +66,7 @@ internal static class GigCrudEndpoints
             gig.Status = request.Status;
             EndpointSupport.StampUpdate(gig, userId);
             await db.SaveChangesAsync();
+            await businessLifecycleSignal.TrackGigAsync(gig);
             if (userId.HasValue)
             {
                 await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
@@ -86,7 +88,8 @@ internal static class GigCrudEndpoints
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceWorkflowService invoiceWorkflowService,
             IWorkspaceEventPublisher workspaceEventPublisher,
-            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
+            ICalendarSyncWorkQueue calendarSyncWorkQueue,
+            IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gigValidation = EndpointSupport.ValidateGigRequest(gig);
@@ -134,6 +137,7 @@ internal static class GigCrudEndpoints
             db.Gigs.Add(gig);
             await invoiceWorkflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, userId);
             await db.SaveChangesAsync();
+            await businessLifecycleSignal.TrackGigAsync(gig);
             if (userId.HasValue)
             {
                 await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "created", gig.Id, DateTimeOffset.UtcNow));
@@ -155,7 +159,8 @@ internal static class GigCrudEndpoints
             IExpenseAttachmentStore attachmentStore,
             IInvoiceWorkflowService invoiceWorkflowService,
             IWorkspaceEventPublisher workspaceEventPublisher,
-            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
+            ICalendarSyncWorkQueue calendarSyncWorkQueue,
+            IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -258,6 +263,7 @@ internal static class GigCrudEndpoints
             gig = await db.Gigs
                 .IncludeGigDetails()
                 .FirstAsync(value => value.Id == id);
+            await businessLifecycleSignal.TrackGigAsync(gig);
             if (userId.HasValue)
             {
                 await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));

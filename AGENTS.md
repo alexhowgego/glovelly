@@ -33,6 +33,7 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - `Configuration/StartupSettings.cs` chooses PostgreSQL vs in-memory by presence of `ConnectionStrings:Glovelly`; development seed data only runs for non-Postgres, non-testing startup.
 - `Endpoints/CrudEndpoints.cs` maps protected `/clients`, `/gigs`, `/gig-imports`, `/invoices`, `/invoice-lines`, and `/seller-profile` groups. Auth/access/Google Drive/MCP/admin/expense statements are mapped separately in `Program.cs`.
 - `Endpoints/EndpointSupport.cs` owns high-risk shared behavior: `WhereVisibleTo`, create/update stamping, gig validation, invoice status transition rules, filename/subject validation, and gig expense normalization.
+- Product wording may call `GigStatus.Confirmed` gigs "planned gigs"; code and persisted JSON use `Confirmed`.
 - `Services/InvoiceWorkflowService.cs` and related invoice services own invoice creation, generated lines, PDFs, issue/reissue, delivery, and gig linkage. Do not duplicate that flow inside endpoints.
 - `Services/GlovellyMcpQueryService.cs` performs user-scoped MCP EF projections; MCP tools should remain scoped by authenticated user visibility.
 

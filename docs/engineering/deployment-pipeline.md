@@ -33,9 +33,23 @@ The deployed container can run the same command via the published worker DLL:
 dotnet worker/Glovelly.Worker.dll calendar-sync drain
 ```
 
-The CI deployment creates or updates a Cloud Run Job for this command and a Cloud Scheduler HTTP trigger that invokes the job. The job uses the same image, runtime service account, environment variables, and Secret Manager bindings as the Cloud Run service.
+Business lifecycle advancement, including automatic gig completion and invoice overdue transitions, can be run with:
+
+```bash
+dotnet run --project backend/Glovelly.Worker -- business-lifecycle advance
+```
+
+The deployed container can run the same command via the published worker DLL:
+
+```bash
+dotnet worker/Glovelly.Worker.dll business-lifecycle advance
+```
+
+The CI deployment creates or updates Cloud Run Jobs for these commands and Cloud Scheduler HTTP triggers that invoke the jobs. Each job uses the same image, runtime service account, environment variables, and Secret Manager bindings as the Cloud Run service.
 
 The default job name is `<cloud-run-service>-calendar-sync`; the default scheduler name is `<job-name>-schedule`; the default schedule is every five minutes. These can be overridden per GitHub Environment with `GCP_CALENDAR_SYNC_JOB_NAME`, `GCP_CALENDAR_SYNC_SCHEDULER_NAME`, `CALENDAR_SYNC_SCHEDULE`, and `GCP_SCHEDULER_LOCATION` variables.
+
+The default Business lifecycle job name is `<cloud-run-service>-business-lifecycle`; the default scheduler name is `<job-name>-schedule`; the default schedule is every fifteen minutes. These can be overridden per GitHub Environment with `GCP_BUSINESS_LIFECYCLE_JOB_NAME`, `GCP_BUSINESS_LIFECYCLE_SCHEDULER_NAME`, `BUSINESS_LIFECYCLE_SCHEDULE`, and `GCP_SCHEDULER_LOCATION` variables.
 
 ## GitHub Actions
 

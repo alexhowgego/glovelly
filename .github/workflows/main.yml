@@ -248,6 +248,22 @@ jobs:
           GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
         run: bash .github/scripts/deploy-calendar-sync-job.sh
 
+      - name: Deploy Business lifecycle job staging
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
+          DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+          GCP_BUCKET_NAME: ${{ vars.GCP_BUCKET_NAME }}
+          GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          GCP_CONNECTION_STRING_SECRET_ID: ${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}
+          GCP_CHATGPT_REDIRECT_SECRET_ID: ${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}
+          GCP_UAT_SECRET_ID: ${{ vars.GCP_UAT_SECRET_ID }}
+          BUSINESS_LIFECYCLE_JOB_NAME: ${{ vars.GCP_BUSINESS_LIFECYCLE_JOB_NAME }}
+          BUSINESS_LIFECYCLE_SCHEDULER_NAME: ${{ vars.GCP_BUSINESS_LIFECYCLE_SCHEDULER_NAME }}
+          BUSINESS_LIFECYCLE_SCHEDULE: ${{ vars.BUSINESS_LIFECYCLE_SCHEDULE }}
+          GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
+        run: bash .github/scripts/deploy-business-lifecycle-job.sh
+
       - name: Comment staging URL on PR
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
@@ -377,6 +393,21 @@ jobs:
           CALENDAR_SYNC_SCHEDULE: ${{ vars.CALENDAR_SYNC_SCHEDULE }}
           GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
         run: bash .github/scripts/deploy-calendar-sync-job.sh
+
+      - name: Deploy Business lifecycle job production
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
+          DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+          GCP_BUCKET_NAME: ${{ vars.GCP_BUCKET_NAME }}
+          GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          GCP_CONNECTION_STRING_SECRET_ID: ${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}
+          GCP_CHATGPT_REDIRECT_SECRET_ID: ${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}
+          BUSINESS_LIFECYCLE_JOB_NAME: ${{ vars.GCP_BUSINESS_LIFECYCLE_JOB_NAME }}
+          BUSINESS_LIFECYCLE_SCHEDULER_NAME: ${{ vars.GCP_BUSINESS_LIFECYCLE_SCHEDULER_NAME }}
+          BUSINESS_LIFECYCLE_SCHEDULE: ${{ vars.BUSINESS_LIFECYCLE_SCHEDULE }}
+          GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
+        run: bash .github/scripts/deploy-business-lifecycle-job.sh
 
   production_smoke:
     name: Run production smoke tests
