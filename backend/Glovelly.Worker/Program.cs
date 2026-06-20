@@ -59,8 +59,21 @@ static RootCommand BuildRootCommand(IServiceProvider services)
     var calendarSyncCommand = new Command("calendar-sync", "Manage Google Calendar sync background work.");
     calendarSyncCommand.Subcommands.Add(drainCommand);
 
+    var advanceCommand = new Command("advance", "Advance due business lifecycle transitions.");
+    advanceCommand.SetAction(async (_, cancellationToken) =>
+    {
+        return await RunBusinessLifecycleAdvancementAsync(
+            new BusinessLifecycleAdvancementOptions(),
+            services,
+            cancellationToken);
+    });
+
+    var businessLifecycleCommand = new Command("business-lifecycle", "Manage automatic business lifecycle transitions.");
+    businessLifecycleCommand.Subcommands.Add(advanceCommand);
+
     var rootCommand = new RootCommand("Glovelly background worker commands.");
     rootCommand.Subcommands.Add(calendarSyncCommand);
+    rootCommand.Subcommands.Add(businessLifecycleCommand);
     return rootCommand;
 }
 
@@ -101,6 +114,44 @@ static async Task<int> RunCalendarSyncDrainAsync(
         result.Skipped,
         result.Recovered,
         result.CompletionReason);
+
+    return 0;
+}
+
+static async Task<int> RunBusinessLifecycleAdvancementAsync(
+    BusinessLifecycleAdvancementOptions options,
+    IServiceProvider services,
+    CancellationToken cancellationToken)
+{
+    var logger = services
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Glovelly.Worker.BusinessLifecycle");
+    var timeProvider = services.GetRequiredService<TimeProvider>();
+    var scheduledTask = services.GetRequiredService<BusinessLifecycleAdvancementScheduledTask>();
+    var context = new ScheduledTaskContext(timeProvider.GetUtcNow());
+    var decision = await scheduledTask.ShouldRunAsync(context, cancellationToken);
+
+    if (!decision.ShouldRun)
+    {
+        logger.LogInformation(
+            "Scheduled task {TaskName} skipped: {Reason}",
+            scheduledTask.Name,
+            decision.Reason);
+        return 0;
+    }
+
+    logger.LogInformation(
+        "Scheduled task {TaskName} running: {Reason}",
+        scheduledTask.Name,
+        decision.Reason);
+
+    var result = await scheduledTask.ExecuteAsync(options, context, cancellationToken);
+    logger.LogInformation(
+        "Business lifecycle advancement complete: {CompletedGigs} gigs completed, {OverdueInvoices} invoices marked overdue. Next gig completion date: {NextGigCompletionDate}; next invoice overdue date: {NextInvoiceOverdueDate}.",
+        result.CompletedGigs,
+        result.OverdueInvoices,
+        result.NextGigCompletionDate,
+        result.NextInvoiceOverdueDate);
 
     return 0;
 }

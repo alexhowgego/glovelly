@@ -84,7 +84,12 @@ public static class InvoiceEndpoints
             return invoice is null ? Results.NotFound() : Results.Ok(invoice);
         });
 
-        group.MapPost("/", async (Invoice invoice, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
+        group.MapPost("/", async (
+            Invoice invoice,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             if (!await db.Clients
@@ -119,6 +124,7 @@ public static class InvoiceEndpoints
 
             db.Invoices.Add(invoice);
             await db.SaveChangesAsync();
+            await businessLifecycleSignal.TrackInvoiceAsync(invoice);
 
             return Results.Created($"/invoices/{invoice.Id}", invoice);
         });
@@ -129,7 +135,8 @@ public static class InvoiceEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
-            IInvoiceWorkflowService invoiceWorkflowService) =>
+            IInvoiceWorkflowService invoiceWorkflowService,
+            IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
@@ -192,6 +199,7 @@ public static class InvoiceEndpoints
             EndpointSupport.StampUpdate(invoice, userId);
 
             await db.SaveChangesAsync();
+            await businessLifecycleSignal.TrackInvoiceAsync(invoice);
 
             return Results.Ok(invoice);
         });
@@ -202,7 +210,8 @@ public static class InvoiceEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
-            IInvoiceWorkflowService invoiceWorkflowService) =>
+            IInvoiceWorkflowService invoiceWorkflowService,
+            IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
@@ -235,6 +244,7 @@ public static class InvoiceEndpoints
 
                 await invoiceWorkflowService.IssueInvoiceAsync(invoice, invoice.Client, userId);
                 await db.SaveChangesAsync();
+                await businessLifecycleSignal.TrackInvoiceAsync(invoice);
 
                 return Results.Ok(invoice);
             }
@@ -243,6 +253,7 @@ public static class InvoiceEndpoints
             invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
             EndpointSupport.StampUpdate(invoice, userId);
             await db.SaveChangesAsync();
+            await businessLifecycleSignal.TrackInvoiceAsync(invoice);
 
             return Results.Ok(invoice);
         });

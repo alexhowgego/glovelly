@@ -44,7 +44,9 @@ internal static class GigCrudEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IWorkspaceEventPublisher workspaceEventPublisher,
-            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
+            ICalendarSyncWorkQueue calendarSyncWorkQueue,
+            IBusinessLifecycleSignal businessLifecycleSignal,
+            TimeProvider timeProvider) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -62,9 +64,19 @@ internal static class GigCrudEndpoints
                 return EndpointSupport.ValidationProblem("status", "Status is invalid.");
             }
 
+            var statusValidation = EndpointSupport.ValidateGigLifecycleStatus(
+                request.Status,
+                gig.Date,
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime));
+            if (statusValidation is not null)
+            {
+                return statusValidation;
+            }
+
             gig.Status = request.Status;
             EndpointSupport.StampUpdate(gig, userId);
             await db.SaveChangesAsync();
+            await businessLifecycleSignal.TrackGigAsync(gig);
             if (userId.HasValue)
             {
                 await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
@@ -86,10 +98,14 @@ internal static class GigCrudEndpoints
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceWorkflowService invoiceWorkflowService,
             IWorkspaceEventPublisher workspaceEventPublisher,
-            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
+            ICalendarSyncWorkQueue calendarSyncWorkQueue,
+            IBusinessLifecycleSignal businessLifecycleSignal,
+            TimeProvider timeProvider) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
-            var gigValidation = EndpointSupport.ValidateGigRequest(gig);
+            var gigValidation = EndpointSupport.ValidateGigRequest(
+                gig,
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime));
             if (gigValidation is not null)
             {
                 return gigValidation;
@@ -134,6 +150,7 @@ internal static class GigCrudEndpoints
             db.Gigs.Add(gig);
             await invoiceWorkflowService.SyncGeneratedInvoiceLinesForGigAsync(gig, userId);
             await db.SaveChangesAsync();
+            await businessLifecycleSignal.TrackGigAsync(gig);
             if (userId.HasValue)
             {
                 await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "created", gig.Id, DateTimeOffset.UtcNow));
@@ -155,7 +172,9 @@ internal static class GigCrudEndpoints
             IExpenseAttachmentStore attachmentStore,
             IInvoiceWorkflowService invoiceWorkflowService,
             IWorkspaceEventPublisher workspaceEventPublisher,
-            ICalendarSyncWorkQueue calendarSyncWorkQueue) =>
+            ICalendarSyncWorkQueue calendarSyncWorkQueue,
+            IBusinessLifecycleSignal businessLifecycleSignal,
+            TimeProvider timeProvider) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var gig = await db.Gigs
@@ -168,7 +187,9 @@ internal static class GigCrudEndpoints
                 return Results.NotFound();
             }
 
-            var gigValidation = EndpointSupport.ValidateGigRequest(request);
+            var gigValidation = EndpointSupport.ValidateGigRequest(
+                request,
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime));
             if (gigValidation is not null)
             {
                 return gigValidation;
@@ -258,6 +279,7 @@ internal static class GigCrudEndpoints
             gig = await db.Gigs
                 .IncludeGigDetails()
                 .FirstAsync(value => value.Id == id);
+            await businessLifecycleSignal.TrackGigAsync(gig);
             if (userId.HasValue)
             {
                 await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));

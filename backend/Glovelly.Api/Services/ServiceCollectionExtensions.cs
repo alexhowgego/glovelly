@@ -30,9 +30,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICalendarSyncWorkQueue, CalendarSyncWorkQueue>();
         services.AddScoped<IGoogleCalendarSyncProcessor, GoogleCalendarSyncProcessor>();
         services.AddScoped<ICalendarSyncQueueDrainer, CalendarSyncQueueDrainer>();
+        services.AddScoped<IBusinessLifecycleAdvancementProcessor, BusinessLifecycleAdvancementProcessor>();
+        services.AddSingleton<IBusinessLifecycleSignal, BusinessLifecycleSignal>();
         services.AddSingleton<IScheduledTaskStateStore, BlobScheduledTaskStateStore>();
         services.AddSingleton<IScheduledTaskSignal, ScheduledTaskSignal>();
         services.AddSingleton<GoogleCalendarPropagationScheduledTask>();
+        services.AddSingleton<BusinessLifecycleAdvancementScheduledTask>();
         services.AddOptions<GoogleRoutesMileageSettings>()
             .BindConfiguration(GoogleRoutesMileageSettings.SectionName);
         services.AddHttpClient<GoogleRoutesMileageEstimationService>();

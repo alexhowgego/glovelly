@@ -62,6 +62,7 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IMileageEstimationService>();
             services.RemoveAll<IBlobStore>();
             services.RemoveAll<IExpenseAttachmentStore>();
+            services.RemoveAll<TimeProvider>();
 
             if (!_useRealAuthentication)
             {
@@ -73,6 +74,7 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IMileageEstimationService>(_fakeMileageEstimationService);
             services.AddSingleton<IBlobStore, InMemoryBlobStore>();
             services.AddSingleton<IExpenseAttachmentStore, ExpenseAttachmentStore>();
+            services.AddSingleton<TimeProvider>(new FixedTimeProvider(new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero)));
             services.PostConfigure<EmailSettings>(settings =>
             {
                 settings.AccessRequests.FromAddress = "access@glovelly.test";
@@ -202,5 +204,10 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
         dbContext.Clients.AddRange(clients);
         dbContext.Invoices.AddRange(invoices);
         dbContext.SaveChanges();
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }

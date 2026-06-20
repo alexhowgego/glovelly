@@ -56,6 +56,28 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
+    public async Task UpdateStatus_WhenOverdueCannotReturnDirectlyToIssued_ReturnsValidationProblem()
+    {
+        var makeOverdueResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
+        {
+            status = "Overdue",
+        }, TestContext.Current.CancellationToken);
+        makeOverdueResponse.EnsureSuccessStatusCode();
+
+        var response = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/status", new
+        {
+            status = "Issued",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            "Invoice status cannot move from Overdue to Issued.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
     public async Task UpdateStatus_WhenInvoiceHasLines_ResponseKeepsLineTotals()
     {
         var createLineResponse = await _client.PostAsJsonAsync("/invoice-lines", new

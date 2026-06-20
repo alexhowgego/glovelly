@@ -590,7 +590,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task QuickReceiptDraft_WithNearbyGig_CreatesDraftExpenseAndAttachment()
     {
-        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var today = new DateOnly(2026, 1, 1);
         var createResponse = await _client.PostAsJsonAsync("/gigs", new
         {
             clientId = TestData.FoxAndFinchId,
@@ -601,7 +601,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             travelMiles = 0.00m,
             notes = "Receipt draft test",
             wasDriving = true,
-            status = 1,
+            status = "Completed",
             expenses = Array.Empty<object>(),
             invoicedAt = (string?)null,
         }, TestContext.Current.CancellationToken);
@@ -636,7 +636,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task QuickReceiptDraft_WithCandidateInsideAmbiguityWindow_FlagsNearbyCandidates()
     {
-        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var today = new DateOnly(2026, 1, 1);
         foreach (var (title, offset) in new[] { ("Yesterday show", -1), ("Tomorrow show", 1), ("Next week show", 7) })
         {
             var createResponse = await _client.PostAsJsonAsync("/gigs", new
@@ -649,7 +649,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 travelMiles = 0.00m,
                 notes = "Ambiguous receipt draft test",
                 wasDriving = true,
-                status = 1,
+                status = offset < 0 ? "Completed" : "Confirmed",
                 expenses = Array.Empty<object>(),
                 invoicedAt = (string?)null,
             }, TestContext.Current.CancellationToken);
@@ -678,7 +678,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task QuickReceiptDraft_WithCandidateOutsideAmbiguityWindow_DoesNotFlagNearbyCandidates()
     {
-        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var today = new DateOnly(2026, 1, 1);
         foreach (var (title, offset) in new[] { ("Today show", 0), ("Last month show", -20) })
         {
             var createResponse = await _client.PostAsJsonAsync("/gigs", new
@@ -691,7 +691,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 travelMiles = 0.00m,
                 notes = "Distant ambiguity test",
                 wasDriving = true,
-                status = 1,
+                status = offset < 0 ? "Completed" : "Confirmed",
                 expenses = Array.Empty<object>(),
                 invoicedAt = (string?)null,
             }, TestContext.Current.CancellationToken);
@@ -715,7 +715,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task QuickReceiptDraft_WithNoCandidateInsideWindow_ReturnsEmptyCandidates()
     {
-        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var today = new DateOnly(2026, 1, 1);
         foreach (var (title, offset) in new[] { ("Old show", -45), ("Future show", 60) })
         {
             var createResponse = await _client.PostAsJsonAsync("/gigs", new
@@ -728,7 +728,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
                 travelMiles = 0.00m,
                 notes = "Distant receipt draft test",
                 wasDriving = true,
-                status = 1,
+                status = offset < 0 ? "Completed" : "Confirmed",
                 expenses = Array.Empty<object>(),
                 invoicedAt = (string?)null,
             }, TestContext.Current.CancellationToken);
@@ -755,7 +755,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             clientId = TestData.FoxAndFinchId,
             title = "Future receipt target",
-            date = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime).AddDays(60).ToString("yyyy-MM-dd"),
+            date = new DateOnly(2026, 1, 1).AddDays(60).ToString("yyyy-MM-dd"),
             venue = "Airport",
             fee = 120.00m,
             travelMiles = 0.00m,
@@ -784,7 +784,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task UpdateQuickReceiptDraft_SavesDetailsAndMovesGig()
     {
-        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var today = new DateOnly(2026, 1, 1);
         var firstGigResponse = await _client.PostAsJsonAsync("/gigs", new
         {
             clientId = TestData.FoxAndFinchId,
@@ -1122,6 +1122,111 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task CreateGig_WhenPlannedDateIsInPast_ReturnsValidationProblem()
+    {
+        var pastDate = new DateOnly(2025, 12, 31);
+
+        var response = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Past planned gig",
+            date = $"{pastDate:yyyy-MM-dd}",
+            venue = "Botanical Gardens",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = "Confirmed",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            "Planned gigs cannot be in the past.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
+    public async Task CreateGig_WhenPlannedDateIsToday_CreatesGig()
+    {
+        var today = new DateOnly(2026, 1, 1);
+
+        var response = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Today planned gig",
+            date = $"{today:yyyy-MM-dd}",
+            venue = "Botanical Gardens",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = "Confirmed",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateGig_WhenPlannedDateIsInPast_ReturnsValidationProblem()
+    {
+        var futureDate = new DateOnly(2026, 1, 8);
+        var pastDate = new DateOnly(2025, 12, 31);
+        var createdGig = await CreateGigAsync(_client, "Past planned update target", $"{futureDate:yyyy-MM-dd}");
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        var response = await _client.PutAsJsonAsync($"/gigs/{gigId}", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Past planned update target",
+            date = $"{pastDate:yyyy-MM-dd}",
+            venue = "Botanical Gardens",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = "Confirmed",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            "Planned gigs cannot be in the past.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
+    public async Task UpdateGigStatus_WhenPastGigWouldReturnToPlanned_ReturnsValidationProblem()
+    {
+        var pastDate = new DateOnly(2025, 12, 31);
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Past completed gig",
+            date = $"{pastDate:yyyy-MM-dd}",
+            venue = "Botanical Gardens",
+            fee = 125.00m,
+            travelMiles = 0,
+            wasDriving = false,
+            status = "Completed",
+        }, TestContext.Current.CancellationToken);
+        createResponse.EnsureSuccessStatusCode();
+        var createdGig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var gigId = createdGig.GetProperty("id").GetGuid();
+
+        var response = await _client.PatchAsJsonAsync($"/gigs/{gigId}/status", new
+        {
+            status = "Confirmed",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            "Planned gigs cannot be in the past.",
+            problem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
     public async Task DeleteGig_WhenPlanned_DeletesGig()
     {
         var createResponse = await _client.PostAsJsonAsync("/gigs", new
@@ -1414,8 +1519,8 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task QuickExternalResourceDraftFile_WithNearbyGig_CreatesDraftResourceAndAttachment()
     {
-        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
-        var gig = await CreateGigAsync(_client, "Attachment quick match", today.AddDays(-1).ToString("yyyy-MM-dd"));
+        var today = new DateOnly(2026, 1, 1);
+        var gig = await CreateGigAsync(_client, "Attachment quick match", today.AddDays(-1).ToString("yyyy-MM-dd"), "Completed");
         var gigId = gig.GetProperty("id").GetGuid();
 
         using var form = BuildReceiptDraftForm("# Contract notes"u8.ToArray(), "contract.md", "text/markdown");
@@ -1471,8 +1576,8 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task QuickExternalResourceDraftFile_WithNoCandidateInsideWindow_ReturnsEmptyCandidates()
     {
-        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
-        _ = await CreateGigAsync(_client, "Old attachment show", today.AddDays(-45).ToString("yyyy-MM-dd"));
+        var today = new DateOnly(2026, 1, 1);
+        _ = await CreateGigAsync(_client, "Old attachment show", today.AddDays(-45).ToString("yyyy-MM-dd"), "Completed");
         _ = await CreateGigAsync(_client, "Future attachment show", today.AddDays(60).ToString("yyyy-MM-dd"));
 
         using var form = BuildReceiptDraftForm("plan"u8.ToArray(), "plan.pdf", "application/pdf");
@@ -1489,7 +1594,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task UpdateQuickExternalResourceDraft_SavesDetailsMovesGigAndUpdatesPrimary()
     {
-        var today = DateOnly.FromDateTime(DateTimeOffset.Now.DateTime);
+        var today = new DateOnly(2026, 1, 1);
         var firstGig = await CreateGigAsync(_client, "Attachment first target", today.ToString("yyyy-MM-dd"));
         var firstGigId = firstGig.GetProperty("id").GetGuid();
         var secondGig = await CreateGigAsync(_client, "Attachment corrected target", today.AddDays(2).ToString("yyyy-MM-dd"));
@@ -1570,7 +1675,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Empty(savedGig.GetProperty("externalResources").EnumerateArray());
     }
 
-    private static async Task<JsonElement> CreateGigAsync(HttpClient client, string title, string date = "2026-08-01")
+    private static async Task<JsonElement> CreateGigAsync(HttpClient client, string title, string date = "2026-08-01", string status = "Confirmed")
     {
         var createResponse = await client.PostAsJsonAsync("/gigs", new
         {
@@ -1581,7 +1686,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
             fee = 125.00m,
             travelMiles = 0,
             wasDriving = false,
-            status = "Confirmed",
+            status,
         }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
 

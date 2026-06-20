@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,14 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
         var batchId = Guid.NewGuid();
         var draftId = Guid.NewGuid();
         await SeedImportBatchAsync(batchId, draftId);
+        using (var stateScope = _factory.Services.CreateScope())
+        {
+            var resetStateStore = stateScope.ServiceProvider.GetRequiredService<IScheduledTaskStateStore>();
+            await resetStateStore.WriteAsync(new ScheduledTaskStateEnvelope<BusinessLifecycleAdvancementTaskState>
+            {
+                TaskName = ScheduledTaskNames.BusinessLifecycleAdvancement
+            }, TestContext.Current.CancellationToken);
+        }
 
         var response = await _client.PostAsJsonAsync($"/gig-imports/{batchId}/commit", new
         {
@@ -58,6 +67,12 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(batchId, gig.SourceImportBatchId);
         Assert.Equal(draftId, gig.SourceImportDraftId);
         Assert.Equal(GigImportDraftStatus.Committed, draftStatus);
+        var stateStore = scope.ServiceProvider.GetRequiredService<IScheduledTaskStateStore>();
+        var envelope = await stateStore.ReadAsync<BusinessLifecycleAdvancementTaskState>(
+            ScheduledTaskNames.BusinessLifecycleAdvancement,
+            TestContext.Current.CancellationToken);
+        Assert.NotNull(envelope);
+        Assert.Equal(new DateOnly(2026, 11, 29), envelope.State.NextGigCompletionDate);
         Assert.Collection(gig.Expenses, expense =>
         {
             Assert.Equal("Per diem", expense.Description);
@@ -84,6 +99,28 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
         var errors = problem.GetProperty("errors").GetProperty($"drafts.{draftId}");
         Assert.Contains(errors.EnumerateArray(), value => value.GetString() == "Client is required.");
         Assert.Contains(errors.EnumerateArray(), value => value.GetString() == "Title is required.");
+        Assert.Equal(0, await CountGigsAsync());
+    }
+
+    [Fact]
+    public async Task CommitSelectedRows_WithPastPlannedDate_ReturnsValidationProblem()
+    {
+        var batchId = Guid.NewGuid();
+        var draftId = Guid.NewGuid();
+        var pastDate = new DateOnly(2025, 12, 31);
+        await SeedImportBatchAsync(batchId, draftId, proposedDate: pastDate);
+
+        var response = await _client.PostAsJsonAsync($"/gig-imports/{batchId}/commit", new
+        {
+            draftIds = new[] { draftId },
+            commitAccepted = false,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var errors = problem.GetProperty("errors").GetProperty($"drafts.{draftId}");
+        Assert.Contains(errors.EnumerateArray(), value => value.GetString() == "Planned gigs cannot be in the past.");
         Assert.Equal(0, await CountGigsAsync());
     }
 
@@ -251,7 +288,8 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
         Guid batchId,
         Guid draftId,
         bool includeRequiredFields = true,
-        string? sourceFingerprint = null)
+        string? sourceFingerprint = null,
+        DateOnly? proposedDate = null)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -271,7 +309,7 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
                     Id = draftId,
                     ProposedClientId = includeRequiredFields ? TestData.FoxAndFinchId : null,
                     ProposedTitle = includeRequiredFields ? "Swing Into Christmas" : null,
-                    ProposedDate = includeRequiredFields ? new DateOnly(2026, 11, 28) : null,
+                    ProposedDate = includeRequiredFields ? proposedDate ?? new DateOnly(2026, 11, 28) : null,
                     ProposedVenueName = includeRequiredFields ? "Music Hall" : null,
                     ProposedVenueAddress = includeRequiredFields ? "Aberdeen" : null,
                     ProposedVenuePostcode = includeRequiredFields ? "AB10 1AA" : null,

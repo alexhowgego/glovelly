@@ -28,4 +28,5 @@ public sealed record ExecutionDecision(bool ShouldRun, string Reason)
 public static class ScheduledTaskNames
 {
     public const string GoogleCalendarPropagation = "google-calendar-propagation";
+    public const string BusinessLifecycleAdvancement = "business-lifecycle-advancement";
 }

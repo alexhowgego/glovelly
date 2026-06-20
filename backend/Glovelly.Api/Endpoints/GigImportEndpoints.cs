@@ -66,6 +66,8 @@ internal static class GigImportEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IWorkspaceEventPublisher workspaceEventPublisher,
+            IBusinessLifecycleSignal businessLifecycleSignal,
+            TimeProvider timeProvider,
             IGigImportDuplicateDetectionService duplicateDetectionService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -144,6 +146,8 @@ internal static class GigImportEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IWorkspaceEventPublisher workspaceEventPublisher,
+            IBusinessLifecycleSignal businessLifecycleSignal,
+            TimeProvider timeProvider,
             IGigImportDuplicateDetectionService duplicateDetectionService) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -202,7 +206,11 @@ internal static class GigImportEndpoints
                     ToDetail(batch, duplicateWarnings)));
             }
 
-            var errors = await ValidateCommitDraftsAsync(db, userId, draftsToCommit);
+            var errors = await ValidateCommitDraftsAsync(
+                db,
+                userId,
+                draftsToCommit,
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime));
             if (errors.Count > 0)
             {
                 return Results.ValidationProblem(errors);
@@ -220,6 +228,11 @@ internal static class GigImportEndpoints
             UpdateBatchStatusAfterCommittedDecisions(batch);
 
             await db.SaveChangesAsync();
+            foreach (var gig in gigs)
+            {
+                await businessLifecycleSignal.TrackGigAsync(gig);
+            }
+
             await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "created", null, DateTimeOffset.UtcNow));
             await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gig-imports", "updated", batch.Id, DateTimeOffset.UtcNow));
 
@@ -268,7 +281,8 @@ internal static class GigImportEndpoints
     private static async Task<Dictionary<string, string[]>> ValidateCommitDraftsAsync(
         AppDbContext db,
         Guid? userId,
-        IReadOnlyList<GigImportDraft> drafts)
+        IReadOnlyList<GigImportDraft> drafts,
+        DateOnly today)
     {
         var errors = new Dictionary<string, string[]>();
         var clientIds = drafts
@@ -306,6 +320,10 @@ internal static class GigImportEndpoints
             if (!draft.ProposedDate.HasValue)
             {
                 draftErrors.Add("Date is required.");
+            }
+            else if (EndpointSupport.IsPastPlannedGig(GigStatus.Confirmed, draft.ProposedDate.Value, today))
+            {
+                draftErrors.Add("Planned gigs cannot be in the past.");
             }
 
             if (string.IsNullOrWhiteSpace(BuildVenue(draft)))

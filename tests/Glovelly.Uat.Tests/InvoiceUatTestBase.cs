@@ -118,11 +118,16 @@ public abstract class InvoiceUatTestBase : UatTestBase
     protected async Task OpenInvoiceLinesAsync()
     {
         var lineItemsButton = Page.GetByTestId("invoice-line-items-button");
-        if (await lineItemsButton.GetAttributeAsync("aria-expanded") != "true")
+        if (await lineItemsButton.GetAttributeAsync("aria-expanded") == "true")
         {
             await lineItemsButton.ClickAsync();
+            await Assertions.Expect(lineItemsButton).ToHaveAttributeAsync("aria-expanded", "false", new LocatorAssertionsToHaveAttributeOptions
+            {
+                Timeout = 30_000,
+            });
         }
 
+        await lineItemsButton.ClickAsync();
         await Assertions.Expect(lineItemsButton).ToHaveAttributeAsync("aria-expanded", "true", new LocatorAssertionsToHaveAttributeOptions
         {
             Timeout = 30_000,
@@ -161,7 +166,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected async Task AssertInvoiceLineTypeCountAsync(string expectedType, int expectedCount)
     {
-        await Assertions.Expect(Page.Locator("[data-testid=\"invoice-line-type\"]:visible").Filter(new LocatorFilterOptions
+        await Assertions.Expect(Page.GetByTestId("invoice-line-type").Filter(new LocatorFilterOptions
         {
             HasTextRegex = new System.Text.RegularExpressions.Regex($"^{System.Text.RegularExpressions.Regex.Escape(expectedType)}$")
         })).ToHaveCountAsync(expectedCount, new LocatorAssertionsToHaveCountOptions
@@ -293,7 +298,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected ILocator ExpenseRowAt(int index) => Page.GetByTestId("gig-expense-item").Nth(index);
 
-    private ILocator VisibleInvoiceLines() => Page.Locator("[data-testid=\"invoice-line-item\"]:visible");
+    private ILocator VisibleInvoiceLines() => Page.GetByTestId("invoice-line-item");
 
     private ILocator InvoiceLine(string expectedText) => VisibleInvoiceLines().Filter(new LocatorFilterOptions
     {

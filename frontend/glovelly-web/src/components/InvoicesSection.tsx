@@ -6,9 +6,11 @@ import {
   formatDateTime,
   getAllowedInvoiceStatusTransitions,
 } from '../formatters'
+import { TrashIcon } from './TrashIcon'
 import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Invoice,
+  InvoiceLine,
   InvoiceQuickFilter,
   InvoiceSort,
   InvoiceSortKey,
@@ -36,6 +38,7 @@ type InvoicesSectionProps = {
   onAdjustmentReasonChange: (value: string) => void
   onAddAdjustment: (invoice: Invoice) => Promise<void>
   onCloseEditor: () => void
+  onDeleteAdjustment: (invoice: Invoice, line: InvoiceLine) => Promise<void>
   onDeleteInvoice: (invoice: Invoice) => Promise<void>
   onDownloadPdf: (invoice: Invoice) => Promise<void>
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<Invoice | null>
@@ -76,6 +79,7 @@ export function InvoicesSection({
   onAdjustmentReasonChange,
   onAddAdjustment,
   onCloseEditor,
+  onDeleteAdjustment,
   onDeleteInvoice,
   onDownloadPdf,
   onInvoiceStatusChange,
@@ -349,6 +353,7 @@ export function InvoicesSection({
                     : 'Delete draft invoice'
                 }
               >
+                <TrashIcon />
                 Delete draft
               </button>
               <button
@@ -493,7 +498,7 @@ export function InvoicesSection({
             </div>
 
             {selectedInvoice ? (
-              <>
+              <div className="invoice-line-editor-content">
                 <div className="gig-timeline-note">
                   <p className="detail-label">Adjustments</p>
                   <span>
@@ -544,7 +549,7 @@ export function InvoicesSection({
 
                       return (
                         <div className="invoice-line-item" data-testid="invoice-line-item" key={line.id}>
-                          <div>
+                          <div className="invoice-line-content">
                             {gigId ? (
                               <button
                                 className="link-button invoice-line-link"
@@ -552,10 +557,10 @@ export function InvoicesSection({
                                 onClick={() => onOpenGig(gigId)}
                                 type="button"
                               >
-                                {line.description}
+                                <span data-testid="invoice-line-description">{line.description}</span>
                               </button>
                             ) : (
-                              <strong>{line.description}</strong>
+                              <strong data-testid="invoice-line-description">{line.description}</strong>
                             )}
                             <span>
                               <span data-testid="invoice-line-type">{line.type}</span> · {line.quantity} x {formatCurrency(line.unitPrice)}
@@ -564,12 +569,27 @@ export function InvoicesSection({
                               <span>Audit: {formatDateTime(line.createdUtc)}</span>
                             ) : null}
                           </div>
-                          <strong>{formatCurrency(line.lineTotal)}</strong>
+                          <div className="invoice-line-end">
+                            <strong>{formatCurrency(line.lineTotal)}</strong>
+                            {line.type === 'ManualAdjustment' ? (
+                              <button
+                                aria-label={`Remove adjustment ${line.description}`}
+                                className="icon-delete-button"
+                                data-testid="invoice-line-delete-button"
+                                disabled={isInvoiceLoading}
+                                onClick={() => void onDeleteAdjustment(selectedInvoice, line)}
+                                title="Remove adjustment"
+                                type="button"
+                              >
+                                <TrashIcon />
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       )
                     })}
                 </div>
-              </>
+              </div>
             ) : (
               <div className="empty-state roomy">
                 <strong>Select an invoice to inspect its line items.</strong>

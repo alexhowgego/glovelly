@@ -155,7 +155,10 @@ export function AppShell({
               </div>
 
               <div className="header-actions">
-                <label className={`primary-button quick-capture-button quick-receipt-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}>
+                <label
+                  className={`primary-button quick-capture-button quick-receipt-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}
+                  title="Quick add expense receipt"
+                >
                   <span className="quick-capture-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" focusable="false">
                       <path d="M8.4 6.5 9.7 4h4.6l1.3 2.5H19a3 3 0 0 1 3 3V17a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V9.5a3 3 0 0 1 3-3h3.4Z" />
@@ -183,6 +186,7 @@ export function AppShell({
                   onClick={onQuickAttachmentOpen}
                   type="button"
                   disabled={isLoading || isGigLoading || isQuickAttachmentSaving}
+                  title="Quick add attachment"
                 >
                   <span className="quick-capture-icon quick-attachment-icon" aria-hidden="true">
                     +

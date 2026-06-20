@@ -4,6 +4,7 @@ import type { FormEvent } from 'react'
 import { GigAttachmentsPanel } from './GigAttachmentsPanel'
 import { GigEditorPanel } from './GigEditorPanel'
 import { GigExpensesPanel } from './GigExpensesPanel'
+import { TrashIcon } from './TrashIcon'
 import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
 import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
@@ -424,6 +425,7 @@ export function GigsSection({
                     : 'Delete planned gig'
                 }
               >
+                <TrashIcon />
                 Delete gig
               </button>
             </div>

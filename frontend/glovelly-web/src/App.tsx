@@ -290,6 +290,7 @@ function App({ appMetadata }: AppProps) {
     filteredInvoices,
     googleDrivePublishLink,
     handleAddInvoiceAdjustment,
+    handleDeleteInvoiceAdjustment,
     handleDeleteInvoice,
     handleDownloadInvoicePdf,
     handleInvoiceReissue,
@@ -845,27 +846,25 @@ function App({ appMetadata }: AppProps) {
     }
 
     const invoiceId = selectedGig.invoiceId
-    if (!invoices.some((invoice) => invoice.id === invoiceId)) {
-      try {
-        const response = await fetchWithSession(buildApiUrl(`/invoices/${invoiceId}`))
-        if (isSessionExpiredResponse(response)) {
-          expireSession('Your session expired. Sign in again to keep working.')
-          return
-        }
-
-        if (!response.ok) {
-          throw new Error('Unable to open linked invoice.')
-        }
-
-        const invoice = (await response.json()) as Invoice
-        setInvoices((current) => [
-          invoice,
-          ...current.filter((value) => value.id !== invoice.id),
-        ])
-      } catch (error) {
-        setGigStatus(error instanceof Error ? error.message : 'Unable to open linked invoice.')
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoiceId}`))
+      if (isSessionExpiredResponse(response)) {
+        expireSession('Your session expired. Sign in again to keep working.')
         return
       }
+
+      if (!response.ok) {
+        throw new Error('Unable to open linked invoice.')
+      }
+
+      const invoice = (await response.json()) as Invoice
+      setInvoices((current) => [
+        invoice,
+        ...current.filter((value) => value.id !== invoice.id),
+      ])
+    } catch (error) {
+      setGigStatus(error instanceof Error ? error.message : 'Unable to open linked invoice.')
+      return
     }
 
     setSelectedInvoiceId(invoiceId)
@@ -1687,6 +1686,7 @@ function App({ appMetadata }: AppProps) {
         onAdjustmentReasonChange={setAdjustmentReason}
         onAddAdjustment={handleAddInvoiceAdjustment}
         onCloseEditor={closeInvoiceEditor}
+        onDeleteAdjustment={handleDeleteInvoiceAdjustment}
         onDeleteInvoice={handleDeleteInvoice}
         onDownloadPdf={handleDownloadInvoicePdf}
         onInvoiceStatusChange={handleInvoiceStatusChangeWithGigPrompt}

@@ -203,7 +203,7 @@ The workflow:
 - Injects the Resend API key into Cloud Run as `Email__Resend__ApiKey`
 - Deploys `main` to the `glovelly` Cloud Run service
 - Deploys each internal pull request to the shared `glovelly-staging` Cloud Run service and comments the preview URL on the PR
-- Deploys the Calendar sync Cloud Run Job and Cloud Scheduler trigger for eligible environments
+- Deploys the Calendar sync and Business lifecycle Cloud Run Jobs and Cloud Scheduler triggers for eligible environments
 
 The image is published to the Google Artifact Registry image configured in `.github/workflows/main.yml`.
 

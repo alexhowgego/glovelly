@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { formatCurrency } from '../formatters'
 import type { Gig, GigExpenseForm, GigExpenseReimbursementStatus } from '../types'
+import { TrashIcon } from './TrashIcon'
 
 type GigExpensesPanelProps = {
   expenses: GigExpenseForm[]
@@ -170,12 +171,14 @@ export function GigExpensesPanel({
                           Edit
                         </button>
                         <button
-                          className="danger-button"
+                          aria-label={`Remove expense ${expense.description || 'Untitled expense'}`}
+                          className="icon-delete-button"
                           onClick={() => void onDeleteExpenseDraft(index)}
                           type="button"
                           disabled={isGigLoading}
+                          title="Remove expense"
                         >
-                          Remove
+                          <TrashIcon />
                         </button>
                       </div>
 
@@ -214,12 +217,14 @@ export function GigExpensesPanel({
                                     {attachment.fileName}
                                   </button>
                                   <button
-                                    className="ghost-button"
+                                    aria-label={`Delete receipt ${attachment.fileName}`}
+                                    className="icon-delete-button"
                                     type="button"
                                     onClick={() => onDeleteExpenseAttachment(expense, attachment.id)}
                                     disabled={isGigLoading}
+                                    title="Delete receipt"
                                   >
-                                    Delete
+                                    <TrashIcon />
                                   </button>
                                 </div>
                               ))}
