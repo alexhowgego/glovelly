@@ -37,7 +37,7 @@ Frontend, backend, and worker are separate concerns at build time. The Vite fron
 
 The browser frontend owns user/admin journeys and calls the API for authenticated application workflows.
 
-The ASP.NET Core backend is responsible for serving the frontend, Google authentication integration, mapping Google identities to Glovelly users, enforcing application authorisation, running business workflows, persistence through EF Core, and integrations such as email, Google Drive, Google Calendar, and storage.
+The ASP.NET Core backend is responsible for serving the frontend, Google authentication integration, mapping Google identities to Glovelly users, enforcing application authorisation, running business workflows, persistence through EF Core, and integrations such as email, Google Drive, Google Sheets, Google Calendar, and storage.
 
 Neon Postgres is the primary system of record for Glovelly users, roles/access metadata, clients, gigs, staged gig imports, invoices, expenses, receipts, delivery records when captured, and future domain entities.
 
@@ -56,6 +56,7 @@ Even while the deployed application remains a single process, code should preser
 - Domain models and business workflows
 - Persistence and EF Core configuration
 - Integrations such as Resend, Google Drive, Google Calendar, and blob storage
+- Google Sheets read access for setlist import remains an integration boundary; parser/review persistence belongs to the application domain rather than Google API client code.
 - Presentation/UI/admin journeys
 - Deployment and configuration concerns
 
@@ -106,6 +107,18 @@ Glovelly responsibility: container health, runtime configuration, logs, service 
 Purpose: one-way gig visibility in a dedicated user calendar.
 
 Glovelly responsibility: treat Glovelly gigs as the source of truth, create and manage a `Glovelly Gigs` calendar with least-privilege app-created scope, sync confirmed/completed gigs, delete cancelled synced gigs, and recover by rebuilding local sync state if the provider calendar is deleted.
+
+### Google Drive
+
+Purpose: invoice PDF publishing.
+
+Glovelly responsibility: request only `drive.file` for this journey, upload generated invoice PDFs through the Drive API, and keep Drive service connection management separate from Sheets access.
+
+### Google Sheets
+
+Purpose: read linked Google Sheet setlists for gigs.
+
+Glovelly responsibility: request `spreadsheets.readonly` only through the separate Sheets service journey, read worksheet metadata/values for user-reviewed import, preserve source order/row numbers, and store imported setlists separately from the live sheet.
 
 ### Google Artifact Registry
 

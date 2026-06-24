@@ -30,6 +30,8 @@ public sealed class Gig
     public ICollection<GigExpense> Expenses { get; set; } = new List<GigExpense>();
     public ICollection<GigExternalResource> ExternalResources { get; set; } = new List<GigExternalResource>();
     [JsonIgnore]
+    public ICollection<GigSetListImport> SetListImports { get; set; } = new List<GigSetListImport>();
+    [JsonIgnore]
     public User? CreatedByUser { get; set; }
     [JsonIgnore]
     public User? UpdatedByUser { get; set; }

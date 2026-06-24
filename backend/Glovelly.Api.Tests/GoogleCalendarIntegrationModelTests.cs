@@ -4,6 +4,7 @@ using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -26,6 +27,138 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         Assert.Equal("https://www.googleapis.com/auth/calendar.app.created", GoogleScopes.CalendarAppCreated);
         Assert.True(GoogleScopes.Contains(GoogleScopes.CalendarAppCreated, GoogleScopes.CalendarAppCreated));
         Assert.False(GoogleScopes.Contains(GoogleScopes.CalendarAppCreated, GoogleScopes.DriveFile));
+    }
+
+    [Fact]
+    public async Task CalendarConnect_WhenDriveScopeExists_RequestsDriveAndCalendarScopes()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Authentication:Google:ClientId", "google-client-id");
+            builder.UseSetting("Authentication:Google:ClientSecret", "google-client-secret");
+        });
+        var client = factory.CreateClient(new()
+        {
+            AllowAutoRedirect = false,
+        });
+        await SeedGoogleConnectionAsync(factory, GoogleScopes.DriveFile);
+
+        var response = await client.GetAsync("/integrations/google-calendar/connect", TestContext.Current.CancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
+        var location = Assert.IsType<Uri>(response.Headers.Location);
+        var query = QueryHelpers.ParseQuery(location.Query);
+        var scopes = query["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains(GoogleScopes.DriveFile, scopes);
+        Assert.Contains(GoogleScopes.CalendarAppCreated, scopes);
+    }
+
+    [Fact]
+    public async Task CalendarConnect_WhenSheetsScopeExists_RequestsSheetsAndCalendarScopes()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Authentication:Google:ClientId", "google-client-id");
+            builder.UseSetting("Authentication:Google:ClientSecret", "google-client-secret");
+        });
+        var client = factory.CreateClient(new()
+        {
+            AllowAutoRedirect = false,
+        });
+        await SeedGoogleConnectionAsync(factory, GoogleScopes.SpreadsheetsReadonly);
+
+        var response = await client.GetAsync("/integrations/google-calendar/connect", TestContext.Current.CancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
+        var location = Assert.IsType<Uri>(response.Headers.Location);
+        var query = QueryHelpers.ParseQuery(location.Query);
+        var scopes = query["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains(GoogleScopes.SpreadsheetsReadonly, scopes);
+        Assert.Contains(GoogleScopes.CalendarAppCreated, scopes);
+    }
+
+    [Fact]
+    public async Task CalendarDisconnect_WhenDriveScopeExists_RemovesCalendarScopeOnly()
+    {
+        var client = _factory.CreateClient();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var connectionId = Guid.NewGuid();
+            dbContext.GoogleConnections.Add(new GoogleConnection
+            {
+                Id = connectionId,
+                UserId = TestAuthContext.UserId,
+                EncryptedAccessToken = "encrypted-access-token",
+                EncryptedRefreshToken = "encrypted-refresh-token",
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
+                RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+                GrantedScopes = $"{GoogleScopes.DriveFile} {GoogleScopes.CalendarAppCreated}",
+                TokenType = "Bearer",
+                ConnectedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            dbContext.GoogleCalendarIntegrationSettings.Add(new GoogleCalendarIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                IsEnabled = true,
+                GoogleCalendarId = "calendar-id",
+                CalendarName = "Glovelly Gigs",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var response = await client.PostAsync("/integrations/google-calendar/disconnect", content: null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode);
+        using var assertionScope = _factory.Services.CreateScope();
+        var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var connection = await assertionDbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
+        var settings = await assertionDbContext.GoogleCalendarIntegrationSettings.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(GoogleScopes.DriveFile, connection.GrantedScopes);
+        Assert.Null(connection.RevokedAtUtc);
+        Assert.NotEmpty(connection.EncryptedAccessToken);
+        Assert.False(settings.IsEnabled);
+        Assert.NotNull(settings.DisconnectedAtUtc);
+    }
+
+    [Fact]
+    public async Task CalendarDisconnect_WhenOnlyCalendarScopeExists_RevokesConnection()
+    {
+        var client = _factory.CreateClient();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var connectionId = Guid.NewGuid();
+            dbContext.GoogleConnections.Add(new GoogleConnection
+            {
+                Id = connectionId,
+                UserId = TestAuthContext.UserId,
+                EncryptedAccessToken = "encrypted-access-token",
+                EncryptedRefreshToken = "encrypted-refresh-token",
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
+                RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+                GrantedScopes = GoogleScopes.CalendarAppCreated,
+                TokenType = "Bearer",
+                ConnectedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var response = await client.PostAsync("/integrations/google-calendar/disconnect", content: null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode);
+        using var assertionScope = _factory.Services.CreateScope();
+        var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var connection = await assertionDbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(connection.RevokedAtUtc);
+        Assert.Empty(connection.EncryptedAccessToken);
+        Assert.Empty(connection.EncryptedRefreshToken);
     }
 
     [Fact]
@@ -1040,6 +1173,11 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
 
     private static async Task<Guid> SeedCalendarConnectionAsync(WebApplicationFactory<Program> factory)
     {
+        return await SeedGoogleConnectionAsync(factory, GoogleScopes.CalendarAppCreated);
+    }
+
+    private static async Task<Guid> SeedGoogleConnectionAsync(WebApplicationFactory<Program> factory, string grantedScopes)
+    {
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tokenProtector = scope.ServiceProvider.GetRequiredService<IGoogleTokenProtector>();
@@ -1052,7 +1190,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             EncryptedRefreshToken = tokenProtector.Protect("refresh-token"),
             AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
             RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
-            GrantedScopes = GoogleScopes.CalendarAppCreated,
+            GrantedScopes = grantedScopes,
             TokenType = "Bearer",
             ConnectedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,

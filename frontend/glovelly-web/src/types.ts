@@ -48,6 +48,7 @@ export type AuthUser = {
   invoiceReplyToEmail: string | null
   invoiceUploadFolderId: string | null
   isGoogleDriveConnected: boolean
+  isGoogleSheetsConnected: boolean
 }
 
 export type GoogleCalendarStatus = {
@@ -212,6 +213,60 @@ export type GigExternalResourceAttachment = {
   contentType: string
   sizeBytes: number
   createdAt: string
+}
+
+export type GigSetListItemKind = 'Song' | 'Separator' | 'Comment'
+export type GigSetListItemConfidence = 'Low' | 'Medium' | 'High'
+
+export type GigSetListWorksheet = {
+  sheetId: string
+  title: string
+  index: number
+}
+
+export type GigSetListSource = {
+  resourceId: string
+  resourceTitle: string
+  resourceUrl: string
+  spreadsheetId: string
+  worksheets: GigSetListWorksheet[]
+}
+
+export type GigSetListImportItemDraft = {
+  sourceRowNumber: number
+  sortOrder: number
+  kind: GigSetListItemKind
+  include: boolean
+  section: string | null
+  padNumber: string | null
+  key: string | null
+  title: string
+  notes: string | null
+  rawCellsJson: string
+  confidence: GigSetListItemConfidence
+}
+
+export type GigSetListPreview = {
+  resourceId: string
+  resourceTitle: string
+  resourceUrl: string
+  spreadsheetId: string
+  worksheetId: string | null
+  worksheetName: string
+  items: GigSetListImportItemDraft[]
+}
+
+export type GigSetListImport = {
+  id: string
+  gigId: string
+  resourceId: string | null
+  spreadsheetId: string
+  worksheetId: string | null
+  worksheetName: string
+  sourceUrl: string | null
+  isActive: boolean
+  importedAtUtc: string
+  items: (GigSetListImportItemDraft & { id: string })[]
 }
 
 export type ExpenseStatementGig = {

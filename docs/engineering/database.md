@@ -12,11 +12,12 @@ The database stores:
 - roles and access metadata
 - clients and contacts
 - gigs
+- imported gig setlists and reviewed setlist item rows
 - gig import batches and draft rows
 - gig expenses and receipt attachment metadata
 - invoices and invoice lines
 - seller profiles
-- reusable Google connection metadata plus Drive and Calendar integration settings
+- reusable Google connection metadata plus Drive, Sheets, and Calendar integration settings/status
 - Google Calendar sync state and durable Calendar sync queue work items
 - MCP OAuth state/tokens
 - ASP.NET Core data protection keys in Postgres-backed deployments
@@ -25,6 +26,8 @@ The database stores:
 Generated binary content such as receipt files and invoice PDFs is stored through blob storage abstractions, with database records holding metadata and storage keys.
 
 Gig import batches and drafts are staging records. They can contain incomplete AI-extracted data and are not treated as real gigs until the user commits accepted rows. Rejected draft rows are deleted when import decisions are committed.
+
+Setlist imports are reviewed snapshots of linked Google Sheet worksheet rows. `GigSetListImports` stores source metadata and active/history state; `GigSetListItems` stores ordered reviewed rows, source row numbers, song/separator/comment kind, and raw source cells for auditability. Re-import creates a new import rather than overwriting prior history.
 
 ## EF Core
 

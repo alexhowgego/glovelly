@@ -76,6 +76,31 @@ The app allows an attachment without a URL, stores uploaded file metadata, downl
 
 Only one `Set list` attachment is primary for the gig. The primary `Gig plan` remains primary because primary status is scoped by gig and purpose.
 
+## Set List Import Journey
+
+> **Automation:** Backend automated; manual UAT: `SetListImportEndpointsTests` and `SetListSheetParserTests` cover source parsing, review save, re-import history, and edit persistence. Browser OAuth and review modal flow remain manual.
+
+### Preconditions
+
+- Google Sheets is connected from the profile `Services` menu, or the tester is ready to connect it from the import modal.
+- A gig has a primary `Set list` attachment whose type is `Google Sheet` and whose URL points to a Google Sheets spreadsheet the connected Google account can read.
+
+### Steps
+
+1. Open Gigs and select the gig with the primary Google Sheet set list attachment.
+2. Expand the attachment and click `Import set list`.
+3. If Google Sheets is not connected, click `Connect Google Sheets`, complete OAuth, and return to the gig.
+4. Choose the worksheet/tab and click `Preview rows`.
+5. Confirm likely songs appear as included rows and non-song headings/instructions appear as greyed review notes.
+6. Expand a row, adjust title/pad/key/section/notes, and save the import.
+7. Re-open the attachment and click `Review set list`.
+8. Toggle a song include flag or edit a row, then save changes.
+9. Re-run `Import set list` and confirm replacing the active import requires confirmation and preserves historical imports.
+
+### Expected Results
+
+Imported setlists preserve source worksheet order and row numbers. Separators/comments are retained for audit but are not included as songs. Reviewing and saving edits updates the active import without changing the linked Google Sheet. Re-importing creates a new active snapshot only after explicit confirmation.
+
 ## Negative Checks
 
 1. Try to save an attachment with a blank title.

@@ -49,6 +49,10 @@ internal static class GoogleDriveIntegrationEndpoints
                 return Results.Unauthorized();
             }
 
+            var authorizationScope = await GoogleIntegrationEndpointSupport.BuildAuthorizationScopeAsync(
+                dbContext,
+                currentUserId.Value,
+                GoogleScopes.DriveFile);
             var state = CreateStateToken(currentUserId.Value, dataProtectionProvider);
             var authorizationUrl = QueryHelpers.AddQueryString(
                 GoogleAuthorizationEndpoint,
@@ -57,11 +61,7 @@ internal static class GoogleDriveIntegrationEndpoints
                     ["client_id"] = settings.GoogleClientId,
                     ["redirect_uri"] = BuildCallbackUri(httpContext),
                     ["response_type"] = "code",
-                    ["scope"] = GoogleScopes.Join(
-                        GoogleScopes.OpenId,
-                        GoogleScopes.Email,
-                        GoogleScopes.Profile,
-                        GoogleScopes.DriveFile),
+                    ["scope"] = authorizationScope,
                     ["access_type"] = "offline",
                     ["prompt"] = "consent",
                     ["state"] = state,
@@ -199,9 +199,13 @@ internal static class GoogleDriveIntegrationEndpoints
                 .FirstOrDefaultAsync(value => value.UserId == currentUserId.Value, cancellationToken);
             if (connection is not null)
             {
-                connection.RevokedAtUtc = now;
-                connection.EncryptedAccessToken = string.Empty;
-                connection.EncryptedRefreshToken = string.Empty;
+                connection.GrantedScopes = GoogleScopes.Remove(connection.GrantedScopes, GoogleScopes.DriveFile);
+                if (string.IsNullOrWhiteSpace(connection.GrantedScopes))
+                {
+                    connection.RevokedAtUtc = now;
+                    connection.EncryptedAccessToken = string.Empty;
+                    connection.EncryptedRefreshToken = string.Empty;
+                }
                 connection.UpdatedAtUtc = now;
             }
 

@@ -59,6 +59,7 @@ type AppShellProps = {
   onOpenNextGig: () => void
   onOpenSellerProfile: () => void
   onGenerateDashboardInvoice: () => void
+  onOpenConnectedServices: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
   onQuickAttachmentOpen: () => void
@@ -95,6 +96,7 @@ export function AppShell({
   onOpenNextGig,
   onOpenSellerProfile,
   onGenerateDashboardInvoice,
+  onOpenConnectedServices,
   onOpenUserSettings,
   onProfileMenuToggle,
   onQuickAttachmentOpen,
@@ -286,6 +288,15 @@ export function AppShell({
                         {pendingGigImportCount > 0 && (
                           <span className="notification-dot" aria-hidden="true" />
                         )}
+                      </button>
+                      <button
+                        className="ghost-button profile-settings"
+                        onClick={onOpenConnectedServices}
+                        role="menuitem"
+                        type="button"
+                        disabled={isLoading || isAdminLoading || isUserSettingsSaving}
+                      >
+                        Services
                       </button>
                       <button
                         className="ghost-button profile-settings"

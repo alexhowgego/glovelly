@@ -54,6 +54,18 @@ User mapping and first-login subject binding happen during Google token validati
 
 Current-user access and policy names live under `backend/Glovelly.Api/Auth/`.
 
+## Optional Google Service Authorisation
+
+The Google sign-in flow is separate from optional Google service authorisation. Optional service OAuth endpoints reuse the encrypted `GoogleConnection` record and merge granted scopes, but each journey asks for only the scope it needs:
+
+- `/integrations/google-drive/connect` requests `https://www.googleapis.com/auth/drive.file` for invoice PDF publishing.
+- `/integrations/google-sheets/connect` requests `https://www.googleapis.com/auth/spreadsheets.readonly` for setlist import.
+- `/integrations/google-calendar/connect` requests the Calendar scopes needed by the gig sync service.
+
+Drive and Sheets can be connected or disconnected independently from the profile `Services` menu. Disconnecting one service removes that local scope and revokes the shared token record only when no Google service scopes remain.
+
+The Sheets readonly scope may require an HTTPS-only OAuth client in Google Cloud. Local HTTP development can continue using Drive without requesting Sheets; use staging or an HTTPS tunnel when testing the Sheets flow against real Google OAuth.
+
 ## Staging UAT Authentication
 
 Staging registers `POST /test-auth/login` so browser-based UAT tests can authenticate deterministically without exercising Google on every regression run.

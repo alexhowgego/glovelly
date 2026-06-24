@@ -3,6 +3,7 @@ import {
   AdminSection,
   AppShell,
   ClientSettingsModal,
+  ConnectedServicesModal,
   ClientsSection,
   ExpenseStatementModal,
   GigImportsModal,
@@ -436,15 +437,24 @@ function App({ appMetadata }: AppProps) {
     setGigStatus,
   })
   const {
+    closeConnectedServices,
     closeUserSettings,
     connectGoogleCalendar,
     connectGoogleDrive,
+    connectGoogleSheets,
     disconnectGoogleCalendar,
+    disconnectGoogleDrive,
+    disconnectGoogleSheets,
     googleCalendarStatus,
     handleUserSettingsSubmit,
     isGoogleCalendarBusy,
+    isGoogleDriveBusy,
+    isGoogleSheetsBusy,
+    isConnectedServicesOpen,
     isUserSettingsOpen,
     isUserSettingsSaving,
+    openConnectedServices,
+    openSettingsFromServices,
     openUserSettings,
     resetUserSettings,
     updateUserSettingsField,
@@ -544,7 +554,6 @@ function App({ appMetadata }: AppProps) {
     onWorkspaceChanged: (event) => {
       if (event.scope === 'gigs') {
         void refreshGigsFromServer('realtime')
-        void refreshInvoicesFromServer('realtime')
       }
 
       if (event.scope === 'gig-imports') {
@@ -1731,6 +1740,7 @@ function App({ appMetadata }: AppProps) {
       onOpenGigImports={openGigImports}
       onOpenNextGig={openDashboardNextGig}
       onOpenSellerProfile={openSellerProfile}
+      onOpenConnectedServices={openConnectedServices}
       onOpenUserSettings={openUserSettings}
       onProfileMenuToggle={toggleProfileMenu}
       onQuickAttachmentOpen={openQuickAttachmentDialog}
@@ -1810,19 +1820,33 @@ function App({ appMetadata }: AppProps) {
           null
         )}
         invoiceFilenameTokens={invoiceFilenameTokens}
-        googleCalendarStatus={googleCalendarStatus}
-        isGoogleCalendarBusy={isGoogleCalendarBusy}
-        isGoogleDriveConnected={authUser?.isGoogleDriveConnected ?? false}
         isOpen={isUserSettingsOpen}
         isSaving={isUserSettingsSaving}
-        isGoogleDriveConnectDisabled={isLoading || isAdminLoading}
         onClose={closeUserSettings}
-        onConnectGoogleCalendar={connectGoogleCalendar}
-        onConnectGoogleDrive={connectGoogleDrive}
-        onDisconnectGoogleCalendar={disconnectGoogleCalendar}
         onSubmit={handleUserSettingsSubmit}
         onUpdateField={updateUserSettingsField}
         sellerProfilePostcode={sellerProfile.postcode}
+        status={userSettingsStatus}
+      />
+
+      <ConnectedServicesModal
+        googleCalendarStatus={googleCalendarStatus}
+        invoiceUploadFolderId={authUser?.invoiceUploadFolderId ?? userSettingsForm.invoiceUploadFolderId}
+        isGoogleCalendarBusy={isGoogleCalendarBusy}
+        isGoogleDriveBusy={isGoogleDriveBusy}
+        isGoogleDriveConnected={authUser?.isGoogleDriveConnected ?? false}
+        isGoogleSheetsBusy={isGoogleSheetsBusy}
+        isGoogleSheetsConnected={authUser?.isGoogleSheetsConnected ?? false}
+        isOpen={isConnectedServicesOpen}
+        isSaving={isUserSettingsSaving}
+        onClose={closeConnectedServices}
+        onConnectGoogleCalendar={connectGoogleCalendar}
+        onConnectGoogleDrive={connectGoogleDrive}
+        onConnectGoogleSheets={connectGoogleSheets}
+        onDisconnectGoogleCalendar={disconnectGoogleCalendar}
+        onDisconnectGoogleDrive={disconnectGoogleDrive}
+        onDisconnectGoogleSheets={disconnectGoogleSheets}
+        onOpenSettings={openSettingsFromServices}
         status={userSettingsStatus}
       />
 

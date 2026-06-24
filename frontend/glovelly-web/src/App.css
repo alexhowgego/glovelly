@@ -1998,6 +1998,81 @@ button.compact-record-row.selected {
   font-weight: 700;
 }
 
+.setlist-import-modal {
+  width: min(920px, calc(100vw - 32px));
+}
+
+.setlist-review-list {
+  max-height: clamp(260px, 48svh, 560px);
+  margin-top: 12px;
+}
+
+.setlist-import-modal .compact-form-grid {
+  row-gap: 12px;
+}
+
+.setlist-import-modal .modal-actions {
+  margin-top: 4px;
+}
+
+.setlist-review-row.muted {
+  background: color-mix(in srgb, var(--surface-subtle) 72%, transparent);
+}
+
+.setlist-review-row.muted .associated-item-main strong,
+.setlist-review-row.muted .associated-item-main span {
+  color: var(--muted) !important;
+}
+
+.setlist-review-summary {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px;
+  padding: 0;
+}
+
+.setlist-include-toggle {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  min-width: 42px;
+  padding: 0 0 0 10px;
+}
+
+.setlist-include-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.setlist-review-main-button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 10px 12px 10px 4px;
+  cursor: pointer;
+}
+
+.setlist-review-main-button:hover,
+.setlist-review-main-button:focus-visible {
+  background: color-mix(in srgb, var(--heading) 6%, transparent);
+  outline: none;
+}
+
+.setlist-review-edit label {
+  display: grid;
+  gap: 6px;
+}
+
+.setlist-review-edit textarea {
+  min-height: 68px;
+}
+
 .external-resource-form {
   display: grid;
   gap: 12px;

@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
         services.AddScoped<IGigImportDuplicateDetectionService, GigImportDuplicateDetectionService>();
+        services.AddSingleton<ISetListSheetParser, SetListSheetParser>();
         services.AddScoped<IGoogleConnectionService, GoogleConnectionService>();
         services.AddSingleton<ICalendarEventPayloadHasher, CalendarEventPayloadHasher>();
         services.AddScoped<IGigCalendarEventMapper, GigCalendarEventMapper>();
@@ -89,6 +90,7 @@ public static class ServiceCollectionExtensions
             });
         services.AddHttpClient<ResendClient>();
         services.AddHttpClient<IGoogleDriveApiClient, GoogleDriveApiClient>();
+        services.AddHttpClient<IGoogleSheetsApiClient, GoogleSheetsApiClient>();
         services.AddHttpClient<IGoogleCalendarApiClient, GoogleCalendarApiClient>();
         services.AddScoped<IResend, ResendClient>();
         services.AddScoped<IEmailSender>(provider =>

@@ -3,7 +3,6 @@ using System.Text.Json;
 using Glovelly.Api.Auth;
 using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
-using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.WebUtilities;
@@ -11,21 +10,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Glovelly.Api.Endpoints;
 
-internal static class GoogleCalendarIntegrationEndpoints
+internal static class GoogleSheetsIntegrationEndpoints
 {
     private const string GoogleAuthorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
-    private const string StateProtectionPurpose = "Glovelly.GoogleCalendarOAuthState";
+    private const string StateProtectionPurpose = "Glovelly.GoogleSheetsOAuthState";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static IEndpointRouteBuilder MapGoogleCalendarIntegrationEndpoints(
+    public static IEndpointRouteBuilder MapGoogleSheetsIntegrationEndpoints(
         this IEndpointRouteBuilder app,
         StartupSettings settings)
     {
-        var googleCalendar = app.MapGroup("/integrations/google-calendar")
+        var googleSheets = app.MapGroup("/integrations/google-sheets")
             .WithTags("Integrations")
             .RequireAuthorization(GlovellyPolicies.GlovellyUser);
 
-        googleCalendar.MapGet("/connect", async (
+        googleSheets.MapGet("/connect", async (
             HttpContext httpContext,
             ClaimsPrincipal principal,
             ICurrentUserAccessor currentUserAccessor,
@@ -49,7 +48,7 @@ internal static class GoogleCalendarIntegrationEndpoints
             var authorizationScope = await GoogleIntegrationEndpointSupport.BuildAuthorizationScopeAsync(
                 dbContext,
                 currentUserId.Value,
-                GoogleScopes.CalendarAppCreated);
+                GoogleScopes.SpreadsheetsReadonly);
             var state = CreateStateToken(currentUserId.Value, dataProtectionProvider);
             var authorizationUrl = QueryHelpers.AddQueryString(
                 GoogleAuthorizationEndpoint,
@@ -67,7 +66,7 @@ internal static class GoogleCalendarIntegrationEndpoints
             return Results.Redirect(authorizationUrl);
         });
 
-        googleCalendar.MapGet("/callback", async (
+        googleSheets.MapGet("/callback", async (
             HttpContext httpContext,
             string? code,
             string? state,
@@ -79,8 +78,7 @@ internal static class GoogleCalendarIntegrationEndpoints
             IDataProtectionProvider dataProtectionProvider,
             IGoogleOAuthTokenClient tokenClient,
             IGoogleConnectionService googleConnectionService,
-            IGoogleCalendarIntegrationService calendarIntegrationService,
-            ICalendarSyncWorkQueue workQueue,
+            ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
             var currentUserId = await GetActiveCurrentUserIdAsync(principal, currentUserAccessor, dbContext);
@@ -98,15 +96,19 @@ internal static class GoogleCalendarIntegrationEndpoints
             if (!string.IsNullOrWhiteSpace(error))
             {
                 return Results.Problem(
-                    title: "Google Calendar connection was not approved.",
+                    title: "Google Sheets connection was not approved.",
                     detail: string.IsNullOrWhiteSpace(error_description) ? error : error_description,
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            if (string.IsNullOrWhiteSpace(code))
+            var validationErrors = ValidateCallback(code);
+            if (validationErrors.Count > 0)
             {
-                return EndpointSupport.ValidationProblem("code", "Google Calendar authorization code is required.");
+                return Results.ValidationProblem(validationErrors);
             }
+
+            var logger = loggerFactory.CreateLogger(nameof(GoogleSheetsIntegrationEndpoints));
+            logger.LogInformation("Received Google Sheets OAuth callback for user {UserId}.", currentUserId.Value);
 
             if (string.IsNullOrWhiteSpace(settings.GoogleClientId) ||
                 string.IsNullOrWhiteSpace(settings.GoogleClientSecret))
@@ -117,125 +119,70 @@ internal static class GoogleCalendarIntegrationEndpoints
             }
 
             var tokenResponse = await tokenClient.ExchangeCodeAsync(
-                code,
+                code!,
                 BuildCallbackUri(httpContext),
                 settings.GoogleClientId,
                 settings.GoogleClientSecret,
                 cancellationToken);
-            if (!tokenResponse.IsSuccess ||
-                tokenResponse.TokenResponse is null ||
-                string.IsNullOrWhiteSpace(tokenResponse.TokenResponse.AccessToken))
+
+            if (settings.IsDevelopment)
+            {
+                logger.LogInformation(
+                    "Google Sheets OAuth token response ({StatusCode}): {TokenResponse}",
+                    tokenResponse.StatusCode,
+                    tokenResponse.ResponseBody);
+            }
+
+            if (!tokenResponse.IsSuccess)
             {
                 return Results.Problem(
-                    title: "Google Calendar token exchange failed.",
-                    detail: settings.IsDevelopment ? tokenResponse.ResponseBody : "Google rejected the Calendar authorization code.",
+                    title: "Google Sheets token exchange failed.",
+                    detail: settings.IsDevelopment
+                        ? tokenResponse.ResponseBody
+                        : "Google rejected the Sheets authorization code.",
                     statusCode: StatusCodes.Status502BadGateway);
             }
 
-            if (!GoogleScopes.Contains(tokenResponse.TokenResponse.Scope, GoogleScopes.CalendarAppCreated))
+            if (tokenResponse.TokenResponse is null ||
+                string.IsNullOrWhiteSpace(tokenResponse.TokenResponse.AccessToken))
             {
-                return EndpointSupport.ValidationProblem("scope", "Google Calendar authorization did not grant the required Calendar scope.");
+                return Results.Problem(
+                    title: "Google Sheets token exchange failed.",
+                    detail: "Google token response did not include an access token.",
+                    statusCode: StatusCodes.Status502BadGateway);
             }
 
-            _ = await googleConnectionService.SaveConnectionAsync(
+            if (!GoogleScopes.Contains(tokenResponse.TokenResponse.Scope, GoogleScopes.SpreadsheetsReadonly))
+            {
+                return EndpointSupport.ValidationProblem("scope", "Google authorization did not grant the required Sheets scope.");
+            }
+
+            await googleConnectionService.SaveConnectionAsync(
                 currentUserId.Value,
                 tokenResponse.TokenResponse,
-                cancellationToken);
-            _ = await calendarIntegrationService.EnsureCalendarAsync(currentUserId.Value, cancellationToken);
-            await calendarIntegrationService.InvalidateSyncHashesAsync(currentUserId.Value, cancellationToken);
-            await workQueue.EnqueueFullSyncAsync(
-                currentUserId.Value,
-                CalendarSyncWorkItemReason.ConnectionChanged,
                 cancellationToken);
 
             return Results.Redirect(BuildIntegrationStatusRedirectUri(settings));
         });
 
-        googleCalendar.MapGet("/status", async (
-            ClaimsPrincipal principal,
-            ICurrentUserAccessor currentUserAccessor,
-            AppDbContext dbContext) =>
-        {
-            var userId = currentUserAccessor.TryGetUserId(principal);
-            if (!userId.HasValue)
-            {
-                return Results.Unauthorized();
-            }
-
-            var now = DateTimeOffset.UtcNow;
-            var connection = await dbContext.GoogleConnections
-                .AsNoTracking()
-                .FirstOrDefaultAsync(value =>
-                    value.UserId == userId.Value &&
-                    value.RevokedAtUtc == null &&
-                    (value.RefreshTokenExpiresAtUtc == null || value.RefreshTokenExpiresAtUtc > now));
-            var hasRequiredScope = connection is not null &&
-                GoogleScopes.Contains(connection.GrantedScopes, GoogleScopes.CalendarAppCreated);
-            var calendarSettings = await dbContext.GoogleCalendarIntegrationSettings
-                .AsNoTracking()
-                .FirstOrDefaultAsync(value => value.UserId == userId.Value);
-            var pendingWorkCount = await dbContext.CalendarSyncWorkItems.CountAsync(value =>
-                value.UserId == userId.Value &&
-                value.Provider == CalendarProvider.GoogleCalendar &&
-                value.Status == CalendarSyncWorkItemStatus.Pending);
-            var failedWorkCount = await dbContext.CalendarSyncWorkItems.CountAsync(value =>
-                value.UserId == userId.Value &&
-                value.Provider == CalendarProvider.GoogleCalendar &&
-                value.Status == CalendarSyncWorkItemStatus.Failed);
-            var lastError = await dbContext.CalendarSyncWorkItems
-                .AsNoTracking()
-                .Where(value =>
-                    value.UserId == userId.Value &&
-                    value.Provider == CalendarProvider.GoogleCalendar &&
-                    value.LastError != null)
-                .OrderByDescending(value => value.UpdatedAtUtc)
-                .Select(value => value.LastError)
-                .FirstOrDefaultAsync();
-
-            return Results.Ok(new
-            {
-                isConnected = calendarSettings is not null &&
-                    calendarSettings.IsEnabled &&
-                    calendarSettings.DisconnectedAtUtc == null &&
-                    hasRequiredScope,
-                isEnabled = calendarSettings?.IsEnabled ?? false,
-                hasRequiredScope,
-                calendarId = calendarSettings?.GoogleCalendarId,
-                calendarName = calendarSettings?.CalendarName,
-                lastSuccessfulSyncAtUtc = calendarSettings?.LastSuccessfulSyncAtUtc,
-                pendingWorkCount,
-                failedWorkCount,
-                lastError,
-            });
-        });
-
-        googleCalendar.MapPost("/disconnect", async (
+        googleSheets.MapPost("/disconnect", async (
             ClaimsPrincipal principal,
             ICurrentUserAccessor currentUserAccessor,
             AppDbContext dbContext,
             CancellationToken cancellationToken) =>
         {
-            var userId = currentUserAccessor.TryGetUserId(principal);
-            if (!userId.HasValue)
+            var currentUserId = await GetActiveCurrentUserIdAsync(principal, currentUserAccessor, dbContext);
+            if (!currentUserId.HasValue)
             {
                 return Results.Unauthorized();
             }
 
-            var calendarSettings = await dbContext.GoogleCalendarIntegrationSettings
-                .FirstOrDefaultAsync(value => value.UserId == userId.Value, cancellationToken);
             var now = DateTimeOffset.UtcNow;
-            if (calendarSettings is not null)
-            {
-                calendarSettings.IsEnabled = false;
-                calendarSettings.DisconnectedAtUtc = now;
-                calendarSettings.UpdatedAtUtc = now;
-            }
-
             var connection = await dbContext.GoogleConnections
-                .FirstOrDefaultAsync(value => value.UserId == userId.Value, cancellationToken);
+                .FirstOrDefaultAsync(value => value.UserId == currentUserId.Value, cancellationToken);
             if (connection is not null)
             {
-                connection.GrantedScopes = GoogleScopes.Remove(connection.GrantedScopes, GoogleScopes.CalendarAppCreated);
+                connection.GrantedScopes = GoogleScopes.Remove(connection.GrantedScopes, GoogleScopes.SpreadsheetsReadonly);
                 if (string.IsNullOrWhiteSpace(connection.GrantedScopes))
                 {
                     connection.RevokedAtUtc = now;
@@ -274,12 +221,12 @@ internal static class GoogleCalendarIntegrationEndpoints
     private static string BuildCallbackUri(HttpContext httpContext)
     {
         var request = httpContext.Request;
-        return $"{request.Scheme}://{request.Host}{request.PathBase}/integrations/google-calendar/callback";
+        return $"{request.Scheme}://{request.Host}{request.PathBase}/integrations/google-sheets/callback";
     }
 
     private static string BuildIntegrationStatusRedirectUri(StartupSettings settings)
     {
-        const string integrationStatusPath = "/?integration=google-calendar&status=callback-received";
+        const string integrationStatusPath = "/?integration=google-sheets&status=callback-received";
 
         if (!settings.IsDevelopment || settings.AllowedCorsOrigins.Length == 0)
         {
@@ -298,9 +245,10 @@ internal static class GoogleCalendarIntegrationEndpoints
         var protector = dataProtectionProvider
             .CreateProtector(StateProtectionPurpose)
             .ToTimeLimitedDataProtector();
+        var state = new GoogleSheetsOAuthState(userId, DateTime.UtcNow);
 
         return protector.Protect(
-            JsonSerializer.Serialize(new GoogleCalendarOAuthState(userId, DateTime.UtcNow), JsonOptions),
+            JsonSerializer.Serialize(state, JsonOptions),
             lifetime: TimeSpan.FromMinutes(15));
     }
 
@@ -313,7 +261,7 @@ internal static class GoogleCalendarIntegrationEndpoints
         {
             return new Dictionary<string, string[]>
             {
-                ["state"] = ["Google Calendar OAuth state is required."]
+                ["state"] = ["Google Sheets OAuth state is required."]
             };
         }
 
@@ -323,7 +271,8 @@ internal static class GoogleCalendarIntegrationEndpoints
                 .CreateProtector(StateProtectionPurpose)
                 .ToTimeLimitedDataProtector();
             var payloadJson = protector.Unprotect(state, out _);
-            var payload = JsonSerializer.Deserialize<GoogleCalendarOAuthState>(payloadJson, JsonOptions);
+            var payload = JsonSerializer.Deserialize<GoogleSheetsOAuthState>(payloadJson, JsonOptions);
+
             if (payload?.UserId == expectedUserId)
             {
                 return [];
@@ -336,9 +285,21 @@ internal static class GoogleCalendarIntegrationEndpoints
 
         return new Dictionary<string, string[]>
         {
-            ["state"] = ["Google Calendar OAuth state is invalid or expired."]
+            ["state"] = ["Google Sheets OAuth state is invalid or expired."]
         };
     }
 
-    private sealed record GoogleCalendarOAuthState(Guid UserId, DateTime CreatedUtc);
+    private static Dictionary<string, string[]> ValidateCallback(string? code)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            errors["code"] = ["Google Sheets authorization code is required."];
+        }
+
+        return errors;
+    }
+
+    private sealed record GoogleSheetsOAuthState(Guid UserId, DateTime CreatedUtc);
 }

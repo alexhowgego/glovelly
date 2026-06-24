@@ -50,7 +50,8 @@ dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~Mcp
 - Client and gig tracking
 - Gig expenses and receipt attachments
 - Invoice generation, issue, reissue, PDF download, email delivery, and Google Drive publishing
-- Seller profile and personal invoice/default settings
+- Seller profile, personal invoice/default settings, and connected-service management
+- Google Sheets set list import from linked gig attachments, with review, audit, and re-import history
 - Google Calendar sync for confirmed and completed gigs
 - Admin access management and access request workflow
 - MCP read-only business tools and staged imported-gig review
@@ -163,6 +164,16 @@ dotnet user-secrets set "Mileage:GoogleRoutes:ApiKey" "your-google-routes-api-ke
 ```
 
 Non-secret local defaults are shown in `appsettings.Development.json`. In deployed environments, provide the key through Secret Manager or an equivalent secret-backed environment variable named `Mileage__GoogleRoutes__ApiKey`.
+
+### Google Drive, Sheets and Calendar services
+
+Authenticated users can connect optional Google services from the profile menu under `Services`:
+
+- Google Drive requests `https://www.googleapis.com/auth/drive.file` and is used for publishing invoice PDFs.
+- Google Sheets requests `https://www.googleapis.com/auth/spreadsheets.readonly` and is used for importing gig set lists from linked Google Sheet attachments.
+- Google Calendar uses the app-created/calendar scopes documented in the handbook and syncs confirmed/completed gigs.
+
+Drive and Sheets are separate OAuth journeys even though they reuse the same encrypted `GoogleConnection` token record internally. This keeps the more sensitive Sheets readonly scope out of the Drive publishing flow and makes local/staging service enablement easier to reason about. Google may require HTTPS-only OAuth clients for the Sheets readonly scope; local HTTP development can still use Drive without requesting Sheets.
 
 Press `Ctrl+C` to stop both services.
 
