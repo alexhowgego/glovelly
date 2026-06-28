@@ -133,6 +133,34 @@ public abstract class UatTestBase : IAsyncLifetime
         };
     }
 
+    protected async Task<JsonElement> FetchJsonWithSessionAsync(string path, string method = "GET", object? body = null)
+    {
+        var bodyJson = body is null ? null : JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        return await Page.EvaluateAsync<JsonElement>(
+            """
+            async ({ path, method, bodyJson }) => {
+              const response = await fetch(path, {
+                method,
+                credentials: 'include',
+                headers: bodyJson ? { 'Content-Type': 'application/json' } : undefined,
+                body: bodyJson ?? undefined,
+              });
+              if (!response.ok) {
+                throw new Error(`Fetch ${method} ${path} failed with ${response.status}`);
+              }
+
+              return await response.json();
+            }
+            """,
+            new
+            {
+                path,
+                method,
+                bodyJson,
+            });
+    }
+
     protected async Task<int> FetchWithSessionAsync(string path, string method = "GET", object? body = null)
     {
         var bodyJson = body is null ? null : JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -155,6 +183,53 @@ public abstract class UatTestBase : IAsyncLifetime
                 method,
                 bodyJson,
             });
+    }
+
+    protected async Task RunWithDialogAsync(Func<Task> action, Func<IDialog, Task> handleDialog)
+    {
+        var dialogHandled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void Handler(object? _, IDialog dialog)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await handleDialog(dialog);
+                    dialogHandled.TrySetResult();
+                }
+                catch (Exception exception)
+                {
+                    dialogHandled.TrySetException(exception);
+                }
+            });
+        }
+
+        Page.Dialog += Handler;
+        try
+        {
+            await action();
+            await dialogHandled.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            Page.Dialog -= Handler;
+        }
+    }
+
+    protected Task AcceptNextDialogAsync(Func<Task> action) =>
+        RunWithDialogAsync(action, dialog => dialog.AcceptAsync());
+
+    protected Task DismissNextDialogAsync(Func<Task> action) =>
+        RunWithDialogAsync(action, dialog => dialog.DismissAsync());
+
+    protected async Task<string> CreateTinyPdfFixtureAsync(string name)
+    {
+        var directory = Path.Combine(ArtifactDirectory(), "fixtures");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"{SafeArtifactName(name)}.pdf");
+        await File.WriteAllBytesAsync(path, "%PDF-1.1\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n"u8.ToArray(), TestContext.Current.CancellationToken);
+        return path;
     }
 
     private async Task CaptureFailureDiagnosticsAsync(string testName)

@@ -211,6 +211,7 @@ export function ClientsSection({
               </button>
               <button
                 className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
+                data-testid="client-edit-button"
                 onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
                 disabled={!selectedClient}

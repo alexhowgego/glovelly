@@ -389,6 +389,7 @@ export function InvoicesSection({
                   <p className="detail-label">Client</p>
                   <button
                     className="link-button detail-link"
+                    data-testid="invoice-client-link"
                     onClick={() => onOpenClient(selectedInvoice.clientId)}
                     type="button"
                   >

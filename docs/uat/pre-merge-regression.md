@@ -62,7 +62,7 @@ When changes touch Google Calendar, run the focused [Google Calendar](calendar.m
 
 ## Cross-Workspace Navigation Shortcuts
 
-> **Automation:** Manual UAT
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.CrossWorkspaceNavigationTests.ClientAndInvoiceLineShortcutsOpenTargetsDespiteStaleFilters`
 
 ### Steps
 
@@ -83,7 +83,7 @@ Cross-workspace shortcuts preserve the intended target record, clear stale searc
 
 ## Editor Navigation Regression Checks
 
-> **Automation:** Manual UAT
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.EditorNavigationGuardTests` covers client and gig editor discard accept/decline paths; admin editor guard checks remain manual.
 
 ### Purpose
 
@@ -164,7 +164,7 @@ Generating an invoice links the gig, creates expected lines, includes saved mile
 
 ## Editing An Invoiced Gig
 
-> **Automation:** Backend automated; manual UAT
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoicePromptChoiceTests.DecliningLinkedDraftRegenerationLeavesExistingInvoiceLinesUnchanged` covers declining draft regeneration after an invoice-relevant gig edit; accepting regeneration and issued-invoice spot checks remain manual/backend-covered.
 
 ### Purpose
 
@@ -256,7 +256,7 @@ Expected result: expenses are copied only when accepted, receipt attachments are
 
 ## Gig Attachments
 
-> **Automation:** Backend automated; manual UAT: focused checks live in [Gig attachments](gig-external-resources.md).
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests` covers browser file-only attachment upload/delete and quick attachment link capture; focused checks live in [Gig attachments](gig-external-resources.md).
 
 ### Steps
 
@@ -296,7 +296,7 @@ Expected result: the app blocks generation and explains that selected gigs must 
 
 ## Imported Gig Review Smoke Check
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigImportEndpointsTests` covers commit rules and duplicate warnings; modal entry, autosave, warning presentation, and notification dots remain manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.ImportedGigReviewTests.ImportedGigModalAutosavesAndCommitsReviewedRows` covers staging setup, modal entry, autosave, accept/reject, and commit; real MCP client creation and duplicate-warning presentation remain manual/backend-covered.
 
 Run the focused [Imported gigs](gig-imports.md) journey when the change touches MCP, gigs, or profile-menu workflows. For broad pre-merge smoke, at minimum:
 

@@ -28,7 +28,7 @@ The MCP call creates a staged batch without creating real gigs. Informal but par
 
 ## Notification And Modal Entry
 
-> **Automation:** Manual UAT
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.ImportedGigReviewTests.ImportedGigModalAutosavesAndCommitsReviewedRows` covers notification/menu entry using controlled staging setup; real MCP/LLM creation remains manual.
 
 ### Steps
 
@@ -45,7 +45,7 @@ The import review modal opens from the profile menu. Imported gigs are not a pri
 
 ## Review And Autosave Rows
 
-> **Automation:** Backend automated for duplicate warning refresh; manual UAT for modal autosave behavior.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.ImportedGigReviewTests.ImportedGigModalAutosavesAndCommitsReviewedRows` covers modal autosave persistence; backend tests cover duplicate warning refresh and duplicate warning presentation remains manual.
 
 ### Steps
 
@@ -80,7 +80,7 @@ Duplicate rows show warning text in the review modal. Editing date, title, clien
 
 ## Commit Decisions
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigImportEndpointsTests.CommitAcceptedRows_CreatesLinkedGigAndMarksDraftCommitted` and `CommitAcceptedRows_DeletesRejectedDraftsAndKeepsPendingRows` cover commit rules; modal workflow remains manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.ImportedGigReviewTests.ImportedGigModalAutosavesAndCommitsReviewedRows` covers browser accept/reject/commit workflow; `Glovelly.Api.Tests.GigImportEndpointsTests.CommitAcceptedRows_CreatesLinkedGigAndMarksDraftCommitted` and `CommitAcceptedRows_DeletesRejectedDraftsAndKeepsPendingRows` cover server rules.
 
 ### Steps
 

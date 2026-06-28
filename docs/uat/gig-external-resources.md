@@ -13,7 +13,7 @@ Use these journeys when a change may affect gig attachments such as set lists, g
 
 ## Add Attachment Journey
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.CreateGigExternalResource_AddsResourceToGig`, `CreateGigExternalResource_WithoutUrl_CreatesFileOnlyResourceShell`, `CreateGigExternalResource_WithInvalidUrl_ReturnsValidationProblem`, and `UpdateGigExternalResource_UpdatesFieldsAndPrimaryForPurposeOnly` cover server-side rules; browser modal flow remains manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.BrowserReceiptAndAttachmentUploadsRoundTripThroughGigUi` covers browser file-only attachment creation/upload/delete; backend tests cover URL validation, resource scoping, and primary rules.
 
 ### Steps
 
@@ -30,7 +30,7 @@ The attachment is added to the selected gig only, appears without refreshing, pr
 
 ## Quick Add Attachment Journey
 
-> **Automation:** Backend automated; manual UAT: `QuickExternalResourceDraftFile_WithNearbyGig_CreatesDraftResourceAndAttachment`, `QuickExternalResourceDraftLink_WithExplicitGig_InfersGoogleDocType`, `QuickExternalResourceDraftFile_WithNoCandidateInsideWindow_ReturnsEmptyCandidates`, and `UpdateQuickExternalResourceDraft_SavesDetailsMovesGigAndUpdatesPrimary` cover server-side quick capture rules; browser floating button and modal flow remain manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickAttachmentMobileFlowSavesDraftAndOpensTargetGig` covers the mobile-sized quick attachment link flow; backend tests cover file draft matching, no-candidate handling, type inference, moves, and primary updates.
 
 ### Steps
 
@@ -47,7 +47,7 @@ The quick add journey uses the same gig matching behaviour as quick receipts, su
 
 ## File-Only Attachment Journey
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.UploadGigExternalResourceAttachment_AddsDownloadableAttachment` covers upload, download, and delete through the API; browser file-picker flow remains manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.BrowserReceiptAndAttachmentUploadsRoundTripThroughGigUi` covers browser file-picker upload/delete and attachment-shell preservation; backend tests cover download/storage rules.
 
 ### Steps
 

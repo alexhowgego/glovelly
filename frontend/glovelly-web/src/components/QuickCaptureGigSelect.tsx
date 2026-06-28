@@ -46,6 +46,7 @@ export function QuickCaptureGigSelect({
     <label className="quick-receipt-select">
       <span>Gig</span>
       <select
+        data-testid="quick-capture-gig-select"
         value={selectedValue}
         onChange={(event) => onSelectedGigChange(event.target.value)}
         disabled={isSaving}

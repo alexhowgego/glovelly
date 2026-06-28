@@ -190,6 +190,7 @@ export function GigExpensesPanel({
                           <label className="ghost-button file-button">
                             Add receipt
                             <input
+                              data-testid="gig-expense-receipt-file-input"
                               type="file"
                               accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
                               disabled={isGigLoading || !expense.id}
@@ -210,6 +211,7 @@ export function GigExpensesPanel({
                                 <div className="expense-attachment-item" key={attachment.id}>
                                   <button
                                     className="link-button"
+                                    data-testid="gig-expense-receipt-download-button"
                                     type="button"
                                     onClick={() => onDownloadExpenseAttachment(expense, attachment.id)}
                                     disabled={isGigLoading}
@@ -219,6 +221,7 @@ export function GigExpensesPanel({
                                   <button
                                     aria-label={`Delete receipt ${attachment.fileName}`}
                                     className="icon-delete-button"
+                                    data-testid="gig-expense-receipt-delete-button"
                                     type="button"
                                     onClick={() => onDeleteExpenseAttachment(expense, attachment.id)}
                                     disabled={isGigLoading}

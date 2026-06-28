@@ -193,7 +193,7 @@ Expected result: redraft and re-issue update the PDF, preserve the expected invo
 
 ## Invoice Status And Delivery
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.InvoiceStatusEndpointsTests` and `Glovelly.Api.Tests.InvoiceDeliveryEndpointsTests` cover server-side status and delivery rules; browser prompts and configured email/Drive checks remain manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoicePromptChoiceTests.IssuingLinkedDraftHonoursLinkedGigCompletionChoice` covers accepting and declining linked-gig completion after issuing; backend tests cover status and delivery rules, while configured email/Drive checks remain manual.
 
 ### Steps
 

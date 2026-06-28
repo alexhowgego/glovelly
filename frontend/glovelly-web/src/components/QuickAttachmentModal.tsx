@@ -131,6 +131,7 @@ export function QuickAttachmentModal({
       <section
         aria-labelledby="quick-attachment-title"
         className="settings-modal quick-receipt-modal panel"
+        data-testid="quick-attachment-modal"
         role="dialog"
         aria-modal="true"
       >
@@ -179,6 +180,7 @@ export function QuickAttachmentModal({
             </label>
             <button
               className="ghost-button quick-attachment-choice"
+              data-testid="quick-attachment-link-mode-button"
               onClick={onModeLink}
               type="button"
               disabled={isSaving}
@@ -245,6 +247,7 @@ export function QuickAttachmentModal({
               <span>Title</span>
               <input
                 value={title}
+                data-testid="quick-attachment-title-input"
                 onChange={(event) => onTitleChange(event.target.value)}
                 placeholder="Set list, gig plan, contract..."
                 disabled={isSaving}
@@ -285,6 +288,7 @@ export function QuickAttachmentModal({
             <label>
               <span>URL</span>
               <input
+                data-testid="quick-attachment-url-input"
                 type="url"
                 value={url}
                 onChange={(event) => onUrlChange(event.target.value)}
@@ -320,6 +324,7 @@ export function QuickAttachmentModal({
               <button
                 className="primary-button"
                 onClick={onSaveDetails}
+                data-testid="quick-attachment-save-details-button"
                 type="button"
                 disabled={isSaving || !selectedGigId}
               >
@@ -328,6 +333,7 @@ export function QuickAttachmentModal({
               <button
                 className="ghost-button"
                 onClick={onGoToGig}
+                data-testid="quick-attachment-go-to-gig-button"
                 type="button"
                 disabled={isSaving || !selectedGigId}
               >
@@ -338,6 +344,7 @@ export function QuickAttachmentModal({
             <button
               className="primary-button"
               onClick={candidates.length > 0 ? onSaveDraft : onSaveLink}
+              data-testid="quick-attachment-save-draft-button"
               type="button"
               disabled={isSaving || (candidates.length > 0 && !selectedGigId)}
             >
@@ -347,6 +354,7 @@ export function QuickAttachmentModal({
             <button
               className="primary-button"
               onClick={onSaveDraft}
+              data-testid="quick-attachment-save-draft-button"
               type="button"
               disabled={isSaving || !selectedGigId || !pendingFile}
             >

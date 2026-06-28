@@ -13,7 +13,7 @@ Use these journeys when a change may affect gig expenses, receipt attachments, q
 
 ## Expense Receipt Journey
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.ExpenseAttachmentFlow_UploadsListsDownloadsAndDeletesReceipt` covers the API flow; browser upload/download/delete remains manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.BrowserReceiptAndAttachmentUploadsRoundTripThroughGigUi` covers browser receipt upload/delete and reimbursement preservation; backend tests cover API download/storage rules.
 
 ### Steps
 
@@ -69,7 +69,7 @@ Expected result: the expense becomes eligible for generated invoice lines again.
 
 ## Expense Statement Journey
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.ExpenseStatementTests.CanGenerateExpenseStatementPreviewAndDownload` covers the main preview/download path; reimbursed, invoiced-gig, receipt-option, and negative variants remain manual/backend-covered.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.ExpenseStatementTests.CanGenerateExpenseStatementPreviewAndDownload` and `ExpenseStatementVariantsRespectReimbursementSelectionAndInvoiceLinks` cover main preview/download, reimbursed inclusion, mixed-client blocking, and invoiced-gig projection rules; receipt-option variants remain manual/backend-covered.
 
 ### Steps
 

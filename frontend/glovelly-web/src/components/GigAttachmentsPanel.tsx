@@ -106,6 +106,7 @@ export function GigAttachmentsPanel({
           </div>
           <button
             className="ghost-button"
+            data-testid="add-gig-attachment-button"
             onClick={onStartExternalResourceCreate}
             type="button"
             disabled={isGigLoading}
@@ -126,6 +127,7 @@ export function GigAttachmentsPanel({
                 <article
                   key={resource.id}
                   className={`associated-item-row external-resource-item ${isExpanded ? 'expanded' : ''}`}
+                  data-testid="gig-attachment-item"
                 >
                   <button
                     className="associated-item-summary"
@@ -216,6 +218,7 @@ export function GigAttachmentsPanel({
                           <label className="ghost-button file-upload-button">
                             Upload
                             <input
+                              data-testid="gig-attachment-file-input"
                               type="file"
                               onChange={(event) => {
                                 const file = event.target.files?.[0]
@@ -303,6 +306,7 @@ export function GigAttachmentsPanel({
                 <label>
                   <span>Type</span>
                   <select
+                    data-testid="gig-attachment-type-select"
                     value={externalResourceForm.resourceType}
                     onChange={(event) =>
                       onUpdateExternalResourceField(
@@ -339,6 +343,7 @@ export function GigAttachmentsPanel({
                 <label>
                   <span>Title</span>
                   <input
+                    data-testid="gig-attachment-title-input"
                     required
                     value={externalResourceForm.title}
                     onChange={(event) =>
@@ -349,6 +354,7 @@ export function GigAttachmentsPanel({
                 <label>
                   <span>URL</span>
                   <input
+                    data-testid="gig-attachment-url-input"
                     type="url"
                     placeholder="Optional link"
                     value={externalResourceForm.url}
@@ -369,7 +375,7 @@ export function GigAttachmentsPanel({
                 />
               </label>
               <label className="checkbox-field resource-primary-toggle">
-                <input
+                  <input
                   type="checkbox"
                   checked={externalResourceForm.isPrimary}
                   onChange={(event) =>
@@ -380,7 +386,9 @@ export function GigAttachmentsPanel({
               </label>
               <div className="form-actions">
                 <button className="primary-button" type="submit" disabled={isGigLoading}>
+                  <span data-testid="gig-attachment-submit-label">
                   {externalResourceMode === 'edit' ? 'Update attachment' : 'Add attachment'}
+                  </span>
                 </button>
                 <button
                   className="ghost-button"

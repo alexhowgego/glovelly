@@ -438,6 +438,7 @@ export function GigsSection({
                   <p className="detail-label">Client</p>
                   <button
                     className="link-button detail-link"
+                    data-testid="gig-client-link"
                     onClick={() => onOpenClient(selectedGig.clientId)}
                     type="button"
                   >
