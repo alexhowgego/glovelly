@@ -169,6 +169,22 @@ public static class McpEndpoints
                 userId,
                 ReadArgument<string?>(arguments, "query"),
                 cancellationToken),
+            "glovelly_get_contact" => await GetContactAsync(userId, arguments, queryService, cancellationToken),
+            "glovelly_list_gigs" => await queryService.ListGigsAsync(
+                userId,
+                ReadArguments<GigListRequest>(arguments),
+                cancellationToken),
+            "glovelly_get_gig" => await GetGigAsync(userId, arguments, queryService, cancellationToken),
+            "glovelly_list_uninvoiced_gigs" => await queryService.ListUninvoicedGigsAsync(
+                userId,
+                ReadArguments<GigListRequest>(arguments) with { InvoicingState = "uninvoiced" },
+                cancellationToken),
+            "glovelly_list_gig_resources" => await ListGigResourcesAsync(userId, arguments, queryService, cancellationToken),
+            "glovelly_get_gig_setlist" => await GetGigSetlistAsync(userId, arguments, queryService, cancellationToken),
+            "glovelly_preview_expense_statement" => await queryService.PreviewExpenseStatementAsync(
+                userId,
+                ReadArguments<ExpenseStatementPreviewRequest>(arguments),
+                cancellationToken),
             "glovelly_list_invoices" => await queryService.ListInvoicesAsync(
                 userId,
                 ReadArguments<InvoiceListRequest>(arguments),
@@ -207,6 +223,66 @@ public static class McpEndpoints
         }
 
         return Rpc(id, result: ToolResult(result));
+    }
+
+    private static async Task<object?> GetContactAsync(
+        Guid userId,
+        JsonElement arguments,
+        IGlovellyMcpQueryService queryService,
+        CancellationToken cancellationToken)
+    {
+        var contactId = ReadArgument<Guid?>(arguments, "contactId");
+        if (!contactId.HasValue || contactId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await queryService.GetContactAsync(userId, contactId.Value, cancellationToken);
+    }
+
+    private static async Task<object?> GetGigAsync(
+        Guid userId,
+        JsonElement arguments,
+        IGlovellyMcpQueryService queryService,
+        CancellationToken cancellationToken)
+    {
+        var gigId = ReadArgument<Guid?>(arguments, "gigId");
+        if (!gigId.HasValue || gigId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await queryService.GetGigAsync(userId, gigId.Value, cancellationToken);
+    }
+
+    private static async Task<object?> ListGigResourcesAsync(
+        Guid userId,
+        JsonElement arguments,
+        IGlovellyMcpQueryService queryService,
+        CancellationToken cancellationToken)
+    {
+        var gigId = ReadArgument<Guid?>(arguments, "gigId");
+        if (!gigId.HasValue || gigId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await queryService.ListGigResourcesAsync(userId, gigId.Value, cancellationToken);
+    }
+
+    private static async Task<object?> GetGigSetlistAsync(
+        Guid userId,
+        JsonElement arguments,
+        IGlovellyMcpQueryService queryService,
+        CancellationToken cancellationToken)
+    {
+        var gigId = ReadArgument<Guid?>(arguments, "gigId");
+        if (!gigId.HasValue || gigId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await queryService.GetGigSetlistAsync(userId, gigId.Value, cancellationToken);
     }
 
     private static async Task<object?> GetInvoiceAsync(

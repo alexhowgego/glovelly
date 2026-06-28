@@ -9,6 +9,13 @@ namespace Glovelly.Api.Services;
 public interface IGlovellyMcpQueryService
 {
     Task<ContactSearchResult> SearchContactsAsync(Guid userId, string? query, CancellationToken cancellationToken);
+    Task<ContactGetResult> GetContactAsync(Guid userId, Guid contactId, CancellationToken cancellationToken);
+    Task<GigListResult> ListGigsAsync(Guid userId, GigListRequest request, CancellationToken cancellationToken);
+    Task<GigGetResult> GetGigAsync(Guid userId, Guid gigId, CancellationToken cancellationToken);
+    Task<GigListResult> ListUninvoicedGigsAsync(Guid userId, GigListRequest request, CancellationToken cancellationToken);
+    Task<GigResourceListResult> ListGigResourcesAsync(Guid userId, Guid gigId, CancellationToken cancellationToken);
+    Task<GigSetlistGetResult> GetGigSetlistAsync(Guid userId, Guid gigId, CancellationToken cancellationToken);
+    Task<ExpenseStatementPreviewResult> PreviewExpenseStatementAsync(Guid userId, ExpenseStatementPreviewRequest request, CancellationToken cancellationToken);
     Task<InvoiceListResult> ListInvoicesAsync(Guid userId, InvoiceListRequest request, CancellationToken cancellationToken);
     Task<InvoiceDetail?> GetInvoiceAsync(Guid userId, Guid invoiceId, CancellationToken cancellationToken);
     Task<ReceiptListResult> ListReceiptsAsync(Guid userId, ReceiptListRequest request, CancellationToken cancellationToken);
@@ -22,6 +29,7 @@ public interface IGlovellyMcpQueryService
 
 public sealed class GlovellyMcpQueryService(
     AppDbContext db,
+    IExpenseStatementBuilder expenseStatementBuilder,
     IWorkspaceEventPublisher workspaceEventPublisher) : IGlovellyMcpQueryService
 {
     private const string DefaultCurrency = "GBP";
@@ -50,6 +58,180 @@ public sealed class GlovellyMcpQueryService(
             .ToListAsync(cancellationToken);
 
         return new ContactSearchResult(normalizedQuery ?? string.Empty, matches);
+    }
+
+    public async Task<ContactGetResult> GetContactAsync(Guid userId, Guid contactId, CancellationToken cancellationToken)
+    {
+        var contact = await db.Clients
+            .WhereVisibleTo(userId)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(value => value.Id == contactId, cancellationToken);
+
+        if (contact is null)
+        {
+            return new ContactGetResult(false, null);
+        }
+
+        var gigCount = await db.Gigs
+            .WhereVisibleTo(userId)
+            .CountAsync(value => value.ClientId == contactId, cancellationToken);
+        var invoiceCount = await db.Invoices
+            .WhereVisibleTo(userId)
+            .CountAsync(value => value.ClientId == contactId, cancellationToken);
+
+        return new ContactGetResult(
+            true,
+            new ContactDetail(
+                contact.Id,
+                contact.Name,
+                contact.Email,
+                ToAddressDetail(contact.BillingAddress),
+                contact.MileageRate,
+                contact.PassengerMileageRate,
+                contact.InvoiceFilenamePattern,
+                contact.InvoiceEmailSubjectPattern,
+                gigCount,
+                invoiceCount));
+    }
+
+    public async Task<GigListResult> ListGigsAsync(Guid userId, GigListRequest request, CancellationToken cancellationToken)
+    {
+        return await ListGigsCoreAsync(userId, request, forceUninvoiced: false, cancellationToken);
+    }
+
+    public async Task<GigGetResult> GetGigAsync(Guid userId, Guid gigId, CancellationToken cancellationToken)
+    {
+        var gig = await db.Gigs
+            .WhereVisibleTo(userId)
+            .AsNoTracking()
+            .Include(gig => gig.Client)
+            .Include(gig => gig.Invoice)
+                .ThenInclude(invoice => invoice!.Lines)
+            .Include(gig => gig.Expenses)
+                .ThenInclude(expense => expense.Attachments)
+            .Include(gig => gig.ExternalResources)
+                .ThenInclude(resource => resource.Attachments)
+            .FirstOrDefaultAsync(value => value.Id == gigId, cancellationToken);
+
+        return gig is null
+            ? new GigGetResult(false, null)
+            : new GigGetResult(true, ToGigDetail(gig));
+    }
+
+    public async Task<GigListResult> ListUninvoicedGigsAsync(Guid userId, GigListRequest request, CancellationToken cancellationToken)
+    {
+        return await ListGigsCoreAsync(userId, request, forceUninvoiced: true, cancellationToken);
+    }
+
+    public async Task<GigResourceListResult> ListGigResourcesAsync(Guid userId, Guid gigId, CancellationToken cancellationToken)
+    {
+        var gig = await db.Gigs
+            .WhereVisibleTo(userId)
+            .AsNoTracking()
+            .Include(value => value.ExternalResources)
+                .ThenInclude(resource => resource.Attachments)
+            .FirstOrDefaultAsync(value => value.Id == gigId, cancellationToken);
+
+        if (gig is null)
+        {
+            return new GigResourceListResult(false, []);
+        }
+
+        return new GigResourceListResult(true, ToGigResourceSummaries(gig.ExternalResources));
+    }
+
+    public async Task<GigSetlistGetResult> GetGigSetlistAsync(Guid userId, Guid gigId, CancellationToken cancellationToken)
+    {
+        if (!await db.Gigs.WhereVisibleTo(userId).AnyAsync(value => value.Id == gigId, cancellationToken))
+        {
+            return new GigSetlistGetResult(false, false, null);
+        }
+
+        var setlist = await db.GigSetListImports
+            .AsNoTracking()
+            .Include(value => value.Items)
+            .Where(value => value.GigId == gigId && value.IsActive)
+            .OrderByDescending(value => value.ImportedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return setlist is null
+            ? new GigSetlistGetResult(true, false, null)
+            : new GigSetlistGetResult(true, true, ToGigSetlistDetail(setlist));
+    }
+
+    public async Task<ExpenseStatementPreviewResult> PreviewExpenseStatementAsync(
+        Guid userId,
+        ExpenseStatementPreviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var statement = await expenseStatementBuilder.BuildAsync(
+                new ExpenseStatementRequest(
+                    request.ContactId,
+                    request.GigIds,
+                    request.ExpenseIds,
+                    request.IncludeReceiptAttachments,
+                    request.IncludeReceiptAppendix,
+                    request.IncludeReimbursedExpenses),
+                userId,
+                cancellationToken);
+
+            return new ExpenseStatementPreviewResult(true, new Dictionary<string, string[]>(), ToExpenseStatementPreview(statement));
+        }
+        catch (ExpenseStatementValidationException exception)
+        {
+            return new ExpenseStatementPreviewResult(false, exception.Errors, null);
+        }
+    }
+
+    private async Task<GigListResult> ListGigsCoreAsync(
+        Guid userId,
+        GigListRequest request,
+        bool forceUninvoiced,
+        CancellationToken cancellationToken)
+    {
+        var contactId = request.ContactId;
+        if (!contactId.HasValue && !string.IsNullOrWhiteSpace(request.ContactQuery))
+        {
+            var contactMatches = await SearchContactsAsync(userId, request.ContactQuery, cancellationToken);
+            if (contactMatches.Matches.Count == 0)
+            {
+                return GigListResult.Success([], 0m, DefaultCurrency);
+            }
+
+            if (contactMatches.Matches.Count > 1)
+            {
+                return GigListResult.WithAmbiguity(
+                    $"Contact query matched {contactMatches.Matches.Count} contacts.",
+                    contactMatches.Matches);
+            }
+
+            contactId = contactMatches.Matches[0].ContactId;
+        }
+
+        var query = db.Gigs
+            .WhereVisibleTo(userId)
+            .AsNoTracking()
+            .Include(gig => gig.Client)
+            .AsQueryable();
+
+        if (contactId.HasValue)
+        {
+            query = query.Where(gig => gig.ClientId == contactId.Value);
+        }
+
+        query = ApplyGigStatusFilter(query, request.Status);
+        query = ApplyGigDateFilter(query, request.FromDate, request.ToDate);
+        query = ApplyGigInvoicingFilter(query, forceUninvoiced ? "uninvoiced" : request.InvoicingState);
+
+        var gigs = await query
+            .OrderBy(gig => gig.Date)
+            .ThenBy(gig => gig.Title)
+            .Select(gig => ToGigSummary(gig))
+            .ToListAsync(cancellationToken);
+
+        return GigListResult.Success(gigs, gigs.Sum(gig => gig.Fee), DefaultCurrency);
     }
 
     public async Task<InvoiceListResult> ListInvoicesAsync(Guid userId, InvoiceListRequest request, CancellationToken cancellationToken)
@@ -341,6 +523,45 @@ public sealed class GlovellyMcpQueryService(
         };
     }
 
+    private static IQueryable<Gig> ApplyGigStatusFilter(IQueryable<Gig> query, string? status)
+    {
+        return Normalize(status) switch
+        {
+            null or "" or "all" => query,
+            "draft" => query.Where(gig => gig.Status == GigStatus.Draft),
+            "confirmed" or "planned" => query.Where(gig => gig.Status == GigStatus.Confirmed),
+            "completed" => query.Where(gig => gig.Status == GigStatus.Completed),
+            "cancelled" or "canceled" => query.Where(gig => gig.Status == GigStatus.Cancelled),
+            _ => query.Where(gig => gig.Status.ToString().ToLower() == Normalize(status)),
+        };
+    }
+
+    private static IQueryable<Gig> ApplyGigDateFilter(IQueryable<Gig> query, DateOnly? fromDate, DateOnly? toDate)
+    {
+        if (fromDate.HasValue)
+        {
+            query = query.Where(gig => gig.Date >= fromDate.Value);
+        }
+
+        if (toDate.HasValue)
+        {
+            query = query.Where(gig => gig.Date <= toDate.Value);
+        }
+
+        return query;
+    }
+
+    private static IQueryable<Gig> ApplyGigInvoicingFilter(IQueryable<Gig> query, string? invoicingState)
+    {
+        return Normalize(invoicingState) switch
+        {
+            null or "" or "all" => query,
+            "invoiced" => query.Where(gig => gig.InvoiceId != null),
+            "uninvoiced" => query.Where(gig => gig.InvoiceId == null),
+            _ => query,
+        };
+    }
+
     private static IQueryable<Invoice> ApplyInvoiceDateFilter(IQueryable<Invoice> query, InvoiceListRequest request)
     {
         var dateBasis = request.DateBasis ?? InvoiceDateBasis.IssueDate;
@@ -411,6 +632,186 @@ public sealed class GlovellyMcpQueryService(
             invoice.Status.ToString().ToLowerInvariant(),
             invoice.Total,
             CalculateOutstandingAmount(invoice),
+            DefaultCurrency);
+    }
+
+    private static AddressDetail ToAddressDetail(Address address)
+    {
+        return new AddressDetail(
+            address.Line1,
+            address.Line2,
+            address.City,
+            address.StateOrCounty,
+            address.PostalCode,
+            address.Country);
+    }
+
+    private static GigSummary ToGigSummary(Gig gig)
+    {
+        return new GigSummary(
+            gig.Id,
+            gig.Title,
+            gig.Date,
+            gig.Venue,
+            gig.ClientId,
+            gig.Client?.Name ?? string.Empty,
+            gig.Status.ToString().ToLowerInvariant(),
+            gig.Fee,
+            gig.IsInvoiced,
+            gig.InvoiceId,
+            DefaultCurrency);
+    }
+
+    private static GigDetail ToGigDetail(Gig gig)
+    {
+        return new GigDetail(
+            gig.Id,
+            gig.Title,
+            gig.Date,
+            gig.Venue,
+            gig.ClientId,
+            gig.Client?.Name ?? string.Empty,
+            gig.Status.ToString().ToLowerInvariant(),
+            gig.Fee,
+            gig.TravelMiles,
+            gig.PassengerCount,
+            gig.WasDriving,
+            gig.Notes,
+            gig.IsInvoiced,
+            gig.Invoice is null ? null : ToInvoiceSummary(gig.Invoice),
+            gig.Expenses
+                .OrderBy(expense => expense.SortOrder)
+                .ThenBy(expense => expense.Description)
+                .Select(ToGigExpenseSummary)
+                .ToList(),
+            ToGigResourceSummaries(gig.ExternalResources),
+            DefaultCurrency);
+    }
+
+    private static GigExpenseSummary ToGigExpenseSummary(GigExpense expense)
+    {
+        var attachmentFileNames = expense.Attachments
+            .Select(attachment => attachment.FileName)
+            .Order()
+            .ToList();
+
+        return new GigExpenseSummary(
+            expense.Id,
+            expense.Description,
+            expense.Amount,
+            expense.SortOrder,
+            expense.ReimbursementStatus.ToString().ToLowerInvariant(),
+            attachmentFileNames.Count,
+            attachmentFileNames,
+            DefaultCurrency);
+    }
+
+    private static IReadOnlyList<GigResourceSummary> ToGigResourceSummaries(IEnumerable<GigExternalResource> resources)
+    {
+        return resources
+            .OrderByDescending(resource => resource.IsPrimary)
+            .ThenBy(resource => resource.Purpose)
+            .ThenBy(resource => resource.Title)
+            .Select(resource => new GigResourceSummary(
+                resource.Id,
+                resource.ResourceType.ToString().ToLowerInvariant(),
+                resource.Purpose.ToString().ToLowerInvariant(),
+                resource.Title,
+                resource.Url,
+                resource.Notes,
+                resource.IsPrimary,
+                resource.CreatedAt,
+                resource.UpdatedAt,
+                resource.Attachments
+                    .OrderBy(attachment => attachment.FileName)
+                    .Select(ToGigResourceAttachmentSummary)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static GigResourceAttachmentSummary ToGigResourceAttachmentSummary(GigExternalResourceAttachment attachment)
+    {
+        return new GigResourceAttachmentSummary(
+            attachment.Id,
+            attachment.FileName,
+            attachment.ContentType,
+            attachment.SizeBytes,
+            attachment.CreatedAt);
+    }
+
+    private static GigResourceAttachmentSummary ToExpenseStatementAttachmentSummary(ExpenseStatementAttachment attachment)
+    {
+        return new GigResourceAttachmentSummary(
+            attachment.AttachmentId,
+            attachment.FileName,
+            attachment.ContentType,
+            attachment.SizeBytes,
+            attachment.CreatedAt);
+    }
+
+    private static GigSetlistDetail ToGigSetlistDetail(GigSetListImport setlist)
+    {
+        return new GigSetlistDetail(
+            setlist.Id,
+            setlist.GigId,
+            setlist.GigExternalResourceId,
+            setlist.SpreadsheetId,
+            setlist.WorksheetId,
+            setlist.WorksheetName,
+            setlist.SourceUrl,
+            setlist.ImportedAtUtc,
+            setlist.Items
+                .OrderBy(item => item.SortOrder)
+                .ThenBy(item => item.SourceRowNumber)
+                .Select(item => new GigSetlistItemDetail(
+                    item.SortOrder,
+                    item.SourceRowNumber,
+                    item.Kind.ToString().ToLowerInvariant(),
+                    item.Include,
+                    item.Section,
+                    item.PadNumber,
+                    item.Key,
+                    item.Title,
+                    item.Notes,
+                    item.Confidence.ToString().ToLowerInvariant()))
+                .ToList());
+    }
+
+    private static ExpenseStatementPreview ToExpenseStatementPreview(ExpenseStatementProjection statement)
+    {
+        return new ExpenseStatementPreview(
+            statement.ClientId,
+            statement.ClientName,
+            statement.StatementDate,
+            statement.Gigs
+                .OrderBy(gig => gig.Date)
+                .ThenBy(gig => gig.Title)
+                .Select(gig => new ExpenseStatementGigPreview(
+                    gig.GigId,
+                    gig.Title,
+                    gig.Date,
+                    gig.Venue,
+                    gig.IsInvoiced,
+                    gig.Expenses
+                        .OrderBy(expense => expense.SortOrder)
+                        .ThenBy(expense => expense.Description)
+                        .Select(expense => new ExpenseStatementExpensePreview(
+                            expense.ExpenseId,
+                            expense.Description,
+                            expense.Amount,
+                            expense.SortOrder,
+                            expense.Attachments
+                                .OrderBy(attachment => attachment.FileName)
+                                .Select(ToExpenseStatementAttachmentSummary)
+                                .ToList(),
+                            DefaultCurrency))
+                        .ToList(),
+                    gig.Total,
+                    DefaultCurrency))
+                .ToList(),
+            statement.Total,
+            statement.ExpenseCount,
+            statement.ReceiptAttachmentCount,
             DefaultCurrency);
     }
 

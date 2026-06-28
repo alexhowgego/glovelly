@@ -16,6 +16,16 @@ public static class GlovellyMcpSchemaFragments
         ["toDate"] = McpSchema.Date("Inclusive end date in YYYY-MM-DD format."),
     };
 
+    public static object GigFilters => new Dictionary<string, object>
+    {
+        ["status"] = McpSchema.Enum(
+            ["all", "draft", "confirmed", "planned", "completed", "cancelled", "canceled"],
+            "Gig status filter. Use confirmed or planned for planned gigs."),
+        ["invoicingState"] = McpSchema.Enum(
+            ["all", "invoiced", "uninvoiced"],
+            "Whether to return invoiced gigs, uninvoiced gigs, or all gigs."),
+    };
+
     public static object Confidence => McpSchema.Enum<GigImportDraftConfidence>(
         "How confident the agent is that the draft row values were interpreted correctly.");
 }
