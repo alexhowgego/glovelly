@@ -27,6 +27,41 @@ confirm the action before the record is removed.
 - invoicedAt?
 - isInvoiced (derived from invoiceId)
 
+Gigs can have external resource links and files, including a primary `SetList` Google Sheet. A primary set list sheet can be imported into Glovelly as a reviewed, persisted setlist snapshot.
+
+## GigSetListImport
+
+- id
+- gigId
+- gigExternalResourceId?
+- spreadsheetId
+- worksheetId?
+- worksheetName
+- sourceUrl?
+- isActive
+- importedAtUtc
+- createdAtUtc
+
+Setlist imports are immutable-ish source snapshots at the import level: re-importing creates a new import and keeps previous imports for history. Only one import should be active for the gig. The active import is the setlist shown for audit/edit after import.
+
+## GigSetListItem
+
+- id
+- gigSetListImportId
+- sortOrder
+- sourceRowNumber
+- kind (`Song`, `Separator`, `Comment`)
+- include
+- section?
+- padNumber?
+- key?
+- title
+- notes?
+- rawCellsJson
+- confidence (`Low`, `Medium`, `High`)
+
+Imported rows preserve worksheet order and source row numbers. Rows that do not look like songs are stored as inactive separators/comments so the user can audit what was skipped without treating those rows as charts. Medleys and segues are stored as a flat ordered list; chart matching and forScore export are intentionally out of scope for this feature.
+
 ## GigImportBatch
 - id
 - sourceName
@@ -92,3 +127,5 @@ The `{userId}` segment uses the same dashless GUID format as receipt attachment 
 Gig -> Generate Invoice -> InvoiceLines created -> Invoice tracked
 
 MCP extraction -> GigImportBatch/GigImportDraft staging -> user review -> accepted rows commit to Gig records
+
+Linked Google Sheet setlist -> worksheet preview -> reviewed GigSetListImport/GigSetListItem snapshot -> optional setlist audit edits

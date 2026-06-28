@@ -59,6 +59,7 @@ type AppShellProps = {
   onOpenNextGig: () => void
   onOpenSellerProfile: () => void
   onGenerateDashboardInvoice: () => void
+  onOpenConnectedServices: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
   onQuickAttachmentOpen: () => void
@@ -95,6 +96,7 @@ export function AppShell({
   onOpenNextGig,
   onOpenSellerProfile,
   onGenerateDashboardInvoice,
+  onOpenConnectedServices,
   onOpenUserSettings,
   onProfileMenuToggle,
   onQuickAttachmentOpen,
@@ -183,6 +185,7 @@ export function AppShell({
 
                 <button
                   className={`primary-button quick-capture-button quick-attachment-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}
+                  data-testid="quick-attachment-button"
                   onClick={onQuickAttachmentOpen}
                   type="button"
                   disabled={isLoading || isGigLoading || isQuickAttachmentSaving}
@@ -200,6 +203,7 @@ export function AppShell({
                     aria-haspopup="menu"
                     aria-label="Open profile menu"
                     className={`profile-trigger ${isProfileMenuOpen ? 'open' : ''}`}
+                    data-testid="profile-menu-button"
                     onClick={onProfileMenuToggle}
                     type="button"
                   >
@@ -274,6 +278,7 @@ export function AppShell({
                       </button>
                       <button
                         className="ghost-button profile-settings profile-menu-alert-item"
+                        data-testid="profile-imported-gigs-menuitem"
                         onClick={onOpenGigImports}
                         role="menuitem"
                         type="button"
@@ -286,6 +291,15 @@ export function AppShell({
                         {pendingGigImportCount > 0 && (
                           <span className="notification-dot" aria-hidden="true" />
                         )}
+                      </button>
+                      <button
+                        className="ghost-button profile-settings"
+                        onClick={onOpenConnectedServices}
+                        role="menuitem"
+                        type="button"
+                        disabled={isLoading || isAdminLoading || isUserSettingsSaving}
+                      >
+                        Services
                       </button>
                       <button
                         className="ghost-button profile-settings"

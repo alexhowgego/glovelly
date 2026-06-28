@@ -2,6 +2,7 @@ export {
   AppShell,
   AdminSection,
   ClientSettingsModal,
+  ConnectedServicesModal,
   ClientsSection,
   ExpenseStatementModal,
   GigImportsModal,

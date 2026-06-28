@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Glovelly.Uat.Tests;
 
-public sealed class ExpenseStatementTests : UatTestBase
+public sealed class ExpenseStatementTests : InvoiceUatTestBase
 {
     [Fact]
     public Task CanGenerateExpenseStatementPreviewAndDownload() => RunWithDiagnosticsAsync(
@@ -19,6 +19,86 @@ public sealed class ExpenseStatementTests : UatTestBase
             await CreateClientAsync(clientName);
             await CreateGigWithExpenseAsync(clientName, gigTitle, expenseDescription);
             await GeneratePreviewAndDownloadAsync(gigTitle, expenseDescription);
+        });
+
+    [Fact]
+    public Task ExpenseStatementVariantsRespectReimbursementSelectionAndInvoiceLinks() => RunWithDiagnosticsAsync(
+        nameof(ExpenseStatementVariantsRespectReimbursementSelectionAndInvoiceLinks),
+        async () =>
+        {
+            var runId = CreateRunId();
+            var clientName = $"{runId} Statement Client";
+            var otherClientName = $"{runId} Other Statement Client";
+            var invoicedGig = $"{runId} Statement Invoiced Gig";
+            var openGig = $"{runId} Statement Open Gig";
+            var otherClientGig = $"{runId} Statement Other Client Gig";
+            var claimableExpense = $"{runId} Claimable Parking";
+            var reimbursedExpense = $"{runId} Reimbursed Train";
+
+            await AuthenticateWithUatSecretAsync();
+            await CreateClientAsync(clientName);
+            await CreateClientAsync(otherClientName);
+            await CreateGigAsync(
+                clientName,
+                invoicedGig,
+                DateTime.UtcNow.AddDays(16).ToString("yyyy-MM-dd"),
+                expenses:
+                [
+                    new GigExpense(claimableExpense, "20.00"),
+                    new GigExpense(reimbursedExpense, "40.00"),
+                ]);
+            await MarkExpenseReimbursedAsync(reimbursedExpense);
+            await GenerateInvoiceAndWaitForPreviewAsync();
+            await Page.GetByTestId("invoice-preview-modal").GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
+
+            await CreateGigAsync(
+                clientName,
+                openGig,
+                DateTime.UtcNow.AddDays(17).ToString("yyyy-MM-dd"),
+                expenses: [new GigExpense($"{runId} Open Expense", "15.00")]);
+            await CreateGigAsync(
+                otherClientName,
+                otherClientGig,
+                DateTime.UtcNow.AddDays(18).ToString("yyyy-MM-dd"),
+                expenses: [new GigExpense($"{runId} Other Expense", "10.00")]);
+
+            var invoiceCountBefore = await CurrentInvoiceCountAsync();
+
+            await SelectGigForStatementAsync(invoicedGig);
+            await SelectGigForStatementAsync(openGig);
+            await Assertions.Expect(GigCard(otherClientGig).Locator("input[type=checkbox]")).ToBeDisabledAsync();
+
+            await Page.GetByTestId("expense-statement-button").ClickAsync();
+            await Page.GetByTestId("expense-statement-modal").WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+            await Assertions.Expect(Page.GetByTestId("expense-statement-modal")).ToContainTextAsync("Invoiced");
+            await Assertions.Expect(ExpenseStatementRow(reimbursedExpense)).ToContainTextAsync("Reimbursed");
+            await Assertions.Expect(Page.GetByTestId("expense-statement-total")).ToContainTextAsync("35.00");
+
+            await ExpenseStatementRow(reimbursedExpense).Locator("input[type=checkbox]").CheckAsync();
+            await Assertions.Expect(Page.GetByTestId("expense-statement-total")).ToContainTextAsync("75.00");
+            await Page.GetByTestId("expense-statement-preview-button").ClickAsync();
+            await Assertions.Expect(Page.GetByTestId("expense-statement-status")).ToContainTextAsync("PDF preview ready", new LocatorAssertionsToContainTextOptions
+            {
+                Timeout = 30_000,
+            });
+            await Page.GetByTestId("expense-statement-preview-frame").WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+
+            Assert.Equal(invoiceCountBefore, await CurrentInvoiceCountAsync());
+            await Page.GetByTestId("expense-statement-modal").GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
+            await OpenGigAsync(invoicedGig);
+            await Page.GetByTestId("gig-open-linked-invoice-button").WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
         });
 
     private async Task CreateClientAsync(string clientName)
@@ -110,13 +190,59 @@ public sealed class ExpenseStatementTests : UatTestBase
         Assert.True(new FileInfo(downloadedPath).Length > 0, "Expected the downloaded expense statement PDF to be non-empty.");
     }
 
-    private ILocator ClientCard(string clientName) => Page.GetByTestId("client-card").Filter(new LocatorFilterOptions
+    private async Task MarkExpenseReimbursedAsync(string expenseDescription)
     {
-        HasText = clientName,
+        Page.Dialog += AcceptReimbursementDialog;
+        try
+        {
+            var row = Page.GetByTestId("gig-expense-item").Filter(new LocatorFilterOptions
+            {
+                HasText = expenseDescription,
+            });
+            await row.Locator(".associated-item-summary").ClickAsync();
+            var responseTask = Page.WaitForResponseAsync(response =>
+            {
+                var path = new Uri(response.Url).AbsolutePath;
+                return response.Request.Method == "PATCH" && path.EndsWith("/expenses/reimbursement", StringComparison.Ordinal);
+            }, new PageWaitForResponseOptions { Timeout = 30_000 });
+            await row.GetByTestId("gig-expense-reimbursement-select").SelectOptionAsync("Reimbursed");
+            Assert.True((await responseTask).Ok);
+        }
+        finally
+        {
+            Page.Dialog -= AcceptReimbursementDialog;
+        }
+
+        static void AcceptReimbursementDialog(object? _, IDialog dialog)
+        {
+            _ = dialog.Message.Contains("date", StringComparison.OrdinalIgnoreCase)
+                ? dialog.AcceptAsync(DateTime.UtcNow.ToString("yyyy-MM-dd"))
+                : dialog.AcceptAsync("UAT reimbursement");
+        }
+    }
+
+    private async Task SelectGigForStatementAsync(string gigTitle)
+    {
+        await Page.GetByTestId("nav-gigs").ClickAsync();
+        await Page.GetByTestId("gig-search-input").FillAsync(string.Empty);
+        var card = GigCard(gigTitle);
+        await card.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+        await card.Locator("input[type=checkbox]").CheckAsync();
+    }
+
+    private ILocator ExpenseStatementRow(string expenseDescription) => Page.GetByTestId("expense-statement-expense-row").Filter(new LocatorFilterOptions
+    {
+        HasText = expenseDescription,
     });
 
-    private ILocator GigCard(string gigTitle) => Page.GetByTestId("gig-card").Filter(new LocatorFilterOptions
+    private async Task<int> CurrentInvoiceCountAsync()
     {
-        HasText = gigTitle,
-    });
+        var invoices = await FetchJsonWithSessionAsync("/invoices");
+        return invoices.GetArrayLength();
+    }
+
 }

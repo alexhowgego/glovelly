@@ -66,6 +66,54 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
     }
 
     [Fact]
+    public async Task Connect_WhenSheetsScopeExists_RequestsDriveAndSheetsScopes()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Authentication:Google:ClientId", "google-client-id");
+            builder.UseSetting("Authentication:Google:ClientSecret", "google-client-secret");
+        });
+        var client = factory.CreateClient(new()
+        {
+            AllowAutoRedirect = false,
+        });
+        await SeedGoogleConnectionAsync(factory, GoogleScopes.SpreadsheetsReadonly);
+
+        var response = await client.GetAsync("/integrations/google-drive/connect", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var location = Assert.IsType<Uri>(response.Headers.Location);
+        var query = QueryHelpers.ParseQuery(location.Query);
+        var scopes = query["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains(GoogleScopes.DriveFile, scopes);
+        Assert.Contains(GoogleScopes.SpreadsheetsReadonly, scopes);
+    }
+
+    [Fact]
+    public async Task Connect_WhenCalendarScopeExists_RequestsDriveAndCalendarScopes()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Authentication:Google:ClientId", "google-client-id");
+            builder.UseSetting("Authentication:Google:ClientSecret", "google-client-secret");
+        });
+        var client = factory.CreateClient(new()
+        {
+            AllowAutoRedirect = false,
+        });
+        await SeedGoogleConnectionAsync(factory, GoogleScopes.CalendarAppCreated);
+
+        var response = await client.GetAsync("/integrations/google-drive/connect", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var location = Assert.IsType<Uri>(response.Headers.Location);
+        var query = QueryHelpers.ParseQuery(location.Query);
+        var scopes = query["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains(GoogleScopes.DriveFile, scopes);
+        Assert.Contains(GoogleScopes.CalendarAppCreated, scopes);
+    }
+
+    [Fact]
     public async Task Callback_WithCodeAndState_RedirectsToIntegrationStatus()
     {
         var tokenExchanger = new FakeGoogleDriveOAuthTokenExchanger();
@@ -269,6 +317,51 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         Assert.Null(driveSettings.InvoiceUploadFolderId);
     }
 
+    [Fact]
+    public async Task Disconnect_WhenSheetsScopeExists_RemovesDriveScopeOnly()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var connectionId = Guid.NewGuid();
+            dbContext.GoogleConnections.Add(new GoogleConnection
+            {
+                Id = connectionId,
+                UserId = TestAuthContext.UserId,
+                EncryptedAccessToken = "encrypted-access-token",
+                EncryptedRefreshToken = "encrypted-refresh-token",
+                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
+                RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+                GrantedScopes = $"{GoogleScopes.DriveFile} {GoogleScopes.SpreadsheetsReadonly}",
+                TokenType = "Bearer",
+                ConnectedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            dbContext.GoogleDriveIntegrationSettings.Add(new GoogleDriveIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                InvoiceUploadFolderId = "drive-folder-id",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var response = await _client.PostAsync("/integrations/google-drive/disconnect", content: null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var assertionScope = _factory.Services.CreateScope();
+        var assertionDbContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var connection = await assertionDbContext.GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
+        var driveSettings = await assertionDbContext.GoogleDriveIntegrationSettings.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(GoogleScopes.SpreadsheetsReadonly, connection.GrantedScopes);
+        Assert.Null(connection.RevokedAtUtc);
+        Assert.NotEmpty(connection.EncryptedAccessToken);
+        Assert.Null(driveSettings.InvoiceUploadFolderId);
+    }
+
     private string CreateGoogleDriveStateToken(Guid? userId = null)
     {
         return CreateGoogleDriveStateToken(_factory.Services, userId);
@@ -304,6 +397,26 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
                 services.AddSingleton<IGoogleOAuthTokenClient>(tokenExchanger);
             });
         });
+    }
+
+    private static async Task SeedGoogleConnectionAsync(WebApplicationFactory<Program> factory, string grantedScopes)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        dbContext.GoogleConnections.Add(new GoogleConnection
+        {
+            Id = Guid.NewGuid(),
+            UserId = TestAuthContext.UserId,
+            EncryptedAccessToken = "encrypted-access-token",
+            EncryptedRefreshToken = "encrypted-refresh-token",
+            AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30),
+            RefreshTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+            GrantedScopes = grantedScopes,
+            TokenType = "Bearer",
+            ConnectedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private sealed class FakeGoogleDriveOAuthTokenExchanger : IGoogleOAuthTokenClient

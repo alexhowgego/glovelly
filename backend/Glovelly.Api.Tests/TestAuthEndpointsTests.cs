@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Glovelly.Api.Data;
+using Glovelly.Api.Models;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,6 +80,32 @@ public sealed class TestAuthEndpointsTests
         Assert.NotNull(await dbContext.Users.FindAsync([UatRegressionDataSeeder.UserId], TestContext.Current.CancellationToken));
         Assert.NotNull(await dbContext.Clients.FindAsync([UatRegressionDataSeeder.ClientId], TestContext.Current.CancellationToken));
         Assert.NotNull(await dbContext.SellerProfiles.FindAsync([UatRegressionDataSeeder.SellerProfileId], TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task GigImportBatchSetup_WithValidSecret_CreatesRegressionImportBatch()
+    {
+        await using var factory = CreateFactory("Staging");
+        var client = factory.CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Post, "/test-auth/gig-import-batches")
+        {
+            Content = JsonContent.Create(new { sourceName = "UAT import setup" }),
+        };
+        request.Headers.Add("X-Glovelly-Uat-Secret", UatSecret);
+
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var batchId = payload.GetProperty("batchId").GetGuid();
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var batch = await dbContext.GigImportBatches.FindAsync([batchId], TestContext.Current.CancellationToken);
+        Assert.NotNull(batch);
+        Assert.Equal(UatRegressionDataSeeder.UserId, batch.CreatedByUserId);
+        Assert.Equal(GigImportBatchStatus.Draft, batch.Status);
+        Assert.Equal(3, dbContext.GigImportDrafts.Count(draft => draft.BatchId == batchId));
     }
 
     private static GlovellyApiFactory CreateFactory(string environmentName)

@@ -70,6 +70,1224 @@ Output schema:
 }
 ```
 
+## `glovelly_get_contact`
+
+Fetch read-only contact details and related summary counts for one contact.
+
+Title: Get Contact
+
+Safety level: ReadOnly
+
+Requires explicit user intent: no
+
+Inputs:
+- `contactId` (required): string (uuid). Contact ID returned by glovelly_search_contacts.
+
+Example input:
+
+```json
+{
+  "contactId": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+Input schema:
+
+```json
+{
+  "properties": {
+    "contactId": {
+      "description": "Contact ID returned by glovelly_search_contacts.",
+      "format": "uuid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contactId"
+  ],
+  "type": "object"
+}
+```
+
+Output schema:
+
+```json
+{
+  "properties": {
+    "contact": {
+      "properties": {
+        "billingAddress": {
+          "properties": {
+            "city": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "line1": {
+              "type": "string"
+            },
+            "line2": {
+              "type": "string"
+            },
+            "postalCode": {
+              "type": "string"
+            },
+            "stateOrCounty": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "contactId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "gigCount": {
+          "type": "integer"
+        },
+        "invoiceCount": {
+          "type": "integer"
+        },
+        "invoiceEmailSubjectPattern": {
+          "type": "string"
+        },
+        "invoiceFilenamePattern": {
+          "type": "string"
+        },
+        "mileageRate": {
+          "description": "Mileage rate for this contact.",
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "passengerMileageRate": {
+          "description": "Passenger mileage rate for this contact.",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "found": {
+      "type": "boolean"
+    }
+  },
+  "type": "object"
+}
+```
+
+## `glovelly_list_gigs`
+
+List gigs by optional contact, status, date range, and invoicing state.
+
+Title: List Gigs
+
+Safety level: ReadOnly
+
+Requires explicit user intent: no
+
+Inputs:
+- `contactId` (optional): string (uuid). Exact Glovelly contact ID. Use this when a previous contact lookup returned an unambiguous match.
+- `contactQuery` (optional): string. Name or email text used to look up a contact when contactId is not known.
+- `fromDate` (optional): string (date). Inclusive start date in YYYY-MM-DD format.
+- `invoicingState` (optional): string = all | invoiced | uninvoiced. Whether to return invoiced gigs, uninvoiced gigs, or all gigs.
+- `status` (optional): string = all | draft | confirmed | planned | completed | cancelled | canceled. Gig status filter. Use confirmed or planned for planned gigs.
+- `toDate` (optional): string (date). Inclusive end date in YYYY-MM-DD format.
+
+Example input:
+
+```json
+{
+  "contactId": "00000000-0000-0000-0000-000000000000",
+  "contactQuery": "string",
+  "fromDate": "2026-01-31"
+}
+```
+
+Input schema:
+
+```json
+{
+  "properties": {
+    "contactId": {
+      "description": "Exact Glovelly contact ID. Use this when a previous contact lookup returned an unambiguous match.",
+      "format": "uuid",
+      "type": "string"
+    },
+    "contactQuery": {
+      "description": "Name or email text used to look up a contact when contactId is not known.",
+      "type": "string"
+    },
+    "fromDate": {
+      "description": "Inclusive start date in YYYY-MM-DD format.",
+      "format": "date",
+      "type": "string"
+    },
+    "invoicingState": {
+      "description": "Whether to return invoiced gigs, uninvoiced gigs, or all gigs.",
+      "enum": [
+        "all",
+        "invoiced",
+        "uninvoiced"
+      ],
+      "type": "string"
+    },
+    "status": {
+      "description": "Gig status filter. Use confirmed or planned for planned gigs.",
+      "enum": [
+        "all",
+        "draft",
+        "confirmed",
+        "planned",
+        "completed",
+        "cancelled",
+        "canceled"
+      ],
+      "type": "string"
+    },
+    "toDate": {
+      "description": "Inclusive end date in YYYY-MM-DD format.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "type": "object"
+}
+```
+
+Output schema:
+
+```json
+{
+  "properties": {
+    "ambiguous": {
+      "type": "boolean"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "gigs": {
+      "items": {
+        "properties": {
+          "contactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "date": {
+            "description": "ISO 8601 calendar date in YYYY-MM-DD format.",
+            "format": "date",
+            "type": "string"
+          },
+          "fee": {
+            "description": "Gig fee.",
+            "type": "number"
+          },
+          "gigId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "invoiceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isInvoiced": {
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Gig lifecycle status.",
+            "enum": [
+              "draft",
+              "confirmed",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "matches": {
+      "items": {
+        "properties": {
+          "contactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "message": {
+      "type": "string"
+    },
+    "totalFees": {
+      "description": "Total fees across returned gigs.",
+      "type": "number"
+    }
+  },
+  "type": "object"
+}
+```
+
+## `glovelly_get_gig`
+
+Fetch read-only details for a single gig.
+
+Title: Get Gig
+
+Safety level: ReadOnly
+
+Requires explicit user intent: no
+
+Inputs:
+- `gigId` (required): string (uuid). Gig ID returned by glovelly_list_gigs.
+
+Example input:
+
+```json
+{
+  "gigId": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+Input schema:
+
+```json
+{
+  "properties": {
+    "gigId": {
+      "description": "Gig ID returned by glovelly_list_gigs.",
+      "format": "uuid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "gigId"
+  ],
+  "type": "object"
+}
+```
+
+Output schema:
+
+```json
+{
+  "properties": {
+    "found": {
+      "type": "boolean"
+    },
+    "gig": {
+      "properties": {
+        "contactId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "contactName": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "date": {
+          "description": "ISO 8601 calendar date in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "expenses": {
+          "items": {
+            "properties": {
+              "amount": {
+                "description": "Expense amount.",
+                "type": "number"
+              },
+              "attachmentCount": {
+                "type": "integer"
+              },
+              "attachmentFileNames": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "expenseId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "reimbursementStatus": {
+                "description": "Expense reimbursement status.",
+                "enum": [
+                  "unreimbursed",
+                  "reimbursed",
+                  "notClaimable"
+                ],
+                "type": "string"
+              },
+              "sortOrder": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "fee": {
+          "description": "Gig fee.",
+          "type": "number"
+        },
+        "gigId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "invoice": {
+          "properties": {
+            "contactId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "contactName": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "dueDate": {
+              "description": "ISO 8601 calendar date in YYYY-MM-DD format.",
+              "format": "date",
+              "type": "string"
+            },
+            "invoiceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "invoiceNumber": {
+              "type": "string"
+            },
+            "issueDate": {
+              "description": "ISO 8601 calendar date in YYYY-MM-DD format.",
+              "format": "date",
+              "type": "string"
+            },
+            "outstandingAmount": {
+              "description": "Amount still outstanding on this invoice.",
+              "type": "number"
+            },
+            "status": {
+              "description": "Invoice lifecycle status.",
+              "enum": [
+                "draft",
+                "issued",
+                "paid",
+                "overdue",
+                "cancelled"
+              ],
+              "type": "string"
+            },
+            "total": {
+              "description": "Invoice total amount.",
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "isInvoiced": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "passengerCount": {
+          "type": "integer"
+        },
+        "resources": {
+          "items": {
+            "properties": {
+              "attachments": {
+                "items": {
+                  "properties": {
+                    "attachmentId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "contentType": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "description": "ISO 8601 UTC timestamp.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    },
+                    "sizeBytes": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "createdAt": {
+                "description": "ISO 8601 UTC timestamp.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "isPrimary": {
+                "type": "boolean"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "purpose": {
+                "description": "Resource purpose.",
+                "enum": [
+                  "setList",
+                  "gigPlan",
+                  "contract",
+                  "travel",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "resourceId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "resourceType": {
+                "description": "Resource type.",
+                "enum": [
+                  "googleSheet",
+                  "googleDoc",
+                  "url",
+                  "email",
+                  "file",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "ISO 8601 UTC timestamp.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "status": {
+          "description": "Gig lifecycle status.",
+          "enum": [
+            "draft",
+            "confirmed",
+            "completed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "travelMiles": {
+          "type": "number"
+        },
+        "venue": {
+          "type": "string"
+        },
+        "wasDriving": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "type": "object"
+}
+```
+
+## `glovelly_list_uninvoiced_gigs`
+
+List visible gigs that are not linked to an invoice.
+
+Title: List Uninvoiced Gigs
+
+Safety level: ReadOnly
+
+Requires explicit user intent: no
+
+Inputs:
+- `contactId` (optional): string (uuid). Exact Glovelly contact ID. Use this when a previous contact lookup returned an unambiguous match.
+- `contactQuery` (optional): string. Name or email text used to look up a contact when contactId is not known.
+- `fromDate` (optional): string (date). Inclusive start date in YYYY-MM-DD format.
+- `status` (optional): string = all | draft | confirmed | planned | completed | cancelled | canceled. Gig status filter. Use confirmed or planned for planned gigs.
+- `toDate` (optional): string (date). Inclusive end date in YYYY-MM-DD format.
+
+Example input:
+
+```json
+{
+  "contactId": "00000000-0000-0000-0000-000000000000",
+  "contactQuery": "string",
+  "fromDate": "2026-01-31"
+}
+```
+
+Input schema:
+
+```json
+{
+  "properties": {
+    "contactId": {
+      "description": "Exact Glovelly contact ID. Use this when a previous contact lookup returned an unambiguous match.",
+      "format": "uuid",
+      "type": "string"
+    },
+    "contactQuery": {
+      "description": "Name or email text used to look up a contact when contactId is not known.",
+      "type": "string"
+    },
+    "fromDate": {
+      "description": "Inclusive start date in YYYY-MM-DD format.",
+      "format": "date",
+      "type": "string"
+    },
+    "status": {
+      "description": "Gig status filter. Use confirmed or planned for planned gigs.",
+      "enum": [
+        "all",
+        "draft",
+        "confirmed",
+        "planned",
+        "completed",
+        "cancelled",
+        "canceled"
+      ],
+      "type": "string"
+    },
+    "toDate": {
+      "description": "Inclusive end date in YYYY-MM-DD format.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "type": "object"
+}
+```
+
+Output schema:
+
+```json
+{
+  "properties": {
+    "ambiguous": {
+      "type": "boolean"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "gigs": {
+      "items": {
+        "properties": {
+          "contactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "date": {
+            "description": "ISO 8601 calendar date in YYYY-MM-DD format.",
+            "format": "date",
+            "type": "string"
+          },
+          "fee": {
+            "description": "Gig fee.",
+            "type": "number"
+          },
+          "gigId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "invoiceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isInvoiced": {
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Gig lifecycle status.",
+            "enum": [
+              "draft",
+              "confirmed",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "matches": {
+      "items": {
+        "properties": {
+          "contactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "message": {
+      "type": "string"
+    },
+    "totalFees": {
+      "description": "Total fees across returned gigs.",
+      "type": "number"
+    }
+  },
+  "type": "object"
+}
+```
+
+## `glovelly_list_gig_resources`
+
+List read-only metadata for links and files attached to a gig. File contents are not returned.
+
+Title: List Gig Resources
+
+Safety level: ReadOnly
+
+Requires explicit user intent: no
+
+Inputs:
+- `gigId` (required): string (uuid). Gig ID returned by glovelly_list_gigs.
+
+Example input:
+
+```json
+{
+  "gigId": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+Input schema:
+
+```json
+{
+  "properties": {
+    "gigId": {
+      "description": "Gig ID returned by glovelly_list_gigs.",
+      "format": "uuid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "gigId"
+  ],
+  "type": "object"
+}
+```
+
+Output schema:
+
+```json
+{
+  "properties": {
+    "found": {
+      "type": "boolean"
+    },
+    "resources": {
+      "items": {
+        "properties": {
+          "attachments": {
+            "items": {
+              "properties": {
+                "attachmentId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "description": "ISO 8601 UTC timestamp.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "fileName": {
+                  "type": "string"
+                },
+                "sizeBytes": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "createdAt": {
+            "description": "ISO 8601 UTC timestamp.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "purpose": {
+            "description": "Resource purpose.",
+            "enum": [
+              "setList",
+              "gigPlan",
+              "contract",
+              "travel",
+              "other"
+            ],
+            "type": "string"
+          },
+          "resourceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "resourceType": {
+            "description": "Resource type.",
+            "enum": [
+              "googleSheet",
+              "googleDoc",
+              "url",
+              "email",
+              "file",
+              "other"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "ISO 8601 UTC timestamp.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "type": "object"
+}
+```
+
+## `glovelly_get_gig_setlist`
+
+Fetch the active setlist import already stored for a gig without reading Google Sheets.
+
+Title: Get Gig Setlist
+
+Safety level: ReadOnly
+
+Requires explicit user intent: no
+
+Inputs:
+- `gigId` (required): string (uuid). Gig ID returned by glovelly_list_gigs.
+
+Example input:
+
+```json
+{
+  "gigId": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+Input schema:
+
+```json
+{
+  "properties": {
+    "gigId": {
+      "description": "Gig ID returned by glovelly_list_gigs.",
+      "format": "uuid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "gigId"
+  ],
+  "type": "object"
+}
+```
+
+Output schema:
+
+```json
+{
+  "properties": {
+    "found": {
+      "type": "boolean"
+    },
+    "hasActiveSetlist": {
+      "type": "boolean"
+    },
+    "setlist": {
+      "properties": {
+        "gigId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "importId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "importedAtUtc": {
+          "description": "ISO 8601 UTC timestamp.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "confidence": {
+                "description": "Setlist item confidence.",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              "include": {
+                "type": "boolean"
+              },
+              "key": {
+                "type": "string"
+              },
+              "kind": {
+                "description": "Setlist row kind.",
+                "enum": [
+                  "song",
+                  "separator",
+                  "comment"
+                ],
+                "type": "string"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "padNumber": {
+                "type": "string"
+              },
+              "section": {
+                "type": "string"
+              },
+              "sortOrder": {
+                "type": "integer"
+              },
+              "sourceRowNumber": {
+                "type": "integer"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "resourceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "spreadsheetId": {
+          "type": "string"
+        },
+        "worksheetId": {
+          "type": "string"
+        },
+        "worksheetName": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "type": "object"
+}
+```
+
+## `glovelly_preview_expense_statement`
+
+Build a read-only structured expense statement preview without generating PDFs or sending it anywhere.
+
+Title: Preview Expense Statement
+
+Safety level: ReadOnly
+
+Requires explicit user intent: no
+
+Inputs:
+- `contactId` (required): string (uuid). Contact ID for the statement client.
+- `expenseIds` (optional): array. Optional expense IDs to include.
+- `gigIds` (optional): array. Optional gig IDs to include.
+- `includeReceiptAppendix` (optional): boolean. Accepted for parity with statement previews; no PDF appendix is generated by this tool.
+- `includeReceiptAttachments` (optional): boolean. Whether receipt attachment metadata should be considered by the statement builder.
+- `includeReimbursedExpenses` (optional): boolean. Whether reimbursed expenses should be included.
+
+Example input:
+
+```json
+{
+  "contactId": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+Input schema:
+
+```json
+{
+  "properties": {
+    "contactId": {
+      "description": "Contact ID for the statement client.",
+      "format": "uuid",
+      "type": "string"
+    },
+    "expenseIds": {
+      "description": "Optional expense IDs to include.",
+      "items": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "gigIds": {
+      "description": "Optional gig IDs to include.",
+      "items": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "includeReceiptAppendix": {
+      "description": "Accepted for parity with statement previews; no PDF appendix is generated by this tool.",
+      "type": "boolean"
+    },
+    "includeReceiptAttachments": {
+      "description": "Whether receipt attachment metadata should be considered by the statement builder.",
+      "type": "boolean"
+    },
+    "includeReimbursedExpenses": {
+      "description": "Whether reimbursed expenses should be included.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "contactId"
+  ],
+  "type": "object"
+}
+```
+
+Output schema:
+
+```json
+{
+  "properties": {
+    "created": {
+      "type": "boolean"
+    },
+    "statement": {
+      "properties": {
+        "contactId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "contactName": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "expenseCount": {
+          "type": "integer"
+        },
+        "gigs": {
+          "items": {
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "date": {
+                "description": "ISO 8601 calendar date in YYYY-MM-DD format.",
+                "format": "date",
+                "type": "string"
+              },
+              "expenses": {
+                "items": {
+                  "properties": {
+                    "amount": {
+                      "description": "Expense amount.",
+                      "type": "number"
+                    },
+                    "attachments": {
+                      "items": {
+                        "properties": {
+                          "attachmentId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "contentType": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "description": "ISO 8601 UTC timestamp.",
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "fileName": {
+                            "type": "string"
+                          },
+                          "sizeBytes": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "expenseId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "sortOrder": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "gigId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "isInvoiced": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "total": {
+                "description": "Total expenses for this gig.",
+                "type": "number"
+              },
+              "venue": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "receiptAttachmentCount": {
+          "type": "integer"
+        },
+        "statementDate": {
+          "description": "ISO 8601 calendar date in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "total": {
+          "description": "Expense statement total.",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "validationErrors": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "type": "object"
+    }
+  },
+  "type": "object"
+}
+```
+
 ## `glovelly_list_invoices`
 
 List invoices by optional contact, status, date range, and date basis.

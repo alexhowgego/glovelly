@@ -69,6 +69,7 @@ export function useUserSettings({
   setAuthUser,
 }: UseUserSettingsOptions) {
   const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false)
+  const [isConnectedServicesOpen, setIsConnectedServicesOpen] = useState(false)
   const [userSettingsForm, setUserSettingsForm] =
     useState<UserSettingsForm>(emptyUserSettingsForm)
   const [userSettingsStatus, setUserSettingsStatus] =
@@ -77,14 +78,19 @@ export function useUserSettings({
   const [googleCalendarStatus, setGoogleCalendarStatus] =
     useState<GoogleCalendarStatus | null>(null)
   const [isGoogleCalendarBusy, setIsGoogleCalendarBusy] = useState(false)
+  const [isGoogleDriveBusy, setIsGoogleDriveBusy] = useState(false)
+  const [isGoogleSheetsBusy, setIsGoogleSheetsBusy] = useState(false)
 
   const resetUserSettings = useCallback(() => {
     setIsUserSettingsOpen(false)
+    setIsConnectedServicesOpen(false)
     setUserSettingsForm(emptyUserSettingsForm())
     setUserSettingsStatus(defaultUserSettingsStatus)
     setIsUserSettingsSaving(false)
     setGoogleCalendarStatus(null)
     setIsGoogleCalendarBusy(false)
+    setIsGoogleDriveBusy(false)
+    setIsGoogleSheetsBusy(false)
   }, [])
 
   const loadGoogleCalendarStatus = useCallback(async () => {
@@ -133,7 +139,22 @@ export function useUserSettings({
     )
     onCloseProfileMenu()
     setIsUserSettingsOpen(true)
+  }
+
+  const openConnectedServices = () => {
+    setUserSettingsStatus('Manage connected services and Google authorizations.')
+    onCloseProfileMenu()
+    setIsConnectedServicesOpen(true)
     void loadGoogleCalendarStatus()
+  }
+
+  const closeConnectedServices = () => {
+    setIsConnectedServicesOpen(false)
+  }
+
+  const openSettingsFromServices = () => {
+    setIsConnectedServicesOpen(false)
+    openUserSettings()
   }
 
   const closeUserSettings = () => {
@@ -142,6 +163,94 @@ export function useUserSettings({
 
   const connectGoogleDrive = () => {
     window.location.assign(buildApiUrl('/integrations/google-drive/connect'))
+  }
+
+  const connectGoogleSheets = () => {
+    window.location.assign(buildApiUrl('/integrations/google-sheets/connect'))
+  }
+
+  const disconnectGoogleDrive = async () => {
+    setIsGoogleDriveBusy(true)
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl('/integrations/google-drive/disconnect'),
+        { method: 'POST' }
+      )
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to disconnect Google Drive.'
+        )
+      ) {
+        setIsUserSettingsOpen(false)
+        setIsConnectedServicesOpen(false)
+        return
+      }
+      if (!response.ok) {
+        throw new Error(
+          (await getResponseErrorMessage(response, 'Unable to disconnect Drive.')) ??
+            'Unable to disconnect Drive.'
+        )
+      }
+
+      setAuthUser((current) => current
+        ? {
+            ...current,
+            isGoogleDriveConnected: false,
+            invoiceUploadFolderId: null,
+          }
+        : current)
+      setUserSettingsForm((current) => ({ ...current, invoiceUploadFolderId: '' }))
+      setUserSettingsStatus('Google Drive disconnected.')
+    } catch (error) {
+      setUserSettingsStatus(
+        error instanceof Error ? error.message : 'Unable to disconnect Drive.'
+      )
+    } finally {
+      setIsGoogleDriveBusy(false)
+    }
+  }
+
+  const disconnectGoogleSheets = async () => {
+    setIsGoogleSheetsBusy(true)
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl('/integrations/google-sheets/disconnect'),
+        { method: 'POST' }
+      )
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to disconnect Google Sheets.'
+        )
+      ) {
+        setIsUserSettingsOpen(false)
+        setIsConnectedServicesOpen(false)
+        return
+      }
+      if (!response.ok) {
+        throw new Error(
+          (await getResponseErrorMessage(response, 'Unable to disconnect Sheets.')) ??
+            'Unable to disconnect Sheets.'
+        )
+      }
+
+      setAuthUser((current) => current
+        ? {
+            ...current,
+            isGoogleSheetsConnected: false,
+          }
+        : current)
+      setUserSettingsStatus('Google Sheets disconnected.')
+    } catch (error) {
+      setUserSettingsStatus(
+        error instanceof Error ? error.message : 'Unable to disconnect Sheets.'
+      )
+    } finally {
+      setIsGoogleSheetsBusy(false)
+    }
   }
 
   const connectGoogleCalendar = () => {
@@ -163,11 +272,13 @@ export function useUserSettings({
         )
       ) {
         setIsUserSettingsOpen(false)
+        setIsConnectedServicesOpen(false)
         return
       }
       if (!response.ok) {
         throw new Error(
-          await getResponseErrorMessage(response, 'Unable to disconnect Calendar.')
+          (await getResponseErrorMessage(response, 'Unable to disconnect Calendar.')) ??
+            'Unable to disconnect Calendar.'
         )
       }
       setUserSettingsStatus('Google Calendar disconnected.')
@@ -249,12 +360,14 @@ export function useUserSettings({
         )
       ) {
         setIsUserSettingsOpen(false)
+        setIsConnectedServicesOpen(false)
         return
       }
 
       if (!response.ok) {
         throw new Error(
-          await getResponseErrorMessage(response, 'Unable to save your settings.')
+          (await getResponseErrorMessage(response, 'Unable to save your settings.')) ??
+            'Unable to save your settings.'
         )
       }
 
@@ -272,6 +385,8 @@ export function useUserSettings({
               invoiceEmailBodyTemplate: savedSettings.invoiceEmailBodyTemplate,
               invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
               invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
+              isGoogleDriveConnected: current.isGoogleDriveConnected,
+              isGoogleSheetsConnected: current.isGoogleSheetsConnected,
             }
           : current
       )
@@ -290,14 +405,23 @@ export function useUserSettings({
 
   return {
     closeUserSettings,
+    closeConnectedServices,
     connectGoogleCalendar,
     connectGoogleDrive,
+    connectGoogleSheets,
     disconnectGoogleCalendar,
+    disconnectGoogleDrive,
+    disconnectGoogleSheets,
     googleCalendarStatus,
     handleUserSettingsSubmit,
     isGoogleCalendarBusy,
+    isGoogleDriveBusy,
+    isGoogleSheetsBusy,
+    isConnectedServicesOpen,
     isUserSettingsOpen,
     isUserSettingsSaving,
+    openConnectedServices,
+    openSettingsFromServices,
     openUserSettings,
     resetUserSettings,
     updateUserSettingsField,

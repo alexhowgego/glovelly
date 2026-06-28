@@ -50,6 +50,7 @@ export function GigImportsModal({
         aria-labelledby="gig-imports-title"
         aria-modal="true"
         className="settings-modal gig-imports-modal panel"
+        data-testid="gig-imports-modal"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >
@@ -83,6 +84,7 @@ export function GigImportsModal({
               <button
                 key={batch.batchId}
                 className={`client-card ${selectedBatchId === batch.batchId ? 'selected' : ''}`}
+                data-testid="gig-import-batch-card"
                 onClick={() => onSelectBatch(batch.batchId)}
                 type="button"
               >
@@ -142,6 +144,7 @@ export function GigImportsModal({
 
                 return (
                   <article className={`gig-import-draft ${draft.status.toLowerCase()}`} key={draft.draftId}>
+                    <div data-draft-id={draft.draftId} data-testid="gig-import-draft-row">
                     <div className="gig-import-draft-header">
                       <div>
                         <strong>{draft.title || draft.projectName || 'Untitled row'}</strong>
@@ -169,6 +172,7 @@ export function GigImportsModal({
                       <label>
                         <span>Client</span>
                         <select
+                          data-testid="gig-import-draft-client-select"
                           value={draft.proposedClientId ?? ''}
                           disabled={isCommitted}
                           onChange={(event) =>
@@ -186,6 +190,7 @@ export function GigImportsModal({
                       <label>
                         <span>Source client</span>
                         <input
+                          data-testid="gig-import-draft-source-client-input"
                           value={draft.clientName ?? ''}
                           disabled={isCommitted}
                           onChange={(event) =>
@@ -196,6 +201,7 @@ export function GigImportsModal({
                       <label className="full-width">
                         <span>Title</span>
                         <input
+                          data-testid="gig-import-draft-title-input"
                           value={draft.title ?? ''}
                           disabled={isCommitted}
                           onChange={(event) =>
@@ -206,6 +212,7 @@ export function GigImportsModal({
                       <label>
                         <span>Date</span>
                         <input
+                          data-testid="gig-import-draft-date-input"
                           type="date"
                           value={draft.date ?? ''}
                           disabled={isCommitted}
@@ -217,6 +224,7 @@ export function GigImportsModal({
                       <label>
                         <span>Fee</span>
                         <input
+                          data-testid="gig-import-draft-fee-input"
                           inputMode="decimal"
                           value={draft.fee ?? ''}
                           disabled={isCommitted}
@@ -228,6 +236,7 @@ export function GigImportsModal({
                       <label>
                         <span>Per diem</span>
                         <input
+                          data-testid="gig-import-draft-per-diem-input"
                           inputMode="decimal"
                           value={draft.perDiem ?? ''}
                           disabled={isCommitted}
@@ -253,6 +262,7 @@ export function GigImportsModal({
                       <label className="full-width">
                         <span>Venue</span>
                         <input
+                          data-testid="gig-import-draft-venue-input"
                           value={draft.venueName ?? ''}
                           disabled={isCommitted}
                           onChange={(event) =>
@@ -294,6 +304,7 @@ export function GigImportsModal({
                       <label className="full-width">
                         <span>Source reference</span>
                         <input
+                          data-testid="gig-import-draft-source-reference-input"
                           value={draft.sourceReference ?? ''}
                           disabled={isCommitted}
                           onChange={(event) =>
@@ -309,6 +320,7 @@ export function GigImportsModal({
                       </span>
                       <button
                         className="ghost-button"
+                        data-testid="gig-import-draft-accept-button"
                         disabled={isGigImportLoading || isCommitted}
                         onClick={() => onSetDraftStatus(draft, 'Accepted')}
                         type="button"
@@ -317,6 +329,7 @@ export function GigImportsModal({
                       </button>
                       <button
                         className="danger-button"
+                        data-testid="gig-import-draft-reject-button"
                         disabled={isGigImportLoading || isCommitted}
                         onClick={() => onSetDraftStatus(draft, 'Rejected')}
                         type="button"
@@ -333,6 +346,7 @@ export function GigImportsModal({
                           Reopen
                         </button>
                       )}
+                    </div>
                     </div>
                   </article>
                 )

@@ -356,7 +356,18 @@ export function useGigImportsWorkspace({
     field: GigImportDraftField,
     value: string
   ) => {
-    let draftToSave: GigImportDraft | null = null
+    const currentDraft = batchDetail?.drafts.find((draft) => draft.draftId === draftId)
+    const draftToSave = currentDraft
+      ? {
+          ...currentDraft,
+          [field]:
+            field === 'fee' || field === 'perDiem'
+              ? value.trim() === ''
+                ? null
+                : Number(value)
+              : value,
+        }
+      : null
 
     setBatchDetail((current) => {
       if (!current) {
@@ -370,17 +381,7 @@ export function useGigImportsWorkspace({
             return draft
           }
 
-          draftToSave = {
-            ...draft,
-            [field]:
-              field === 'fee' || field === 'perDiem'
-                ? value.trim() === ''
-                  ? null
-                  : Number(value)
-                : value,
-          }
-
-          return draftToSave
+          return draftToSave ?? draft
         }),
       }
     })

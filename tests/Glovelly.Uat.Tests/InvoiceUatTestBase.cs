@@ -237,6 +237,14 @@ public abstract class InvoiceUatTestBase : UatTestBase
         });
     }
 
+    protected async Task AddManualAdjustmentAsync(string adjustmentReason, string amount = "-5.00")
+    {
+        await Page.GetByTestId("invoice-adjustment-amount-input").FillAsync(amount);
+        await Page.GetByTestId("invoice-adjustment-reason-input").FillAsync(adjustmentReason);
+        await Page.GetByTestId("invoice-add-adjustment-button").ClickAsync();
+        await AssertInvoiceLineCountAsync(adjustmentReason, 1);
+    }
+
     protected async Task RedraftSelectedInvoiceAndOpenPreviewAsync()
     {
         await RunAndAcceptConfirmAsync(

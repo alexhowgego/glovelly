@@ -13,7 +13,7 @@ Use these journeys when a change may affect gig attachments such as set lists, g
 
 ## Add Attachment Journey
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.CreateGigExternalResource_AddsResourceToGig`, `CreateGigExternalResource_WithoutUrl_CreatesFileOnlyResourceShell`, `CreateGigExternalResource_WithInvalidUrl_ReturnsValidationProblem`, and `UpdateGigExternalResource_UpdatesFieldsAndPrimaryForPurposeOnly` cover server-side rules; browser modal flow remains manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.BrowserReceiptAndAttachmentUploadsRoundTripThroughGigUi` covers browser file-only attachment creation/upload/delete; backend tests cover URL validation, resource scoping, and primary rules.
 
 ### Steps
 
@@ -30,7 +30,7 @@ The attachment is added to the selected gig only, appears without refreshing, pr
 
 ## Quick Add Attachment Journey
 
-> **Automation:** Backend automated; manual UAT: `QuickExternalResourceDraftFile_WithNearbyGig_CreatesDraftResourceAndAttachment`, `QuickExternalResourceDraftLink_WithExplicitGig_InfersGoogleDocType`, `QuickExternalResourceDraftFile_WithNoCandidateInsideWindow_ReturnsEmptyCandidates`, and `UpdateQuickExternalResourceDraft_SavesDetailsMovesGigAndUpdatesPrimary` cover server-side quick capture rules; browser floating button and modal flow remain manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickAttachmentMobileFlowSavesDraftAndOpensTargetGig` covers the mobile-sized quick attachment link flow; backend tests cover file draft matching, no-candidate handling, type inference, moves, and primary updates.
 
 ### Steps
 
@@ -47,7 +47,7 @@ The quick add journey uses the same gig matching behaviour as quick receipts, su
 
 ## File-Only Attachment Journey
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.UploadGigExternalResourceAttachment_AddsDownloadableAttachment` covers upload, download, and delete through the API; browser file-picker flow remains manual.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.BrowserReceiptAndAttachmentUploadsRoundTripThroughGigUi` covers browser file-picker upload/delete and attachment-shell preservation; backend tests cover download/storage rules.
 
 ### Steps
 
@@ -75,6 +75,31 @@ The app allows an attachment without a URL, stores uploaded file metadata, downl
 ### Expected Results
 
 Only one `Set list` attachment is primary for the gig. The primary `Gig plan` remains primary because primary status is scoped by gig and purpose.
+
+## Set List Import Journey
+
+> **Automation:** Backend automated; manual UAT: `SetListImportEndpointsTests` and `SetListSheetParserTests` cover source parsing, review save, re-import history, and edit persistence. Browser OAuth and review modal flow remain manual.
+
+### Preconditions
+
+- Google Sheets is connected from the profile `Services` menu, or the tester is ready to connect it from the import modal.
+- A gig has a primary `Set list` attachment whose type is `Google Sheet` and whose URL points to a Google Sheets spreadsheet the connected Google account can read.
+
+### Steps
+
+1. Open Gigs and select the gig with the primary Google Sheet set list attachment.
+2. Expand the attachment and click `Import set list`.
+3. If Google Sheets is not connected, click `Connect Google Sheets`, complete OAuth, and return to the gig.
+4. Choose the worksheet/tab and click `Preview rows`.
+5. Confirm likely songs appear as included rows and non-song headings/instructions appear as greyed review notes.
+6. Expand a row, adjust title/pad/key/section/notes, and save the import.
+7. Re-open the attachment and click `Review set list`.
+8. Toggle a song include flag or edit a row, then save changes.
+9. Re-run `Import set list` and confirm replacing the active import requires confirmation and preserves historical imports.
+
+### Expected Results
+
+Imported setlists preserve source worksheet order and row numbers. Separators/comments are retained for audit but are not included as songs. Reviewing and saving edits updates the active import without changing the linked Google Sheet. Re-importing creates a new active snapshot only after explicit confirmation.
 
 ## Negative Checks
 

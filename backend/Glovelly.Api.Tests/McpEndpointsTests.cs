@@ -33,12 +33,24 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         "status",
         "dateBasis",
         "type",
+        "resourceType",
+        "purpose",
+        "kind",
         "confidence",
+        "reimbursementStatus",
+        "invoicingState",
     ];
 
     private static readonly string[] ExpectedMcpToolNames =
     [
         "glovelly_search_contacts",
+        "glovelly_get_contact",
+        "glovelly_list_gigs",
+        "glovelly_get_gig",
+        "glovelly_list_uninvoiced_gigs",
+        "glovelly_list_gig_resources",
+        "glovelly_get_gig_setlist",
+        "glovelly_preview_expense_statement",
         "glovelly_list_invoices",
         "glovelly_get_invoice",
         "glovelly_list_receipts",
@@ -459,6 +471,13 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         var safetyLevels = GlovellyMcpToolCatalog.Tools.ToDictionary(tool => tool.Name, tool => tool.SafetyLevel);
         Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_search_contacts"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_contact"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_gigs"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_gig"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_uninvoiced_gigs"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_gig_resources"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_gig_setlist"]);
+        Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_preview_expense_statement"]);
         Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_invoices"]);
         Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_get_invoice"]);
         Assert.Equal(McpToolSafetyLevel.ReadOnly, safetyLevels["glovelly_list_receipts"]);
@@ -544,6 +563,192 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         {
             AssertSchemaConventions(items, $"{path}.items", propertyName: null);
         }
+    }
+
+    [Fact]
+    public async Task ListGigs_ResolvesContactsAndFiltersVisibleGigs()
+    {
+        var gigId = await CreateGigAsync("MCP list gig", []);
+
+        var result = await CallToolAsync("glovelly_list_gigs", new
+        {
+            contactQuery = "Fox",
+            fromDate = "2026-04-01",
+            toDate = "2026-04-30",
+            status = "planned",
+            invoicingState = "uninvoiced",
+        });
+
+        Assert.False(result.GetProperty("ambiguous").GetBoolean());
+        Assert.Equal(100m, result.GetProperty("totalFees").GetDecimal());
+
+        var gig = Assert.Single(result.GetProperty("gigs").EnumerateArray());
+        Assert.Equal(gigId, gig.GetProperty("gigId").GetGuid());
+        Assert.Equal("MCP list gig", gig.GetProperty("title").GetString());
+        Assert.False(gig.GetProperty("isInvoiced").GetBoolean());
+        Assert.Equal("confirmed", gig.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task ListGigs_WhenContactQueryIsAmbiguous_ReturnsMatchesWithoutGuessing()
+    {
+        await CreateGigAsync("Ambiguous gig", []);
+        var createClientResponse = await _client.PostAsJsonAsync("/clients", new
+        {
+            name = "Fox Theatre",
+            email = "accounts@foxtheatre.test",
+            billingAddress = new { },
+        }, TestContext.Current.CancellationToken);
+        createClientResponse.EnsureSuccessStatusCode();
+
+        var result = await CallToolAsync("glovelly_list_gigs", new
+        {
+            contactQuery = "Fox",
+        });
+
+        Assert.True(result.GetProperty("ambiguous").GetBoolean());
+        Assert.Empty(result.GetProperty("gigs").EnumerateArray());
+        Assert.True(result.GetProperty("matches").GetArrayLength() >= 2);
+    }
+
+    [Fact]
+    public async Task GetGig_ReturnsDetailAndHidesOtherUsersGigs()
+    {
+        var gigId = await CreateGigAsync("MCP detail gig", new object[]
+        {
+            new { sortOrder = 1, description = "Parking", amount = 12m },
+        });
+        await AddGigResourceAndSetlistAsync(gigId);
+
+        var result = await CallToolAsync("glovelly_get_gig", new
+        {
+            gigId,
+        });
+
+        Assert.True(result.GetProperty("found").GetBoolean());
+        var gig = result.GetProperty("gig");
+        Assert.Equal("MCP detail gig", gig.GetProperty("title").GetString());
+        Assert.Single(gig.GetProperty("expenses").EnumerateArray());
+        Assert.Single(gig.GetProperty("resources").EnumerateArray());
+
+        var alternateResult = await CallToolAsAlternateUserAsync("glovelly_get_gig", new
+        {
+            gigId,
+        });
+        Assert.False(alternateResult.GetProperty("found").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ListUninvoicedGigs_ReturnsOnlyUnlinkedGigsWithTotals()
+    {
+        var gigId = await CreateGigAsync("Uninvoiced MCP gig", []);
+
+        var result = await CallToolAsync("glovelly_list_uninvoiced_gigs", new
+        {
+            contactId = TestData.FoxAndFinchId,
+            fromDate = "2026-04-01",
+            toDate = "2026-04-30",
+        });
+
+        var gig = Assert.Single(result.GetProperty("gigs").EnumerateArray());
+        Assert.Equal(gigId, gig.GetProperty("gigId").GetGuid());
+        Assert.Equal(100m, result.GetProperty("totalFees").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GetContact_ReturnsDetailAndHidesOtherUsersContacts()
+    {
+        await CreateGigAsync("Contact count gig", []);
+
+        var result = await CallToolAsync("glovelly_get_contact", new
+        {
+            contactId = TestData.FoxAndFinchId,
+        });
+
+        Assert.True(result.GetProperty("found").GetBoolean());
+        var contact = result.GetProperty("contact");
+        Assert.Equal("Fox & Finch Events", contact.GetProperty("name").GetString());
+        Assert.Equal("M3 5JZ", contact.GetProperty("billingAddress").GetProperty("postalCode").GetString());
+        Assert.True(contact.GetProperty("gigCount").GetInt32() >= 1);
+
+        var alternateResult = await CallToolAsAlternateUserAsync("glovelly_get_contact", new
+        {
+            contactId = TestData.FoxAndFinchId,
+        });
+        Assert.False(alternateResult.GetProperty("found").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ListGigResources_ReturnsMetadataWithoutFileContents()
+    {
+        var gigId = await CreateGigAsync("Resource gig", []);
+        await AddGigResourceAndSetlistAsync(gigId);
+
+        var result = await CallToolAsync("glovelly_list_gig_resources", new
+        {
+            gigId,
+        });
+
+        Assert.True(result.GetProperty("found").GetBoolean());
+        var resource = Assert.Single(result.GetProperty("resources").EnumerateArray());
+        Assert.Equal("Setlist", resource.GetProperty("title").GetString());
+        var attachment = Assert.Single(resource.GetProperty("attachments").EnumerateArray());
+        Assert.Equal("setlist.pdf", attachment.GetProperty("fileName").GetString());
+        Assert.False(attachment.TryGetProperty("storageKey", out _));
+    }
+
+    [Fact]
+    public async Task GetGigSetlist_ReturnsStoredActiveSetlistOrNoActiveState()
+    {
+        var gigId = await CreateGigAsync("Setlist gig", []);
+        await AddGigResourceAndSetlistAsync(gigId);
+
+        var result = await CallToolAsync("glovelly_get_gig_setlist", new
+        {
+            gigId,
+        });
+
+        Assert.True(result.GetProperty("found").GetBoolean());
+        Assert.True(result.GetProperty("hasActiveSetlist").GetBoolean());
+        var item = Assert.Single(result.GetProperty("setlist").GetProperty("items").EnumerateArray());
+        Assert.Equal("Opening Tune", item.GetProperty("title").GetString());
+
+        var noSetlistGigId = await CreateGigAsync("No setlist gig", []);
+        var noSetlistResult = await CallToolAsync("glovelly_get_gig_setlist", new
+        {
+            gigId = noSetlistGigId,
+        });
+        Assert.True(noSetlistResult.GetProperty("found").GetBoolean());
+        Assert.False(noSetlistResult.GetProperty("hasActiveSetlist").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PreviewExpenseStatement_ReturnsPreviewAndValidationFeedback()
+    {
+        var gigId = await CreateGigAsync("Statement gig", new object[]
+        {
+            new { sortOrder = 1, description = "Train", amount = 24m },
+        });
+
+        var result = await CallToolAsync("glovelly_preview_expense_statement", new
+        {
+            contactId = TestData.FoxAndFinchId,
+            gigIds = new[] { gigId },
+            includeReceiptAttachments = true,
+        });
+
+        Assert.True(result.GetProperty("created").GetBoolean());
+        var statement = result.GetProperty("statement");
+        Assert.Equal("Fox & Finch Events", statement.GetProperty("contactName").GetString());
+        Assert.Equal(24m, statement.GetProperty("total").GetDecimal());
+        Assert.Single(statement.GetProperty("gigs").EnumerateArray());
+
+        var invalid = await CallToolAsync("glovelly_preview_expense_statement", new
+        {
+            contactId = Guid.NewGuid(),
+        });
+        Assert.False(invalid.GetProperty("created").GetBoolean());
+        Assert.True(invalid.GetProperty("validationErrors").EnumerateObject().Any());
     }
 
     [Fact]
@@ -1029,7 +1234,7 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         response.EnsureSuccessStatusCode();
     }
 
-    private async Task CreateGigAsync(string title, object[] expenses)
+    private async Task<Guid> CreateGigAsync(string title, object[] expenses)
     {
         var response = await _client.PostAsJsonAsync("/gigs", new
         {
@@ -1045,5 +1250,68 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
         });
 
         response.EnsureSuccessStatusCode();
+        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        return gig.GetProperty("id").GetGuid();
+    }
+
+    private async Task AddGigResourceAndSetlistAsync(Guid gigId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var resourceId = Guid.NewGuid();
+        db.GigExternalResources.Add(new GigExternalResource
+        {
+            Id = resourceId,
+            GigId = gigId,
+            ResourceType = GigExternalResourceType.File,
+            Purpose = GigExternalResourcePurpose.SetList,
+            Title = "Setlist",
+            IsPrimary = true,
+            CreatedAt = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
+            Attachments =
+            [
+                new GigExternalResourceAttachment
+                {
+                    Id = Guid.NewGuid(),
+                    FileName = "setlist.pdf",
+                    ContentType = "application/pdf",
+                    SizeBytes = 1234,
+                    StorageKey = "private/setlist.pdf",
+                    CreatedAt = new DateTimeOffset(2026, 4, 1, 9, 5, 0, TimeSpan.Zero),
+                },
+            ],
+        });
+
+        db.GigSetListImports.Add(new GigSetListImport
+        {
+            Id = Guid.NewGuid(),
+            GigId = gigId,
+            GigExternalResourceId = resourceId,
+            SpreadsheetId = "spreadsheet-test",
+            WorksheetId = "0",
+            WorksheetName = "Set 1",
+            SourceUrl = "https://docs.google.com/spreadsheets/d/spreadsheet-test",
+            IsActive = true,
+            ImportedAtUtc = new DateTimeOffset(2026, 4, 1, 10, 0, 0, TimeSpan.Zero),
+            CreatedAtUtc = new DateTimeOffset(2026, 4, 1, 10, 0, 0, TimeSpan.Zero),
+            Items =
+            [
+                new GigSetListItem
+                {
+                    Id = Guid.NewGuid(),
+                    SortOrder = 0,
+                    SourceRowNumber = 2,
+                    Kind = GigSetListItemKind.Song,
+                    Include = true,
+                    Section = "Set 1",
+                    PadNumber = "001",
+                    Key = "G",
+                    Title = "Opening Tune",
+                    Confidence = GigSetListItemConfidence.High,
+                },
+            ],
+        });
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 }

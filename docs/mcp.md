@@ -24,6 +24,90 @@ Arguments:
 
 Returns possible contact matches without guessing.
 
+### `glovelly_get_contact`
+
+Fetch read-only details for one contact.
+
+Arguments:
+
+- `contactId`: required UUID
+
+Returns contact details, billing address, mileage settings, invoice naming patterns, and related visible gig/invoice counts when found.
+
+### `glovelly_list_gigs`
+
+List gigs by optional contact, status, date range, and invoicing state.
+
+Arguments:
+
+- `contactId`: optional UUID
+- `contactQuery`: optional string. If it matches multiple contacts, the result is marked ambiguous.
+- `status`: optional `all`, `draft`, `confirmed`, `planned`, `completed`, `cancelled`, or `canceled`
+- `fromDate`: optional date
+- `toDate`: optional date
+- `invoicingState`: optional `all`, `invoiced`, or `uninvoiced`
+
+Returns gig summaries plus total fees for returned rows.
+
+### `glovelly_get_gig`
+
+Fetch read-only details for one gig.
+
+Arguments:
+
+- `gigId`: required UUID
+
+Returns gig details, contact summary, linked invoice summary when present, expenses, and resource metadata when found.
+
+### `glovelly_list_uninvoiced_gigs`
+
+List visible gigs that are not linked to an invoice.
+
+Arguments:
+
+- `contactId`: optional UUID
+- `contactQuery`: optional string. If it matches multiple contacts, the result is marked ambiguous.
+- `status`: optional `all`, `draft`, `confirmed`, `planned`, `completed`, `cancelled`, or `canceled`
+- `fromDate`: optional date
+- `toDate`: optional date
+
+Returns uninvoiced gig summaries plus total uninvoiced fees.
+
+### `glovelly_list_gig_resources`
+
+List metadata for resources attached to a gig.
+
+Arguments:
+
+- `gigId`: required UUID
+
+Returns link/file metadata and attachment metadata only. It does not return attachment bytes or generated downloads.
+
+### `glovelly_get_gig_setlist`
+
+Fetch the active setlist import already stored for a gig.
+
+Arguments:
+
+- `gigId`: required UUID
+
+Returns active setlist import metadata and ordered setlist rows when present. It does not read Google Sheets or any other external source.
+
+### `glovelly_preview_expense_statement`
+
+Build a read-only structured expense statement preview.
+
+Arguments:
+
+- `contactId`: required UUID
+- `gigIds`: optional array of UUIDs; at least one gig is required by the statement builder
+- `expenseIds`: optional array of UUIDs
+- `includeReceiptAttachments`: optional boolean
+- `includeReceiptAppendix`: optional boolean accepted for preview parity; no PDF appendix is generated
+- `includeReimbursedExpenses`: optional boolean
+
+Returns a statement projection or validation errors. It does not generate PDFs, send email, publish to Google Drive, mutate reimbursement state, or write workspace events.
+
 ### `glovelly_list_invoices`
 
 List invoices by optional contact, status, date range, and date basis.

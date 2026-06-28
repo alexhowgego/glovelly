@@ -66,6 +66,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal("BS1 1AA", payload.GetProperty("travelOriginPostcode").GetString());
         Assert.Equal(30, payload.GetProperty("defaultPaymentWindowDays").GetInt32());
         Assert.False(payload.GetProperty("isGoogleDriveConnected").GetBoolean());
+        Assert.False(payload.GetProperty("isGoogleSheetsConnected").GetBoolean());
     }
 
     [Fact]
@@ -96,6 +97,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.True(payload.GetProperty("isGoogleDriveConnected").GetBoolean());
+        Assert.False(payload.GetProperty("isGoogleSheetsConnected").GetBoolean());
     }
 
     [Fact]

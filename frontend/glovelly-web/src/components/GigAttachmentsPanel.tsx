@@ -8,6 +8,8 @@ import type {
   GigExternalResourcePurpose,
   GigExternalResourceType,
 } from '../types'
+import { SetListImportModal } from './SetListImportModal'
+import { GigSetListModal } from './GigSetListModal'
 import { TrashIcon } from './TrashIcon'
 
 type GigAttachmentsPanelProps = {
@@ -72,6 +74,8 @@ export function GigAttachmentsPanel({
   onUploadExternalResourceAttachment,
 }: GigAttachmentsPanelProps) {
   const [expandedResourceId, setExpandedResourceId] = useState<string>('')
+  const [setListImportResource, setSetListImportResource] = useState<GigExternalResource | null>(null)
+  const [isSetListModalOpen, setIsSetListModalOpen] = useState(false)
   const externalResourceEditorTitle =
     externalResourceMode === 'edit' ? 'Edit attachment' : 'Add attachment'
   const formatResourceType = (value: GigExternalResourceType) =>
@@ -102,6 +106,7 @@ export function GigAttachmentsPanel({
           </div>
           <button
             className="ghost-button"
+            data-testid="add-gig-attachment-button"
             onClick={onStartExternalResourceCreate}
             type="button"
             disabled={isGigLoading}
@@ -122,6 +127,7 @@ export function GigAttachmentsPanel({
                 <article
                   key={resource.id}
                   className={`associated-item-row external-resource-item ${isExpanded ? 'expanded' : ''}`}
+                  data-testid="gig-attachment-item"
                 >
                   <button
                     className="associated-item-summary"
@@ -167,6 +173,26 @@ export function GigAttachmentsPanel({
                             Open
                           </a>
                         )}
+                        {selectedGig && resource.resourceType === 'GoogleSheet' && resource.purpose === 'SetList' && (
+                          <>
+                            <button
+                              className="ghost-button"
+                              onClick={() => setSetListImportResource(resource)}
+                              type="button"
+                              disabled={isGigLoading}
+                            >
+                              Import set list
+                            </button>
+                            <button
+                              className="ghost-button"
+                              onClick={() => setIsSetListModalOpen(true)}
+                              type="button"
+                              disabled={isGigLoading}
+                            >
+                              Review set list
+                            </button>
+                          </>
+                        )}
                         <button
                           className="ghost-button"
                           onClick={() => onStartExternalResourceEdit(resource)}
@@ -192,6 +218,7 @@ export function GigAttachmentsPanel({
                           <label className="ghost-button file-upload-button">
                             Upload
                             <input
+                              data-testid="gig-attachment-file-input"
                               type="file"
                               onChange={(event) => {
                                 const file = event.target.files?.[0]
@@ -279,6 +306,7 @@ export function GigAttachmentsPanel({
                 <label>
                   <span>Type</span>
                   <select
+                    data-testid="gig-attachment-type-select"
                     value={externalResourceForm.resourceType}
                     onChange={(event) =>
                       onUpdateExternalResourceField(
@@ -315,6 +343,7 @@ export function GigAttachmentsPanel({
                 <label>
                   <span>Title</span>
                   <input
+                    data-testid="gig-attachment-title-input"
                     required
                     value={externalResourceForm.title}
                     onChange={(event) =>
@@ -325,6 +354,7 @@ export function GigAttachmentsPanel({
                 <label>
                   <span>URL</span>
                   <input
+                    data-testid="gig-attachment-url-input"
                     type="url"
                     placeholder="Optional link"
                     value={externalResourceForm.url}
@@ -345,7 +375,7 @@ export function GigAttachmentsPanel({
                 />
               </label>
               <label className="checkbox-field resource-primary-toggle">
-                <input
+                  <input
                   type="checkbox"
                   checked={externalResourceForm.isPrimary}
                   onChange={(event) =>
@@ -356,7 +386,9 @@ export function GigAttachmentsPanel({
               </label>
               <div className="form-actions">
                 <button className="primary-button" type="submit" disabled={isGigLoading}>
+                  <span data-testid="gig-attachment-submit-label">
                   {externalResourceMode === 'edit' ? 'Update attachment' : 'Add attachment'}
+                  </span>
                 </button>
                 <button
                   className="ghost-button"
@@ -371,6 +403,21 @@ export function GigAttachmentsPanel({
             </form>
           </section>
         </div>
+      )}
+
+      {selectedGig && setListImportResource && (
+        <SetListImportModal
+          gig={selectedGig}
+          resource={setListImportResource}
+          onClose={() => setSetListImportResource(null)}
+        />
+      )}
+
+      {selectedGig && isSetListModalOpen && (
+        <GigSetListModal
+          gig={selectedGig}
+          onClose={() => setIsSetListModalOpen(false)}
+        />
       )}
     </>
   )

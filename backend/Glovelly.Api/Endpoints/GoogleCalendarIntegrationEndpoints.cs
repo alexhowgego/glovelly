@@ -46,6 +46,10 @@ internal static class GoogleCalendarIntegrationEndpoints
                 return Results.Unauthorized();
             }
 
+            var authorizationScope = await GoogleIntegrationEndpointSupport.BuildAuthorizationScopeAsync(
+                dbContext,
+                currentUserId.Value,
+                GoogleScopes.CalendarAppCreated);
             var state = CreateStateToken(currentUserId.Value, dataProtectionProvider);
             var authorizationUrl = QueryHelpers.AddQueryString(
                 GoogleAuthorizationEndpoint,
@@ -54,11 +58,7 @@ internal static class GoogleCalendarIntegrationEndpoints
                     ["client_id"] = settings.GoogleClientId,
                     ["redirect_uri"] = BuildCallbackUri(httpContext),
                     ["response_type"] = "code",
-                    ["scope"] = GoogleScopes.Join(
-                        GoogleScopes.OpenId,
-                        GoogleScopes.Email,
-                        GoogleScopes.Profile,
-                        GoogleScopes.CalendarAppCreated),
+                    ["scope"] = authorizationScope,
                     ["access_type"] = "offline",
                     ["prompt"] = "consent",
                     ["state"] = state,
@@ -223,14 +223,29 @@ internal static class GoogleCalendarIntegrationEndpoints
 
             var calendarSettings = await dbContext.GoogleCalendarIntegrationSettings
                 .FirstOrDefaultAsync(value => value.UserId == userId.Value, cancellationToken);
+            var now = DateTimeOffset.UtcNow;
             if (calendarSettings is not null)
             {
-                var now = DateTimeOffset.UtcNow;
                 calendarSettings.IsEnabled = false;
                 calendarSettings.DisconnectedAtUtc = now;
                 calendarSettings.UpdatedAtUtc = now;
-                await dbContext.SaveChangesAsync(cancellationToken);
             }
+
+            var connection = await dbContext.GoogleConnections
+                .FirstOrDefaultAsync(value => value.UserId == userId.Value, cancellationToken);
+            if (connection is not null)
+            {
+                connection.GrantedScopes = GoogleScopes.Remove(connection.GrantedScopes, GoogleScopes.CalendarAppCreated);
+                if (string.IsNullOrWhiteSpace(connection.GrantedScopes))
+                {
+                    connection.RevokedAtUtc = now;
+                    connection.EncryptedAccessToken = string.Empty;
+                    connection.EncryptedRefreshToken = string.Empty;
+                }
+                connection.UpdatedAtUtc = now;
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             return Results.NoContent();
         });

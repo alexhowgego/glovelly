@@ -71,6 +71,8 @@ internal static class AuthEndpoints
                      connection.RefreshTokenExpiresAtUtc > now));
             var isGoogleDriveConnected = googleConnection is not null &&
                 GoogleScopes.Contains(googleConnection.GrantedScopes, GoogleScopes.DriveFile);
+            var isGoogleSheetsConnected = googleConnection is not null &&
+                GoogleScopes.Contains(googleConnection.GrantedScopes, GoogleScopes.SpreadsheetsReadonly);
             var googleDriveSettings = isGoogleDriveConnected
                 ? await dbContext.GoogleDriveIntegrationSettings
                     .AsNoTracking()
@@ -94,6 +96,7 @@ internal static class AuthEndpoints
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
                 invoiceUploadFolderId = googleDriveSettings?.InvoiceUploadFolderId,
                 isGoogleDriveConnected,
+                isGoogleSheetsConnected,
             });
         });
 
