@@ -676,6 +676,60 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task QuickReceiptDraft_IncludesAllCandidatesTiedAtCandidateLimit()
+    {
+        var today = new DateOnly(2026, 1, 1);
+        for (var index = 0; index < 6; index++)
+        {
+            var createResponse = await _client.PostAsJsonAsync("/gigs", new
+            {
+                clientId = TestData.FoxAndFinchId,
+                title = $"Same-day candidate {index}",
+                date = today.ToString("yyyy-MM-dd"),
+                venue = "Theatre",
+                fee = 120.00m,
+                travelMiles = 0.00m,
+                notes = "Candidate tie test",
+                wasDriving = true,
+                status = "Confirmed",
+                expenses = Array.Empty<object>(),
+                invoicedAt = (string?)null,
+            }, TestContext.Current.CancellationToken);
+
+            createResponse.EnsureSuccessStatusCode();
+        }
+
+        var nextDayResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Next-day candidate",
+            date = today.AddDays(1).ToString("yyyy-MM-dd"),
+            venue = "Theatre",
+            fee = 120.00m,
+            travelMiles = 0.00m,
+            notes = "Candidate tie test",
+            wasDriving = true,
+            status = "Confirmed",
+            expenses = Array.Empty<object>(),
+            invoicedAt = (string?)null,
+        }, TestContext.Current.CancellationToken);
+        nextDayResponse.EnsureSuccessStatusCode();
+
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf");
+
+        var response = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var candidates = result.GetProperty("candidates").EnumerateArray().ToArray();
+
+        Assert.Equal(6, candidates.Length);
+        Assert.All(candidates, candidate => Assert.Equal(0, candidate.GetProperty("daysFromToday").GetInt32()));
+        Assert.DoesNotContain(candidates, candidate => candidate.GetProperty("title").GetString() == "Next-day candidate");
+    }
+
+    [Fact]
     public async Task QuickReceiptDraft_WithCandidateOutsideAmbiguityWindow_DoesNotFlagNearbyCandidates()
     {
         var today = new DateOnly(2026, 1, 1);
