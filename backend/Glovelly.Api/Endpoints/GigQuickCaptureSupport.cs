@@ -35,7 +35,7 @@ internal static class GigQuickCaptureSupport
             .Where(value => value.Status != GigStatus.Cancelled)
             .ToListAsync();
 
-        return gigs
+        var candidates = gigs
             .Select(gig => new QuickGigCandidate(
                 gig.Id,
                 gig.ClientId,
@@ -48,7 +48,14 @@ internal static class GigQuickCaptureSupport
             .OrderBy(candidate => candidate.DaysFromToday)
             .ThenBy(candidate => candidate.Date)
             .ThenBy(candidate => candidate.Title)
-            .Take(settings.CandidateCount)
+            .ToList();
+
+        var cutoff = candidates.Count >= settings.CandidateCount
+            ? candidates[settings.CandidateCount - 1].DaysFromToday
+            : (int?)null;
+
+        return candidates
+            .Where((candidate, index) => !cutoff.HasValue || index < settings.CandidateCount || candidate.DaysFromToday == cutoff.Value)
             .ToList();
     }
 

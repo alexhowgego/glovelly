@@ -365,7 +365,7 @@ function App({ appMetadata }: AppProps) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    return gigs
+    const sortedCandidates = gigs
       .filter((gig) => gig.status !== 'Cancelled')
       .map((gig) => {
         const gigDate = new Date(`${gig.date}T00:00:00`)
@@ -391,7 +391,10 @@ function App({ appMetadata }: AppProps) {
         left.date.localeCompare(right.date) ||
         left.title.localeCompare(right.title)
       )
-      .slice(0, 5)
+
+    const cutoff = sortedCandidates[4]?.daysFromToday
+    return sortedCandidates
+      .filter((candidate, index) => cutoff === undefined || index < 5 || candidate.daysFromToday === cutoff)
       .map((candidate, index) => ({
         ...candidate,
         isSelected: index === 0,
