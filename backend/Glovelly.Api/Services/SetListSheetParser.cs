@@ -397,4 +397,6 @@ public sealed record SetListImportItemDraft(
     string Title,
     string? Notes,
     string RawCellsJson,
-    GigSetListItemConfidence Confidence);
+    GigSetListItemConfidence Confidence,
+    Guid? ForScoreChartId = null,
+    SetListChartMatchResult? ForScoreMatch = null);

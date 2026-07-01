@@ -54,6 +54,7 @@ import type {
   AuthUser,
   Client,
   ForScoreLibrarySnapshot,
+  ForScoreLibraryImportResponse,
   Gig,
   GigImportBatchSummary,
   Invoice,
@@ -788,10 +789,15 @@ function App({ appMetadata }: AppProps) {
         )
       }
 
-      const snapshot = (await response.json()) as ForScoreLibrarySnapshot
+      const importResult = (await response.json()) as ForScoreLibraryImportResponse
+      const { snapshot, impact } = importResult
       setForScoreSnapshot(snapshot)
       setForScoreLibraryStatus(
-        `Imported ${snapshot.chartCount} chart(s) from ${snapshot.originalFileName}.`
+        impact.needsReviewItemCount > 0
+          ? `Imported ${snapshot.chartCount} chart(s). ${impact.affectedSetListCount} set list(s) have chart links that need review.`
+          : impact.autoRelinkedItemCount > 0
+            ? `Imported ${snapshot.chartCount} chart(s). ${impact.autoRelinkedItemCount} chart link(s) were updated automatically.`
+            : `Imported ${snapshot.chartCount} chart(s) from ${snapshot.originalFileName}.`
       )
     } catch (error) {
       setForScoreLibraryStatus(

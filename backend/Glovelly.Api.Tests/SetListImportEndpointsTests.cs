@@ -283,6 +283,141 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal("Medium", updatedItem.GetProperty("confidence").GetString());
     }
 
+    [Fact]
+    public async Task Preview_IncludesForScoreChartMatches()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
+        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+
+        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/preview", new
+        {
+            resourceId,
+            worksheetId = "0",
+            worksheetName = "Set list",
+        }, TestContext.Current.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var love = payload.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "L-O-V-E");
+        Assert.Equal("Suggested", love.GetProperty("forScoreMatch").GetProperty("status").GetString());
+        Assert.Equal("L-O-V-E", love.GetProperty("forScoreMatch").GetProperty("selectedChart").GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task SaveImport_RejectsChartFromAnotherUser()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
+        var otherChartId = await SeedForScoreSnapshotAsync(factory, TestAuthContext.AlternateUserId, ("Other.pdf", "Other"));
+
+        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports", new
+        {
+            resourceId,
+            worksheetId = "0",
+            worksheetName = "Set list",
+            replaceActiveImport = false,
+            items = new[]
+            {
+                new
+                {
+                    sourceRowNumber = 3,
+                    sortOrder = 0,
+                    kind = "Song",
+                    include = true,
+                    section = (string?)"Set One",
+                    padNumber = (string?)"74-G",
+                    key = (string?)"G",
+                    title = "L-O-V-E",
+                    notes = (string?)null,
+                    rawCellsJson = "[\"74-G\",\"G\",\"L-O-V-E\"]",
+                    confidence = "High",
+                    forScoreChartId = otherChartId,
+                },
+            },
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExistingSetList_CanPreviewAndSaveChartMappingWithoutReplacingImport()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
+        var chartId = await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+
+        var createResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports", new
+        {
+            resourceId,
+            worksheetId = "0",
+            worksheetName = "Set list",
+            replaceActiveImport = false,
+            items = new[]
+            {
+                new
+                {
+                    sourceRowNumber = 3,
+                    sortOrder = 0,
+                    kind = "Song",
+                    include = true,
+                    section = (string?)"Set One",
+                    padNumber = (string?)"74-G",
+                    key = (string?)"G",
+                    title = "L-O-V-E",
+                    notes = (string?)null,
+                    rawCellsJson = "[\"74-G\",\"G\",\"L-O-V-E\"]",
+                    confidence = "High",
+                },
+            },
+        }, TestContext.Current.CancellationToken);
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var importId = created.GetProperty("id").GetGuid();
+        var itemId = created.GetProperty("items")[0].GetProperty("id").GetGuid();
+
+        var previewResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/{importId}/chart-matches/preview", new { }, TestContext.Current.CancellationToken);
+        previewResponse.EnsureSuccessStatusCode();
+        var preview = await previewResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Suggested", preview.GetProperty("items")[0].GetProperty("status").GetString());
+
+        var updateResponse = await client.PutAsJsonAsync($"/gigs/{gigId}/setlist-imports/{importId}", new
+        {
+            items = new[]
+            {
+                new
+                {
+                    id = itemId,
+                    sourceRowNumber = 3,
+                    sortOrder = 0,
+                    kind = "Song",
+                    include = true,
+                    section = (string?)"Set One",
+                    padNumber = (string?)"74-G",
+                    key = (string?)"G",
+                    title = "L-O-V-E",
+                    notes = (string?)null,
+                    rawCellsJson = "[\"74-G\",\"G\",\"L-O-V-E\"]",
+                    confidence = "High",
+                    forScoreChartId = chartId,
+                },
+            },
+        }, TestContext.Current.CancellationToken);
+
+        updateResponse.EnsureSuccessStatusCode();
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var item = await db.GigSetListItems.SingleAsync(value => value.Id == itemId, TestContext.Current.CancellationToken);
+        Assert.Equal(chartId, item.ForScoreChartId);
+        Assert.Equal(ForScoreMappingStatus.Linked, item.ForScoreMappingStatus);
+    }
+
     private WebApplicationFactory<Program> CreateFactory(FakeGoogleSheetsApiClient sheetsClient)
     {
         return _factory.WithWebHostBuilder(builder =>
@@ -346,6 +481,49 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return (gigId, resourceId);
+    }
+
+    private static async Task<Guid> SeedForScoreSnapshotAsync(WebApplicationFactory<Program> factory, Guid userId, params (string FilePath, string Title)[] charts)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (userId == TestAuthContext.AlternateUserId && !await dbContext.Users.AnyAsync(user => user.Id == userId, TestContext.Current.CancellationToken))
+        {
+            dbContext.Users.Add(new User
+            {
+                Id = userId,
+                GoogleSubject = "alternate-subject",
+                Email = "alternate@glovelly.local",
+                DisplayName = "Alternate User",
+                Role = UserRole.User,
+                IsActive = true,
+                CreatedUtc = DateTime.UtcNow,
+            });
+        }
+
+        var snapshot = new ForScoreLibrarySnapshot
+        {
+            Id = Guid.NewGuid(),
+            CreatedByUserId = userId,
+            OriginalFileName = "library.4sb",
+            SourceFormat = "FourSb",
+            IsActive = true,
+            ChartCount = charts.Length,
+            WarningsJson = "[]",
+            ImportedAtUtc = DateTimeOffset.UtcNow,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            Charts = charts.Select((chart, index) => new ForScoreChart
+            {
+                Id = Guid.NewGuid(),
+                SortOrder = index,
+                FilePath = chart.FilePath,
+                Title = chart.Title,
+                NormalizedTitle = SetListChartMatcher.Normalize(chart.Title),
+            }).ToList(),
+        };
+        dbContext.ForScoreLibrarySnapshots.Add(snapshot);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return snapshot.Charts.First().Id;
     }
 
     private sealed class FakeGoogleSheetsApiClient : IGoogleSheetsApiClient

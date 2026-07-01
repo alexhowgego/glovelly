@@ -33,10 +33,11 @@ public sealed class ForScoreLibraryEndpointsTests : IClassFixture<GlovellyApiFac
         var response = await _client.PostAsync("/forscore-library/imports", content, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var snapshot = await response.Content.ReadFromJsonAsync<SnapshotResponse>(TestContext.Current.CancellationToken);
-        Assert.NotNull(snapshot);
-        Assert.True(snapshot.IsActive);
-        Assert.Equal(1, snapshot.ChartCount);
+        var importResult = await response.Content.ReadFromJsonAsync<ImportResponse>(TestContext.Current.CancellationToken);
+        Assert.NotNull(importResult);
+        Assert.True(importResult.Snapshot.IsActive);
+        Assert.Equal(1, importResult.Snapshot.ChartCount);
+        Assert.Equal(0, importResult.Impact.AffectedSetListCount);
 
         var chartsResponse = await _client.GetAsync("/forscore-library/active/charts", TestContext.Current.CancellationToken);
         chartsResponse.EnsureSuccessStatusCode();
@@ -100,6 +101,106 @@ public sealed class ForScoreLibraryEndpointsTests : IClassFixture<GlovellyApiFac
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Upload_NewSnapshotRelinksMappedUpcomingDraftAndConfirmedSetLists()
+    {
+        await _client.PostAsync("/forscore-library/imports", BuildUploadContent(ForScoreBackupFixture.Build(new Dictionary<string, object>
+        {
+            ["Shared.pdf|title"] = "Shared",
+            ["Missing.pdf|title"] = "Missing",
+        }), "old.4sb"), TestContext.Current.CancellationToken);
+
+        Guid oldSnapshotId;
+        Guid sharedChartId;
+        Guid missingChartId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var oldSnapshot = await db.ForScoreLibrarySnapshots.Include(snapshot => snapshot.Charts).SingleAsync(snapshot => snapshot.IsActive, TestContext.Current.CancellationToken);
+            oldSnapshotId = oldSnapshot.Id;
+            sharedChartId = oldSnapshot.Charts.Single(chart => chart.FilePath == "Shared.pdf").Id;
+            missingChartId = oldSnapshot.Charts.Single(chart => chart.FilePath == "Missing.pdf").Id;
+
+            var gigId = Guid.NewGuid();
+            db.Gigs.Add(new Gig
+            {
+                Id = gigId,
+                ClientId = TestData.FoxAndFinchId,
+                CreatedByUserId = TestAuthContext.UserId,
+                UpdatedByUserId = TestAuthContext.UserId,
+                Title = "Future draft gig",
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14)),
+                Venue = "Future venue",
+                Status = GigStatus.Draft,
+            });
+
+            db.GigSetListImports.Add(new GigSetListImport
+            {
+                Id = Guid.NewGuid(),
+                GigId = gigId,
+                SpreadsheetId = "spreadsheet",
+                WorksheetName = "Set 1",
+                IsActive = true,
+                ImportedAtUtc = DateTimeOffset.UtcNow,
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                Items =
+                [
+                    new GigSetListItem
+                    {
+                        Id = Guid.NewGuid(),
+                        SortOrder = 0,
+                        SourceRowNumber = 1,
+                        Kind = GigSetListItemKind.Song,
+                        Include = true,
+                        Title = "Shared",
+                        ForScoreLibrarySnapshotId = oldSnapshotId,
+                        ForScoreChartId = sharedChartId,
+                        ForScoreChartTitle = "Shared",
+                        ForScoreChartFilePath = "Shared.pdf",
+                        ForScoreMappingStatus = ForScoreMappingStatus.Linked,
+                        ForScoreMappingConfidence = ForScoreMappingConfidence.Manual,
+                    },
+                    new GigSetListItem
+                    {
+                        Id = Guid.NewGuid(),
+                        SortOrder = 1,
+                        SourceRowNumber = 2,
+                        Kind = GigSetListItemKind.Song,
+                        Include = true,
+                        Title = "Missing",
+                        ForScoreLibrarySnapshotId = oldSnapshotId,
+                        ForScoreChartId = missingChartId,
+                        ForScoreChartTitle = "Missing",
+                        ForScoreChartFilePath = "Missing.pdf",
+                        ForScoreMappingStatus = ForScoreMappingStatus.Linked,
+                        ForScoreMappingConfidence = ForScoreMappingConfidence.Manual,
+                    },
+                ],
+            });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var response = await _client.PostAsync("/forscore-library/imports", BuildUploadContent(ForScoreBackupFixture.Build(new Dictionary<string, object>
+        {
+            ["Shared.pdf|title"] = "Shared",
+        }), "new.4sb"), TestContext.Current.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var importResult = await response.Content.ReadFromJsonAsync<ImportResponse>(TestContext.Current.CancellationToken);
+        Assert.NotNull(importResult);
+        Assert.Equal(1, importResult.Impact.AffectedSetListCount);
+        Assert.Equal(1, importResult.Impact.AutoRelinkedItemCount);
+        Assert.Equal(1, importResult.Impact.NeedsReviewItemCount);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var items = await verifyDb.GigSetListItems.OrderBy(item => item.SortOrder).ToListAsync(TestContext.Current.CancellationToken);
+        Assert.NotEqual(oldSnapshotId, items[0].ForScoreLibrarySnapshotId);
+        Assert.Equal(ForScoreMappingStatus.Linked, items[0].ForScoreMappingStatus);
+        Assert.Equal(oldSnapshotId, items[1].ForScoreLibrarySnapshotId);
+        Assert.Equal(ForScoreMappingStatus.MissingFromLatestLibrary, items[1].ForScoreMappingStatus);
+    }
+
     private async Task SeedAlternateUserAsync()
     {
         using var scope = _factory.Services.CreateScope();
@@ -127,6 +228,10 @@ public sealed class ForScoreLibraryEndpointsTests : IClassFixture<GlovellyApiFac
     }
 
     private sealed record SnapshotResponse(Guid Id, bool IsActive, int ChartCount, string OriginalFileName, IReadOnlyList<string> Warnings);
+
+    private sealed record ImportResponse(SnapshotResponse Snapshot, ImpactResponse Impact);
+
+    private sealed record ImpactResponse(int AffectedSetListCount, int AutoRelinkedItemCount, int NeedsReviewItemCount);
 
     private sealed record ChartsResponse(Guid SnapshotId, IReadOnlyList<ChartResponse> Charts);
 

@@ -91,6 +91,30 @@ export type ForScoreLibraryChartsResponse = {
   charts: ForScoreChart[]
 }
 
+export type ForScoreLibraryImportImpactSetList = {
+  gigId: string
+  setListImportId: string
+  gigTitle: string
+  gigDate: string
+  gigStatus: string
+  autoRelinkedItemCount: number
+  needsReviewItemCount: number
+}
+
+export type ForScoreLibraryImportImpact = {
+  checkedSetListCount: number
+  affectedSetListCount: number
+  checkedItemCount: number
+  autoRelinkedItemCount: number
+  needsReviewItemCount: number
+  setLists: ForScoreLibraryImportImpactSetList[]
+}
+
+export type ForScoreLibraryImportResponse = {
+  snapshot: ForScoreLibrarySnapshot
+  impact: ForScoreLibraryImportImpact
+}
+
 export type AdminUser = {
   id: string
   email: string
@@ -245,6 +269,42 @@ export type GigExternalResourceAttachment = {
 
 export type GigSetListItemKind = 'Song' | 'Separator' | 'Comment'
 export type GigSetListItemConfidence = 'Low' | 'Medium' | 'High'
+export type ForScoreMappingStatus = 'Unmapped' | 'Linked' | 'Suggested' | 'NeedsReview' | 'MissingFromLatestLibrary' | 'NotApplicable' | 'NoActiveLibrary'
+export type ForScoreMappingConfidence = 'None' | 'Low' | 'Medium' | 'High' | 'Manual'
+
+export type ForScoreChartReference = {
+  id: string
+  snapshotId: string
+  title: string
+  filePath: string
+  normalizedTitle: string
+}
+
+export type SetListChartMatchCandidate = {
+  chart: ForScoreChartReference
+  score: number
+  reason: string
+}
+
+export type SetListChartMatchResult = {
+  itemId: string | null
+  sourceRowNumber: number
+  status: ForScoreMappingStatus
+  confidence: ForScoreMappingConfidence
+  reason: string
+  selectedChart: ForScoreChartReference | null
+  candidates: SetListChartMatchCandidate[]
+}
+
+export type SetListSavedChartMapping = {
+  snapshotId: string | null
+  chartId: string | null
+  chartTitle: string | null
+  chartFilePath: string | null
+  status: ForScoreMappingStatus
+  confidence: ForScoreMappingConfidence
+  updatedAtUtc: string | null
+}
 
 export type GigSetListWorksheet = {
   sheetId: string
@@ -272,6 +332,8 @@ export type GigSetListImportItemDraft = {
   notes: string | null
   rawCellsJson: string
   confidence: GigSetListItemConfidence
+  forScoreChartId: string | null
+  forScoreMatch: SetListChartMatchResult | null
 }
 
 export type GigSetListPreview = {
@@ -294,7 +356,7 @@ export type GigSetListImport = {
   sourceUrl: string | null
   isActive: boolean
   importedAtUtc: string
-  items: (GigSetListImportItemDraft & { id: string })[]
+  items: (GigSetListImportItemDraft & { id: string; forScoreMapping: SetListSavedChartMapping })[]
 }
 
 export type ExpenseStatementGig = {

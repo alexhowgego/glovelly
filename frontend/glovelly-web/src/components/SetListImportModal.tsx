@@ -156,7 +156,7 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
 
   const updateItem = (
     index: number,
-    patch: Partial<Pick<GigSetListImportItemDraft, 'include' | 'title' | 'padNumber' | 'key' | 'section' | 'notes'>>
+    patch: Partial<Pick<GigSetListImportItemDraft, 'include' | 'title' | 'padNumber' | 'key' | 'section' | 'notes' | 'forScoreChartId'>>
   ) => {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item))
   }
@@ -166,9 +166,33 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
   const getItemMeta = (item: GigSetListImportItemDraft) => [
     `Row ${item.sourceRowNumber}`,
     item.kind,
+    getMatchLabel(item),
     `${item.confidence} confidence`,
     item.section,
   ].filter(Boolean).join(' · ')
+
+  const getMatchLabel = (item: GigSetListImportItemDraft) => {
+    if (item.kind !== 'Song' || !item.include) {
+      return null
+    }
+
+    if (item.forScoreChartId) {
+      return 'Chart selected'
+    }
+
+    switch (item.forScoreMatch?.status) {
+      case 'Suggested':
+        return item.forScoreMatch.selectedChart ? `Suggested: ${item.forScoreMatch.selectedChart.title}` : 'Suggested chart'
+      case 'NeedsReview':
+        return 'Choose chart'
+      case 'MissingFromLatestLibrary':
+        return 'Missing from latest library'
+      case 'NoActiveLibrary':
+        return 'No forScore library'
+      default:
+        return 'No chart selected'
+    }
+  }
 
   return (
     <div className="settings-overlay" role="presentation">
@@ -249,6 +273,7 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
                       <div className="associated-item-chips">
                         {item.padNumber && <span className="resource-meta-chip">Pad {item.padNumber}</span>}
                         {item.key && <span className="resource-meta-chip">Key {item.key}</span>}
+                        {isSong && <span className="resource-meta-chip">{getMatchLabel(item)}</span>}
                         {!isSong && <span className="resource-meta-chip">Review note</span>}
                         <span className="associated-item-expand-indicator" aria-hidden="true">
                           {isExpanded ? '−' : '+'}
@@ -280,6 +305,19 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
                         <span>Notes</span>
                         <textarea value={item.notes ?? ''} onChange={(event) => updateItem(index, { notes: event.target.value || null })} />
                       </label>
+                      {isSong && item.forScoreMatch && (
+                        <label>
+                          <span>forScore chart</span>
+                          <select value={item.forScoreChartId ?? ''} onChange={(event) => updateItem(index, { forScoreChartId: event.target.value || null })}>
+                            <option value="">No chart selected</option>
+                            {item.forScoreMatch.selectedChart && <option value={item.forScoreMatch.selectedChart.id}>{item.forScoreMatch.selectedChart.title}</option>}
+                            {item.forScoreMatch.candidates
+                              .filter((candidate) => candidate.chart.id !== item.forScoreMatch?.selectedChart?.id)
+                              .map((candidate) => <option key={candidate.chart.id} value={candidate.chart.id}>{candidate.chart.title}</option>)}
+                          </select>
+                          <span className="settings-hint">{item.forScoreMatch.reason}</span>
+                        </label>
+                      )}
                     </div>
                   </div>
                 </article>

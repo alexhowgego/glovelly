@@ -78,11 +78,12 @@ Only one `Set list` attachment is primary for the gig. The primary `Gig plan` re
 
 ## Set List Import Journey
 
-> **Automation:** Backend automated; manual UAT: `SetListImportEndpointsTests` and `SetListSheetParserTests` cover source parsing, review save, re-import history, and edit persistence. Browser OAuth and review modal flow remain manual.
+> **Automation:** Backend automated; manual UAT: `SetListImportEndpointsTests`, `SetListChartMatcherTests`, and `SetListSheetParserTests` cover source parsing, forScore chart matching, review save, re-import history, and edit persistence. Browser OAuth and review modal flow remain manual.
 
 ### Preconditions
 
 - Google Sheets is connected from the profile `Services` menu, or the tester is ready to connect it from the import modal.
+- A forScore `.4sb` library snapshot has been imported from the profile `Services` menu when testing chart matching.
 - A gig has a primary `Set list` attachment whose type is `Google Sheet` and whose URL points to a Google Sheets spreadsheet the connected Google account can read.
 
 ### Steps
@@ -92,14 +93,31 @@ Only one `Set list` attachment is primary for the gig. The primary `Gig plan` re
 3. If Google Sheets is not connected, click `Connect Google Sheets`, complete OAuth, and return to the gig.
 4. Choose the worksheet/tab and click `Preview rows`.
 5. Confirm likely songs appear as included rows and non-song headings/instructions appear as greyed review notes.
-6. Expand a row, adjust title/pad/key/section/notes, and save the import.
-7. Re-open the attachment and click `Review set list`.
-8. Toggle a song include flag or edit a row, then save changes.
-9. Re-run `Import set list` and confirm replacing the active import requires confirmation and preserves historical imports.
+6. Confirm song rows show forScore chart status such as suggested, choose chart, missing from latest library, or no library.
+7. Expand a song row, choose or clear the forScore chart, adjust title/pad/key/section/notes, and save the import.
+8. Re-open the attachment and click `Review set list`.
+9. Click `Check forScore matches`, confirm existing rows can be matched without re-importing the Google Sheet, and save a chart mapping change.
+10. Re-run `Import set list` and confirm replacing the active import requires confirmation and preserves historical imports.
 
 ### Expected Results
 
-Imported setlists preserve source worksheet order and row numbers. Separators/comments are retained for audit but are not included as songs. Reviewing and saving edits updates the active import without changing the linked Google Sheet. Re-importing creates a new active snapshot only after explicit confirmation.
+Imported setlists preserve source worksheet order and row numbers. Separators/comments are retained for audit but are not included as songs. Chart mappings are saved only for selected song rows, show copied forScore title/path context, and can be reviewed later without replacing the set list import. Reviewing and saving edits updates the active import without changing the linked Google Sheet. Re-importing creates a new active snapshot only after explicit confirmation.
+
+## forScore Library Drift Journey
+
+> **Automation:** Backend automated; manual UAT: `ForScoreLibraryEndpointsTests.Upload_NewSnapshotRelinksMappedUpcomingDraftAndConfirmedSetLists` covers auto-relink and review marking after library replacement.
+
+### Steps
+
+1. Import a forScore `.4sb` library snapshot.
+2. Map at least one chart on an active set list for a Draft or Confirmed future gig.
+3. Import a newer `.4sb` snapshot where one mapped chart keeps the same file path and another mapped chart is absent or ambiguous.
+4. Read the profile `Services` forScore library card status.
+5. Open the affected gig's reviewed set list and click `Check forScore matches`.
+
+### Expected Results
+
+The library import succeeds and is not blocked by existing chart links. The services card explains that set lists have chart links needing review when applicable. Exact file path matches are updated automatically; missing or ambiguous chart links remain visible with prior chart context and can be fixed from the reviewed set list.
 
 ## Negative Checks
 

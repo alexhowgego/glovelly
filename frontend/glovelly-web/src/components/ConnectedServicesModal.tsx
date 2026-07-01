@@ -226,7 +226,7 @@ export function ConnectedServicesModal({
                     ? `${forScoreLibrarySnapshot.chartCount} chart(s) imported`
                     : 'No library snapshot'}
                 </strong>
-                <span>Upload a forScore .4sb library export for future set list matching.</span>
+                <span>Upload a forScore .4sb library export for set list chart matching.</span>
               </div>
               <span
                 aria-hidden="true"
@@ -242,6 +242,11 @@ export function ConnectedServicesModal({
                 : 'Glovelly only stores chart metadata from the backup. Existing forScore set lists, annotations and settings are ignored.'}
             </span>
             <span className="connected-service-note">{forScoreLibraryStatus}</span>
+            {forScoreLibraryStatus.includes('need review') && (
+              <span className="connected-service-note">
+                Open each affected gig's reviewed set list and choose Check forScore matches to fix chart links.
+              </span>
+            )}
             {forScoreLibrarySnapshot?.warnings.length ? (
               <span className="connected-service-error">
                 {forScoreLibrarySnapshot.warnings.slice(0, 2).join(' ')}

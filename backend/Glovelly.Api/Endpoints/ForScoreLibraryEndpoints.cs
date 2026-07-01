@@ -80,8 +80,8 @@ internal static class ForScoreLibraryEndpoints
             try
             {
                 await using var stream = file!.OpenReadStream();
-                var snapshot = await importService.ImportAsync(userId!.Value, file.FileName, stream, cancellationToken);
-                return Results.Created($"/forscore-library/imports/{snapshot.Id}", ToSnapshotResponse(snapshot));
+                var result = await importService.ImportAsync(userId!.Value, file.FileName, stream, cancellationToken);
+                return Results.Created($"/forscore-library/imports/{result.Snapshot.Id}", ToImportResponse(result));
             }
             catch (ForScoreLibraryParseException exception)
             {
@@ -131,6 +131,10 @@ internal static class ForScoreLibraryEndpoints
             snapshot.CreatedAtUtc);
     }
 
+    private static ForScoreLibraryImportResponse ToImportResponse(ForScoreLibraryImportResult result) => new(
+        ToSnapshotResponse(result.Snapshot),
+        result.Impact);
+
     private static ForScoreChartResponse ToChartResponse(ForScoreChart chart) => new(
         chart.Id,
         chart.FilePath,
@@ -151,6 +155,10 @@ internal static class ForScoreLibraryEndpoints
         IReadOnlyList<string> Warnings,
         DateTimeOffset ImportedAtUtc,
         DateTimeOffset CreatedAtUtc);
+
+    private sealed record ForScoreLibraryImportResponse(
+        ForScoreLibrarySnapshotResponse Snapshot,
+        ForScoreLibraryImportImpact Impact);
 
     private sealed record ForScoreLibraryChartsResponse(
         Guid SnapshotId,
