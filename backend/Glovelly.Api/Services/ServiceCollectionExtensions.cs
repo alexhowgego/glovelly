@@ -23,6 +23,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
         services.AddScoped<IGigImportDuplicateDetectionService, GigImportDuplicateDetectionService>();
         services.AddSingleton<ISetListSheetParser, SetListSheetParser>();
+        services.AddSingleton<IForScoreLibraryParser, ForScoreLibraryParser>();
+        services.AddScoped<IForScoreLibraryImportService, ForScoreLibraryImportService>();
         services.AddScoped<IGoogleConnectionService, GoogleConnectionService>();
         services.AddSingleton<ICalendarEventPayloadHasher, CalendarEventPayloadHasher>();
         services.AddScoped<IGigCalendarEventMapper, GigCalendarEventMapper>();

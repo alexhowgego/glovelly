@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="plist-cil" />
     <PackageReference Include="Resend" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>

@@ -26,6 +26,7 @@ app.MapGoogleCalendarIntegrationEndpoints(startupSettings);
 app.MapMcpOAuthEndpoints();
 app.MapMcpEndpoints();
 app.MapInvoiceEmailTemplateEndpoints();
+app.MapForScoreLibraryEndpoints();
 app.MapCrudEndpoints();
 app.MapExpenseStatementEndpoints();
 app.MapAdminEndpoints();

@@ -63,6 +63,34 @@ export type GoogleCalendarStatus = {
   lastError: string | null
 }
 
+export type ForScoreLibrarySnapshot = {
+  id: string
+  originalFileName: string
+  sourceFormat: string
+  backupVersion: string | null
+  isActive: boolean
+  chartCount: number
+  warnings: string[]
+  importedAtUtc: string
+  createdAtUtc: string
+}
+
+export type ForScoreChart = {
+  id: string
+  filePath: string
+  title: string
+  normalizedTitle: string
+  keywords: string | null
+  addedAt: string | null
+  printNumber: number | null
+  version: number | null
+}
+
+export type ForScoreLibraryChartsResponse = {
+  snapshotId: string
+  charts: ForScoreChart[]
+}
+
 export type AdminUser = {
   id: string
   email: string

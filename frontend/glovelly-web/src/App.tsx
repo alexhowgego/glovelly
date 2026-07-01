@@ -53,6 +53,7 @@ import type {
   AppSection,
   AuthUser,
   Client,
+  ForScoreLibrarySnapshot,
   Gig,
   GigImportBatchSummary,
   Invoice,
@@ -94,6 +95,9 @@ function App({ appMetadata }: AppProps) {
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
   const [isGigImportsOpen, setIsGigImportsOpen] = useState(false)
+  const [forScoreSnapshot, setForScoreSnapshot] = useState<ForScoreLibrarySnapshot | null>(null)
+  const [forScoreLibraryStatus, setForScoreLibraryStatus] = useState('No forScore library snapshot imported yet.')
+  const [isForScoreLibraryUploading, setIsForScoreLibraryUploading] = useState(false)
 
   const isAdmin = authUser?.role === 'Admin'
   const clearSession = useCallback(() => {
@@ -590,6 +594,8 @@ function App({ appMetadata }: AppProps) {
       resetUserSettings()
       resetSellerProfile()
       resetAdminWorkspace()
+      setForScoreSnapshot(null)
+      setForScoreLibraryStatus('No forScore library snapshot imported yet.')
     }
 
     const expireSignedInSession = (message: string) => {
@@ -625,12 +631,13 @@ function App({ appMetadata }: AppProps) {
         setAuthUser(user)
         setIsLoading(true)
 
-        const [clientsResponse, gigsResponse, gigImportsResponse, invoicesResponse, sellerProfileResponse] = await Promise.all([
+        const [clientsResponse, gigsResponse, gigImportsResponse, invoicesResponse, sellerProfileResponse, forScoreSnapshotResponse] = await Promise.all([
           fetchWithSession(buildApiUrl('/clients')),
           fetchWithSession(buildApiUrl('/gigs')),
           fetchWithSession(buildApiUrl('/gig-imports')),
           fetchWithSession(buildApiUrl('/invoices')),
           fetchWithSession(buildApiUrl('/seller-profile')),
+          fetchWithSession(buildApiUrl('/forscore-library/active')),
         ])
 
         if (
@@ -638,7 +645,8 @@ function App({ appMetadata }: AppProps) {
           isSessionExpiredResponse(gigsResponse) ||
           isSessionExpiredResponse(gigImportsResponse) ||
           isSessionExpiredResponse(invoicesResponse) ||
-          isSessionExpiredResponse(sellerProfileResponse)
+          isSessionExpiredResponse(sellerProfileResponse) ||
+          isSessionExpiredResponse(forScoreSnapshotResponse)
         ) {
           expireSignedInSession('Your session expired. Sign in again to keep working.')
           return
@@ -664,11 +672,18 @@ function App({ appMetadata }: AppProps) {
           throw new Error('Unable to load seller profile.')
         }
 
+        if (!forScoreSnapshotResponse.ok && forScoreSnapshotResponse.status !== 404) {
+          throw new Error('Unable to load forScore library snapshot.')
+        }
+
         const data = (await clientsResponse.json()) as Client[]
         const gigData = (await gigsResponse.json()) as Gig[]
         const gigImportData = (await gigImportsResponse.json()) as GigImportBatchSummary[]
         const invoiceData = (await invoicesResponse.json()) as Invoice[]
         const sellerProfileData = (await sellerProfileResponse.json()) as SellerProfile
+        const loadedForScoreSnapshot = forScoreSnapshotResponse.ok
+          ? ((await forScoreSnapshotResponse.json()) as ForScoreLibrarySnapshot)
+          : null
         if (ignore) {
           return
         }
@@ -681,6 +696,12 @@ function App({ appMetadata }: AppProps) {
         }
         applyInvoices(invoiceData)
         applySellerProfile(sellerProfileData)
+        setForScoreSnapshot(loadedForScoreSnapshot)
+        setForScoreLibraryStatus(
+          loadedForScoreSnapshot
+            ? `Active forScore library: ${loadedForScoreSnapshot.chartCount} chart(s) imported from ${loadedForScoreSnapshot.originalFileName}.`
+            : 'No forScore library snapshot imported yet.'
+        )
         setIsApiConnected(true)
         setShouldCloseBrowserNotice(false)
         setStatus(
@@ -743,6 +764,43 @@ function App({ appMetadata }: AppProps) {
     resetSellerProfile,
     resetUserSettings,
   ])
+
+  const uploadForScoreLibrary = async (file: File) => {
+    setIsForScoreLibraryUploading(true)
+    setForScoreLibraryStatus('Importing forScore library snapshot...')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await fetchWithSession(buildApiUrl('/forscore-library/imports'), {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (isSessionExpiredResponse(response)) {
+        expireSession('Your session expired. Sign in again to keep importing forScore libraries.')
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to import forScore library snapshot.')
+        )
+      }
+
+      const snapshot = (await response.json()) as ForScoreLibrarySnapshot
+      setForScoreSnapshot(snapshot)
+      setForScoreLibraryStatus(
+        `Imported ${snapshot.chartCount} chart(s) from ${snapshot.originalFileName}.`
+      )
+    } catch (error) {
+      setForScoreLibraryStatus(
+        error instanceof Error ? error.message : 'Unable to import forScore library snapshot.'
+      )
+    } finally {
+      setIsForScoreLibraryUploading(false)
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -1833,6 +1891,8 @@ function App({ appMetadata }: AppProps) {
       />
 
       <ConnectedServicesModal
+        forScoreLibrarySnapshot={forScoreSnapshot}
+        forScoreLibraryStatus={forScoreLibraryStatus}
         googleCalendarStatus={googleCalendarStatus}
         invoiceUploadFolderId={authUser?.invoiceUploadFolderId ?? userSettingsForm.invoiceUploadFolderId}
         isGoogleCalendarBusy={isGoogleCalendarBusy}
@@ -1840,6 +1900,7 @@ function App({ appMetadata }: AppProps) {
         isGoogleDriveConnected={authUser?.isGoogleDriveConnected ?? false}
         isGoogleSheetsBusy={isGoogleSheetsBusy}
         isGoogleSheetsConnected={authUser?.isGoogleSheetsConnected ?? false}
+        isForScoreLibraryUploading={isForScoreLibraryUploading}
         isOpen={isConnectedServicesOpen}
         isSaving={isUserSettingsSaving}
         onClose={closeConnectedServices}
@@ -1849,6 +1910,7 @@ function App({ appMetadata }: AppProps) {
         onDisconnectGoogleCalendar={disconnectGoogleCalendar}
         onDisconnectGoogleDrive={disconnectGoogleDrive}
         onDisconnectGoogleSheets={disconnectGoogleSheets}
+        onForScoreLibraryFile={uploadForScoreLibrary}
         onOpenSettings={openSettingsFromServices}
         status={userSettingsStatus}
       />

@@ -2578,6 +2578,10 @@ button.compact-record-row.selected {
   border-color: var(--surface-border);
 }
 
+.file-action-label input[type='file'] {
+  display: none;
+}
+
 .editor-toggle {
   position: relative;
 }
