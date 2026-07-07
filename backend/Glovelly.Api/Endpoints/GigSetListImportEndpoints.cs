@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Text.Json;
 using Glovelly.Api.Auth;
@@ -122,7 +123,6 @@ internal static class GigSetListImportEndpoints
             IGoogleConnectionService googleConnectionService,
             IGoogleSheetsApiClient sheetsApiClient,
             ISetListSheetParser parser,
-            ISetListChartMatcher chartMatcher,
             CancellationToken cancellationToken) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -174,8 +174,6 @@ internal static class GigSetListImportEndpoints
             }
 
             var items = parser.Parse(valuesResult.Values!.Rows);
-            var matches = await chartMatcher.MatchAsync(userId, items.Select(ToMatchInput).ToList(), cancellationToken);
-            var itemsWithMatches = AttachMatches(items, matches);
 
             return Results.Ok(new SetListPreviewResponse(
                 sourceResult.Resource!.Id,
@@ -184,7 +182,71 @@ internal static class GigSetListImportEndpoints
                 sourceResult.SpreadsheetId!,
                 request.WorksheetId,
                 worksheetNameResult.WorksheetName!,
-                itemsWithMatches));
+                items));
+        });
+
+        group.MapPost("/{gigId:guid}/setlist-imports/chart-matches/preview", async (
+            Guid gigId,
+            SetListDraftChartMatchPreviewRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            ISetListChartMatcher chartMatcher,
+            HttpContext httpContext,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
+        {
+            var logger = loggerFactory.CreateLogger("Glovelly.Api.Endpoints.GigSetListImportEndpoints");
+            var requestId = httpContext.Request.Headers.TryGetValue("X-Glovelly-Request-Id", out var requestIdHeader) && !string.IsNullOrWhiteSpace(requestIdHeader)
+                ? requestIdHeader.ToString()
+                : httpContext.TraceIdentifier;
+            var stopwatch = Stopwatch.StartNew();
+            var includedSongCount = request.Items.Count(item => item.Kind == GigSetListItemKind.Song && item.Include);
+            logger.LogInformation(
+                "Set list chart match preview started: RequestId {RequestId}, GigId {GigId}, UseAi {UseAi}, ItemCount {ItemCount}, IncludedSongCount {IncludedSongCount}, ContentLength {ContentLength}, UserAgent {UserAgent}.",
+                requestId,
+                gigId,
+                request.UseAi,
+                request.Items.Count,
+                includedSongCount,
+                httpContext.Request.ContentLength,
+                httpContext.Request.Headers.UserAgent.ToString());
+
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!await db.Gigs.WhereVisibleTo(userId).AnyAsync(gig => gig.Id == gigId, cancellationToken))
+            {
+                logger.LogInformation(
+                    "Set list chart match preview returned not found: RequestId {RequestId}, GigId {GigId}, ElapsedMilliseconds {ElapsedMilliseconds}.",
+                    requestId,
+                    gigId,
+                    stopwatch.ElapsedMilliseconds);
+                return Results.NotFound();
+            }
+
+            try
+            {
+                var matches = await chartMatcher.MatchAsync(userId, request.Items.Select(ToMatchInput).ToList(), cancellationToken, request.UseAi);
+                logger.LogInformation(
+                    "Set list chart match preview completed: RequestId {RequestId}, GigId {GigId}, UseAi {UseAi}, ResultCount {ResultCount}, SuggestedCount {SuggestedCount}, NeedsReviewCount {NeedsReviewCount}, ElapsedMilliseconds {ElapsedMilliseconds}.",
+                    requestId,
+                    gigId,
+                    request.UseAi,
+                    matches.Count,
+                    matches.Count(match => match.Status == ForScoreMappingStatus.Suggested),
+                    matches.Count(match => match.Status == ForScoreMappingStatus.NeedsReview),
+                    stopwatch.ElapsedMilliseconds);
+                return Results.Ok(new SetListDraftChartMatchPreviewResponse(matches));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || httpContext.RequestAborted.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    "Set list chart match preview cancelled: RequestId {RequestId}, GigId {GigId}, UseAi {UseAi}, ElapsedMilliseconds {ElapsedMilliseconds}.",
+                    requestId,
+                    gigId,
+                    request.UseAi,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
         });
 
         group.MapPost("/{gigId:guid}/setlist-imports", async (
@@ -273,6 +335,7 @@ internal static class GigSetListImportEndpoints
                         ForScoreMappingStatus = item.ForScoreChartId.HasValue ? ForScoreMappingStatus.Linked : ForScoreMappingStatus.Unmapped,
                         ForScoreMappingConfidence = item.ForScoreChartId.HasValue ? ForScoreMappingConfidence.Manual : ForScoreMappingConfidence.None,
                         ForScoreMappingUpdatedAtUtc = item.ForScoreChartId.HasValue ? timeProvider.GetUtcNow() : null,
+                        ForScoreMatchJson = SerializeMatch(item.ForScoreMatch),
                     })
                     .ToList(),
             };
@@ -339,6 +402,7 @@ internal static class GigSetListImportEndpoints
                 item.Title = requestItem.Title.Trim();
                 item.Notes = NormalizeOptional(requestItem.Notes);
                 item.Confidence = requestItem.Confidence;
+                item.ForScoreMatchJson = SerializeMatch(requestItem.ForScoreMatch);
                 ApplyChartMapping(item, requestItem.ForScoreChartId, chartValidation.ChartsById, timeProvider.GetUtcNow());
             }
 
@@ -352,6 +416,7 @@ internal static class GigSetListImportEndpoints
         group.MapPost("/{gigId:guid}/setlist-imports/{importId:guid}/chart-matches/preview", async (
             Guid gigId,
             Guid importId,
+            SetListSavedChartMatchPreviewRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
@@ -374,7 +439,7 @@ internal static class GigSetListImportEndpoints
                 return Results.NotFound();
             }
 
-            var matches = await chartMatcher.MatchAsync(userId, import.Items.OrderBy(item => item.SortOrder).Select(ToMatchInput).ToList(), cancellationToken);
+            var matches = await chartMatcher.MatchAsync(userId, import.Items.OrderBy(item => item.SortOrder).Select(ToMatchInput).ToList(), cancellationToken, request.UseAi);
             return Results.Ok(new SetListChartMatchPreviewResponse(import.Id, matches));
         });
 
@@ -694,6 +759,7 @@ internal static class GigSetListImportEndpoints
             item.RawCellsJson,
             item.Confidence,
             item.ForScoreChartId,
+            DeserializeMatch(item.ForScoreMatchJson),
             new SetListSavedChartMappingResponse(
                 item.ForScoreLibrarySnapshotId,
                 item.ForScoreChartId,
@@ -709,25 +775,48 @@ internal static class GigSetListImportEndpoints
         item.SourceRowNumber,
         item.Kind,
         item.Include,
-        item.Title);
+        item.Title,
+        item.PadNumber,
+        item.Key);
+
+    private static SetListChartMatchInput ToMatchInput(SetListDraftChartMatchPreviewItem item) => new(
+        null,
+        item.SourceRowNumber,
+        item.Kind,
+        item.Include,
+        item.Title,
+        item.PadNumber,
+        item.Key);
 
     private static SetListChartMatchInput ToMatchInput(GigSetListItem item) => new(
         item.Id,
         item.SourceRowNumber,
         item.Kind,
         item.Include,
-        item.Title);
+        item.Title,
+        item.PadNumber,
+        item.Key);
 
-    private static IReadOnlyList<SetListImportItemDraft> AttachMatches(
-        IReadOnlyList<SetListImportItemDraft> items,
-        IReadOnlyList<SetListChartMatchResult> matches)
+    private static string? SerializeMatch(SetListChartMatchResult? match)
     {
-        var byRow = matches.ToDictionary(match => match.SourceRowNumber);
-        return items.Select(item => item with
+        return match is null ? null : JsonSerializer.Serialize(match, JsonOptions);
+    }
+
+    private static SetListChartMatchResult? DeserializeMatch(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
         {
-            ForScoreChartId = byRow.TryGetValue(item.SourceRowNumber, out var match) ? match.SelectedChart?.Id : null,
-            ForScoreMatch = match,
-        }).ToList();
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<SetListChartMatchResult>(json, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static async Task<ChartValidationResult> ValidateRequestedChartsAsync(
@@ -823,6 +912,18 @@ internal static class GigSetListImportEndpoints
         bool ReplaceActiveImport,
         IReadOnlyList<SetListImportItemDraft> Items);
 
+    private sealed record SetListDraftChartMatchPreviewRequest(IReadOnlyList<SetListDraftChartMatchPreviewItem> Items, bool UseAi = true);
+
+    private sealed record SetListDraftChartMatchPreviewItem(
+        int SourceRowNumber,
+        GigSetListItemKind Kind,
+        bool Include,
+        string Title,
+        string? PadNumber,
+        string? Key);
+
+    private sealed record SetListDraftChartMatchPreviewResponse(IReadOnlyList<SetListChartMatchResult> Items);
+
     private sealed record SetListUpdateImportRequest(IReadOnlyList<SetListUpdateImportItemRequest> Items);
 
     private sealed record SetListUpdateImportItemRequest(
@@ -838,7 +939,8 @@ internal static class GigSetListImportEndpoints
         string? Notes,
         string RawCellsJson,
         GigSetListItemConfidence Confidence,
-        Guid? ForScoreChartId);
+        Guid? ForScoreChartId,
+        SetListChartMatchResult? ForScoreMatch);
 
     private sealed record SetListImportResponse(
         Guid Id,
@@ -866,6 +968,7 @@ internal static class GigSetListImportEndpoints
         string RawCellsJson,
         GigSetListItemConfidence Confidence,
         Guid? ForScoreChartId,
+        SetListChartMatchResult? ForScoreMatch,
         SetListSavedChartMappingResponse ForScoreMapping);
 
     private sealed record SetListSavedChartMappingResponse(
@@ -876,6 +979,8 @@ internal static class GigSetListImportEndpoints
         ForScoreMappingStatus Status,
         ForScoreMappingConfidence Confidence,
         DateTimeOffset? UpdatedAtUtc);
+
+    private sealed record SetListSavedChartMatchPreviewRequest(bool UseAi = true);
 
     private sealed record SetListChartMatchPreviewResponse(Guid ImportId, IReadOnlyList<SetListChartMatchResult> Items);
 

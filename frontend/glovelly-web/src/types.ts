@@ -284,6 +284,7 @@ export type SetListChartMatchCandidate = {
   chart: ForScoreChartReference
   score: number
   reason: string
+  evidence: string[]
 }
 
 export type SetListChartMatchResult = {

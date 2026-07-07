@@ -9,7 +9,6 @@ import type {
   GigExternalResourceType,
 } from '../types'
 import { SetListImportModal } from './SetListImportModal'
-import { GigSetListModal } from './GigSetListModal'
 import { TrashIcon } from './TrashIcon'
 
 type GigAttachmentsPanelProps = {
@@ -75,7 +74,6 @@ export function GigAttachmentsPanel({
 }: GigAttachmentsPanelProps) {
   const [expandedResourceId, setExpandedResourceId] = useState<string>('')
   const [setListImportResource, setSetListImportResource] = useState<GigExternalResource | null>(null)
-  const [isSetListModalOpen, setIsSetListModalOpen] = useState(false)
   const externalResourceEditorTitle =
     externalResourceMode === 'edit' ? 'Edit attachment' : 'Add attachment'
   const formatResourceType = (value: GigExternalResourceType) =>
@@ -181,15 +179,7 @@ export function GigAttachmentsPanel({
                               type="button"
                               disabled={isGigLoading}
                             >
-                              Import set list
-                            </button>
-                            <button
-                              className="ghost-button"
-                              onClick={() => setIsSetListModalOpen(true)}
-                              type="button"
-                              disabled={isGigLoading}
-                            >
-                              Review set list
+                              Manage set list
                             </button>
                           </>
                         )}
@@ -410,13 +400,6 @@ export function GigAttachmentsPanel({
           gig={selectedGig}
           resource={setListImportResource}
           onClose={() => setSetListImportResource(null)}
-        />
-      )}
-
-      {selectedGig && isSetListModalOpen && (
-        <GigSetListModal
-          gig={selectedGig}
-          onClose={() => setIsSetListModalOpen(false)}
         />
       )}
     </>

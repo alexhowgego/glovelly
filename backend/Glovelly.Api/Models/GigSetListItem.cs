@@ -24,6 +24,7 @@ public sealed class GigSetListItem
     public ForScoreMappingStatus ForScoreMappingStatus { get; set; } = ForScoreMappingStatus.Unmapped;
     public ForScoreMappingConfidence ForScoreMappingConfidence { get; set; } = ForScoreMappingConfidence.None;
     public DateTimeOffset? ForScoreMappingUpdatedAtUtc { get; set; }
+    public string? ForScoreMatchJson { get; set; }
 
     [JsonIgnore]
     public GigSetListImport? Import { get; set; }

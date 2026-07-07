@@ -1,3 +1,4 @@
+using Google.Cloud.AIPlatform.V1;
 using Google.Cloud.Storage.V1;
 using Glovelly.Api.Configuration;
 using Microsoft.Extensions.Options;
@@ -10,6 +11,8 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddGlovellyApplicationServices(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddOptions<SetListChartRankingSettings>()
+            .BindConfiguration(SetListChartRankingSettings.SectionName);
         services.AddScoped<AccessRequestWorkflowService>();
         services.AddScoped<AccessRequestRetentionService>();
         services.AddScoped<IExpenseStatementBuilder, ExpenseStatementBuilder>();
@@ -24,6 +27,24 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGigImportDuplicateDetectionService, GigImportDuplicateDetectionService>();
         services.AddSingleton<ISetListSheetParser, SetListSheetParser>();
         services.AddScoped<ISetListChartMatcher, SetListChartMatcher>();
+        services.AddScoped<DeterministicSetListChartContextualRanker>();
+        services.AddScoped<VertexAiSetListChartContextualRanker>();
+        services.AddScoped<ISetListChartContextualRanker>(provider =>
+        {
+            var settings = provider.GetRequiredService<IOptions<SetListChartRankingSettings>>().Value;
+            var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("SetListChartRanking");
+            if (settings.IsVertexAiConfigured)
+            {
+                logger.LogInformation(
+                    "Set list chart ranking provider selected: VertexAi using model {Model} in {Location}.",
+                    settings.VertexAiModel ?? "gemini-2.5-flash",
+                    settings.VertexAiLocation);
+                return provider.GetRequiredService<VertexAiSetListChartContextualRanker>();
+            }
+
+            logger.LogInformation("Set list chart ranking provider selected: Deterministic.");
+            return provider.GetRequiredService<DeterministicSetListChartContextualRanker>();
+        });
         services.AddSingleton<IForScoreLibraryParser, ForScoreLibraryParser>();
         services.AddScoped<IForScoreLibraryImportService, ForScoreLibraryImportService>();
         services.AddScoped<IGoogleConnectionService, GoogleConnectionService>();

@@ -5,6 +5,7 @@ using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
+using Glovelly.Matching;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -284,7 +285,7 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
-    public async Task Preview_IncludesForScoreChartMatches()
+    public async Task Preview_ParsesRowsWithoutForScoreChartMatches()
     {
         var sheetsClient = new FakeGoogleSheetsApiClient();
         using var factory = CreateFactory(sheetsClient);
@@ -302,8 +303,106 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         var love = payload.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "L-O-V-E");
+        Assert.True(love.GetProperty("forScoreMatch").ValueKind is JsonValueKind.Null);
+        Assert.True(love.GetProperty("forScoreChartId").ValueKind is JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task DraftChartMatchesPreview_ReturnsForScoreChartMatches()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
+        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+
+        var previewResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/preview", new
+        {
+            resourceId,
+            worksheetId = "0",
+            worksheetName = "Set list",
+        }, TestContext.Current.CancellationToken);
+        previewResponse.EnsureSuccessStatusCode();
+        var previewPayload = await previewResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        var matchResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/chart-matches/preview", new
+        {
+            items = previewPayload.GetProperty("items"),
+        }, TestContext.Current.CancellationToken);
+
+        matchResponse.EnsureSuccessStatusCode();
+        var payload = await matchResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var love = payload.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("sourceRowNumber").GetInt32() == 3);
+        Assert.Equal("Suggested", love.GetProperty("status").GetString());
+        Assert.Equal("L-O-V-E", love.GetProperty("selectedChart").GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task SaveImport_PreservesForScoreMatchCandidatesForReview()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
+        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+
+        var previewResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/preview", new
+        {
+            resourceId,
+            worksheetId = "0",
+            worksheetName = "Set list",
+        }, TestContext.Current.CancellationToken);
+        previewResponse.EnsureSuccessStatusCode();
+        var previewPayload = await previewResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        var matchResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/chart-matches/preview", new
+        {
+            items = previewPayload.GetProperty("items"),
+        }, TestContext.Current.CancellationToken);
+        matchResponse.EnsureSuccessStatusCode();
+        var matchPayload = await matchResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var matchesByRow = matchPayload.GetProperty("items").EnumerateArray().ToDictionary(item => item.GetProperty("sourceRowNumber").GetInt32());
+
+        var items = previewPayload.GetProperty("items").EnumerateArray().Select(item =>
+        {
+            var row = item.GetProperty("sourceRowNumber").GetInt32();
+            var match = matchesByRow.GetValueOrDefault(row);
+            return new
+            {
+                sourceRowNumber = row,
+                sortOrder = item.GetProperty("sortOrder").GetInt32(),
+                kind = item.GetProperty("kind").GetString(),
+                include = item.GetProperty("include").GetBoolean(),
+                section = JsonStringOrNull(item.GetProperty("section")),
+                padNumber = JsonStringOrNull(item.GetProperty("padNumber")),
+                key = JsonStringOrNull(item.GetProperty("key")),
+                title = item.GetProperty("title").GetString(),
+                notes = JsonStringOrNull(item.GetProperty("notes")),
+                rawCellsJson = item.GetProperty("rawCellsJson").GetString(),
+                confidence = item.GetProperty("confidence").GetString(),
+                forScoreChartId = match.ValueKind == JsonValueKind.Object && match.GetProperty("selectedChart").ValueKind == JsonValueKind.Object
+                    ? match.GetProperty("selectedChart").GetProperty("id").GetString()
+                    : null,
+                forScoreMatch = match.ValueKind == JsonValueKind.Object ? match : (JsonElement?)null,
+            };
+        }).ToList();
+
+        var saveResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports", new
+        {
+            resourceId,
+            worksheetId = "0",
+            worksheetName = "Set list",
+            replaceActiveImport = false,
+            items,
+        }, TestContext.Current.CancellationToken);
+        saveResponse.EnsureSuccessStatusCode();
+
+        var activeResponse = await client.GetAsync($"/gigs/{gigId}/setlist-imports/active", TestContext.Current.CancellationToken);
+        activeResponse.EnsureSuccessStatusCode();
+        var activePayload = await activeResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var love = activePayload.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "L-O-V-E");
         Assert.Equal("Suggested", love.GetProperty("forScoreMatch").GetProperty("status").GetString());
-        Assert.Equal("L-O-V-E", love.GetProperty("forScoreMatch").GetProperty("selectedChart").GetProperty("title").GetString());
+        Assert.NotEmpty(love.GetProperty("forScoreMatch").GetProperty("candidates").EnumerateArray());
     }
 
     [Fact]
@@ -518,12 +617,17 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
                 SortOrder = index,
                 FilePath = chart.FilePath,
                 Title = chart.Title,
-                NormalizedTitle = SetListChartMatcher.Normalize(chart.Title),
+                NormalizedTitle = MatchTextNormalizer.Normalize(chart.Title).Canonical,
             }).ToList(),
         };
         dbContext.ForScoreLibrarySnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         return snapshot.Charts.First().Id;
+    }
+
+    private static string? JsonStringOrNull(JsonElement element)
+    {
+        return element.ValueKind == JsonValueKind.Null ? null : element.GetString();
     }
 
     private sealed class FakeGoogleSheetsApiClient : IGoogleSheetsApiClient
