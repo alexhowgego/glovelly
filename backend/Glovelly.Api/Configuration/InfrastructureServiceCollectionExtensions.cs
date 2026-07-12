@@ -48,6 +48,7 @@ internal static class InfrastructureServiceCollectionExtensions
         });
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<IWorkspaceEventPublisher, WorkspaceEventPublisher>();
+        services.AddHostedService<SetListChartMatchJobWorker>();
         services.AddScoped<IGlovellyMcpQueryService, GlovellyMcpQueryService>();
         services.AddScoped<IMcpOAuthService, McpOAuthService>();
         services.AddScoped<IClaimsTransformation, GoogleOidcClaimsTransformation>();

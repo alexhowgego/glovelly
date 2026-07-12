@@ -338,6 +338,142 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
+    public async Task DraftChartMatchAiJobs_StartsJobAndReturnsAcceptedQuickly()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, _) = await SeedGigWithSetListAsync(factory);
+        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+
+        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs", new
+        {
+            items = new[]
+            {
+                new { sourceRowNumber = 3, kind = "Song", include = true, title = "L-O-V-E", padNumber = "74-G", key = "G" },
+            },
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.NotEqual(Guid.Empty, payload.GetProperty("jobId").GetGuid());
+        Assert.Equal("Pending", payload.GetProperty("status").GetString());
+        Assert.NotNull(response.Headers.Location);
+    }
+
+    [Fact]
+    public async Task DraftChartMatchAiJobs_StatusReturnsCompletedResult()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, _) = await SeedGigWithSetListAsync(factory);
+        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+
+        var startResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs", new
+        {
+            items = new[]
+            {
+                new { sourceRowNumber = 3, kind = "Song", include = true, title = "L-O-V-E", padNumber = "74-G", key = "G" },
+            },
+        }, TestContext.Current.CancellationToken);
+        startResponse.EnsureSuccessStatusCode();
+        var started = await startResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var jobId = started.GetProperty("jobId").GetGuid();
+
+        var payload = await WaitForJobStatusAsync(client, gigId, jobId, "Completed");
+
+        Assert.Equal("Completed", payload.GetProperty("status").GetString());
+        var result = Assert.Single(payload.GetProperty("result").EnumerateArray());
+        Assert.Equal(3, result.GetProperty("sourceRowNumber").GetInt32());
+        Assert.Equal("Suggested", result.GetProperty("status").GetString());
+        Assert.Equal("L-O-V-E", result.GetProperty("selectedChart").GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task DraftChartMatchAiJobs_StatusIsScopedToOwningUser()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, _) = await SeedGigWithSetListAsync(factory);
+        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+
+        var startResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs", new
+        {
+            items = new[]
+            {
+                new { sourceRowNumber = 3, kind = "Song", include = true, title = "L-O-V-E", padNumber = "74-G", key = "G" },
+            },
+        }, TestContext.Current.CancellationToken);
+        startResponse.EnsureSuccessStatusCode();
+        var started = await startResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        client.DefaultRequestHeaders.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
+        var otherResponse = await client.GetAsync($"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs/{started.GetProperty("jobId").GetGuid()}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, otherResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task DraftChartMatchAiJobs_ReturnsNotFoundForMissingGigOrJob()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, _) = await SeedGigWithSetListAsync(factory);
+
+        var missingGigResponse = await client.PostAsJsonAsync($"/gigs/{Guid.NewGuid()}/setlist-imports/chart-matches/ai-jobs", new
+        {
+            items = new[]
+            {
+                new { sourceRowNumber = 3, kind = "Song", include = true, title = "L-O-V-E", padNumber = "74-G", key = "G" },
+            },
+        }, TestContext.Current.CancellationToken);
+        var missingJobResponse = await client.GetAsync($"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, missingGigResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missingJobResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task DraftChartMatchAiJobs_FailedStatusReturnsSafeDiagnostics()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient, services =>
+        {
+            services.RemoveAll<ISetListChartMatcher>();
+            services.AddScoped<ISetListChartMatcher, ThrowingSetListChartMatcher>();
+        });
+        var client = factory.CreateClient();
+        var (gigId, _) = await SeedGigWithSetListAsync(factory);
+
+        var startRequest = new HttpRequestMessage(HttpMethod.Post, $"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs")
+        {
+            Content = JsonContent.Create(new
+            {
+                items = new[]
+                {
+                    new { sourceRowNumber = 3, kind = "Song", include = true, title = "Sensitive title", padNumber = "74-G", key = "G" },
+                },
+            }),
+        };
+        startRequest.Headers.Add("X-Glovelly-Request-Id", "test-correlation-id");
+        var startResponse = await client.SendAsync(startRequest, TestContext.Current.CancellationToken);
+        startResponse.EnsureSuccessStatusCode();
+        var started = await startResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var jobId = started.GetProperty("jobId").GetGuid();
+
+        var payload = await WaitForJobStatusAsync(client, gigId, jobId, "Failed");
+
+        Assert.Equal("Failed", payload.GetProperty("status").GetString());
+        Assert.Equal("test-correlation-id", payload.GetProperty("correlationId").GetString());
+        Assert.Contains("Chart matching failed", payload.GetProperty("errorMessage").GetString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Sensitive title", payload.GetProperty("errorMessage").GetString(), StringComparison.Ordinal);
+        Assert.True(payload.GetProperty("result").ValueKind is JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task SaveImport_PreservesForScoreMatchCandidatesForReview()
     {
         var sheetsClient = new FakeGoogleSheetsApiClient();
@@ -517,7 +653,7 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(ForScoreMappingStatus.Linked, item.ForScoreMappingStatus);
     }
 
-    private WebApplicationFactory<Program> CreateFactory(FakeGoogleSheetsApiClient sheetsClient)
+    private WebApplicationFactory<Program> CreateFactory(FakeGoogleSheetsApiClient sheetsClient, Action<IServiceCollection>? configureServices = null)
     {
         return _factory.WithWebHostBuilder(builder =>
         {
@@ -525,8 +661,27 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
             {
                 services.RemoveAll<IGoogleSheetsApiClient>();
                 services.AddSingleton<IGoogleSheetsApiClient>(sheetsClient);
+                configureServices?.Invoke(services);
             });
         });
+    }
+
+    private static async Task<JsonElement> WaitForJobStatusAsync(HttpClient client, Guid gigId, Guid jobId, string expectedStatus)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var response = await client.GetAsync($"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs/{jobId}", TestContext.Current.CancellationToken);
+            response.EnsureSuccessStatusCode();
+            var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+            if (string.Equals(payload.GetProperty("status").GetString(), expectedStatus, StringComparison.Ordinal))
+            {
+                return payload;
+            }
+
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException($"Timed out waiting for chart match job {jobId} to reach {expectedStatus}.");
     }
 
     private static async Task<(Guid GigId, Guid ResourceId)> SeedGigWithSetListAsync(WebApplicationFactory<Program> factory, bool addConnection = true)
@@ -672,6 +827,18 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
                 ["", "", "Please delete old parts"],
             ];
             return Task.FromResult(new GoogleSheetValues("Set list", rows));
+        }
+    }
+
+    private sealed class ThrowingSetListChartMatcher : ISetListChartMatcher
+    {
+        public Task<IReadOnlyList<SetListChartMatchResult>> MatchAsync(
+            Guid? userId,
+            IReadOnlyList<SetListChartMatchInput> items,
+            CancellationToken cancellationToken = default,
+            bool useConfiguredRanker = true)
+        {
+            throw new InvalidOperationException("Sensitive provider response should not be exposed.");
         }
     }
 }

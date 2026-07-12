@@ -78,7 +78,7 @@ Only one `Set list` attachment is primary for the gig. The primary `Gig plan` re
 
 ## Set List Import Journey
 
-> **Automation:** Backend automated; manual UAT: `SetListImportEndpointsTests`, `SetListChartMatcherTests`, and `SetListSheetParserTests` cover source parsing, forScore chart matching, review save, re-import history, and edit persistence. Browser OAuth and review modal flow remain manual.
+> **Automation:** Backend automated; manual UAT: `SetListImportEndpointsTests`, `SetListChartMatcherTests`, `SetListChartMatchJobProcessorTests`, and `SetListSheetParserTests` cover source parsing, deterministic forScore chart matching, asynchronous AI chart matching jobs, review save, re-import history, and edit persistence. Browser OAuth and review modal flow remain manual.
 
 ### Preconditions
 
@@ -91,19 +91,20 @@ Only one `Set list` attachment is primary for the gig. The primary `Gig plan` re
 1. Open Gigs and select the gig with the primary Google Sheet set list attachment.
 2. Expand the attachment and click `Import set list`.
 3. If Google Sheets is not connected, click `Connect Google Sheets`, complete OAuth, and return to the gig.
-4. Choose the worksheet/tab and click `Preview rows`.
+4. Choose the worksheet/tab and click `Import rows`.
 5. Confirm likely songs appear as included rows and non-song headings/instructions appear as greyed review notes.
 6. Confirm song rows show forScore chart status such as suggested, choose chart, missing from latest library, or no library.
 7. Confirm common title variants such as `LOVE`/`L-O-V-E` and `Jump Jive & Wail`/`Jump Jive And Wail` appear as plausible chart matches when present in the library.
 8. Confirm rows with chart numbers such as `61-E`, `17`, or `104` prefer chart-number candidates over title-only candidates, while ambiguous or nearby-number-only candidates still require review.
-9. Expand a song row, choose or clear the forScore chart, adjust title/pad/key/section/notes, and save the import.
-10. Re-open the attachment and click `Review set list`.
-11. Click `Check forScore matches`, confirm existing rows can be matched without re-importing the Google Sheet, and save a chart mapping change.
-12. Re-run `Import set list` and confirm replacing the active import requires confirmation and preserves historical imports.
+9. Click `Ask AI to choose`, confirm the modal shows queued/running progress without a long blocking browser request, then confirm completed AI choices apply to matching rows.
+10. Expand a song row, choose or clear the forScore chart, adjust title/pad/key/section/notes, and save the import.
+11. Re-open the attachment and click `Review set list`.
+12. Click `Ask AI to choose`, confirm existing rows can be matched without re-importing the Google Sheet, and save a chart mapping change.
+13. Re-run `Import set list` and confirm replacing the active import requires confirmation and preserves historical imports.
 
 ### Expected Results
 
-Imported setlists preserve source worksheet order and row numbers. Separators/comments are retained for audit but are not included as songs. Chart mappings are saved only for selected song rows, show copied forScore title/path context, and can be reviewed later without replacing the set list import. Match chips and reasons distinguish chart-number matches from title-similarity matches where possible. Reviewing and saving edits updates the active import without changing the linked Google Sheet. Re-importing creates a new active snapshot only after explicit confirmation.
+Imported setlists preserve source worksheet order and row numbers. Separators/comments are retained for audit but are not included as songs. Importing rows locates deterministic chart candidates immediately; optional AI matching runs as a recoverable background job, uses SignalR/polling for completion, and keeps deterministic/manual choices available if AI is pending or fails. Chart mappings are saved only for selected song rows, show copied forScore title/path context, and can be reviewed later without replacing the set list import. Match chips and reasons distinguish chart-number matches from title-similarity matches where possible. Reviewing and saving edits updates the active import without changing the linked Google Sheet. Re-importing creates a new active snapshot only after explicit confirmation.
 
 ## forScore Library Drift Journey
 

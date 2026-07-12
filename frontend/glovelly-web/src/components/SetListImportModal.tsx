@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { buildApiUrl, fetchWithSession, getResponseErrorMessage, jsonRequestInit } from '../api'
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents'
 import type {
   Gig,
   GigExternalResource,
@@ -7,6 +8,7 @@ import type {
   GigSetListImportItemDraft,
   GigSetListPreview,
   GigSetListSource,
+  SetListChartMatchJobResponse,
   SetListChartMatchResult,
 } from '../types'
 
@@ -20,6 +22,7 @@ type ImportPhase = 'idle' | 'loadingWorksheets' | 'parsingSheet' | 'interpreting
 type ManagedSetListItem = GigSetListImportItemDraft & { id?: string; forScoreMapping?: GigSetListImport['items'][number]['forScoreMapping'] }
 type ChartMatchStage = 'locate' | 'ai'
 type ChartMatchRequestItem = Pick<ManagedSetListItem, 'sourceRowNumber' | 'kind' | 'include' | 'title' | 'padNumber' | 'key'>
+type ActiveChartMatchJob = Pick<SetListChartMatchJobResponse, 'jobId' | 'status' | 'correlationId'>
 
 const createClientRequestId = () => {
   if ('randomUUID' in crypto) {
@@ -45,6 +48,31 @@ const applyChartMatches = (sourceItems: ManagedSetListItem[], resultItems: SetLi
   return sourceItems.map((item) => {
     const match = byRow.get(item.sourceRowNumber)
     return match ? { ...item, forScoreMatch: match, forScoreChartId: match.selectedChart?.id ?? item.forScoreChartId } : item
+  })
+}
+
+const getChartMatchRowSignature = (item: ManagedSetListItem) => JSON.stringify({
+  sourceRowNumber: item.sourceRowNumber,
+  kind: item.kind,
+  include: item.include,
+  title: item.title,
+  padNumber: item.padNumber,
+  key: item.key,
+})
+
+const applyChartMatchesPreservingEdits = (
+  sourceItems: ManagedSetListItem[],
+  resultItems: SetListChartMatchResult[],
+  jobStartedRowSignatures: Map<number, string>
+) => {
+  const byRow = new Map(resultItems.map((item) => [item.sourceRowNumber, item]))
+  return sourceItems.map((item) => {
+    const match = byRow.get(item.sourceRowNumber)
+    if (!match || jobStartedRowSignatures.get(item.sourceRowNumber) !== getChartMatchRowSignature(item)) {
+      return item
+    }
+
+    return { ...item, forScoreMatch: match, forScoreChartId: match.selectedChart?.id ?? item.forScoreChartId }
   })
 }
 
@@ -77,6 +105,11 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
   const [phase, setPhase] = useState<ImportPhase>('loadingWorksheets')
   const [needsSheetsConnection, setNeedsSheetsConnection] = useState(false)
   const [baselineItemsJson, setBaselineItemsJson] = useState('')
+  const [activeChartMatchJob, setActiveChartMatchJob] = useState<ActiveChartMatchJob | null>(null)
+  const activeChartMatchJobIdRef = useRef<string | null>(null)
+  const activeJobRowSignaturesRef = useRef<Map<number, string>>(new Map())
+  const isFetchingJobStatusRef = useRef(false)
+  const fetchChartMatchJobStatusRef = useRef<(jobId: string) => void>(() => {})
 
   useEffect(() => {
     let isCancelled = false
@@ -224,6 +257,130 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
     }
   }
 
+  const startChartMatchJob = async (sourceItems: ManagedSetListItem[], flowRequestId: string) => {
+    const requestId = `${flowRequestId}-ai-job`
+    const body = { items: toChartMatchRequestItems(sourceItems) }
+    const response = await fetchWithSession(
+      buildApiUrl(`/gigs/${gig.id}/setlist-imports/chart-matches/ai-jobs`),
+      {
+        ...jsonRequestInit('POST', body),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Glovelly-Request-Id': requestId,
+        },
+      }
+    )
+    if (!response.ok) {
+      const message = (await getResponseErrorMessage(response, 'Unable to start AI chart matching.')) ?? 'Unable to start AI chart matching.'
+      throw new Error(`${message} (HTTP ${response.status}, request ${requestId})`)
+    }
+
+    return (await response.json()) as SetListChartMatchJobResponse
+  }
+
+  const applyChartMatchJobStatus = (job: SetListChartMatchJobResponse) => {
+    setActiveChartMatchJob({ jobId: job.jobId, status: job.status, correlationId: job.correlationId })
+    if (job.status === 'Completed') {
+      const matches = job.result ?? []
+      const jobStartedRowSignatures = activeJobRowSignaturesRef.current
+      setItems((current) => applyChartMatchesPreservingEdits(current, matches, jobStartedRowSignatures))
+      const suggested = matches.filter((item) => item.status === 'Suggested').length
+      const review = matches.filter((item) => item.status === 'NeedsReview').length
+      setStatus(`AI chart matching complete: ${suggested} suggested, ${review} need review.`)
+      setIsLoading(false)
+      setPhase('idle')
+      setActiveChartMatchJob(null)
+      activeChartMatchJobIdRef.current = null
+      activeJobRowSignaturesRef.current = new Map()
+      return
+    }
+
+    if (job.status === 'Failed' || job.status === 'Cancelled') {
+      const reference = job.correlationId ? ` Reference: ${job.correlationId}.` : ''
+      setStatus(`${job.errorMessage ?? 'AI chart matching could not complete. Continue reviewing chart candidates manually.'}${reference}`)
+      setIsLoading(false)
+      setPhase('idle')
+      setActiveChartMatchJob(null)
+      activeChartMatchJobIdRef.current = null
+      activeJobRowSignaturesRef.current = new Map()
+      return
+    }
+
+    setStatus(job.status === 'Running' ? 'AI is choosing chart matches...' : 'AI chart matching is queued...')
+  }
+
+  const fetchChartMatchJobStatus = async (jobId: string) => {
+    if (isFetchingJobStatusRef.current) {
+      return
+    }
+
+    isFetchingJobStatusRef.current = true
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/gigs/${gig.id}/setlist-imports/chart-matches/ai-jobs/${jobId}`))
+      if (!response.ok) {
+        const message = (await getResponseErrorMessage(response, 'Unable to check AI chart matching status.')) ?? 'Unable to check AI chart matching status.'
+        setStatus(`${message} Continue reviewing chart candidates manually.`)
+        if (response.status === 404) {
+          setIsLoading(false)
+          setPhase('idle')
+          setActiveChartMatchJob(null)
+          activeChartMatchJobIdRef.current = null
+        }
+        return
+      }
+
+      applyChartMatchJobStatus((await response.json()) as SetListChartMatchJobResponse)
+    } finally {
+      isFetchingJobStatusRef.current = false
+    }
+  }
+
+  useEffect(() => {
+    fetchChartMatchJobStatusRef.current = (jobId: string) => {
+      void fetchChartMatchJobStatus(jobId)
+    }
+  })
+
+  useWorkspaceEvents({
+    enabled: activeChartMatchJob !== null,
+    onWorkspaceChanged: (event) => {
+      const activeJobId = activeChartMatchJobIdRef.current
+      if (event.scope === 'setlist-chart-matching' && event.entityId === activeJobId && activeJobId) {
+        fetchChartMatchJobStatusRef.current(activeJobId)
+      }
+    },
+  })
+
+  useEffect(() => {
+    activeChartMatchJobIdRef.current = activeChartMatchJob?.jobId ?? null
+  }, [activeChartMatchJob?.jobId])
+
+  useEffect(() => {
+    const jobId = activeChartMatchJob?.jobId
+    if (!jobId || activeChartMatchJob.status === 'Completed' || activeChartMatchJob.status === 'Failed' || activeChartMatchJob.status === 'Cancelled') {
+      return
+    }
+
+    const poll = () => fetchChartMatchJobStatusRef.current(jobId)
+    const intervalId = window.setInterval(poll, 2500)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        poll()
+      }
+    }
+    window.addEventListener('focus', poll)
+    window.addEventListener('online', poll)
+    document.addEventListener('visibilitychange', handleVisibility)
+    poll()
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', poll)
+      window.removeEventListener('online', poll)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [activeChartMatchJob?.jobId, activeChartMatchJob?.status])
+
   const previewWorksheet = async () => {
     if (!selectedWorksheet) {
       setStatus('Choose a worksheet first.')
@@ -314,18 +471,17 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
       }
     }
 
-    setStatus('Asking AI to choose chart matches...')
+    setStatus('Starting AI chart matching...')
     try {
-      const matchItems = await requestChartMatches(itemsToSend, true, flowRequestId, 'ai')
-      setItems((current) => applyChartMatches(current, matchItems))
-      const suggested = matchItems.filter((item) => item.status === 'Suggested').length
-      const review = matchItems.filter((item) => item.status === 'NeedsReview').length
-      setStatus(`AI chart matching complete: ${suggested} suggested, ${review} need review.`)
+      activeJobRowSignaturesRef.current = new Map(itemsToSend.map((item) => [item.sourceRowNumber, getChartMatchRowSignature(item)]))
+      const job = await startChartMatchJob(itemsToSend, flowRequestId)
+      activeChartMatchJobIdRef.current = job.jobId
+      setActiveChartMatchJob({ jobId: job.jobId, status: job.status, correlationId: job.correlationId })
+      setStatus(job.status === 'Running' ? 'AI is choosing chart matches...' : 'AI chart matching is queued...')
     } catch (error) {
-      setStatus(error instanceof Error ? `Unable to match charts: ${error.message}` : 'Unable to match charts.')
-    } finally {
       setIsLoading(false)
       setPhase('idle')
+      setStatus(error instanceof Error ? `Unable to match charts: ${error.message}` : 'Unable to match charts.')
     }
   }
 

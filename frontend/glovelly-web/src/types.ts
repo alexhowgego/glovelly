@@ -297,6 +297,21 @@ export type SetListChartMatchResult = {
   candidates: SetListChartMatchCandidate[]
 }
 
+export type SetListChartMatchJobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Cancelled'
+
+export type SetListChartMatchJobResponse = {
+  jobId: string
+  gigId: string
+  status: SetListChartMatchJobStatus
+  correlationId: string | null
+  errorMessage: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  startedAtUtc: string | null
+  completedAtUtc: string | null
+  result: SetListChartMatchResult[] | null
+}
+
 export type SetListSavedChartMapping = {
   snapshotId: string | null
   chartId: string | null

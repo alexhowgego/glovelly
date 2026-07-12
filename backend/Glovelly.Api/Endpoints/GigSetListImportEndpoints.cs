@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
@@ -11,7 +12,7 @@ namespace Glovelly.Api.Endpoints;
 
 internal static class GigSetListImportEndpoints
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
     public static RouteGroupBuilder MapGigSetListImportEndpoints(this RouteGroupBuilder group)
     {
@@ -247,6 +248,90 @@ internal static class GigSetListImportEndpoints
                     stopwatch.ElapsedMilliseconds);
                 throw;
             }
+        });
+
+        group.MapPost("/{gigId:guid}/setlist-imports/chart-matches/ai-jobs", async (
+            Guid gigId,
+            SetListDraftChartMatchJobRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            ISetListChartMatchJobQueue jobQueue,
+            TimeProvider timeProvider,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!userId.HasValue)
+            {
+                return Results.Unauthorized();
+            }
+
+            if (!await db.Gigs.WhereVisibleTo(userId).AnyAsync(gig => gig.Id == gigId, cancellationToken))
+            {
+                return Results.NotFound();
+            }
+
+            var validation = ValidateChartMatchJobRequest(request);
+            if (validation is not null)
+            {
+                return validation;
+            }
+
+            var requestId = httpContext.Request.Headers.TryGetValue("X-Glovelly-Request-Id", out var requestIdHeader) && !string.IsNullOrWhiteSpace(requestIdHeader)
+                ? requestIdHeader.ToString()
+                : httpContext.TraceIdentifier;
+            var now = timeProvider.GetUtcNow();
+            var job = new SetListChartMatchJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId.Value,
+                GigId = gigId,
+                Status = SetListChartMatchJobStatus.Pending,
+                InputJson = JsonSerializer.Serialize(request.Items.Select(ToMatchInput).ToList(), JsonOptions),
+                CorrelationId = requestId,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            };
+
+            db.SetListChartMatchJobs.Add(job);
+            await db.SaveChangesAsync(cancellationToken);
+            await jobQueue.EnqueueAsync(job.Id, cancellationToken);
+
+            return Results.Accepted(
+                $"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs/{job.Id}",
+                ToJobResponse(job, null));
+        });
+
+        group.MapGet("/{gigId:guid}/setlist-imports/chart-matches/ai-jobs/{jobId:guid}", async (
+            Guid gigId,
+            Guid jobId,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!userId.HasValue)
+            {
+                return Results.Unauthorized();
+            }
+
+            var job = await db.SetListChartMatchJobs
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == jobId && value.GigId == gigId && value.UserId == userId.Value, cancellationToken);
+            if (job is null)
+            {
+                return Results.NotFound();
+            }
+
+            IReadOnlyList<SetListChartMatchResult>? result = null;
+            if (job.Status == SetListChartMatchJobStatus.Completed && !string.IsNullOrWhiteSpace(job.ResultJson))
+            {
+                result = JsonSerializer.Deserialize<IReadOnlyList<SetListChartMatchResult>>(job.ResultJson, JsonOptions);
+            }
+
+            return Results.Ok(ToJobResponse(job, result));
         });
 
         group.MapPost("/{gigId:guid}/setlist-imports", async (
@@ -686,6 +771,36 @@ internal static class GigSetListImportEndpoints
         return errors.Count == 0 ? null : Results.ValidationProblem(errors);
     }
 
+    private static IResult? ValidateChartMatchJobRequest(SetListDraftChartMatchJobRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (request.Items.Count == 0)
+        {
+            errors["items"] = ["Provide setlist rows before starting chart matching."];
+        }
+
+        for (var index = 0; index < request.Items.Count; index++)
+        {
+            var item = request.Items[index];
+            if (item.SourceRowNumber <= 0)
+            {
+                errors[$"items[{index}].sourceRowNumber"] = ["Source row number is required."];
+            }
+
+            if (!Enum.IsDefined(item.Kind))
+            {
+                errors[$"items[{index}].kind"] = ["Item kind is invalid."];
+            }
+        }
+
+        if (!request.Items.Any(item => item.Kind == GigSetListItemKind.Song && item.Include))
+        {
+            errors["items"] = ["Include at least one song row before starting chart matching."];
+        }
+
+        return errors.Count == 0 ? null : Results.ValidationProblem(errors);
+    }
+
     private static bool TryParseSpreadsheetId(string url, out string spreadsheetId)
     {
         spreadsheetId = string.Empty;
@@ -788,6 +903,15 @@ internal static class GigSetListImportEndpoints
         item.PadNumber,
         item.Key);
 
+    private static SetListChartMatchInput ToMatchInput(SetListDraftChartMatchJobItem item) => new(
+        null,
+        item.SourceRowNumber,
+        item.Kind,
+        item.Include,
+        item.Title,
+        item.PadNumber,
+        item.Key);
+
     private static SetListChartMatchInput ToMatchInput(GigSetListItem item) => new(
         item.Id,
         item.SourceRowNumber,
@@ -817,6 +941,27 @@ internal static class GigSetListImportEndpoints
         {
             return null;
         }
+    }
+
+    private static SetListChartMatchJobResponse ToJobResponse(
+        SetListChartMatchJob job,
+        IReadOnlyList<SetListChartMatchResult>? result) => new(
+            job.Id,
+            job.GigId,
+            job.Status,
+            job.CorrelationId,
+            job.SafeErrorMessage,
+            job.CreatedAtUtc,
+            job.UpdatedAtUtc,
+            job.StartedAtUtc,
+            job.CompletedAtUtc,
+            result);
+
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
     }
 
     private static async Task<ChartValidationResult> ValidateRequestedChartsAsync(
@@ -923,6 +1068,28 @@ internal static class GigSetListImportEndpoints
         string? Key);
 
     private sealed record SetListDraftChartMatchPreviewResponse(IReadOnlyList<SetListChartMatchResult> Items);
+
+    private sealed record SetListDraftChartMatchJobRequest(IReadOnlyList<SetListDraftChartMatchJobItem> Items);
+
+    private sealed record SetListDraftChartMatchJobItem(
+        int SourceRowNumber,
+        GigSetListItemKind Kind,
+        bool Include,
+        string Title,
+        string? PadNumber,
+        string? Key);
+
+    private sealed record SetListChartMatchJobResponse(
+        Guid JobId,
+        Guid GigId,
+        SetListChartMatchJobStatus Status,
+        string? CorrelationId,
+        string? ErrorMessage,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset UpdatedAtUtc,
+        DateTimeOffset? StartedAtUtc,
+        DateTimeOffset? CompletedAtUtc,
+        IReadOnlyList<SetListChartMatchResult>? Result);
 
     private sealed record SetListUpdateImportRequest(IReadOnlyList<SetListUpdateImportItemRequest> Items);
 

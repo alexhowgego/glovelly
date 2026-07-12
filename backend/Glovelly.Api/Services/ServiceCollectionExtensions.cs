@@ -27,6 +27,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGigImportDuplicateDetectionService, GigImportDuplicateDetectionService>();
         services.AddSingleton<ISetListSheetParser, SetListSheetParser>();
         services.AddScoped<ISetListChartMatcher, SetListChartMatcher>();
+        services.AddSingleton<ISetListChartMatchJobQueue, SetListChartMatchJobQueue>();
+        services.AddScoped<SetListChartMatchJobProcessor>();
         services.AddScoped<DeterministicSetListChartContextualRanker>();
         services.AddScoped<VertexAiSetListChartContextualRanker>();
         services.AddScoped<ISetListChartContextualRanker>(provider =>

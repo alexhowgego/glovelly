@@ -4,4 +4,5 @@ public sealed record WorkspaceEvent(
     string Scope,
     string Action,
     Guid? EntityId,
-    DateTimeOffset OccurredAtUtc);
+    DateTimeOffset OccurredAtUtc,
+    IReadOnlyDictionary<string, string>? Metadata = null);
