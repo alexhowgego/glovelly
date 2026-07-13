@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Xml.Linq;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
@@ -653,6 +654,114 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(ForScoreMappingStatus.Linked, item.ForScoreMappingStatus);
     }
 
+    [Fact]
+    public async Task ForScoreExport_Returns4ssWithIncludedSongsInSavedOrder()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, _) = await SeedGigWithSetListAsync(factory);
+        await SeedActiveSetListImportAsync(factory, gigId,
+            new TestSetListItem(GigSetListItemKind.Song, true, 2, "Second", Guid.NewGuid(), "Second Chart", "Second.Pdf"),
+            new TestSetListItem(GigSetListItemKind.Separator, false, 0, "Set One", null, null, null),
+            new TestSetListItem(GigSetListItemKind.Song, true, 1, "First", Guid.NewGuid(), "First Chart", "First.pdf"),
+            new TestSetListItem(GigSetListItemKind.Song, false, 3, "Excluded", Guid.NewGuid(), "Excluded Chart", "Excluded.pdf"),
+            new TestSetListItem(GigSetListItemKind.Comment, false, 4, "Note", null, null, null));
+
+        var response = await client.GetAsync($"/gigs/{gigId}/setlist-imports/active/forscore-export", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/xml", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("Setlist test gig.4ss", response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        var document = XDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var root = Assert.IsType<XElement>(document.Root);
+        Assert.Equal("forScore", root.Name.LocalName);
+        Assert.Equal("setlist", root.Attribute("kind")?.Value);
+        Assert.Equal("1.0", root.Attribute("version")?.Value);
+        Assert.Equal("Setlist test gig", root.Attribute("title")?.Value);
+        var scores = root.Elements("score").ToList();
+        Assert.Equal(2, scores.Count);
+        Assert.Equal("First Chart", scores[0].Attribute("title")?.Value);
+        Assert.Equal("First.pdf", scores[0].Attribute("path")?.Value);
+        Assert.Equal("Second Chart", scores[1].Attribute("title")?.Value);
+        Assert.Equal("Second.Pdf", scores[1].Attribute("path")?.Value);
+    }
+
+    [Fact]
+    public async Task ForScoreExport_EscapesXmlSensitiveValues()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, _) = await SeedGigWithSetListAsync(factory, title: "Bella & Roxie's <Show>");
+        await SeedActiveSetListImportAsync(factory, gigId,
+            new TestSetListItem(
+                GigSetListItemKind.Song,
+                true,
+                0,
+                "Fallback",
+                Guid.NewGuid(),
+                "B-017 Jump, Jive An' Wail \"Piano\"",
+                "Charts/B-017 Jump, Jive An' Wail & Piano.pdf"));
+
+        var response = await client.GetAsync($"/gigs/{gigId}/setlist-imports/active/forscore-export", TestContext.Current.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var document = XDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var root = document.Root!;
+        var score = Assert.Single(root.Elements("score"));
+        Assert.Equal("Bella & Roxie's <Show>", root.Attribute("title")?.Value);
+        Assert.Equal("B-017 Jump, Jive An' Wail \"Piano\"", score.Attribute("title")?.Value);
+        Assert.Equal("Charts/B-017 Jump, Jive An' Wail & Piano.pdf", score.Attribute("path")?.Value);
+    }
+
+    [Fact]
+    public async Task ForScoreExport_RejectsInaccessibleGigAndMissingActiveSetList()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient);
+        var client = factory.CreateClient();
+        var (gigId, _) = await SeedGigWithSetListAsync(factory);
+
+        client.DefaultRequestHeaders.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
+        var inaccessibleResponse = await client.GetAsync($"/gigs/{gigId}/setlist-imports/active/forscore-export", TestContext.Current.CancellationToken);
+        client.DefaultRequestHeaders.Remove("X-Test-UserId");
+        var missingActiveResponse = await client.GetAsync($"/gigs/{gigId}/setlist-imports/active/forscore-export", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, inaccessibleResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missingActiveResponse.StatusCode);
+        var missingPayload = await missingActiveResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("No active set list is available for this gig.", missingPayload.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task ForScoreExport_RejectsEmptyAndUnmappedIncludedSongs()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var emptyFactory = CreateFactory(sheetsClient);
+        var emptyClient = emptyFactory.CreateClient();
+        var (emptyGigId, _) = await SeedGigWithSetListAsync(emptyFactory);
+        await SeedActiveSetListImportAsync(emptyFactory, emptyGigId,
+            new TestSetListItem(GigSetListItemKind.Separator, false, 0, "Set One", null, null, null));
+
+        var emptyResponse = await emptyClient.GetAsync($"/gigs/{emptyGigId}/setlist-imports/active/forscore-export", TestContext.Current.CancellationToken);
+
+        using var unmappedFactory = CreateFactory(new FakeGoogleSheetsApiClient());
+        var unmappedClient = unmappedFactory.CreateClient();
+        var (unmappedGigId, _) = await SeedGigWithSetListAsync(unmappedFactory);
+        await SeedActiveSetListImportAsync(unmappedFactory, unmappedGigId,
+            new TestSetListItem(GigSetListItemKind.Song, true, 0, "Needs Chart", null, null, null));
+
+        var unmappedResponse = await unmappedClient.GetAsync($"/gigs/{unmappedGigId}/setlist-imports/active/forscore-export", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, emptyResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, unmappedResponse.StatusCode);
+        var payload = await unmappedResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Select forScore charts for all included song rows before exporting.", payload.GetProperty("message").GetString());
+        var missing = Assert.Single(payload.GetProperty("missingItems").EnumerateArray());
+        Assert.Equal("Needs Chart", missing.GetProperty("title").GetString());
+    }
+
     private WebApplicationFactory<Program> CreateFactory(FakeGoogleSheetsApiClient sheetsClient, Action<IServiceCollection>? configureServices = null)
     {
         return _factory.WithWebHostBuilder(builder =>
@@ -684,7 +793,7 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         throw new TimeoutException($"Timed out waiting for chart match job {jobId} to reach {expectedStatus}.");
     }
 
-    private static async Task<(Guid GigId, Guid ResourceId)> SeedGigWithSetListAsync(WebApplicationFactory<Program> factory, bool addConnection = true)
+    private static async Task<(Guid GigId, Guid ResourceId)> SeedGigWithSetListAsync(WebApplicationFactory<Program> factory, bool addConnection = true, string title = "Setlist test gig")
     {
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -712,7 +821,7 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
             ClientId = TestData.FoxAndFinchId,
             CreatedByUserId = TestAuthContext.UserId,
             UpdatedByUserId = TestAuthContext.UserId,
-            Title = "Setlist test gig",
+            Title = title,
             Date = new DateOnly(2026, 6, 5),
             Venue = "Test venue",
             Fee = 1000,
@@ -735,6 +844,41 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return (gigId, resourceId);
+    }
+
+    private static async Task SeedActiveSetListImportAsync(WebApplicationFactory<Program> factory, Guid gigId, params TestSetListItem[] items)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        dbContext.GigSetListImports.Add(new GigSetListImport
+        {
+            Id = Guid.NewGuid(),
+            GigId = gigId,
+            SpreadsheetId = "spreadsheet-123",
+            WorksheetName = "Set list",
+            IsActive = true,
+            ImportedAtUtc = DateTimeOffset.UtcNow,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            Items = items.Select((item, index) => new GigSetListItem
+            {
+                Id = Guid.NewGuid(),
+                SourceRowNumber = index + 1,
+                SortOrder = item.SortOrder,
+                Kind = item.Kind,
+                Include = item.Include,
+                Title = item.Title,
+                RawCellsJson = "[]",
+                Confidence = GigSetListItemConfidence.High,
+                ForScoreChartId = item.ChartId,
+                ForScoreLibrarySnapshotId = item.ChartId.HasValue ? Guid.NewGuid() : null,
+                ForScoreChartTitle = item.ChartTitle,
+                ForScoreChartFilePath = item.ChartFilePath,
+                ForScoreMappingStatus = item.ChartId.HasValue ? ForScoreMappingStatus.Linked : ForScoreMappingStatus.Unmapped,
+                ForScoreMappingConfidence = item.ChartId.HasValue ? ForScoreMappingConfidence.Manual : ForScoreMappingConfidence.None,
+                ForScoreMappingUpdatedAtUtc = item.ChartId.HasValue ? DateTimeOffset.UtcNow : null,
+            }).ToList(),
+        });
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private static async Task<Guid> SeedForScoreSnapshotAsync(WebApplicationFactory<Program> factory, Guid userId, params (string FilePath, string Title)[] charts)
@@ -841,4 +985,13 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
             throw new InvalidOperationException("Sensitive provider response should not be exposed.");
         }
     }
+
+    private sealed record TestSetListItem(
+        GigSetListItemKind Kind,
+        bool Include,
+        int SortOrder,
+        string Title,
+        Guid? ChartId,
+        string? ChartTitle,
+        string? ChartFilePath);
 }

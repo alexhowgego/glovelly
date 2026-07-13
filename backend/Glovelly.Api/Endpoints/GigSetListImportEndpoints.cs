@@ -62,6 +62,67 @@ internal static class GigSetListImportEndpoints
             return activeImport is null ? Results.NotFound() : Results.Ok(ToImportResponse(activeImport));
         });
 
+        group.MapGet("/{gigId:guid}/setlist-imports/active/forscore-export", async (
+            Guid gigId,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IForScoreSetListExportService exportService,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var gig = await db.Gigs
+                .AsNoTracking()
+                .WhereVisibleTo(userId)
+                .FirstOrDefaultAsync(value => value.Id == gigId, cancellationToken);
+            if (gig is null)
+            {
+                return Results.NotFound();
+            }
+
+            var activeImport = await db.GigSetListImports
+                .AsNoTracking()
+                .Include(value => value.Items)
+                .Where(value => value.GigId == gigId && value.IsActive)
+                .OrderByDescending(value => value.ImportedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (activeImport is null)
+            {
+                return Results.NotFound(new { message = "No active set list is available for this gig." });
+            }
+
+            var includedSongs = activeImport.Items
+                .Where(item => item.Kind == GigSetListItemKind.Song && item.Include)
+                .OrderBy(item => item.SortOrder)
+                .ToList();
+            if (includedSongs.Count == 0)
+            {
+                return EndpointSupport.ValidationProblem("items", "Include at least one song row before exporting to forScore.");
+            }
+
+            var unmappedRows = includedSongs
+                .Where(item => !item.ForScoreChartId.HasValue || string.IsNullOrWhiteSpace(item.ForScoreChartFilePath))
+                .Select(item => new UnexportableSetListItemResponse(item.Id, item.SourceRowNumber, item.Title))
+                .ToList();
+            if (unmappedRows.Count > 0)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Select forScore charts for all included song rows before exporting.",
+                    missingItems = unmappedRows,
+                });
+            }
+
+            var exportItems = includedSongs
+                .Select(item => new ForScoreSetListExportItem(
+                    string.IsNullOrWhiteSpace(item.ForScoreChartTitle) ? item.Title : item.ForScoreChartTitle,
+                    item.ForScoreChartFilePath!))
+                .ToList();
+            var content = exportService.BuildExport(gig.Title, exportItems);
+            var fileName = exportService.BuildFileName(gig.Title);
+            return Results.File(content, "application/xml; charset=utf-8", fileName);
+        });
+
         group.MapGet("/{gigId:guid}/setlist-imports/source", async (
             Guid gigId,
             Guid? resourceId,
@@ -1090,6 +1151,8 @@ internal static class GigSetListImportEndpoints
         DateTimeOffset? StartedAtUtc,
         DateTimeOffset? CompletedAtUtc,
         IReadOnlyList<SetListChartMatchResult>? Result);
+
+    private sealed record UnexportableSetListItemResponse(Guid Id, int SourceRowNumber, string Title);
 
     private sealed record SetListUpdateImportRequest(IReadOnlyList<SetListUpdateImportItemRequest> Items);
 

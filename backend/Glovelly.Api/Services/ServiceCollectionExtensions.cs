@@ -49,6 +49,7 @@ public static class ServiceCollectionExtensions
         });
         services.AddSingleton<IForScoreLibraryParser, ForScoreLibraryParser>();
         services.AddScoped<IForScoreLibraryImportService, ForScoreLibraryImportService>();
+        services.AddSingleton<IForScoreSetListExportService, ForScoreSetListExportService>();
         services.AddScoped<IGoogleConnectionService, GoogleConnectionService>();
         services.AddSingleton<ICalendarEventPayloadHasher, CalendarEventPayloadHasher>();
         services.AddScoped<IGigCalendarEventMapper, GigCalendarEventMapper>();

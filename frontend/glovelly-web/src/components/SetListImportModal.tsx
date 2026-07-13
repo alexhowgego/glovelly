@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { buildApiUrl, fetchWithSession, getResponseErrorMessage, jsonRequestInit } from '../api'
+import { buildApiUrl, downloadResponseBlob, fetchWithSession, getResponseErrorMessage, jsonRequestInit } from '../api'
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents'
 import type {
   Gig,
@@ -23,6 +23,11 @@ type ManagedSetListItem = GigSetListImportItemDraft & { id?: string; forScoreMap
 type ChartMatchStage = 'locate' | 'ai'
 type ChartMatchRequestItem = Pick<ManagedSetListItem, 'sourceRowNumber' | 'kind' | 'include' | 'title' | 'padNumber' | 'key'>
 type ActiveChartMatchJob = Pick<SetListChartMatchJobResponse, 'jobId' | 'status' | 'correlationId'>
+type ForScoreExportError = {
+  message?: string
+  missingItems?: { title?: string; sourceRowNumber?: number }[]
+  errors?: Record<string, string[]>
+}
 
 const createClientRequestId = () => {
   if ('randomUUID' in crypto) {
@@ -33,6 +38,27 @@ const createClientRequestId = () => {
 }
 
 const getPayloadBytes = (value: unknown) => new Blob([JSON.stringify(value)]).size
+
+async function getExportErrorMessage(response: Response) {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json') && !contentType.includes('+json')) {
+    return 'Unable to export forScore set list.'
+  }
+
+  try {
+    const payload = (await response.json()) as ForScoreExportError
+    const validationMessage = payload.errors ? Object.values(payload.errors).flat().join(' ') : ''
+    const missingTitles = payload.missingItems
+      ?.slice(0, 3)
+      .map((item) => item.title || (item.sourceRowNumber ? `row ${item.sourceRowNumber}` : null))
+      .filter(Boolean)
+      .join(', ')
+    const missingSuffix = missingTitles ? ` Remaining rows: ${missingTitles}.` : ''
+    return `${payload.message || validationMessage || 'Select forScore charts for all included song rows before exporting.'}${missingSuffix}`
+  } catch {
+    return 'Unable to export forScore set list.'
+  }
+}
 
 const toChartMatchRequestItems = (sourceItems: ManagedSetListItem[]): ChartMatchRequestItem[] => sourceItems.map((item) => ({
   sourceRowNumber: item.sourceRowNumber,
@@ -574,6 +600,42 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
     }
   }
 
+  const exportForScoreSetList = async () => {
+    if (!canAttemptForScoreExport) {
+      setStatus(unselectedSongCount > 0
+        ? 'Select forScore charts for all included song rows before exporting.'
+        : 'Include at least one song row before exporting to forScore.')
+      return
+    }
+
+    if (!activeImport || hasUnsavedChanges) {
+      const shouldSave = window.confirm('Save this set list before exporting? The forScore export uses the saved active set list.')
+      if (shouldSave) {
+        await saveImport(false)
+      } else {
+        setStatus('Save the set list before exporting to forScore.')
+      }
+      return
+    }
+
+    setIsLoading(true)
+    setStatus('Preparing forScore export...')
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/gigs/${gig.id}/setlist-imports/active/forscore-export`))
+      if (!response.ok) {
+        setStatus(await getExportErrorMessage(response))
+        return
+      }
+
+      const fileName = await downloadResponseBlob(response, `${gig.title || 'setlist'}.4ss`)
+      setStatus(`Downloaded ${fileName}. Open the .4ss file on your iPad and import it into forScore.`)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Unable to export forScore set list.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const updateItem = (
     index: number,
     patch: Partial<Pick<ManagedSetListItem, 'include' | 'title' | 'padNumber' | 'key' | 'section' | 'notes' | 'forScoreChartId'>>
@@ -639,6 +701,15 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
   const attentionItems = includedSongs.filter(itemNeedsAttention)
   const selectedChartCount = includedSongs.filter((item) => item.forScoreChartId).length
   const hasUnsavedChanges = preview !== null || (!!activeImport && baselineItemsJson !== serializeItemsForDirty(items))
+  const unselectedSongCount = includedSongs.length - selectedChartCount
+  const canAttemptForScoreExport = includedSongs.length > 0 && unselectedSongCount === 0
+  const exportHint = canAttemptForScoreExport
+    ? activeImport && !hasUnsavedChanges
+      ? 'Downloads a .4ss file you can open or share into forScore on iPad.'
+      : 'Save this set list before exporting; the .4ss file is built from the saved active set list.'
+    : unselectedSongCount > 0
+      ? `${unselectedSongCount} included song row${unselectedSongCount === 1 ? '' : 's'} still need a forScore chart before export.`
+      : 'Include at least one song row before exporting to forScore.'
 
   const getEvidenceLabel = (evidence: string[]) => {
     if (evidence.some((value) => value.includes('chart_number'))) {
@@ -734,8 +805,12 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
             <button className="primary-button" onClick={() => void saveImport(false)} type="button" disabled={isLoading || items.length === 0 || (activeImport !== null && preview === null && !hasUnsavedChanges)}>
               {activeImport && !preview ? 'Save changes' : 'Save import'}
             </button>
+            <button className="ghost-button" onClick={() => void exportForScoreSetList()} type="button" disabled={isLoading || !canAttemptForScoreExport}>
+              Export forScore .4ss
+            </button>
           </div>
         </div>
+        {items.length > 0 && <p className="settings-hint">{exportHint}</p>}
 
         {items.length > 0 && (
           <div className="associated-item-list setlist-review-list">
