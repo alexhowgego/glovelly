@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
@@ -10,7 +12,7 @@ namespace Glovelly.Api.Endpoints;
 
 internal static class GigSetListImportEndpoints
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
     public static RouteGroupBuilder MapGigSetListImportEndpoints(this RouteGroupBuilder group)
     {
@@ -58,6 +60,67 @@ internal static class GigSetListImportEndpoints
                 .FirstOrDefaultAsync(cancellationToken);
 
             return activeImport is null ? Results.NotFound() : Results.Ok(ToImportResponse(activeImport));
+        });
+
+        group.MapGet("/{gigId:guid}/setlist-imports/active/forscore-export", async (
+            Guid gigId,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IForScoreSetListExportService exportService,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var gig = await db.Gigs
+                .AsNoTracking()
+                .WhereVisibleTo(userId)
+                .FirstOrDefaultAsync(value => value.Id == gigId, cancellationToken);
+            if (gig is null)
+            {
+                return Results.NotFound();
+            }
+
+            var activeImport = await db.GigSetListImports
+                .AsNoTracking()
+                .Include(value => value.Items)
+                .Where(value => value.GigId == gigId && value.IsActive)
+                .OrderByDescending(value => value.ImportedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (activeImport is null)
+            {
+                return Results.NotFound(new { message = "No active set list is available for this gig." });
+            }
+
+            var includedSongs = activeImport.Items
+                .Where(item => item.Kind == GigSetListItemKind.Song && item.Include)
+                .OrderBy(item => item.SortOrder)
+                .ToList();
+            if (includedSongs.Count == 0)
+            {
+                return EndpointSupport.ValidationProblem("items", "Include at least one song row before exporting to forScore.");
+            }
+
+            var unmappedRows = includedSongs
+                .Where(item => !item.ForScoreChartId.HasValue || string.IsNullOrWhiteSpace(item.ForScoreChartFilePath))
+                .Select(item => new UnexportableSetListItemResponse(item.Id, item.SourceRowNumber, item.Title))
+                .ToList();
+            if (unmappedRows.Count > 0)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Select forScore charts for all included song rows before exporting.",
+                    missingItems = unmappedRows,
+                });
+            }
+
+            var exportItems = includedSongs
+                .Select(item => new ForScoreSetListExportItem(
+                    string.IsNullOrWhiteSpace(item.ForScoreChartTitle) ? item.Title : item.ForScoreChartTitle,
+                    item.ForScoreChartFilePath!))
+                .ToList();
+            var content = exportService.BuildExport(gig.Title, exportItems);
+            var fileName = exportService.BuildFileName(gig.Title);
+            return Results.File(content, "application/xml; charset=utf-8", fileName);
         });
 
         group.MapGet("/{gigId:guid}/setlist-imports/source", async (
@@ -184,12 +247,161 @@ internal static class GigSetListImportEndpoints
                 items));
         });
 
+        group.MapPost("/{gigId:guid}/setlist-imports/chart-matches/preview", async (
+            Guid gigId,
+            SetListDraftChartMatchPreviewRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            ISetListChartMatcher chartMatcher,
+            HttpContext httpContext,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
+        {
+            var logger = loggerFactory.CreateLogger("Glovelly.Api.Endpoints.GigSetListImportEndpoints");
+            var requestId = httpContext.Request.Headers.TryGetValue("X-Glovelly-Request-Id", out var requestIdHeader) && !string.IsNullOrWhiteSpace(requestIdHeader)
+                ? requestIdHeader.ToString()
+                : httpContext.TraceIdentifier;
+            var stopwatch = Stopwatch.StartNew();
+            var includedSongCount = request.Items.Count(item => item.Kind == GigSetListItemKind.Song && item.Include);
+            logger.LogInformation(
+                "Set list chart match preview started: RequestId {RequestId}, GigId {GigId}, UseAi {UseAi}, ItemCount {ItemCount}, IncludedSongCount {IncludedSongCount}, ContentLength {ContentLength}, UserAgent {UserAgent}.",
+                requestId,
+                gigId,
+                request.UseAi,
+                request.Items.Count,
+                includedSongCount,
+                httpContext.Request.ContentLength,
+                httpContext.Request.Headers.UserAgent.ToString());
+
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!await db.Gigs.WhereVisibleTo(userId).AnyAsync(gig => gig.Id == gigId, cancellationToken))
+            {
+                logger.LogInformation(
+                    "Set list chart match preview returned not found: RequestId {RequestId}, GigId {GigId}, ElapsedMilliseconds {ElapsedMilliseconds}.",
+                    requestId,
+                    gigId,
+                    stopwatch.ElapsedMilliseconds);
+                return Results.NotFound();
+            }
+
+            try
+            {
+                var matches = await chartMatcher.MatchAsync(userId, request.Items.Select(ToMatchInput).ToList(), cancellationToken, request.UseAi);
+                logger.LogInformation(
+                    "Set list chart match preview completed: RequestId {RequestId}, GigId {GigId}, UseAi {UseAi}, ResultCount {ResultCount}, SuggestedCount {SuggestedCount}, NeedsReviewCount {NeedsReviewCount}, ElapsedMilliseconds {ElapsedMilliseconds}.",
+                    requestId,
+                    gigId,
+                    request.UseAi,
+                    matches.Count,
+                    matches.Count(match => match.Status == ForScoreMappingStatus.Suggested),
+                    matches.Count(match => match.Status == ForScoreMappingStatus.NeedsReview),
+                    stopwatch.ElapsedMilliseconds);
+                return Results.Ok(new SetListDraftChartMatchPreviewResponse(matches));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || httpContext.RequestAborted.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    "Set list chart match preview cancelled: RequestId {RequestId}, GigId {GigId}, UseAi {UseAi}, ElapsedMilliseconds {ElapsedMilliseconds}.",
+                    requestId,
+                    gigId,
+                    request.UseAi,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
+        });
+
+        group.MapPost("/{gigId:guid}/setlist-imports/chart-matches/ai-jobs", async (
+            Guid gigId,
+            SetListDraftChartMatchJobRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            ISetListChartMatchJobQueue jobQueue,
+            TimeProvider timeProvider,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!userId.HasValue)
+            {
+                return Results.Unauthorized();
+            }
+
+            if (!await db.Gigs.WhereVisibleTo(userId).AnyAsync(gig => gig.Id == gigId, cancellationToken))
+            {
+                return Results.NotFound();
+            }
+
+            var validation = ValidateChartMatchJobRequest(request);
+            if (validation is not null)
+            {
+                return validation;
+            }
+
+            var requestId = httpContext.Request.Headers.TryGetValue("X-Glovelly-Request-Id", out var requestIdHeader) && !string.IsNullOrWhiteSpace(requestIdHeader)
+                ? requestIdHeader.ToString()
+                : httpContext.TraceIdentifier;
+            var now = timeProvider.GetUtcNow();
+            var job = new SetListChartMatchJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId.Value,
+                GigId = gigId,
+                Status = SetListChartMatchJobStatus.Pending,
+                InputJson = JsonSerializer.Serialize(request.Items.Select(ToMatchInput).ToList(), JsonOptions),
+                CorrelationId = requestId,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            };
+
+            db.SetListChartMatchJobs.Add(job);
+            await db.SaveChangesAsync(cancellationToken);
+            await jobQueue.EnqueueAsync(job.Id, cancellationToken);
+
+            return Results.Accepted(
+                $"/gigs/{gigId}/setlist-imports/chart-matches/ai-jobs/{job.Id}",
+                ToJobResponse(job, null));
+        });
+
+        group.MapGet("/{gigId:guid}/setlist-imports/chart-matches/ai-jobs/{jobId:guid}", async (
+            Guid gigId,
+            Guid jobId,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!userId.HasValue)
+            {
+                return Results.Unauthorized();
+            }
+
+            var job = await db.SetListChartMatchJobs
+                .AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == jobId && value.GigId == gigId && value.UserId == userId.Value, cancellationToken);
+            if (job is null)
+            {
+                return Results.NotFound();
+            }
+
+            IReadOnlyList<SetListChartMatchResult>? result = null;
+            if (job.Status == SetListChartMatchJobStatus.Completed && !string.IsNullOrWhiteSpace(job.ResultJson))
+            {
+                result = JsonSerializer.Deserialize<IReadOnlyList<SetListChartMatchResult>>(job.ResultJson, JsonOptions);
+            }
+
+            return Results.Ok(ToJobResponse(job, result));
+        });
+
         group.MapPost("/{gigId:guid}/setlist-imports", async (
             Guid gigId,
             SetListSaveImportRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            TimeProvider timeProvider,
             IWorkspaceEventPublisher workspaceEventPublisher,
             CancellationToken cancellationToken) =>
         {
@@ -204,6 +416,12 @@ internal static class GigSetListImportEndpoints
             if (validation is not null)
             {
                 return validation;
+            }
+
+            var chartValidation = await ValidateRequestedChartsAsync(db, userId, request.Items.Select(item => item.ForScoreChartId), cancellationToken);
+            if (chartValidation.Result is not null)
+            {
+                return chartValidation.Result;
             }
 
             var activeImportExists = await db.GigSetListImports
@@ -256,6 +474,14 @@ internal static class GigSetListImportEndpoints
                         Notes = NormalizeOptional(item.Notes),
                         RawCellsJson = NormalizeRawCellsJson(item.RawCellsJson),
                         Confidence = item.Confidence,
+                        ForScoreChartId = item.ForScoreChartId,
+                        ForScoreLibrarySnapshotId = item.ForScoreChartId.HasValue ? chartValidation.ChartsById[item.ForScoreChartId.Value].ForScoreLibrarySnapshotId : null,
+                        ForScoreChartTitle = item.ForScoreChartId.HasValue ? chartValidation.ChartsById[item.ForScoreChartId.Value].Title : null,
+                        ForScoreChartFilePath = item.ForScoreChartId.HasValue ? chartValidation.ChartsById[item.ForScoreChartId.Value].FilePath : null,
+                        ForScoreMappingStatus = item.ForScoreChartId.HasValue ? ForScoreMappingStatus.Linked : ForScoreMappingStatus.Unmapped,
+                        ForScoreMappingConfidence = item.ForScoreChartId.HasValue ? ForScoreMappingConfidence.Manual : ForScoreMappingConfidence.None,
+                        ForScoreMappingUpdatedAtUtc = item.ForScoreChartId.HasValue ? timeProvider.GetUtcNow() : null,
+                        ForScoreMatchJson = SerializeMatch(item.ForScoreMatch),
                     })
                     .ToList(),
             };
@@ -276,6 +502,7 @@ internal static class GigSetListImportEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
+            TimeProvider timeProvider,
             IWorkspaceEventPublisher workspaceEventPublisher,
             CancellationToken cancellationToken) =>
         {
@@ -302,6 +529,12 @@ internal static class GigSetListImportEndpoints
                 return validation;
             }
 
+            var chartValidation = await ValidateRequestedChartsAsync(db, userId, request.Items.Select(item => item.ForScoreChartId), cancellationToken);
+            if (chartValidation.Result is not null)
+            {
+                return chartValidation.Result;
+            }
+
             var itemsById = import.Items.ToDictionary(value => value.Id);
             foreach (var requestItem in request.Items.OrderBy(value => value.SortOrder))
             {
@@ -315,6 +548,8 @@ internal static class GigSetListImportEndpoints
                 item.Title = requestItem.Title.Trim();
                 item.Notes = NormalizeOptional(requestItem.Notes);
                 item.Confidence = requestItem.Confidence;
+                item.ForScoreMatchJson = SerializeMatch(requestItem.ForScoreMatch);
+                ApplyChartMapping(item, requestItem.ForScoreChartId, chartValidation.ChartsById, timeProvider.GetUtcNow());
             }
 
             EndpointSupport.StampUpdate(gig, userId);
@@ -322,6 +557,36 @@ internal static class GigSetListImportEndpoints
             await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gigId, DateTimeOffset.UtcNow));
 
             return Results.Ok(ToImportResponse(import));
+        });
+
+        group.MapPost("/{gigId:guid}/setlist-imports/{importId:guid}/chart-matches/preview", async (
+            Guid gigId,
+            Guid importId,
+            SetListSavedChartMatchPreviewRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            ISetListChartMatcher chartMatcher,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var gig = await db.Gigs.WhereVisibleTo(userId).FirstOrDefaultAsync(value => value.Id == gigId, cancellationToken);
+            if (gig is null)
+            {
+                return Results.NotFound();
+            }
+
+            var import = await db.GigSetListImports
+                .AsNoTracking()
+                .Include(value => value.Items)
+                .FirstOrDefaultAsync(value => value.Id == importId && value.GigId == gigId, cancellationToken);
+            if (import is null)
+            {
+                return Results.NotFound();
+            }
+
+            var matches = await chartMatcher.MatchAsync(userId, import.Items.OrderBy(item => item.SortOrder).Select(ToMatchInput).ToList(), cancellationToken, request.UseAi);
+            return Results.Ok(new SetListChartMatchPreviewResponse(import.Id, matches));
         });
 
         return group;
@@ -567,6 +832,36 @@ internal static class GigSetListImportEndpoints
         return errors.Count == 0 ? null : Results.ValidationProblem(errors);
     }
 
+    private static IResult? ValidateChartMatchJobRequest(SetListDraftChartMatchJobRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (request.Items.Count == 0)
+        {
+            errors["items"] = ["Provide setlist rows before starting chart matching."];
+        }
+
+        for (var index = 0; index < request.Items.Count; index++)
+        {
+            var item = request.Items[index];
+            if (item.SourceRowNumber <= 0)
+            {
+                errors[$"items[{index}].sourceRowNumber"] = ["Source row number is required."];
+            }
+
+            if (!Enum.IsDefined(item.Kind))
+            {
+                errors[$"items[{index}].kind"] = ["Item kind is invalid."];
+            }
+        }
+
+        if (!request.Items.Any(item => item.Kind == GigSetListItemKind.Song && item.Include))
+        {
+            errors["items"] = ["Include at least one song row before starting chart matching."];
+        }
+
+        return errors.Count == 0 ? null : Results.ValidationProblem(errors);
+    }
+
     private static bool TryParseSpreadsheetId(string url, out string spreadsheetId)
     {
         spreadsheetId = string.Empty;
@@ -638,7 +933,154 @@ internal static class GigSetListImportEndpoints
             item.Title,
             item.Notes,
             item.RawCellsJson,
-            item.Confidence);
+            item.Confidence,
+            item.ForScoreChartId,
+            DeserializeMatch(item.ForScoreMatchJson),
+            new SetListSavedChartMappingResponse(
+                item.ForScoreLibrarySnapshotId,
+                item.ForScoreChartId,
+                item.ForScoreChartTitle,
+                item.ForScoreChartFilePath,
+                item.ForScoreMappingStatus,
+                item.ForScoreMappingConfidence,
+                item.ForScoreMappingUpdatedAtUtc));
+    }
+
+    private static SetListChartMatchInput ToMatchInput(SetListImportItemDraft item) => new(
+        null,
+        item.SourceRowNumber,
+        item.Kind,
+        item.Include,
+        item.Title,
+        item.PadNumber,
+        item.Key);
+
+    private static SetListChartMatchInput ToMatchInput(SetListDraftChartMatchPreviewItem item) => new(
+        null,
+        item.SourceRowNumber,
+        item.Kind,
+        item.Include,
+        item.Title,
+        item.PadNumber,
+        item.Key);
+
+    private static SetListChartMatchInput ToMatchInput(SetListDraftChartMatchJobItem item) => new(
+        null,
+        item.SourceRowNumber,
+        item.Kind,
+        item.Include,
+        item.Title,
+        item.PadNumber,
+        item.Key);
+
+    private static SetListChartMatchInput ToMatchInput(GigSetListItem item) => new(
+        item.Id,
+        item.SourceRowNumber,
+        item.Kind,
+        item.Include,
+        item.Title,
+        item.PadNumber,
+        item.Key);
+
+    private static string? SerializeMatch(SetListChartMatchResult? match)
+    {
+        return match is null ? null : JsonSerializer.Serialize(match, JsonOptions);
+    }
+
+    private static SetListChartMatchResult? DeserializeMatch(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<SetListChartMatchResult>(json, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static SetListChartMatchJobResponse ToJobResponse(
+        SetListChartMatchJob job,
+        IReadOnlyList<SetListChartMatchResult>? result) => new(
+            job.Id,
+            job.GigId,
+            job.Status,
+            job.CorrelationId,
+            job.SafeErrorMessage,
+            job.CreatedAtUtc,
+            job.UpdatedAtUtc,
+            job.StartedAtUtc,
+            job.CompletedAtUtc,
+            result);
+
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
+    }
+
+    private static async Task<ChartValidationResult> ValidateRequestedChartsAsync(
+        AppDbContext db,
+        Guid? userId,
+        IEnumerable<Guid?> requestedChartIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = requestedChartIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new ChartValidationResult(new Dictionary<Guid, ForScoreChart>(), null);
+        }
+
+        var charts = await db.ForScoreCharts
+            .Include(chart => chart.Snapshot)
+            .Where(chart => ids.Contains(chart.Id)
+                && chart.Snapshot != null
+                && chart.Snapshot.CreatedByUserId == userId
+                && chart.Snapshot.IsActive)
+            .ToListAsync(cancellationToken);
+
+        if (charts.Count != ids.Count)
+        {
+            return new ChartValidationResult(new Dictionary<Guid, ForScoreChart>(), EndpointSupport.ValidationProblem("forScoreChartId", "Choose charts from your active forScore library."));
+        }
+
+        return new ChartValidationResult(charts.ToDictionary(chart => chart.Id), null);
+    }
+
+    private static void ApplyChartMapping(
+        GigSetListItem item,
+        Guid? chartId,
+        IReadOnlyDictionary<Guid, ForScoreChart> chartsById,
+        DateTimeOffset now)
+    {
+        if (!chartId.HasValue)
+        {
+            item.ForScoreChartId = null;
+            item.ForScoreLibrarySnapshotId = null;
+            item.ForScoreChartTitle = null;
+            item.ForScoreChartFilePath = null;
+            item.ForScoreMappingStatus = item.Kind == GigSetListItemKind.Song && item.Include
+                ? ForScoreMappingStatus.Unmapped
+                : ForScoreMappingStatus.NotApplicable;
+            item.ForScoreMappingConfidence = ForScoreMappingConfidence.None;
+            item.ForScoreMappingUpdatedAtUtc = now;
+            return;
+        }
+
+        var chart = chartsById[chartId.Value];
+        item.ForScoreChartId = chart.Id;
+        item.ForScoreLibrarySnapshotId = chart.ForScoreLibrarySnapshotId;
+        item.ForScoreChartTitle = chart.Title;
+        item.ForScoreChartFilePath = chart.FilePath;
+        item.ForScoreMappingStatus = ForScoreMappingStatus.Linked;
+        item.ForScoreMappingConfidence = ForScoreMappingConfidence.Manual;
+        item.ForScoreMappingUpdatedAtUtc = now;
     }
 
     private sealed record SetListSourceResolution(GigExternalResource? Resource, string? SpreadsheetId, IResult? Result);
@@ -676,6 +1118,42 @@ internal static class GigSetListImportEndpoints
         bool ReplaceActiveImport,
         IReadOnlyList<SetListImportItemDraft> Items);
 
+    private sealed record SetListDraftChartMatchPreviewRequest(IReadOnlyList<SetListDraftChartMatchPreviewItem> Items, bool UseAi = true);
+
+    private sealed record SetListDraftChartMatchPreviewItem(
+        int SourceRowNumber,
+        GigSetListItemKind Kind,
+        bool Include,
+        string Title,
+        string? PadNumber,
+        string? Key);
+
+    private sealed record SetListDraftChartMatchPreviewResponse(IReadOnlyList<SetListChartMatchResult> Items);
+
+    private sealed record SetListDraftChartMatchJobRequest(IReadOnlyList<SetListDraftChartMatchJobItem> Items);
+
+    private sealed record SetListDraftChartMatchJobItem(
+        int SourceRowNumber,
+        GigSetListItemKind Kind,
+        bool Include,
+        string Title,
+        string? PadNumber,
+        string? Key);
+
+    private sealed record SetListChartMatchJobResponse(
+        Guid JobId,
+        Guid GigId,
+        SetListChartMatchJobStatus Status,
+        string? CorrelationId,
+        string? ErrorMessage,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset UpdatedAtUtc,
+        DateTimeOffset? StartedAtUtc,
+        DateTimeOffset? CompletedAtUtc,
+        IReadOnlyList<SetListChartMatchResult>? Result);
+
+    private sealed record UnexportableSetListItemResponse(Guid Id, int SourceRowNumber, string Title);
+
     private sealed record SetListUpdateImportRequest(IReadOnlyList<SetListUpdateImportItemRequest> Items);
 
     private sealed record SetListUpdateImportItemRequest(
@@ -690,7 +1168,9 @@ internal static class GigSetListImportEndpoints
         string Title,
         string? Notes,
         string RawCellsJson,
-        GigSetListItemConfidence Confidence);
+        GigSetListItemConfidence Confidence,
+        Guid? ForScoreChartId,
+        SetListChartMatchResult? ForScoreMatch);
 
     private sealed record SetListImportResponse(
         Guid Id,
@@ -716,5 +1196,23 @@ internal static class GigSetListImportEndpoints
         string Title,
         string? Notes,
         string RawCellsJson,
-        GigSetListItemConfidence Confidence);
+        GigSetListItemConfidence Confidence,
+        Guid? ForScoreChartId,
+        SetListChartMatchResult? ForScoreMatch,
+        SetListSavedChartMappingResponse ForScoreMapping);
+
+    private sealed record SetListSavedChartMappingResponse(
+        Guid? SnapshotId,
+        Guid? ChartId,
+        string? ChartTitle,
+        string? ChartFilePath,
+        ForScoreMappingStatus Status,
+        ForScoreMappingConfidence Confidence,
+        DateTimeOffset? UpdatedAtUtc);
+
+    private sealed record SetListSavedChartMatchPreviewRequest(bool UseAi = true);
+
+    private sealed record SetListChartMatchPreviewResponse(Guid ImportId, IReadOnlyList<SetListChartMatchResult> Items);
+
+    private sealed record ChartValidationResult(IReadOnlyDictionary<Guid, ForScoreChart> ChartsById, IResult? Result);
 }

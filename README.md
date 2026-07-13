@@ -149,10 +149,29 @@ export Email__Invoices__FromDisplayName="Glovelly Invoices"
    - `Email__Mode`
    - `Email__AccessRequests__FromAddress`
    - `Email__AccessRequests__FromDisplayName`
-   - `Email__Invoices__FromAddress`
-   - `Email__Invoices__FromDisplayName`
+    - `Email__Invoices__FromAddress`
+    - `Email__Invoices__FromDisplayName`
+    - `SetListChartRanking__Provider`
+    - `SetListChartRanking__VertexAiProjectId`
+    - `SetListChartRanking__VertexAiLocation`
+    - `SetListChartRanking__VertexAiModel`
 
 The frontend signs users in through `/auth/login`, the backend completes the Google OpenID Connect flow, and the app stores the session in a secure cookie before allowing access to `/clients`, `/gigs`, `/invoices`, and `/invoice-lines`.
+
+### Vertex AI set list chart ranking
+
+Set list chart matching uses deterministic ranking by default. To enable Gemini-backed contextual ranking locally, authenticate with Google Application Default Credentials and set the ranking provider values:
+
+```bash
+gcloud auth application-default login
+cd backend/Glovelly.Api
+dotnet user-secrets set "SetListChartRanking:Provider" "VertexAi"
+dotnet user-secrets set "SetListChartRanking:VertexAiProjectId" "your-gcp-project-id"
+dotnet user-secrets set "SetListChartRanking:VertexAiLocation" "europe-west1"
+dotnet user-secrets set "SetListChartRanking:VertexAiModel" "gemini-2.5-flash"
+```
+
+The configured principal must be able to call Vertex AI, for example with `roles/aiplatform.user`. If any required Vertex AI setting is missing or `Provider` remains `Deterministic`, Glovelly uses the deterministic fallback and does not call Gemini.
 
 ### Google Routes mileage estimates
 
@@ -212,6 +231,7 @@ The workflow:
 - Tags images with `latest` on the default branch and with a commit SHA tag for each build
 - Injects Google Secret Manager secrets into Cloud Run, including `Authentication__Google__ClientId`, `Authentication__Google__ClientSecret`, and `ConnectionStrings__Glovelly`
 - Injects the Resend API key into Cloud Run as `Email__Resend__ApiKey`
+- Passes optional set list chart ranking variables for Vertex AI/Gemini; environments remain deterministic unless `SET_LIST_CHART_RANKING_PROVIDER` is set to `VertexAi`
 - Deploys `main` to the `glovelly` Cloud Run service
 - Deploys each internal pull request to the shared `glovelly-staging` Cloud Run service and comments the preview URL on the PR
 - Deploys the Calendar sync and Business lifecycle Cloud Run Jobs and Cloud Scheduler triggers for eligible environments

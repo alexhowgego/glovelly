@@ -15,6 +15,8 @@ COPY Directory.Build.props Directory.Packages.props ./
 COPY backend/Glovelly.Api/Glovelly.Api.csproj backend/Glovelly.Api/
 COPY backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj backend/Glovelly.Api.Tests/
 COPY backend/Glovelly.Worker/Glovelly.Worker.csproj backend/Glovelly.Worker/
+COPY backend/Glovelly.Matching/Glovelly.Matching.csproj backend/Glovelly.Matching/
+COPY backend/Glovelly.Matching.Tests/Glovelly.Matching.Tests.csproj backend/Glovelly.Matching.Tests/
 RUN dotnet restore glovelly.sln
 
 COPY backend/ ./backend/

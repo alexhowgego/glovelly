@@ -55,4 +55,6 @@ public sealed class User
     public ICollection<GigCalendarSyncState> GigCalendarSyncStates { get; set; } = new List<GigCalendarSyncState>();
     [JsonIgnore]
     public ICollection<CalendarSyncWorkItem> CalendarSyncWorkItems { get; set; } = new List<CalendarSyncWorkItem>();
+    [JsonIgnore]
+    public ICollection<ForScoreLibrarySnapshot> ForScoreLibrarySnapshots { get; set; } = new List<ForScoreLibrarySnapshot>();
 }

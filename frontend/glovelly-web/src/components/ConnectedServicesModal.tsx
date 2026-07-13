@@ -1,8 +1,11 @@
-import type { GoogleCalendarStatus } from '../types'
+import type { ForScoreLibrarySnapshot, GoogleCalendarStatus } from '../types'
 
 type ConnectedServicesModalProps = {
+  forScoreLibrarySnapshot: ForScoreLibrarySnapshot | null
+  forScoreLibraryStatus: string
   googleCalendarStatus: GoogleCalendarStatus | null
   invoiceUploadFolderId: string
+  isForScoreLibraryUploading: boolean
   isGoogleCalendarBusy: boolean
   isGoogleDriveBusy: boolean
   isGoogleDriveConnected: boolean
@@ -17,13 +20,17 @@ type ConnectedServicesModalProps = {
   onDisconnectGoogleCalendar: () => void
   onDisconnectGoogleDrive: () => void
   onDisconnectGoogleSheets: () => void
+  onForScoreLibraryFile: (file: File) => void
   onOpenSettings: () => void
   status: string
 }
 
 export function ConnectedServicesModal({
+  forScoreLibrarySnapshot,
+  forScoreLibraryStatus,
   googleCalendarStatus,
   invoiceUploadFolderId,
+  isForScoreLibraryUploading,
   isGoogleCalendarBusy,
   isGoogleDriveBusy,
   isGoogleDriveConnected,
@@ -38,6 +45,7 @@ export function ConnectedServicesModal({
   onDisconnectGoogleCalendar,
   onDisconnectGoogleDrive,
   onDisconnectGoogleSheets,
+  onForScoreLibraryFile,
   onOpenSettings,
   status,
 }: ConnectedServicesModalProps) {
@@ -206,6 +214,61 @@ export function ConnectedServicesModal({
               >
                 Disconnect
               </button>
+            </div>
+          </article>
+
+          <article className="connected-service-card">
+            <div className="connected-service-summary">
+              <div>
+                <p className="detail-label">forScore library</p>
+                <strong>
+                  {forScoreLibrarySnapshot
+                    ? `${forScoreLibrarySnapshot.chartCount} chart(s) imported`
+                    : 'No library snapshot'}
+                </strong>
+                <span>Upload a forScore .4sb library export for set list chart matching.</span>
+              </div>
+              <span
+                aria-hidden="true"
+                className={`service-connection-indicator ${
+                  forScoreLibrarySnapshot ? 'connected' : 'disconnected'
+                }`}
+              />
+            </div>
+
+            <span className="connected-service-note">
+              {forScoreLibrarySnapshot
+                ? `Active snapshot: ${forScoreLibrarySnapshot.originalFileName}, imported ${new Date(forScoreLibrarySnapshot.importedAtUtc).toLocaleString()}. Existing forScore set lists are ignored.`
+                : 'Glovelly only stores chart metadata from the backup. Existing forScore set lists, annotations and settings are ignored.'}
+            </span>
+            <span className="connected-service-note">{forScoreLibraryStatus}</span>
+            {forScoreLibraryStatus.includes('need review') && (
+              <span className="connected-service-note">
+                Open each affected gig's reviewed set list and choose Check forScore matches to fix chart links.
+              </span>
+            )}
+            {forScoreLibrarySnapshot?.warnings.length ? (
+              <span className="connected-service-error">
+                {forScoreLibrarySnapshot.warnings.slice(0, 2).join(' ')}
+              </span>
+            ) : null}
+
+            <div className="form-actions compact-actions">
+              <label className="ghost-button file-action-label">
+                {isForScoreLibraryUploading ? 'Importing...' : 'Upload .4sb'}
+                <input
+                  accept=".4sb"
+                  disabled={isForScoreLibraryUploading}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0]
+                    event.currentTarget.value = ''
+                    if (file) {
+                      onForScoreLibraryFile(file)
+                    }
+                  }}
+                  type="file"
+                />
+              </label>
             </div>
           </article>
         </div>

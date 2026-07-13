@@ -8,6 +8,7 @@ const API_PREFIXES = [
   '/auth',
   '/clients',
   '/expense-statements',
+  '/forscore-library',
   '/gigs',
   '/gig-imports',
   '/health',

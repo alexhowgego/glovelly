@@ -7,6 +7,7 @@ export type WorkspaceEvent = {
   action: string
   entityId: string | null
   occurredAtUtc: string
+  metadata?: Record<string, string> | null
 }
 
 type UseWorkspaceEventsOptions = {
