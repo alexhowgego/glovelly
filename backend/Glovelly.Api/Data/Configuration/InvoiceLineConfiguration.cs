@@ -10,7 +10,8 @@ internal sealed class InvoiceLineConfiguration : IEntityTypeConfiguration<Invoic
     {
         entity.HasKey(line => line.Id);
         entity.Property(line => line.CreatedUtc)
-            .IsRequired();
+            .IsRequired()
+            .HasDefaultValueSql("now()");
         entity.Property(line => line.Type)
             .HasConversion<string>()
             .HasMaxLength(50);
@@ -21,8 +22,9 @@ internal sealed class InvoiceLineConfiguration : IEntityTypeConfiguration<Invoic
         entity.Property(line => line.UnitPrice)
             .HasPrecision(18, 2);
         entity.Property(line => line.CalculationNotes)
-            .HasMaxLength(2000);
-        entity.Property(line => line.IsSystemGenerated);
+            .HasColumnType("text");
+        entity.Property(line => line.IsSystemGenerated)
+            .HasDefaultValue(false);
 
         entity.HasOne(line => line.Invoice)
             .WithMany(invoice => invoice.Lines)

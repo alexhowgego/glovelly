@@ -55,6 +55,38 @@ CI validates EF migration consistency once an initial model snapshot exists. It 
 
 The `InitialBaseline` migration and live database registration are handled by the dedicated baseline procedure. The baseline migration is for fresh database creation; existing staging and production databases are registered as already having applied it only after schema equivalence has been verified.
 
+### InitialBaseline Adoption
+
+`InitialBaseline` is `20260717214619_InitialBaseline`, generated with EF Core product version `10.0.8` in `backend/Glovelly.Migrations`.
+
+Schema evidence captured before registration:
+
+- Neon staging and production schema exports were compared before baseline generation.
+- Staging and production domain schemas matched.
+- Staging already contained an empty, correctly shaped `__EFMigrationsHistory` table from migration-pipeline execution.
+- Production did not yet contain `__EFMigrationsHistory` before registration.
+- The only staging/production schema differences were expected EF history presence, column-order/export formatting, and equivalent check-constraint formatting.
+- EF baseline SQL was compared against the production schema export. Column shape matched after explicitly modelling existing nullable seller address columns, existing defaults, and `InvoiceLines.CalculationNotes` as `text`.
+- Index shape matched apart from primary-key indexes emitted differently by Neon export and the EF convention support index `IX_SetListChartMatchJobs_GigId`, which appears only in fresh databases created by the baseline and is not a domain constraint.
+
+Pre-registration table-count sanity checks were captured for `Users`, `Clients`, `Gigs`, `Invoices`, `InvoiceLines`, and `SellerProfiles` in both staging and production. These counts must remain unchanged after registration.
+
+Existing databases must be registered with `docs/engineering/register-initial-baseline.sql`. That script modifies only `__EFMigrationsHistory`, allows either an absent history table or an existing empty EF-shaped history table, and fails if unexpected history rows or shape differences exist. Do not execute generated `InitialBaseline` DDL against staging or production.
+
+After registration, verify:
+
+- `__EFMigrationsHistory` contains exactly `20260717214619_InitialBaseline` with product version `10.0.8`.
+- The table-count sanity query returns the same values captured before registration.
+- The migration bundle exits successfully with no pending migrations.
+
+Staging registration was completed first. The guarded SQL inserted the expected `20260717214619_InitialBaseline` history row, row-count sanity checks were unchanged, staging UAT passed, and the staging Cloud Run migration job reported `No migrations were applied. The database is already up to date.`
+
+Production adoption follows the same reviewed registration procedure through the protected production rollout. Confirm the production restore point/branch before registration, verify the same history row and unchanged table counts, then allow the production migration job and smoke tests to complete as part of the merge-gated deployment.
+
+Future schema changes, including any `GigType` work, must be added as ordinary post-baseline EF migrations. Do not edit or replace `InitialBaseline` after it has been registered in staging or production.
+
+Rollback for a failed registration before later domain schema changes is Neon restore from the confirmed restore point or, only after review of the failure mode, removal of the narrowly inserted history row. Do not use EF `Down` methods for this adoption step.
+
 ## Ownership And Access
 
 Use one application database at this stage. Do not introduce separate databases or schemas per user without a clear product/operational reason.

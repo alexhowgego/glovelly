@@ -15,7 +15,8 @@ internal sealed class GigExpenseConfiguration : IEntityTypeConfiguration<GigExpe
             .HasPrecision(18, 2);
         entity.Property(expense => expense.ReimbursementStatus)
             .HasConversion<string>()
-            .HasMaxLength(50);
+            .HasMaxLength(50)
+            .HasDefaultValue(GigExpenseReimbursementStatus.Unreimbursed);
         entity.Property(expense => expense.ReimbursementMethod)
             .HasMaxLength(100);
         entity.Property(expense => expense.ReimbursementNote)

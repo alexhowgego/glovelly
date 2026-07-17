@@ -17,10 +17,12 @@ internal sealed class GigSetListItemConfiguration : IEntityTypeConfiguration<Gig
             .HasMaxLength(50);
         entity.Property(item => item.ForScoreMappingStatus)
             .HasConversion<string>()
-            .HasMaxLength(50);
+            .HasMaxLength(50)
+            .HasDefaultValue(ForScoreMappingStatus.Unmapped);
         entity.Property(item => item.ForScoreMappingConfidence)
             .HasConversion<string>()
-            .HasMaxLength(50);
+            .HasMaxLength(50)
+            .HasDefaultValue(ForScoreMappingConfidence.None);
         entity.Property(item => item.Section)
             .HasMaxLength(200);
         entity.Property(item => item.PadNumber)

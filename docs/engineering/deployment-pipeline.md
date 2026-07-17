@@ -20,6 +20,8 @@ Database migrations run as an explicit Cloud Run Job, not during web application
 
 The migration job is one-shot, single-task, non-retrying, and bounded by a task timeout. Re-running the same bundle is safe because EF applies only migrations missing from `__EFMigrationsHistory`.
 
+The initial migration baseline is a special adoption step. `20260717214619_InitialBaseline` creates the full schema for fresh databases, but existing staging and production databases must be registered as already having applied it with the guarded SQL in `docs/engineering/register-initial-baseline.sql`. Do not run the baseline DDL against existing databases. After registration, normal deployments use the migration job and bundle path below.
+
 The release order is:
 
 1. Build and test the application image and migration bundle.

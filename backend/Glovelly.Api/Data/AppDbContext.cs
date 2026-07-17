@@ -37,5 +37,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        var setListJobEntity = modelBuilder.Entity<SetListChartMatchJob>().Metadata;
+        var gigIdProperty = setListJobEntity.FindProperty(nameof(SetListChartMatchJob.GigId));
+        if (gigIdProperty is not null)
+        {
+            var gigIdIndexProperties = new[] { gigIdProperty };
+            if (setListJobEntity.FindIndex(gigIdIndexProperties) is not null)
+            {
+                setListJobEntity.RemoveIndex(gigIdIndexProperties);
+            }
+        }
     }
 }

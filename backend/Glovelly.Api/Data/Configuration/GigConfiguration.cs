@@ -59,7 +59,6 @@ internal sealed class GigConfiguration : IEntityTypeConfiguration<Gig>
 
         entity.HasIndex(gig => gig.SourceImportBatchId);
         entity.HasIndex(gig => gig.SourceImportDraftId)
-            .IsUnique()
-            .HasFilter("\"SourceImportDraftId\" IS NOT NULL");
+            .IsUnique();
     }
 }
