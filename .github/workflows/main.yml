@@ -7,6 +7,8 @@ on:
     paths:
       - ".github/workflows/main.yml"
       - ".github/workflows/uat.yml"
+      - ".github/scripts/**"
+      - ".config/dotnet-tools.json"
       - ".dockerignore"
       - "Dockerfile"
       - "Directory.Build.props"
@@ -24,6 +26,8 @@ on:
     paths:
       - ".github/workflows/main.yml"
       - ".github/workflows/uat.yml"
+      - ".github/scripts/**"
+      - ".config/dotnet-tools.json"
       - ".dockerignore"
       - "Dockerfile"
       - "Directory.Build.props"
@@ -71,6 +75,21 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
 
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: glovelly_migration_validation
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     outputs:
       image_uri: ${{ steps.image.outputs.uri }}
 
@@ -85,6 +104,11 @@ jobs:
 
       - name: Restore .NET dependencies
         run: dotnet restore glovelly.sln
+
+      - name: Validate EF migrations
+        env:
+          GLOVELLY_MIGRATIONS_VALIDATION_CONNECTION: Host=localhost;Port=5432;Database=glovelly_migration_validation;Username=postgres;Password=postgres
+        run: bash .github/scripts/validate-ef-migrations.sh
 
       - name: Run backend tests
         run: dotnet test glovelly.sln --no-restore -m:1
@@ -161,8 +185,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy_staging:
-    name: Deploy staging
+  migrate_staging:
+    name: Migrate staging database
     needs: build
     runs-on: ubuntu-latest
     environment: staging
@@ -171,6 +195,37 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'staging') ||
       (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'production' && github.ref == 'refs/heads/main')
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Run database migrations staging
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          GCP_CONNECTION_STRING_SECRET_ID: ${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}
+          DATABASE_MIGRATION_JOB_NAME: ${{ vars.GCP_DATABASE_MIGRATION_JOB_NAME }}
+        run: bash .github/scripts/deploy-database-migration-job.sh
+
+  deploy_staging:
+    name: Deploy staging
+    needs:
+      - build
+      - migrate_staging
+    runs-on: ubuntu-latest
+    environment: staging
 
     outputs:
       url: ${{ steps.deploy_staging.outputs.url }}
@@ -313,11 +368,45 @@ jobs:
       require_invoice_recipient: true
       artifact_name: glovelly-staging-uat-diagnostics
 
+  migrate_production:
+    name: Migrate production database
+    needs:
+      - build
+      - staging_uat
+    runs-on: ubuntu-latest
+    environment: production
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target_environment == 'production' && github.ref == 'refs/heads/main')
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Run database migrations production
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          GCP_CONNECTION_STRING_SECRET_ID: ${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}
+          DATABASE_MIGRATION_JOB_NAME: ${{ vars.GCP_DATABASE_MIGRATION_JOB_NAME }}
+        run: bash .github/scripts/deploy-database-migration-job.sh
+
   deploy_production:
     name: Deploy production
     needs:
       - build
-      - staging_uat
+      - migrate_production
     runs-on: ubuntu-latest
     environment: production
     if: >-

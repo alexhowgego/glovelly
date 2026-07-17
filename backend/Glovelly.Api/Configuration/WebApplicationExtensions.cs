@@ -9,24 +9,23 @@ internal static class WebApplicationExtensions
     public static async Task InitializeDatabaseAsync(
         this WebApplication app,
         IConfiguration configuration,
-        bool shouldSeedDevelopmentData,
-        bool shouldSeedUatData)
+        StartupSettings settings)
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        if (shouldSeedDevelopmentData)
+        if (settings.ShouldSeedDevelopmentData)
         {
             var attachmentStore = scope.ServiceProvider.GetRequiredService<IExpenseAttachmentStore>();
             var blobStore = scope.ServiceProvider.GetRequiredService<IBlobStore>();
             await DevelopmentDataSeeder.SeedAsync(dbContext, configuration, attachmentStore, blobStore);
         }
-        else
+        else if (!settings.UsePostgres)
         {
             await dbContext.Database.EnsureCreatedAsync();
         }
 
-        if (shouldSeedUatData)
+        if (settings.ShouldSeedUatData)
         {
             await UatRegressionDataSeeder.SeedAsync(dbContext);
         }

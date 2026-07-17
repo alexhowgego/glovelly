@@ -44,12 +44,12 @@ internal sealed class SellerProfileConfiguration : IEntityTypeConfiguration<Sell
 
         entity.OwnsOne(profile => profile.Address, address =>
         {
-            address.Property(value => value.Line1).HasMaxLength(200);
+            address.Property(value => value.Line1).HasMaxLength(200).IsRequired(false);
             address.Property(value => value.Line2).HasMaxLength(200);
-            address.Property(value => value.City).HasMaxLength(100);
+            address.Property(value => value.City).HasMaxLength(100).IsRequired(false);
             address.Property(value => value.StateOrCounty).HasMaxLength(100);
-            address.Property(value => value.PostalCode).HasMaxLength(20);
-            address.Property(value => value.Country).HasMaxLength(100);
+            address.Property(value => value.PostalCode).HasMaxLength(20).IsRequired(false);
+            address.Property(value => value.Country).HasMaxLength(100).IsRequired(false);
         });
     }
 }

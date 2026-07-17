@@ -25,8 +25,7 @@ internal sealed class GigCalendarSyncStateConfiguration : IEntityTypeConfigurati
         entity.Property(state => state.UpdatedAtUtc)
             .IsRequired();
         entity.HasIndex(state => new { state.GigId, state.Provider })
-            .IsUnique()
-            .HasFilter("\"GigId\" IS NOT NULL");
+            .IsUnique();
         entity.HasIndex(state => new { state.UserId, state.Provider });
         entity.HasIndex(state => new { state.ProviderCalendarId, state.ProviderEventId });
         entity.HasOne(state => state.User)

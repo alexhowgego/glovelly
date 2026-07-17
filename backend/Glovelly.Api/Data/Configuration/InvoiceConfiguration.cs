@@ -14,8 +14,10 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         entity.Property(invoice => invoice.Status)
             .HasConversion<string>()
             .HasMaxLength(50);
-        entity.Property(invoice => invoice.ReissueCount);
-        entity.Property(invoice => invoice.DeliveryCount);
+        entity.Property(invoice => invoice.ReissueCount)
+            .HasDefaultValue(0);
+        entity.Property(invoice => invoice.DeliveryCount)
+            .HasDefaultValue(0);
         entity.Property(invoice => invoice.LastDeliveryChannel)
             .HasMaxLength(50);
         entity.Property(invoice => invoice.LastDeliveryRecipient)

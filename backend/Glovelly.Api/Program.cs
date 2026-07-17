@@ -12,8 +12,7 @@ var app = builder.Build();
 
 await app.InitializeDatabaseAsync(
     builder.Configuration,
-    startupSettings.ShouldSeedDevelopmentData,
-    startupSettings.ShouldSeedUatData);
+    startupSettings);
 
 app.UseGlovellyHttpPipeline(startupSettings);
 app.MapAppMetadataEndpoints(startupSettings);

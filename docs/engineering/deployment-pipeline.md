@@ -9,9 +9,31 @@ The root `Dockerfile` uses a multi-stage build:
 1. Build the Vite frontend with Node.
 2. Restore and publish the ASP.NET Core backend and worker with the .NET SDK.
 3. Copy the frontend `dist` output into the backend publish output under `wwwroot`.
-4. Run the final image on the ASP.NET Core runtime image.
+4. Build a self-contained Linux EF Core migration bundle from `backend/Glovelly.Migrations` and copy it into the final image as `/app/efbundle`.
+5. Run the final image on the ASP.NET Core runtime image.
 
-The final image exposes port `8080` and starts `Glovelly.Api.dll`, respecting Cloud Run's `PORT` environment variable. It also includes `Glovelly.Worker.dll` under `/app/worker` so Cloud Run Jobs can run non-interactive commands from the same image.
+The final image exposes port `8080` and starts `Glovelly.Api.dll`, respecting Cloud Run's `PORT` environment variable. It also includes `Glovelly.Worker.dll` under `/app/worker` so Cloud Run Jobs can run non-interactive commands from the same image, and `/app/efbundle` so database migrations can run from the same immutable artifact.
+
+## Database Migrations
+
+Database migrations run as an explicit Cloud Run Job, not during web application startup. The deployment job uses the same image URI that will be deployed to the Cloud Run service and binds `ConnectionStrings__Glovelly` from Secret Manager. The job runs `/app/efbundle` with the target connection string and fails the deployment if the bundle exits unsuccessfully.
+
+The migration job is one-shot, single-task, non-retrying, and bounded by a task timeout. Re-running the same bundle is safe because EF applies only migrations missing from `__EFMigrationsHistory`.
+
+The initial migration baseline is a special adoption step. `20260717214619_InitialBaseline` creates the full schema for fresh databases, but existing staging and production databases must be registered as already having applied it with the guarded SQL in `docs/engineering/register-initial-baseline.sql`. Do not run the baseline DDL against existing databases. After registration, normal deployments use the migration job and bundle path below.
+
+The release order is:
+
+1. Build and test the application image and migration bundle.
+2. Execute pending migrations against staging.
+3. Deploy the staging service revision.
+4. Run staging UAT.
+5. Pass the production environment approval/gate.
+6. Execute the exact same migration artifact against production.
+7. Deploy the production service revision.
+8. Run production smoke tests.
+
+If migration execution fails, the corresponding service revision is not deployed. The workflow prints recent Cloud Run Job logs to make the failure actionable.
 
 ## Worker Commands
 
@@ -60,14 +82,16 @@ It currently:
 1. checks out the repository
 2. sets up .NET
 3. restores dependencies
-4. runs backend tests with `dotnet test glovelly.sln --no-restore -m:1`
-5. authenticates to Google Cloud through Workload Identity Federation
-6. sets up Docker Buildx
-7. builds and optionally pushes the image
-8. pushes images to Artifact Registry
-9. deploys eligible builds to Cloud Run
-10. deploys the Calendar sync Cloud Run Job and Scheduler trigger
-11. comments a staging preview URL on same-repository pull requests
+4. validates EF migrations against a disposable PostgreSQL database once a baseline snapshot exists
+5. runs backend tests with `dotnet test glovelly.sln --no-restore -m:1`
+6. authenticates to Google Cloud through Workload Identity Federation
+7. sets up Docker Buildx
+8. builds and optionally pushes the image
+9. pushes images to Artifact Registry
+10. runs the database migration job before eligible Cloud Run service deployments
+11. deploys eligible builds to Cloud Run
+12. deploys the Calendar sync and Business lifecycle Cloud Run Jobs and Scheduler triggers
+13. comments a staging preview URL on same-repository pull requests
 
 Workload Identity Federation is preferred because it avoids storing long-lived Google service account JSON keys in GitHub.
 
@@ -106,6 +130,7 @@ Do not commit secret values, OAuth client secrets, Resend API keys, database con
 The deployment depends on:
 
 - Cloud Run service hosting the app
+- Cloud Run Job that executes the EF migration bundle before service deployment
 - Cloud Run Job that drains the Calendar sync queue
 - Cloud Scheduler trigger that invokes the Calendar sync job
 - Artifact Registry repository for the container image
