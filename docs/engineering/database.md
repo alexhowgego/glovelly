@@ -35,7 +35,25 @@ Setlist imports are reviewed snapshots of linked Google Sheet worksheet rows. `G
 
 Production uses Npgsql when `ConnectionStrings:Glovelly` is configured. Without that connection string, the app uses an in-memory database and seeds development data outside the testing environment.
 
-Schema evolution is currently applied with manually reviewed PostgreSQL SQL rather than checked-in EF Core migrations. SQL changes should be deliberate, idempotent where practical, and reviewed against both current staging state and fresh production creation needs.
+Checked-in EF Core migrations are the authoritative schema history for PostgreSQL deployments. Migration files and the model snapshot live in `backend/Glovelly.Migrations`, which references the existing `Glovelly.Api` data model and owns design-time `AppDbContext` creation.
+
+Generate migrations from the repo root with the migrations project as both project and startup project:
+
+```bash
+dotnet tool restore
+dotnet tool run dotnet-ef migrations add <MigrationName> \
+  --project backend/Glovelly.Migrations/Glovelly.Migrations.csproj \
+  --startup-project backend/Glovelly.Migrations/Glovelly.Migrations.csproj \
+  --context AppDbContext
+```
+
+Review generated migrations before merge. Pay particular attention to destructive operations, renames that EF may model as drop/create, data transformations, defaults for existing rows, indexes, constraints, and provider-specific PostgreSQL details. Prefer expand-and-contract changes for production-safe releases.
+
+The web application must not apply PostgreSQL schema changes during startup. When `ConnectionStrings:Glovelly` is configured, schema creation and migration execution are deployment concerns handled by the migration bundle and Cloud Run Job. Local development and tests may still use EF Core's in-memory provider when no Glovelly connection string is configured.
+
+CI validates EF migration consistency once an initial model snapshot exists. It checks for pending model changes without a migration, applies the migration chain to a disposable PostgreSQL database, and runs the update path twice to verify no-op reruns.
+
+The `InitialBaseline` migration and live database registration are handled by the dedicated baseline procedure. The baseline migration is for fresh database creation; existing staging and production databases are registered as already having applied it only after schema equivalence has been verified.
 
 ## Ownership And Access
 
@@ -54,5 +72,7 @@ When Postgres is configured, ASP.NET Core data protection keys are persisted thr
 ## Operational Notes
 
 The database connection string is a runtime secret and should be supplied through secure configuration, currently via Cloud Run/Secret Manager binding.
+
+Deployment runs migrations explicitly before deploying each corresponding Cloud Run service revision. Migration failures stop the release; rollback normally means restoring a database backup or deploying a forward-fix migration, not automatically running EF `Down` methods.
 
 Backup, restore, retention, and operational alerting for Neon data are important follow-up topics for the operations handbook.
