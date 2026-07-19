@@ -103,6 +103,7 @@ export function QuickAttachmentModal({
         title: draft.gig.title,
         date: draft.gig.date,
         venue: draft.gig.venue,
+        type: draft.gig.type,
         status: draft.gig.status,
         daysFromToday: getDaysFromToday(draft.gig.date),
         isSelected: true,

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { formatDate } from '../formatters'
+import { formatDate, formatGigType } from '../formatters'
 import type { QuickGigCandidate } from '../types'
 
 type QuickCaptureGigSelectProps = {
@@ -53,7 +53,7 @@ export function QuickCaptureGigSelect({
       >
         {candidates.map((gig) => (
           <option key={gig.id} value={gig.id}>
-            {gig.title} · {formatDate(gig.date)} · {gig.venue} ·{' '}
+            {gig.title} · {formatGigType(gig.type)} · {formatDate(gig.date)} · {gig.venue} ·{' '}
             {clientNamesById.get(gig.clientId) ?? 'Unknown client'} ·{' '}
             {gig.daysFromToday === 0
               ? 'today'

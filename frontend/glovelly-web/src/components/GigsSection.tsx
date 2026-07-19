@@ -5,7 +5,7 @@ import { GigAttachmentsPanel } from './GigAttachmentsPanel'
 import { GigEditorPanel } from './GigEditorPanel'
 import { GigExpensesPanel } from './GigExpensesPanel'
 import { TrashIcon } from './TrashIcon'
-import { formatCurrency, formatDate, formatGigStatus } from '../formatters'
+import { formatCurrency, formatDate, formatGigStatus, formatGigType } from '../formatters'
 import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Client,
@@ -19,6 +19,7 @@ import type {
   GigQuickFilter,
   GigSort,
   GigSortKey,
+  GigType,
 } from '../types'
 
 type GigsSectionProps = {
@@ -32,6 +33,7 @@ type GigsSectionProps = {
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
   gigQuickFilter: GigQuickFilter
+  gigTypeFilter: GigType | 'all'
   gigSearchQuery: string
   gigSort: GigSort
   gigStatus: string
@@ -65,6 +67,7 @@ type GigsSectionProps = {
   onDeleteExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onResetForm: () => void
   onQuickFilterChange: (filter: GigQuickFilter) => void
+  onGigTypeFilterChange: (filter: GigType | 'all') => void
   onSearchQueryChange: (value: string) => void
   onSelectGig: (gigId: string) => void
   onSortChange: (sort: GigSort) => void
@@ -107,6 +110,7 @@ export function GigsSection({
   isEditorOpen,
   gigMode,
   gigQuickFilter,
+  gigTypeFilter,
   gigSearchQuery,
   gigSort,
   gigStatus,
@@ -134,6 +138,7 @@ export function GigsSection({
   onDeleteExpenseAttachment,
   onResetForm,
   onQuickFilterChange,
+  onGigTypeFilterChange,
   onSearchQueryChange,
   onSelectGig,
   onSortChange,
@@ -224,10 +229,22 @@ export function GigsSection({
                 <input
                   data-testid="gig-search-input"
                   type="search"
-                  placeholder="Client, title, venue..."
+                  placeholder="Client, title, location, type..."
                   value={gigSearchQuery}
                   onChange={(event) => onSearchQueryChange(event.target.value)}
                 />
+              </label>
+              <label>
+                <span>Type</span>
+                <select value={gigTypeFilter} onChange={(event) => onGigTypeFilterChange(event.target.value as GigType | 'all')}>
+                  <option value="all">All types</option>
+                  <option value="Performance">Performance</option>
+                  <option value="Teaching">Teaching</option>
+                  <option value="Rehearsal">Rehearsal</option>
+                  <option value="Recording">Recording</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Other">Other work</option>
+                </select>
               </label>
               <label>
                 <span>Sort by</span>
@@ -283,7 +300,7 @@ export function GigsSection({
               <span>Gig</span>
               <span>Client</span>
               <span>Date</span>
-              <span>Venue</span>
+              <span>Location</span>
               <span>Fee</span>
               <span>Status</span>
             </div>
@@ -323,7 +340,7 @@ export function GigsSection({
                   </label>
                   <div className="compact-primary-cell">
                     <strong>{gig.title}</strong>
-                    <span>{clientName}</span>
+                    <span>{formatGigType(gig.type)} · {clientName}</span>
                   </div>
                   <span>{clientName}</span>
                   <span>{formatDate(gig.date)}</span>
@@ -446,17 +463,23 @@ export function GigsSection({
                   </button>
                 </article>
                 <article>
-                  <p className="detail-label">Status</p>
-                  <strong data-testid="selected-gig-status">{formatGigStatus(selectedGig.status)}</strong>
+                  <p className="detail-label">Type</p>
+                  <strong>{formatGigType(selectedGig.type)}</strong>
                 </article>
-                <article>
-                  <p className="detail-label">Date</p>
-                  <strong>{formatDate(selectedGig.date)}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Fee</p>
-                  <strong>{formatCurrency(selectedGig.fee)}</strong>
-                </article>
+                <div className="gig-detail-metrics full-width">
+                  <article>
+                    <p className="detail-label">Date</p>
+                    <strong>{formatDate(selectedGig.date)}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Fee</p>
+                    <strong>{formatCurrency(selectedGig.fee)}</strong>
+                  </article>
+                  <article>
+                    <p className="detail-label">Status</p>
+                    <strong data-testid="selected-gig-status">{formatGigStatus(selectedGig.status)}</strong>
+                  </article>
+                </div>
                 <article className="full-width">
                   <p className="detail-label">Location</p>
                   <strong>{selectedGig.venue}</strong>

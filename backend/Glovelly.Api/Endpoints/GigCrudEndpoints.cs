@@ -239,6 +239,7 @@ internal static class GigCrudEndpoints
             gig.PassengerCount = request.PassengerCount;
             gig.Notes = request.Notes?.Trim();
             gig.WasDriving = request.WasDriving;
+            gig.Type = request.Type;
             gig.Status = request.Status;
             gig.InvoicedAt = EndpointSupport.ResolveInvoicedAt(
                 requestedInvoiceId,

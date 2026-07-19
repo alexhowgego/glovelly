@@ -20,6 +20,9 @@ internal sealed class GigConfiguration : IEntityTypeConfiguration<Gig>
         entity.Property(gig => gig.PassengerCount);
         entity.Property(gig => gig.Notes)
             .HasMaxLength(4000);
+        entity.Property(gig => gig.Type)
+            .HasConversion<string>()
+            .HasMaxLength(50);
         entity.Property(gig => gig.Status)
             .HasConversion<string>()
             .HasMaxLength(50);

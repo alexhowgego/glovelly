@@ -19,6 +19,7 @@ public sealed class Gig
     public int? PassengerCount { get; set; }
     public string? Notes { get; set; }
     public bool WasDriving { get; set; }
+    public GigType Type { get; set; } = GigType.Performance;
     public GigStatus Status { get; set; } = GigStatus.Draft;
     public DateTimeOffset? InvoicedAt { get; set; }
     public bool IsInvoiced => InvoiceId.HasValue;

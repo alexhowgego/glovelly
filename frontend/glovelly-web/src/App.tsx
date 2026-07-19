@@ -204,6 +204,7 @@ function App({ appMetadata }: AppProps) {
     gigForm,
     gigMode,
     gigQuickFilter,
+    gigTypeFilter,
     gigSearchQuery,
     gigSort,
     gigStatus,
@@ -234,6 +235,7 @@ function App({ appMetadata }: AppProps) {
     selectGig,
     setGigs,
     setGigQuickFilter,
+    setGigTypeFilter,
     setGigSearchQuery,
     setGigSort,
     setGigStatus,
@@ -385,6 +387,7 @@ function App({ appMetadata }: AppProps) {
           title: gig.title,
           date: gig.date,
           venue: gig.venue,
+          type: gig.type,
           status: gig.status,
           daysFromToday,
           isSelected: false,
@@ -1693,6 +1696,7 @@ function App({ appMetadata }: AppProps) {
         isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
         gigQuickFilter={gigQuickFilter}
+        gigTypeFilter={gigTypeFilter}
         gigSearchQuery={gigSearchQuery}
         gigSort={gigSort}
         gigStatus={gigStatus}
@@ -1720,6 +1724,7 @@ function App({ appMetadata }: AppProps) {
         onDeleteExpenseAttachment={deleteExpenseAttachment}
         onResetForm={startGigCreate}
         onQuickFilterChange={setGigQuickFilter}
+        onGigTypeFilterChange={setGigTypeFilter}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={selectGig}
         onSortChange={setGigSort}

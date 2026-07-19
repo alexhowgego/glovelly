@@ -2,6 +2,7 @@ import type {
   GigExpense,
   GigExpenseForm,
   GigStatus,
+  GigType,
   InvoiceStatus,
 } from './types'
 
@@ -89,6 +90,10 @@ export function toGigExpenseForm(expense: GigExpense): GigExpenseForm {
 
 export function formatGigStatus(status: GigStatus) {
   return status === 'Confirmed' ? 'Planned' : status
+}
+
+export function formatGigType(type: GigType) {
+  return type === 'Other' ? 'Other work' : type
 }
 
 export function getAllowedInvoiceStatusTransitions(status: InvoiceStatus) {

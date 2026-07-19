@@ -224,6 +224,10 @@ public sealed class GlovellyMcpQueryService(
         query = ApplyGigStatusFilter(query, request.Status);
         query = ApplyGigDateFilter(query, request.FromDate, request.ToDate);
         query = ApplyGigInvoicingFilter(query, forceUninvoiced ? "uninvoiced" : request.InvoicingState);
+        if (request.GigType.HasValue && Enum.IsDefined(request.GigType.Value))
+        {
+            query = query.Where(gig => gig.Type == request.GigType.Value);
+        }
 
         var gigs = await query
             .OrderBy(gig => gig.Date)
@@ -656,6 +660,7 @@ public sealed class GlovellyMcpQueryService(
             gig.ClientId,
             gig.Client?.Name ?? string.Empty,
             gig.Status.ToString().ToLowerInvariant(),
+            gig.Type.ToString(),
             gig.Fee,
             gig.IsInvoiced,
             gig.InvoiceId,
@@ -672,6 +677,7 @@ public sealed class GlovellyMcpQueryService(
             gig.ClientId,
             gig.Client?.Name ?? string.Empty,
             gig.Status.ToString().ToLowerInvariant(),
+            gig.Type.ToString(),
             gig.Fee,
             gig.TravelMiles,
             gig.PassengerCount,
@@ -954,6 +960,7 @@ public sealed class GlovellyMcpQueryService(
             AccommodationNotes = NormalizeForStorage(request.AccommodationNotes),
             TravelNotes = NormalizeForStorage(request.TravelNotes),
             SourceReference = NormalizeForStorage(request.SourceReference),
+            ProposedGigType = request.GigType ?? GigType.Performance,
             Confidence = request.Confidence ?? GigImportDraftConfidence.Medium,
             WarningsJson = JsonSerializer.Serialize(NormalizeWarnings(request.Warnings), JsonOptions),
             Status = GigImportDraftStatus.Pending,
@@ -979,6 +986,11 @@ public sealed class GlovellyMcpQueryService(
         ValidateLength(request.AccommodationNotes, "accommodationNotes", 4000, validationErrors);
         ValidateLength(request.TravelNotes, "travelNotes", 4000, validationErrors);
         ValidateLength(request.SourceReference, "sourceReference", 500, validationErrors);
+
+        if (request.GigType.HasValue && !Enum.IsDefined(request.GigType.Value))
+        {
+            validationErrors.Add("gigType is invalid.");
+        }
 
         if (request.Fee.HasValue && request.Fee.Value < 0)
         {
@@ -1047,6 +1059,7 @@ public sealed class GlovellyMcpQueryService(
             draft.AccommodationNotes,
             draft.TravelNotes,
             draft.SourceReference,
+            draft.ProposedGigType.ToString(),
             draft.Confidence.ToString().ToLowerInvariant(),
             ReadWarnings(draft.WarningsJson),
             draft.Status.ToString().ToLowerInvariant());

@@ -18,11 +18,11 @@ Use these journeys when a change may affect invoice creation, generated invoice 
 ### Steps
 
 1. Create a client or choose an existing client.
-2. Create a gig with fee, date, venue, status `Planned`, and at least one claimable expense.
+2. Create a gig with a type, fee, date, location, status `Planned`, and at least one claimable expense.
 3. Save the gig.
 4. Generate an invoice from that gig.
 5. Open the invoice.
-6. Confirm invoice lines include the performance fee and chargeable expenses.
+6. Confirm invoice lines include the type-appropriate fee description and chargeable expenses.
 7. Download the PDF.
 8. Return to the gig.
 9. Confirm the gig shows as invoiced and links back to the invoice.

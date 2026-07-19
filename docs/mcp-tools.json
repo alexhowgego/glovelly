@@ -130,7 +130,7 @@
       "title": "Get Contact"
     },
     {
-      "description": "List gigs by optional contact, status, date range, and invoicing state.",
+      "description": "List gigs by optional contact, status, type, date range, and invoicing state.",
       "inputSchema": {
         "properties": {
           "contactId": {
@@ -145,6 +145,18 @@
           "fromDate": {
             "description": "Inclusive start date in YYYY-MM-DD format.",
             "format": "date",
+            "type": "string"
+          },
+          "gigType": {
+            "description": "Nature of the musician work.",
+            "enum": [
+              "performance",
+              "teaching",
+              "rehearsal",
+              "recording",
+              "admin",
+              "other"
+            ],
             "type": "string"
           },
           "invoicingState": {
@@ -210,6 +222,18 @@
                 },
                 "gigId": {
                   "format": "uuid",
+                  "type": "string"
+                },
+                "gigType": {
+                  "description": "Nature of the musician work.",
+                  "enum": [
+                    "performance",
+                    "teaching",
+                    "rehearsal",
+                    "recording",
+                    "admin",
+                    "other"
+                  ],
                   "type": "string"
                 },
                 "invoiceId": {
@@ -359,6 +383,18 @@
               },
               "gigId": {
                 "format": "uuid",
+                "type": "string"
+              },
+              "gigType": {
+                "description": "Nature of the musician work.",
+                "enum": [
+                  "performance",
+                  "teaching",
+                  "rehearsal",
+                  "recording",
+                  "admin",
+                  "other"
+                ],
                 "type": "string"
               },
               "invoice": {
@@ -554,6 +590,18 @@
             "format": "date",
             "type": "string"
           },
+          "gigType": {
+            "description": "Nature of the musician work.",
+            "enum": [
+              "performance",
+              "teaching",
+              "rehearsal",
+              "recording",
+              "admin",
+              "other"
+            ],
+            "type": "string"
+          },
           "status": {
             "description": "Gig status filter. Use confirmed or planned for planned gigs.",
             "enum": [
@@ -608,6 +656,18 @@
                 },
                 "gigId": {
                   "format": "uuid",
+                  "type": "string"
+                },
+                "gigType": {
+                  "description": "Nature of the musician work.",
+                  "enum": [
+                    "performance",
+                    "teaching",
+                    "rehearsal",
+                    "recording",
+                    "admin",
+                    "other"
+                  ],
                   "type": "string"
                 },
                 "invoiceId": {
@@ -1650,6 +1710,18 @@
             "minimum": 0,
             "type": "number"
           },
+          "gigType": {
+            "description": "Nature of the proposed musician work.",
+            "enum": [
+              "performance",
+              "teaching",
+              "rehearsal",
+              "recording",
+              "admin",
+              "other"
+            ],
+            "type": "string"
+          },
           "notes": {
             "description": "General notes from the source.",
             "maxLength": 4000,
@@ -1799,6 +1871,18 @@
                 "description": "Proposed gig fee.",
                 "type": "number"
               },
+              "gigType": {
+                "description": "Nature of the proposed musician work.",
+                "enum": [
+                  "performance",
+                  "teaching",
+                  "rehearsal",
+                  "recording",
+                  "admin",
+                  "other"
+                ],
+                "type": "string"
+              },
               "notes": {
                 "type": "string"
               },
@@ -1946,6 +2030,18 @@
                   "description": "Proposed gig fee.",
                   "minimum": 0,
                   "type": "number"
+                },
+                "gigType": {
+                  "description": "Nature of the proposed musician work.",
+                  "enum": [
+                    "performance",
+                    "teaching",
+                    "rehearsal",
+                    "recording",
+                    "admin",
+                    "other"
+                  ],
+                  "type": "string"
                 },
                 "notes": {
                   "description": "General notes from the source.",
@@ -2111,6 +2207,18 @@
                     "fee": {
                       "description": "Proposed gig fee.",
                       "type": "number"
+                    },
+                    "gigType": {
+                      "description": "Nature of the proposed musician work.",
+                      "enum": [
+                        "performance",
+                        "teaching",
+                        "rehearsal",
+                        "recording",
+                        "admin",
+                        "other"
+                      ],
+                      "type": "string"
                     },
                     "notes": {
                       "type": "string"
@@ -2338,6 +2446,18 @@
                     "fee": {
                       "description": "Proposed gig fee.",
                       "type": "number"
+                    },
+                    "gigType": {
+                      "description": "Nature of the proposed musician work.",
+                      "enum": [
+                        "performance",
+                        "teaching",
+                        "rehearsal",
+                        "recording",
+                        "admin",
+                        "other"
+                      ],
+                      "type": "string"
                     },
                     "notes": {
                       "type": "string"

@@ -551,18 +551,7 @@ export function InvoicesSection({
                       return (
                         <div className="invoice-line-item" data-testid="invoice-line-item" key={line.id}>
                           <div className="invoice-line-content">
-                            {gigId ? (
-                              <button
-                                className="link-button invoice-line-link"
-                                data-testid="invoice-line-link"
-                                onClick={() => onOpenGig(gigId)}
-                                type="button"
-                              >
-                                <span data-testid="invoice-line-description">{line.description}</span>
-                              </button>
-                            ) : (
-                              <strong data-testid="invoice-line-description">{line.description}</strong>
-                            )}
+                            <strong data-testid="invoice-line-description">{line.description}</strong>
                             <span>
                               <span data-testid="invoice-line-type">{line.type}</span> · {line.quantity} x {formatCurrency(line.unitPrice)}
                             </span>
@@ -572,6 +561,16 @@ export function InvoicesSection({
                           </div>
                           <div className="invoice-line-end">
                             <strong>{formatCurrency(line.lineTotal)}</strong>
+                            {gigId ? (
+                              <button
+                                className="link-button invoice-line-link"
+                                data-testid="invoice-line-link"
+                                onClick={() => onOpenGig(gigId)}
+                                type="button"
+                              >
+                                View gig
+                              </button>
+                            ) : null}
                             {line.type === 'ManualAdjustment' ? (
                               <button
                                 aria-label={`Remove adjustment ${line.description}`}

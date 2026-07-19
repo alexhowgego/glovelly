@@ -27,6 +27,7 @@
 - Set lists
 - Richer financial reporting
 - More automation around tax prep
+- Invoice-native editing for draft line items, including clear regeneration behavior for generated lines
 
 ## Not Yet
 - AI chat agent

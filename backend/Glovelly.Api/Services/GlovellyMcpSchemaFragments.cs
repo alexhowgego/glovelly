@@ -24,6 +24,7 @@ public static class GlovellyMcpSchemaFragments
         ["invoicingState"] = McpSchema.Enum(
             ["all", "invoiced", "uninvoiced"],
             "Whether to return invoiced gigs, uninvoiced gigs, or all gigs."),
+        ["gigType"] = McpSchema.Enum<GigType>("Nature of the musician work."),
     };
 
     public static object Confidence => McpSchema.Enum<GigImportDraftConfidence>(

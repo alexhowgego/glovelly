@@ -139,6 +139,19 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public void McpToolCatalog_ExposesGigTypeForGigQueriesAndImportDrafts()
+    {
+        var listGigs = GlovellyMcpToolCatalog.Tools.Single(tool => tool.Name == "glovelly_list_gigs");
+        var listUninvoiced = GlovellyMcpToolCatalog.Tools.Single(tool => tool.Name == "glovelly_list_uninvoiced_gigs");
+        var addDraft = GlovellyMcpToolCatalog.Tools.Single(tool => tool.Name == "glovelly_add_gig_import_draft");
+
+        Assert.Contains("gigType", JsonSerializer.Serialize(listGigs.InputSchema));
+        Assert.Contains("gigType", JsonSerializer.Serialize(listUninvoiced.InputSchema));
+        Assert.Contains("gigType", JsonSerializer.Serialize(addDraft.InputSchema));
+        Assert.Contains("gigType", JsonSerializer.Serialize(addDraft.OutputSchema));
+    }
+
+    [Fact]
     public async Task OptionsMcp_ReturnsChatGptCompatibleCorsHeaders()
     {
         using var request = new HttpRequestMessage(HttpMethod.Options, "/mcp");
