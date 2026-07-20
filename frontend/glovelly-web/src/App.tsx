@@ -954,7 +954,10 @@ function App({ appMetadata }: AppProps) {
   }
 
   const openInvoiceLineGig = (gigId: string) => {
-    setSelectedGigId(gigId)
+    if (!selectGig(gigId)) {
+      return
+    }
+
     setSelectedGigIds([])
     setGigSearchQuery('')
     closeInvoiceEditor()
@@ -1455,7 +1458,10 @@ function App({ appMetadata }: AppProps) {
       return
     }
 
-    setSelectedGigId(nextDashboardGig.id)
+    if (!selectGig(nextDashboardGig.id)) {
+      return
+    }
+
     setSelectedGigIds([])
     setGigSearchQuery('')
     setActiveSection('gigs')
@@ -1466,7 +1472,10 @@ function App({ appMetadata }: AppProps) {
       return
     }
 
-    setSelectedGigId(dashboardInvoiceCandidate.id)
+    if (!selectGig(dashboardInvoiceCandidate.id)) {
+      return
+    }
+
     setSelectedGigIds([])
     setGigSearchQuery('')
     setActiveSection('gigs')

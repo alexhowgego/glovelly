@@ -742,12 +742,12 @@ export function useGigsWorkspace({
 
   const selectGig = (gigId: string) => {
     if (gigId === selectedGig?.id) {
-      return
+      return true
     }
 
     const nextGig = gigsById.get(gigId)
     if (!nextGig) {
-      return
+      return false
     }
 
     if (isGigEditorOpen) {
@@ -755,7 +755,7 @@ export function useGigsWorkspace({
         hasUnsavedGigEditorChanges() &&
         !window.confirm('Discard unsaved gig changes and edit the selected gig?')
       ) {
-        return
+        return false
       }
 
       setGigMode('edit')
@@ -766,6 +766,7 @@ export function useGigsWorkspace({
     cancelExternalResourceEdit()
 
     setSelectedGigId(gigId)
+    return true
   }
 
   const closeGigEditor = () => {
