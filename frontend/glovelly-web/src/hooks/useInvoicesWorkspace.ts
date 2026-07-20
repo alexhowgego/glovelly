@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import {
   buildApiUrl,
   downloadResponseBlob,
@@ -48,6 +48,7 @@ export function useInvoicesWorkspace({
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
   const [adjustmentAmount, setAdjustmentAmount] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
+  const [invoiceDescription, setInvoiceDescription] = useState('')
   const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery)
 
   const invoicesById = useMemo(
@@ -166,6 +167,10 @@ export function useInvoicesWorkspace({
     ? invoicesById.get(selectedInvoiceId) ?? null
     : filteredInvoices[0] ?? null
 
+  useEffect(() => {
+    setInvoiceDescription(selectedInvoice?.description ?? '')
+  }, [selectedInvoice?.description, selectedInvoice?.id])
+
   const applyInvoices = useCallback((nextInvoices: Invoice[]) => {
     setInvoices(nextInvoices)
     setSelectedInvoiceId(nextInvoices[0]?.id ?? '')
@@ -183,6 +188,7 @@ export function useInvoicesWorkspace({
     setIsInvoiceLoading(false)
     setAdjustmentAmount('')
     setAdjustmentReason('')
+    setInvoiceDescription('')
   }, [])
 
   const startInvoiceEdit = () => {
@@ -195,8 +201,10 @@ export function useInvoicesWorkspace({
 
   const closeInvoiceEditor = () => {
     if (
-      (adjustmentAmount.trim().length > 0 || adjustmentReason.trim().length > 0) &&
-      !window.confirm('Discard unsaved invoice adjustment and close line items?')
+      (adjustmentAmount.trim().length > 0 ||
+        adjustmentReason.trim().length > 0 ||
+        invoiceDescription !== (selectedInvoice?.description ?? '')) &&
+      !window.confirm('Discard unsaved invoice changes and close line items?')
     ) {
       return
     }
@@ -204,6 +212,7 @@ export function useInvoicesWorkspace({
     setIsInvoiceEditorOpen(false)
     setAdjustmentAmount('')
     setAdjustmentReason('')
+    setInvoiceDescription(selectedInvoice?.description ?? '')
   }
 
   const handleDownloadInvoicePdf = async (invoice: Invoice) => {
@@ -485,6 +494,40 @@ export function useInvoicesWorkspace({
     }
   }
 
+  const handleInvoiceDescriptionSave = async (invoice: Invoice) => {
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Saving description for ${invoice.invoiceNumber}...`)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/description`),
+        jsonRequestInit('PUT', { description: invoiceDescription })
+      )
+
+      if (!response.ok) {
+        const problem = await parseProblemDetails(response)
+        const descriptionError = problem?.errors?.description?.[0]
+        const statusError = problem?.errors?.status?.[0]
+        throw new Error(
+          descriptionError ??
+            statusError ??
+            getProblemDetailsMessage(problem, 'Unable to save invoice description.')
+        )
+      }
+
+      const updatedInvoice = (await response.json()) as Invoice
+      setInvoices((current) =>
+        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
+      )
+      setInvoiceDescription(updatedInvoice.description ?? '')
+      setInvoiceStatus(`Description saved for ${updatedInvoice.invoiceNumber}. Redraft the invoice to update its PDF.`)
+    } catch (error) {
+      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to save invoice description.')
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
   const handleDeleteInvoiceAdjustment = async (invoice: Invoice, line: InvoiceLine) => {
     if (line.type !== 'ManualAdjustment') {
       setInvoiceStatus('Only manual adjustments can be removed from here.')
@@ -571,6 +614,7 @@ export function useInvoicesWorkspace({
   return {
     adjustmentAmount,
     adjustmentReason,
+    invoiceDescription,
     applyInvoices,
     closeInvoiceEditor,
     draftInvoiceCount: invoices.filter((invoice) => invoice.status === 'Draft').length,
@@ -581,6 +625,7 @@ export function useInvoicesWorkspace({
     handleDeleteInvoice,
     handleDownloadInvoicePdf,
     handleInvoiceReissue,
+    handleInvoiceDescriptionSave,
     handleInvoiceStatusChange,
     handlePublishInvoiceGoogleDrive,
     handleSendInvoiceEmail,
@@ -597,6 +642,7 @@ export function useInvoicesWorkspace({
     selectedInvoice,
     setAdjustmentAmount,
     setAdjustmentReason,
+    setInvoiceDescription,
     setInvoices,
     setInvoiceStatus,
     setIsInvoiceLoading,

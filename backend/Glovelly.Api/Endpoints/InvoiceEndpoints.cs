@@ -258,6 +258,41 @@ public static class InvoiceEndpoints
             return Results.Ok(invoice);
         });
 
+        group.MapPut("/{id:guid}/description", async (
+            Guid id,
+            InvoiceDescriptionUpdateRequest request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id);
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (invoice.Status is not InvoiceStatus.Draft)
+            {
+                return EndpointSupport.ValidationProblem("status", "Only Draft invoices can have their description changed.");
+            }
+
+            var description = request.Description?.Trim();
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                return EndpointSupport.ValidationProblem("description", "Invoice description is required.");
+            }
+
+            invoice.Description = description;
+            EndpointSupport.StampUpdate(invoice, userId);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(invoice);
+        });
+
         group.MapPost("/{id:guid}/reissue", async (
             Guid id,
             AppDbContext db,
@@ -464,5 +499,6 @@ public static class InvoiceEndpoints
     }
 
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
+    private sealed record InvoiceDescriptionUpdateRequest(string? Description);
     private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);
 }

@@ -2423,6 +2423,10 @@ button.compact-record-row.selected {
   justify-self: start;
 }
 
+.invoice-description-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 @media (max-width: 1380px) {
   .invoice-adjustment-form {
     grid-template-columns: 1fr;

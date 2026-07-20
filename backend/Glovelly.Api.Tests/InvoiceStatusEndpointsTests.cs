@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Glovelly.Api.Models;
 using Glovelly.Api.Tests.Infrastructure;
@@ -262,6 +263,76 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.False(updatedInvoice.TryGetProperty("pdfBlob", out _));
         Assert.Equal("application/pdf", updatedInvoice.GetProperty("pdfContentType").GetString());
         Assert.True(updatedInvoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
+    }
+
+    [Fact]
+    public async Task UpdateDescription_WhenDraft_PersistsTrimmedDescriptionAndRetainsItOnRedraft()
+    {
+        var createLineResponse = await _client.PostAsJsonAsync("/invoice-lines", new
+        {
+            invoiceId = TestData.RiversideInvoiceId,
+            sortOrder = 1,
+            type = InvoiceLineType.PerformanceFee,
+            description = "Headline performance",
+            quantity = 1m,
+            unitPrice = 200m,
+        }, TestContext.Current.CancellationToken);
+        createLineResponse.EnsureSuccessStatusCode();
+
+        var updateResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/description", new
+        {
+            description = "  June performance services  ",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updatedInvoice = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("June performance services", updatedInvoice.GetProperty("description").GetString());
+        Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("updatedByUserId").GetGuid());
+        Assert.Single(updatedInvoice.GetProperty("lines").EnumerateArray());
+
+        var redraftResponse = await _client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/redraft", null, TestContext.Current.CancellationToken);
+        redraftResponse.EnsureSuccessStatusCode();
+
+        var pdfResponse = await _client.GetAsync($"/invoices/{TestData.RiversideInvoiceId}/pdf", TestContext.Current.CancellationToken);
+        pdfResponse.EnsureSuccessStatusCode();
+        var pdfText = Encoding.ASCII.GetString(await pdfResponse.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("June performance services", pdfText);
+    }
+
+    [Fact]
+    public async Task UpdateDescription_WhenBlankOrInvoiceIsNotDraft_ReturnsValidationProblem()
+    {
+        var blankResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/description", new
+        {
+            description = "   ",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, blankResponse.StatusCode);
+        var blankProblem = await blankResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Invoice description is required.", blankProblem.GetProperty("errors").GetProperty("description")[0].GetString());
+
+        var issuedResponse = await _client.PutAsJsonAsync($"/invoices/{TestData.FoxInvoiceId}/description", new
+        {
+            description = "Updated description",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, issuedResponse.StatusCode);
+        var issuedProblem = await issuedResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Only Draft invoices can have their description changed.", issuedProblem.GetProperty("errors").GetProperty("status")[0].GetString());
+    }
+
+    [Fact]
+    public async Task UpdateDescription_WhenInvoiceIsNotVisible_ReturnsNotFound()
+    {
+        _client.DefaultRequestHeaders.Remove("X-Test-UserId");
+        _client.DefaultRequestHeaders.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
+
+        var response = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/description", new
+        {
+            description = "Not visible",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

@@ -191,6 +191,17 @@ The same invoice PDF can be previewed reactively from the invoice pane, download
 
 Expected result: redraft and re-issue update the PDF, preserve the expected invoice history rules, and show the latest PDF in the preview modal.
 
+### Draft Description Customization
+
+1. Open a draft invoice and open its Line items pane.
+2. Change the Description and save it.
+3. Confirm the invoice details show the saved description.
+4. Redraft the invoice and preview or download the PDF.
+5. Confirm the regenerated PDF uses the saved description.
+6. Open an issued invoice's Line items pane.
+
+Expected result: only draft invoices expose an editable Description and save action. Saving does not immediately regenerate the PDF; redrafting does. Non-draft invoice descriptions are read-only.
+
 ## Invoice Status And Delivery
 
 > **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoicePromptChoiceTests.IssuingLinkedDraftHonoursLinkedGigCompletionChoice` covers accepting and declining linked-gig completion after issuing; backend tests cover status and delivery rules, while configured email/Drive checks remain manual.

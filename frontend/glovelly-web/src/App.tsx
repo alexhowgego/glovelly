@@ -302,11 +302,13 @@ function App({ appMetadata }: AppProps) {
     handleDeleteInvoice,
     handleDownloadInvoicePdf,
     handleInvoiceReissue,
+    handleInvoiceDescriptionSave,
     handleInvoiceStatusChange,
     handlePublishInvoiceGoogleDrive,
     handleSendInvoiceEmail,
     invoices,
     invoiceQuickFilter,
+    invoiceDescription,
     invoiceSearchQuery,
     invoiceSort,
     invoiceStatus,
@@ -317,6 +319,7 @@ function App({ appMetadata }: AppProps) {
     selectedInvoice,
     setAdjustmentAmount,
     setAdjustmentReason,
+    setInvoiceDescription,
     setInvoices,
     setInvoiceStatus,
     setIsInvoiceLoading,
@@ -1752,6 +1755,7 @@ function App({ appMetadata }: AppProps) {
         filteredInvoices={filteredInvoices}
         isEditorOpen={isInvoiceEditorOpen}
         invoiceQuickFilter={invoiceQuickFilter}
+        invoiceDescription={invoiceDescription}
         invoiceSearchQuery={invoiceSearchQuery}
         invoiceSort={invoiceSort}
         invoiceStatus={invoiceStatus}
@@ -1770,6 +1774,8 @@ function App({ appMetadata }: AppProps) {
         onDeleteAdjustment={handleDeleteInvoiceAdjustment}
         onDeleteInvoice={handleDeleteInvoice}
         onDownloadPdf={handleDownloadInvoicePdf}
+        onInvoiceDescriptionChange={setInvoiceDescription}
+        onInvoiceDescriptionSave={handleInvoiceDescriptionSave}
         onInvoiceStatusChange={handleInvoiceStatusChangeWithGigPrompt}
         onOpenClient={openClientShortcut}
         onOpenGig={openInvoiceLineGig}
