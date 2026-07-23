@@ -27,7 +27,7 @@ public sealed class InvoiceLineGenerationService(
                 userId,
                 nextSortOrder++,
                 InvoiceLineType.PerformanceFee,
-                $"Performance fee for {gig.Title} ({gig.Date:yyyy-MM-dd})",
+                $"{FeePrefixFor(gig.Type)} for {gig.Title} ({gig.Date:yyyy-MM-dd})",
                 1m,
                 gig.Fee));
         }
@@ -87,6 +87,19 @@ public sealed class InvoiceLineGenerationService(
         }
 
         return lines;
+    }
+
+    private static string FeePrefixFor(GigType type)
+    {
+        return type switch
+        {
+            GigType.Performance => "Performance fee",
+            GigType.Teaching => "Teaching fee",
+            GigType.Rehearsal => "Rehearsal fee",
+            GigType.Recording => "Recording fee",
+            GigType.Admin => "Admin fee",
+            _ => "Fee",
+        };
     }
 
     public async Task<bool> RemoveSystemGeneratedInvoiceLinesForGigAsync(

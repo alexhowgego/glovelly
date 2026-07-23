@@ -20,6 +20,7 @@ import type {
 type InvoicesSectionProps = {
   adjustmentAmount: string
   adjustmentReason: string
+  invoiceDescription: string
   clientNamesById: ReadonlyMap<string, string>
   draftInvoiceCount: number
   filteredInvoices: Invoice[]
@@ -41,6 +42,8 @@ type InvoicesSectionProps = {
   onDeleteAdjustment: (invoice: Invoice, line: InvoiceLine) => Promise<void>
   onDeleteInvoice: (invoice: Invoice) => Promise<void>
   onDownloadPdf: (invoice: Invoice) => Promise<void>
+  onInvoiceDescriptionChange: (value: string) => void
+  onInvoiceDescriptionSave: (invoice: Invoice) => Promise<void>
   onInvoiceStatusChange: (invoice: Invoice, status: InvoiceStatus) => Promise<Invoice | null>
   onOpenClient: (clientId: string) => void
   onOpenGig: (gigId: string) => void
@@ -61,6 +64,7 @@ type InvoicesSectionProps = {
 export function InvoicesSection({
   adjustmentAmount,
   adjustmentReason,
+  invoiceDescription,
   clientNamesById,
   draftInvoiceCount,
   filteredInvoices,
@@ -82,6 +86,8 @@ export function InvoicesSection({
   onDeleteAdjustment,
   onDeleteInvoice,
   onDownloadPdf,
+  onInvoiceDescriptionChange,
+  onInvoiceDescriptionSave,
   onInvoiceStatusChange,
   onOpenClient,
   onOpenGig,
@@ -501,6 +507,39 @@ export function InvoicesSection({
             {selectedInvoice ? (
               <div className="invoice-line-editor-content">
                 <div className="gig-timeline-note">
+                  <p className="detail-label">Description</p>
+                  {selectedInvoice.status === 'Draft' ? (
+                    <form
+                      className="invoice-adjustment-form invoice-description-form"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        void onInvoiceDescriptionSave(selectedInvoice)
+                      }}
+                      >
+                      <label>
+                        <input
+                          aria-label="Description"
+                          data-testid="invoice-description-input"
+                          value={invoiceDescription}
+                          onChange={(event) => onInvoiceDescriptionChange(event.target.value)}
+                          disabled={isInvoiceLoading}
+                        />
+                      </label>
+                      <button
+                        className="ghost-button"
+                        data-testid="invoice-description-save-button"
+                        type="submit"
+                        disabled={isInvoiceLoading}
+                      >
+                        Save description
+                      </button>
+                    </form>
+                  ) : (
+                    <span>{selectedInvoice.description?.trim() || 'No description set.'}</span>
+                  )}
+                </div>
+
+                <div className="gig-timeline-note">
                   <p className="detail-label">Adjustments</p>
                   <span>
                     Add adjustments as separate line items so the invoice stays clear and easy to follow.
@@ -551,18 +590,7 @@ export function InvoicesSection({
                       return (
                         <div className="invoice-line-item" data-testid="invoice-line-item" key={line.id}>
                           <div className="invoice-line-content">
-                            {gigId ? (
-                              <button
-                                className="link-button invoice-line-link"
-                                data-testid="invoice-line-link"
-                                onClick={() => onOpenGig(gigId)}
-                                type="button"
-                              >
-                                <span data-testid="invoice-line-description">{line.description}</span>
-                              </button>
-                            ) : (
-                              <strong data-testid="invoice-line-description">{line.description}</strong>
-                            )}
+                            <strong data-testid="invoice-line-description">{line.description}</strong>
                             <span>
                               <span data-testid="invoice-line-type">{line.type}</span> · {line.quantity} x {formatCurrency(line.unitPrice)}
                             </span>
@@ -572,6 +600,16 @@ export function InvoicesSection({
                           </div>
                           <div className="invoice-line-end">
                             <strong>{formatCurrency(line.lineTotal)}</strong>
+                            {gigId ? (
+                              <button
+                                className="link-button invoice-line-link"
+                                data-testid="invoice-line-link"
+                                onClick={() => onOpenGig(gigId)}
+                                type="button"
+                              >
+                                View gig
+                              </button>
+                            ) : null}
                             {line.type === 'ManualAdjustment' ? (
                               <button
                                 aria-label={`Remove adjustment ${line.description}`}

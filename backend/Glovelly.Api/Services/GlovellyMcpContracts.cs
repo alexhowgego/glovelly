@@ -44,7 +44,7 @@ public sealed record InvoiceLineDetail(Guid InvoiceLineId, string Description, d
 public sealed record ReceiptListRequest(DateOnly? FromDate, DateOnly? ToDate, string? Status);
 public sealed record ReceiptListResult(IReadOnlyList<ReceiptSummary> Receipts, int ReceiptCount, int UnmatchedReceiptCount, decimal TotalAmount, string Currency);
 public sealed record ReceiptSummary(Guid ReceiptId, Guid GigId, string GigTitle, DateOnly ReceiptDate, Guid? ContactId, string? ContactName, string Description, decimal Amount, string Status, int AttachmentCount, IReadOnlyList<string> AttachmentFileNames, string Currency);
-public sealed record GigListRequest(Guid? ContactId, string? ContactQuery, string? Status, DateOnly? FromDate, DateOnly? ToDate, string? InvoicingState);
+public sealed record GigListRequest(Guid? ContactId, string? ContactQuery, string? Status, DateOnly? FromDate, DateOnly? ToDate, string? InvoicingState, GigType? GigType);
 public sealed record GigListResult(bool Ambiguous, string? Message, IReadOnlyList<ContactMatch> Matches, IReadOnlyList<GigSummary> Gigs, decimal TotalFees, string Currency)
 {
     public static GigListResult Success(IReadOnlyList<GigSummary> gigs, decimal totalFees, string currency)
@@ -58,7 +58,7 @@ public sealed record GigListResult(bool Ambiguous, string? Message, IReadOnlyLis
     }
 }
 public sealed record GigGetResult(bool Found, GigDetail? Gig);
-public sealed record GigSummary(Guid GigId, string Title, DateOnly Date, string Venue, Guid ContactId, string ContactName, string Status, decimal Fee, bool IsInvoiced, Guid? InvoiceId, string Currency);
+public sealed record GigSummary(Guid GigId, string Title, DateOnly Date, string Venue, Guid ContactId, string ContactName, string Status, string GigType, decimal Fee, bool IsInvoiced, Guid? InvoiceId, string Currency);
 public sealed record GigDetail(
     Guid GigId,
     string Title,
@@ -67,6 +67,7 @@ public sealed record GigDetail(
     Guid ContactId,
     string ContactName,
     string Status,
+    string GigType,
     decimal Fee,
     decimal TravelMiles,
     int? PassengerCount,
@@ -129,6 +130,7 @@ public sealed record GigImportDraftAddRequest(
     string? AccommodationNotes,
     string? TravelNotes,
     string? SourceReference,
+    GigType? GigType,
     GigImportDraftConfidence? Confidence,
     IReadOnlyList<string>? Warnings);
 public sealed record GigImportDraftAddResult(bool BatchFound, bool Created, int Index, IReadOnlyList<string> ValidationErrors, IReadOnlyList<ContactMatch> ContactMatches, GigImportDraftDetail? Draft);
@@ -156,6 +158,7 @@ public sealed record GigImportDraftDetail(
     string? AccommodationNotes,
     string? TravelNotes,
     string? SourceReference,
+    string GigType,
     string Confidence,
     IReadOnlyList<string> Warnings,
     string Status);

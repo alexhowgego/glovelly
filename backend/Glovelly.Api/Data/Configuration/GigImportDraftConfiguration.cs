@@ -37,6 +37,9 @@ internal sealed class GigImportDraftConfiguration : IEntityTypeConfiguration<Gig
             .HasMaxLength(4000);
         entity.Property(draft => draft.SourceReference)
             .HasMaxLength(500);
+        entity.Property(draft => draft.ProposedGigType)
+            .HasConversion<string>()
+            .HasMaxLength(50);
         entity.Property(draft => draft.Confidence)
             .HasConversion<string>()
             .HasMaxLength(50);

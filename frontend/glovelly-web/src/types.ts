@@ -204,6 +204,7 @@ export type SellerProfileForm = {
 }
 
 export type GigStatus = 'Draft' | 'Confirmed' | 'Completed' | 'Cancelled'
+export type GigType = 'Performance' | 'Teaching' | 'Rehearsal' | 'Recording' | 'Admin' | 'Other'
 export type GigExternalResourceType =
   | 'GoogleSheet'
   | 'GoogleDoc'
@@ -438,6 +439,7 @@ export type Gig = {
   passengerCount: number | null
   notes: string | null
   wasDriving: boolean
+  type: GigType
   status: GigStatus
   invoicedAt: string | null
   isInvoiced: boolean
@@ -497,6 +499,7 @@ export type GigImportDraft = {
   accommodationNotes: string | null
   travelNotes: string | null
   sourceReference: string | null
+  gigType: GigType
   confidence: GigImportDraftConfidence
   warnings: string[]
   status: GigImportDraftStatus
@@ -516,7 +519,7 @@ export type GigImportCommitResult = {
 
 export type QuickGigCandidate = Pick<
   Gig,
-  'id' | 'clientId' | 'title' | 'date' | 'venue' | 'status'
+  'id' | 'clientId' | 'title' | 'date' | 'venue' | 'type' | 'status'
 > & {
   daysFromToday: number
   isSelected: boolean
@@ -626,6 +629,7 @@ export type GigForm = {
   passengerCount: string
   notes: string
   wasDriving: boolean
+  type: GigType
   status: GigStatus
   expenses: GigExpenseForm[]
 }

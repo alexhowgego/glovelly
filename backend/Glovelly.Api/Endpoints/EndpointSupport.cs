@@ -212,6 +212,11 @@ internal static class EndpointSupport
             errors["travelMiles"] = ["Travel miles cannot be negative."];
         }
 
+        if (!Enum.IsDefined(gig.Type))
+        {
+            errors["type"] = ["Gig type is invalid."];
+        }
+
         if (!Enum.IsDefined(gig.Status))
         {
             errors["status"] = ["Status is invalid."];

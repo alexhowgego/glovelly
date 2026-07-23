@@ -31,6 +31,7 @@ import type {
   GigForm,
   GigQuickFilter,
   GigSort,
+  GigType,
   Invoice,
 } from '../types'
 import { useExpenseStatementWorkspace } from './useExpenseStatementWorkspace'
@@ -66,6 +67,7 @@ export function useGigsWorkspace({
   const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
   const [gigSearchQuery, setGigSearchQuery] = useState('')
   const [gigQuickFilter, setGigQuickFilter] = useState<GigQuickFilter>('all')
+  const [gigTypeFilter, setGigTypeFilter] = useState<GigType | 'all'>('all')
   const [gigSort, setGigSort] = useState<GigSort>({ key: 'priority', direction: 'asc' })
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
@@ -164,6 +166,9 @@ export function useGigsWorkspace({
       return left.id.localeCompare(right.id)
     })
     const quickFilteredGigs = sortedGigs.filter((gig) => {
+      if (gigTypeFilter !== 'all' && gig.type !== gigTypeFilter) {
+        return false
+      }
       switch (gigQuickFilter) {
         case 'completed':
           return gig.status === 'Completed'
@@ -186,12 +191,12 @@ export function useGigsWorkspace({
     return quickFilteredGigs.filter((gig) => {
       const clientName = clientNamesById.get(gig.clientId) ?? ''
 
-      return [gig.title, gig.venue, gig.date, gig.status, clientName]
+      return [gig.title, gig.venue, gig.date, gig.status, gig.type, clientName]
         .join(' ')
         .toLowerCase()
         .includes(query)
     })
-  }, [clientNamesById, deferredGigSearchQuery, gigQuickFilter, gigSort, gigs])
+  }, [clientNamesById, deferredGigSearchQuery, gigQuickFilter, gigSort, gigTypeFilter, gigs])
 
   const selectedGig = gigsById.get(selectedGigId) ?? filteredGigs[0] ?? null
 
@@ -686,6 +691,7 @@ export function useGigsWorkspace({
           passengerCount: selectedGig.passengerCount,
           notes: selectedGig.notes,
           wasDriving: selectedGig.wasDriving,
+          type: selectedGig.type,
           status: selectedGig.status,
           invoiceId: null,
           expenses: includeExpenses
@@ -736,12 +742,12 @@ export function useGigsWorkspace({
 
   const selectGig = (gigId: string) => {
     if (gigId === selectedGig?.id) {
-      return
+      return true
     }
 
     const nextGig = gigsById.get(gigId)
     if (!nextGig) {
-      return
+      return false
     }
 
     if (isGigEditorOpen) {
@@ -749,7 +755,7 @@ export function useGigsWorkspace({
         hasUnsavedGigEditorChanges() &&
         !window.confirm('Discard unsaved gig changes and edit the selected gig?')
       ) {
-        return
+        return false
       }
 
       setGigMode('edit')
@@ -760,6 +766,7 @@ export function useGigsWorkspace({
     cancelExternalResourceEdit()
 
     setSelectedGigId(gigId)
+    return true
   }
 
   const closeGigEditor = () => {
@@ -1227,6 +1234,7 @@ export function useGigsWorkspace({
       wasDriving: gigForm.wasDriving,
       travelMiles: gigForm.travelMiles.trim(),
       passengerCount: gigForm.passengerCount.trim(),
+      type: gigForm.type,
       status: gigForm.status,
       expenses: expensesOverride ?? gigForm.expenses,
     }
@@ -1301,6 +1309,7 @@ export function useGigsWorkspace({
           fee,
           travelMiles,
           passengerCount: passengerCount === 0 ? null : passengerCount,
+          type: payload.type,
           notes: payload.notes || null,
           wasDriving: payload.wasDriving,
           status: payload.status,
@@ -1500,6 +1509,7 @@ export function useGigsWorkspace({
     gigForm,
     gigMode,
     gigQuickFilter,
+    gigTypeFilter,
     gigSearchQuery,
     gigSort,
     gigStatus,
@@ -1526,6 +1536,7 @@ export function useGigsWorkspace({
     selectGig,
     setGigs,
     setGigQuickFilter,
+    setGigTypeFilter,
     setGigSearchQuery,
     setGigSort,
     setGigStatus,

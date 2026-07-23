@@ -27,6 +27,7 @@ public sealed class GigImportDraft
     public string? AccommodationNotes { get; set; }
     public string? TravelNotes { get; set; }
     public string? SourceReference { get; set; }
+    public GigType ProposedGigType { get; set; } = GigType.Performance;
     public GigImportDraftConfidence Confidence { get; set; } = GigImportDraftConfidence.Medium;
     public string WarningsJson { get; set; } = "[]";
     public GigImportDraftStatus Status { get; set; } = GigImportDraftStatus.Pending;

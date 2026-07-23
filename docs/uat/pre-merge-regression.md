@@ -62,7 +62,7 @@ When changes touch Google Calendar, run the focused [Google Calendar](calendar.m
 
 ## Cross-Workspace Navigation Shortcuts
 
-> **Automation:** Automated UAT: `Glovelly.Uat.Tests.CrossWorkspaceNavigationTests.ClientAndInvoiceLineShortcutsOpenTargetsDespiteStaleFilters`
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.CrossWorkspaceNavigationTests.ClientAndInvoiceLineShortcutsOpenTargetsDespiteStaleFilters` and `InvoiceLineNavigationDoesNotReusePreviouslySavedGigEditorState`
 
 ### Steps
 
@@ -76,10 +76,12 @@ When changes touch Google Calendar, run the focused [Google Calendar](calendar.m
 8. Click a generated line-item title for a performance fee, mileage, passenger mileage, or expense line.
 9. Confirm the app opens Gigs with the corresponding gig selected.
 10. Confirm manual adjustment lines are not shown as gig links.
+11. For two gigs on one draft invoice, edit and regenerate the first gig, then use an invoice-line shortcut to open the second without refreshing the browser.
+12. Confirm the second gig editor shows only the second gig's saved fields and expenses before saving an intended second-gig change.
 
 ### Expected Results
 
-Cross-workspace shortcuts preserve the intended target record, clear stale search filters that would hide the target, and leave unrelated records unchanged.
+Cross-workspace shortcuts preserve the intended target record, clear stale search filters that would hide the target, hydrate an open gig editor from the target record, and leave unrelated records unchanged.
 
 ## Editor Navigation Regression Checks
 

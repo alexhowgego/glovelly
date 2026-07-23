@@ -36,6 +36,7 @@ export type GigImportDraftField =
   | 'accommodationNotes'
   | 'travelNotes'
   | 'sourceReference'
+  | 'gigType'
   | 'confidence'
   | 'status'
 
@@ -66,6 +67,7 @@ function toDraftPayload(draft: GigImportDraft) {
     accommodationNotes: draft.accommodationNotes || null,
     travelNotes: draft.travelNotes || null,
     sourceReference: draft.sourceReference || null,
+    gigType: draft.gigType,
     confidence: draft.confidence,
     warnings: draft.warnings,
     status: draft.status,

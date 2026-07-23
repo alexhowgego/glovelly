@@ -42,6 +42,7 @@ internal static class GigQuickCaptureSupport
                 gig.Title,
                 gig.Date,
                 gig.Venue,
+                gig.Type,
                 gig.Status,
                 Math.Abs(gig.Date.DayNumber - today.DayNumber)))
             .Where(candidate => candidate.DaysFromToday <= settings.AutoAttachWindowDays)
@@ -80,6 +81,7 @@ internal static class GigQuickCaptureSupport
             candidate.Title,
             candidate.Date,
             candidate.Venue,
+            candidate.Type,
             candidate.Status,
             candidate.DaysFromToday,
             IsSelected = candidate.Id == selectedGigId,
@@ -93,5 +95,6 @@ internal sealed record QuickGigCandidate(
     string Title,
     DateOnly Date,
     string Venue,
+    GigType Type,
     GigStatus Status,
     int DaysFromToday);

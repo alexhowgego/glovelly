@@ -47,7 +47,7 @@ public static class GlovellyMcpToolCatalog
         new(
             "glovelly_list_gigs",
             "List Gigs",
-            "List gigs by optional contact, status, date range, and invoicing state.",
+            "List gigs by optional contact, status, type, date range, and invoicing state.",
             McpSchema.Object(MergeProperties(
                 GlovellyMcpSchemaFragments.ContactSelector,
                 GlovellyMcpSchemaFragments.DateRange,
@@ -73,9 +73,10 @@ public static class GlovellyMcpToolCatalog
                 GlovellyMcpSchemaFragments.DateRange,
                 new Dictionary<string, object>
                 {
-                    ["status"] = McpSchema.Enum(
+                        ["status"] = McpSchema.Enum(
                         ["all", "draft", "confirmed", "planned", "completed", "cancelled", "canceled"],
-                        "Gig status filter. Use confirmed or planned for planned gigs."),
+                            "Gig status filter. Use confirmed or planned for planned gigs."),
+                    ["gigType"] = McpSchema.Enum<GigType>("Nature of the musician work."),
                 })),
             McpToolSafetyLevel.ReadOnly,
             OutputSchema: GigListOutputSchema()),
@@ -482,6 +483,7 @@ public static class GlovellyMcpToolCatalog
             contactId = UuidSchema(),
             contactName = new { type = "string" },
             status = McpSchema.Enum<GigStatus>("Gig lifecycle status."),
+            gigType = McpSchema.Enum<GigType>("Nature of the musician work."),
             fee = McpSchema.Money("Gig fee."),
             isInvoiced = new { type = "boolean" },
             invoiceId = UuidSchema(),
@@ -501,6 +503,7 @@ public static class GlovellyMcpToolCatalog
             contactId = UuidSchema(),
             contactName = new { type = "string" },
             status = McpSchema.Enum<GigStatus>("Gig lifecycle status."),
+            gigType = McpSchema.Enum<GigType>("Nature of the musician work."),
             fee = McpSchema.Money("Gig fee."),
             travelMiles = new { type = "number" },
             passengerCount = new { type = "integer" },
@@ -786,6 +789,7 @@ public static class GlovellyMcpToolCatalog
             accommodationNotes = new { type = "string" },
             travelNotes = new { type = "string" },
             sourceReference = new { type = "string" },
+            gigType = McpSchema.Enum<GigType>("Nature of the proposed musician work."),
             confidence = GlovellyMcpSchemaFragments.Confidence,
             warnings = StringArraySchema(),
             status = McpSchema.Enum<GigImportDraftStatus>("Draft review status."),
@@ -861,6 +865,7 @@ public static class GlovellyMcpToolCatalog
             ["accommodationNotes"] = McpSchema.String("Accommodation details or uncertainty.", maxLength: 4000),
             ["travelNotes"] = McpSchema.String("Travel details or uncertainty.", maxLength: 4000),
             ["sourceReference"] = McpSchema.String("Optional reference to the source row, page, message, or attachment.", maxLength: 500),
+            ["gigType"] = McpSchema.Enum<GigType>("Nature of the proposed musician work."),
             ["confidence"] = GlovellyMcpSchemaFragments.Confidence,
             ["warnings"] = StringArraySchema(),
         };

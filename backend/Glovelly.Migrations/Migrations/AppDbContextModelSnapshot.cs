@@ -385,6 +385,11 @@ namespace Glovelly.Migrations.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid?>("UpdatedByUserId")
                         .HasColumnType("uuid");
 
@@ -704,6 +709,11 @@ namespace Glovelly.Migrations.Migrations
                     b.Property<decimal?>("ProposedFee")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ProposedGigType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("ProposedNotes")
                         .HasMaxLength(4000)

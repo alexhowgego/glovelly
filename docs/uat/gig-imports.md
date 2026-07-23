@@ -50,7 +50,7 @@ The import review modal opens from the profile menu. Imported gigs are not a pri
 ### Steps
 
 1. Select the staged batch in the modal.
-2. Edit a missing or incorrect field, such as client, title, date, venue, fee, or source reference.
+2. Edit a missing or incorrect field, such as client, title, type, date, location, fee, or source reference.
 3. Wait briefly without clicking a save button.
 4. Close and reopen the import modal, or select another batch and return.
 5. Accept at least one valid row.
@@ -93,7 +93,7 @@ Duplicate rows show warning text in the review modal. Editing date, title, clien
 
 ### Expected Results
 
-Accepted rows become real gigs with source import linkage. Rejected rows are deleted from the import on commit. Pending rows remain staged. Previously rejected rows should not reappear or jump back into the review list on later passes.
+Accepted rows become real gigs with source import linkage and the reviewed gig type. Rejected rows are deleted from the import on commit. Pending rows remain staged. Previously rejected rows should not reappear or jump back into the review list on later passes.
 
 ## Validation And Multi-Pass Review
 

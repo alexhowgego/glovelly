@@ -18,11 +18,11 @@ Use these journeys when a change may affect invoice creation, generated invoice 
 ### Steps
 
 1. Create a client or choose an existing client.
-2. Create a gig with fee, date, venue, status `Planned`, and at least one claimable expense.
+2. Create a gig with a type, fee, date, location, status `Planned`, and at least one claimable expense.
 3. Save the gig.
 4. Generate an invoice from that gig.
 5. Open the invoice.
-6. Confirm invoice lines include the performance fee and chargeable expenses.
+6. Confirm invoice lines include the type-appropriate fee description and chargeable expenses.
 7. Download the PDF.
 8. Return to the gig.
 9. Confirm the gig shows as invoiced and links back to the invoice.
@@ -190,6 +190,17 @@ The same invoice PDF can be previewed reactively from the invoice pane, download
 4. Confirm the regenerated PDF preview modal opens after re-issue.
 
 Expected result: redraft and re-issue update the PDF, preserve the expected invoice history rules, and show the latest PDF in the preview modal.
+
+### Draft Description Customization
+
+1. Open a draft invoice and open its Line items pane.
+2. Change the Description and save it.
+3. Confirm the invoice details show the saved description.
+4. Redraft the invoice and preview or download the PDF.
+5. Confirm the regenerated PDF uses the saved description.
+6. Open an issued invoice's Line items pane.
+
+Expected result: only draft invoices expose an editable Description and save action. Saving does not immediately regenerate the PDF; redrafting does. Non-draft invoice descriptions are read-only.
 
 ## Invoice Status And Delivery
 

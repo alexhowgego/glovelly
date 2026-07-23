@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate } from '../formatters'
+import { formatCurrency, formatDate, formatGigType } from '../formatters'
 import type { Client, GigImportBatchDetail, GigImportBatchSummary, GigImportDraft } from '../types'
 import type { GigImportDraftField } from '../hooks/useGigImportsWorkspace'
 
@@ -149,7 +149,7 @@ export function GigImportsModal({
                       <div>
                         <strong>{draft.title || draft.projectName || 'Untitled row'}</strong>
                         <span>
-                          {draft.date ? formatDate(draft.date) : 'Missing date'} · {draft.venueName || draft.venueAddress || 'Missing venue'}
+                          {formatGigType(draft.gigType)} · {draft.date ? formatDate(draft.date) : 'Missing date'} · {draft.venueName || draft.venueAddress || 'Missing location'}
                         </span>
                       </div>
                       <span className={`status-pill confidence-${draft.confidence.toLowerCase()}`}>
@@ -222,6 +222,24 @@ export function GigImportsModal({
                         />
                       </label>
                       <label>
+                        <span>Type</span>
+                        <select
+                          data-testid="gig-import-draft-type-select"
+                          value={draft.gigType}
+                          disabled={isCommitted}
+                          onChange={(event) =>
+                            onUpdateDraftField(draft.draftId, 'gigType', event.target.value)
+                          }
+                        >
+                          <option value="Performance">Performance</option>
+                          <option value="Teaching">Teaching</option>
+                          <option value="Rehearsal">Rehearsal</option>
+                          <option value="Recording">Recording</option>
+                          <option value="Admin">Admin</option>
+                          <option value="Other">Other work</option>
+                        </select>
+                      </label>
+                      <label>
                         <span>Fee</span>
                         <input
                           data-testid="gig-import-draft-fee-input"
@@ -260,7 +278,7 @@ export function GigImportsModal({
                         </select>
                       </label>
                       <label className="full-width">
-                        <span>Venue</span>
+                        <span>Location</span>
                         <input
                           data-testid="gig-import-draft-venue-input"
                           value={draft.venueName ?? ''}

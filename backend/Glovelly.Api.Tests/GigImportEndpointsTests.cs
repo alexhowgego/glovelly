@@ -64,6 +64,7 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(new DateOnly(2026, 11, 28), gig.Date);
         Assert.Equal("Music Hall, Aberdeen, AB10 1AA", gig.Venue);
         Assert.Equal(250m, gig.Fee);
+        Assert.Equal(GigType.Performance, gig.Type);
         Assert.Equal(batchId, gig.SourceImportBatchId);
         Assert.Equal(draftId, gig.SourceImportDraftId);
         Assert.Equal(GigImportDraftStatus.Committed, draftStatus);

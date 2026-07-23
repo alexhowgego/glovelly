@@ -123,6 +123,15 @@ internal static class GigImportEndpoints
             draft.AccommodationNotes = Normalize(request.AccommodationNotes);
             draft.TravelNotes = Normalize(request.TravelNotes);
             draft.SourceReference = Normalize(request.SourceReference);
+            if (request.GigType.HasValue)
+            {
+                if (!Enum.IsDefined(request.GigType.Value))
+                {
+                    return EndpointSupport.ValidationProblem("gigType", "Gig type is invalid.");
+                }
+
+                draft.ProposedGigType = request.GigType.Value;
+            }
             draft.Confidence = request.Confidence ?? draft.Confidence;
             draft.WarningsJson = JsonSerializer.Serialize(
                 PersistedWarnings(request.Warnings ?? ReadWarnings(draft.WarningsJson)),
@@ -365,6 +374,7 @@ internal static class GigImportEndpoints
             PassengerCount = null,
             Notes = BuildNotes(draft),
             WasDriving = false,
+            Type = draft.ProposedGigType,
             Status = GigStatus.Confirmed,
             SourceImportBatchId = batch.Id,
             SourceImportDraftId = draft.Id,
@@ -508,6 +518,7 @@ internal static class GigImportEndpoints
             draft.AccommodationNotes,
             draft.TravelNotes,
             draft.SourceReference,
+            draft.ProposedGigType.ToString(),
             draft.Confidence.ToString(),
             warnings,
             draft.Status.ToString(),
@@ -614,6 +625,7 @@ public sealed record GigImportDraftUpdateRequest(
     string? AccommodationNotes,
     string? TravelNotes,
     string? SourceReference,
+    GigType? GigType,
     GigImportDraftConfidence? Confidence,
     IReadOnlyList<string>? Warnings,
     string? Status);
@@ -660,6 +672,7 @@ public sealed record GigImportDraftDetailDto(
     string? AccommodationNotes,
     string? TravelNotes,
     string? SourceReference,
+    string GigType,
     string Confidence,
     IReadOnlyList<string> Warnings,
     string Status,

@@ -1263,6 +1263,23 @@
   gap: 5px;
 }
 
+.gig-editor-metrics,
+.gig-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gig-detail-metrics article {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  border-radius: 20px;
+  padding: 18px;
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
+}
+
 .gig-editor-panel input,
 .gig-editor-panel select {
   min-height: 40px;
@@ -2406,6 +2423,10 @@ button.compact-record-row.selected {
   justify-self: start;
 }
 
+.invoice-description-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 @media (max-width: 1380px) {
   .invoice-adjustment-form {
     grid-template-columns: 1fr;
@@ -2892,6 +2913,12 @@ button:disabled {
   .gig-expense-item {
     grid-template-columns: 1fr;
   }
+
+  .gig-editor-metrics,
+  .gig-detail-metrics {
+    grid-template-columns: 1fr;
+  }
+
 
   .panel-heading {
     flex-direction: column;

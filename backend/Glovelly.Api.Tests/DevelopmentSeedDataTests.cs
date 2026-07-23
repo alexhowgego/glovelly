@@ -109,6 +109,27 @@ public sealed class DevelopmentSeedDataTests
             line.Quantity == gig.TravelMiles);
     }
 
+    [Fact]
+    public async Task SeedAsync_AdditionalDraftInvoiceLinesLinkToTheirGig()
+    {
+        await using var dbContext = CreateDbContext();
+        await DevelopmentDataSeeder.SeedAsync(
+            dbContext,
+            CreateSeedConfiguration(),
+            new InMemoryExpenseAttachmentStore());
+
+        var invoice = await dbContext.Invoices
+            .Include(value => value.Lines)
+            .SingleAsync(value => value.InvoiceNumber == "GLV-2026-006", TestContext.Current.CancellationToken);
+        var gig = await dbContext.Gigs
+            .SingleAsync(value => value.InvoiceId == invoice.Id, TestContext.Current.CancellationToken);
+
+        Assert.Equal(InvoiceStatus.Draft, invoice.Status);
+        Assert.All(invoice.Lines, line => Assert.Equal(gig.Id, line.GigId));
+        Assert.Contains(invoice.Lines, line =>
+            line.Type == InvoiceLineType.PerformanceFee && line.IsSystemGenerated);
+    }
+
     private static AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

@@ -182,7 +182,7 @@ Output schema:
 
 ## `glovelly_list_gigs`
 
-List gigs by optional contact, status, date range, and invoicing state.
+List gigs by optional contact, status, type, date range, and invoicing state.
 
 Title: List Gigs
 
@@ -194,6 +194,7 @@ Inputs:
 - `contactId` (optional): string (uuid). Exact Glovelly contact ID. Use this when a previous contact lookup returned an unambiguous match.
 - `contactQuery` (optional): string. Name or email text used to look up a contact when contactId is not known.
 - `fromDate` (optional): string (date). Inclusive start date in YYYY-MM-DD format.
+- `gigType` (optional): string = performance | teaching | rehearsal | recording | admin | other. Nature of the musician work.
 - `invoicingState` (optional): string = all | invoiced | uninvoiced. Whether to return invoiced gigs, uninvoiced gigs, or all gigs.
 - `status` (optional): string = all | draft | confirmed | planned | completed | cancelled | canceled. Gig status filter. Use confirmed or planned for planned gigs.
 - `toDate` (optional): string (date). Inclusive end date in YYYY-MM-DD format.
@@ -225,6 +226,18 @@ Input schema:
     "fromDate": {
       "description": "Inclusive start date in YYYY-MM-DD format.",
       "format": "date",
+      "type": "string"
+    },
+    "gigType": {
+      "description": "Nature of the musician work.",
+      "enum": [
+        "performance",
+        "teaching",
+        "rehearsal",
+        "recording",
+        "admin",
+        "other"
+      ],
       "type": "string"
     },
     "invoicingState": {
@@ -294,6 +307,18 @@ Output schema:
           },
           "gigId": {
             "format": "uuid",
+            "type": "string"
+          },
+          "gigType": {
+            "description": "Nature of the musician work.",
+            "enum": [
+              "performance",
+              "teaching",
+              "rehearsal",
+              "recording",
+              "admin",
+              "other"
+            ],
             "type": "string"
           },
           "invoiceId": {
@@ -467,6 +492,18 @@ Output schema:
         },
         "gigId": {
           "format": "uuid",
+          "type": "string"
+        },
+        "gigType": {
+          "description": "Nature of the musician work.",
+          "enum": [
+            "performance",
+            "teaching",
+            "rehearsal",
+            "recording",
+            "admin",
+            "other"
+          ],
           "type": "string"
         },
         "invoice": {
@@ -656,6 +693,7 @@ Inputs:
 - `contactId` (optional): string (uuid). Exact Glovelly contact ID. Use this when a previous contact lookup returned an unambiguous match.
 - `contactQuery` (optional): string. Name or email text used to look up a contact when contactId is not known.
 - `fromDate` (optional): string (date). Inclusive start date in YYYY-MM-DD format.
+- `gigType` (optional): string = performance | teaching | rehearsal | recording | admin | other. Nature of the musician work.
 - `status` (optional): string = all | draft | confirmed | planned | completed | cancelled | canceled. Gig status filter. Use confirmed or planned for planned gigs.
 - `toDate` (optional): string (date). Inclusive end date in YYYY-MM-DD format.
 
@@ -686,6 +724,18 @@ Input schema:
     "fromDate": {
       "description": "Inclusive start date in YYYY-MM-DD format.",
       "format": "date",
+      "type": "string"
+    },
+    "gigType": {
+      "description": "Nature of the musician work.",
+      "enum": [
+        "performance",
+        "teaching",
+        "rehearsal",
+        "recording",
+        "admin",
+        "other"
+      ],
       "type": "string"
     },
     "status": {
@@ -746,6 +796,18 @@ Output schema:
           },
           "gigId": {
             "format": "uuid",
+            "type": "string"
+          },
+          "gigType": {
+            "description": "Nature of the musician work.",
+            "enum": [
+              "performance",
+              "teaching",
+              "rehearsal",
+              "recording",
+              "admin",
+              "other"
+            ],
             "type": "string"
           },
           "invoiceId": {
@@ -1962,6 +2024,7 @@ Inputs:
 - `contactQuery` (optional): string. Name or email text to resolve the gig client/contact.
 - `date` (optional): string (date). ISO 8601 calendar date in YYYY-MM-DD format.
 - `fee` (optional): number. Proposed gig fee.
+- `gigType` (optional): string = performance | teaching | rehearsal | recording | admin | other. Nature of the proposed musician work.
 - `notes` (optional): string. General notes from the source.
 - `perDiem` (optional): number. Proposed per diem amount.
 - `postcode` (optional): string. Venue postcode.
@@ -2042,6 +2105,18 @@ Input schema:
       "description": "Proposed gig fee.",
       "minimum": 0,
       "type": "number"
+    },
+    "gigType": {
+      "description": "Nature of the proposed musician work.",
+      "enum": [
+        "performance",
+        "teaching",
+        "rehearsal",
+        "recording",
+        "admin",
+        "other"
+      ],
+      "type": "string"
     },
     "notes": {
       "description": "General notes from the source.",
@@ -2195,6 +2270,18 @@ Output schema:
         "fee": {
           "description": "Proposed gig fee.",
           "type": "number"
+        },
+        "gigType": {
+          "description": "Nature of the proposed musician work.",
+          "enum": [
+            "performance",
+            "teaching",
+            "rehearsal",
+            "recording",
+            "admin",
+            "other"
+          ],
+          "type": "string"
         },
         "notes": {
           "type": "string"
@@ -2372,6 +2459,18 @@ Input schema:
             "minimum": 0,
             "type": "number"
           },
+          "gigType": {
+            "description": "Nature of the proposed musician work.",
+            "enum": [
+              "performance",
+              "teaching",
+              "rehearsal",
+              "recording",
+              "admin",
+              "other"
+            ],
+            "type": "string"
+          },
           "notes": {
             "description": "General notes from the source.",
             "maxLength": 4000,
@@ -2540,6 +2639,18 @@ Output schema:
               "fee": {
                 "description": "Proposed gig fee.",
                 "type": "number"
+              },
+              "gigType": {
+                "description": "Nature of the proposed musician work.",
+                "enum": [
+                  "performance",
+                  "teaching",
+                  "rehearsal",
+                  "recording",
+                  "admin",
+                  "other"
+                ],
+                "type": "string"
               },
               "notes": {
                 "type": "string"
@@ -2814,6 +2925,18 @@ Output schema:
               "fee": {
                 "description": "Proposed gig fee.",
                 "type": "number"
+              },
+              "gigType": {
+                "description": "Nature of the proposed musician work.",
+                "enum": [
+                  "performance",
+                  "teaching",
+                  "rehearsal",
+                  "recording",
+                  "admin",
+                  "other"
+                ],
+                "type": "string"
               },
               "notes": {
                 "type": "string"

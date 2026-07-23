@@ -647,6 +647,7 @@ public static class DevelopmentDataSeeder
                     Description = $"Performance fee for {lineSubjects[index]}",
                     Quantity = 1m,
                     UnitPrice = 350m + (index * 35m),
+                    GigId = DevelopmentGuid(4000 + index),
                     IsSystemGenerated = true,
                     CreatedByUserId = seededAdminUserId,
                     CreatedUtc = SeededCreatedUtc.AddDays(index)
@@ -660,6 +661,7 @@ public static class DevelopmentDataSeeder
                     Description = $"Mileage for {lineSubjects[index]}",
                     Quantity = 10m + index,
                     UnitPrice = 0.45m,
+                    GigId = DevelopmentGuid(4000 + index),
                     CalculationNotes = "Generated development data for large-list testing.",
                     IsSystemGenerated = true,
                     CreatedByUserId = seededAdminUserId,
@@ -722,7 +724,7 @@ public static class DevelopmentDataSeeder
             {
                 var status = statuses[index % statuses.Length];
                 var date = new DateOnly(2026, 4, 10).AddDays(index * 4);
-                var invoice = index % 4 == 0 ? additionalInvoices[index % additionalInvoices.Count] : null;
+                var invoice = index < additionalInvoices.Count ? additionalInvoices[index] : null;
 
                 return new Gig
                 {

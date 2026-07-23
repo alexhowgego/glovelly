@@ -43,6 +43,7 @@ export function toEditableGigForm(gig: Gig): GigForm {
     passengerCount: formatEditableNumber(gig.passengerCount),
     notes: gig.notes ?? '',
     wasDriving: gig.wasDriving,
+    type: gig.type,
     status: gig.status,
     expenses: toEditableGigExpenses(gig),
   }
@@ -87,6 +88,7 @@ export function hasInvoiceRelevantGigChanges(
     fee: string
     notes: string
     wasDriving: boolean
+    type: Gig['type']
     travelMiles: string
     passengerCount: string
     status: Gig['status']
@@ -105,7 +107,8 @@ export function hasInvoiceRelevantGigChanges(
     (gig.passengerCount ?? 0) !==
       (payload.passengerCount ? Number(payload.passengerCount) : 0) ||
     (gig.notes ?? '') !== (payload.notes || '') ||
-    gig.wasDriving !== payload.wasDriving
+    gig.wasDriving !== payload.wasDriving ||
+    gig.type !== payload.type
   ) {
     return true
   }

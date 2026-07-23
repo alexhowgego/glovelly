@@ -204,6 +204,7 @@ function App({ appMetadata }: AppProps) {
     gigForm,
     gigMode,
     gigQuickFilter,
+    gigTypeFilter,
     gigSearchQuery,
     gigSort,
     gigStatus,
@@ -234,6 +235,7 @@ function App({ appMetadata }: AppProps) {
     selectGig,
     setGigs,
     setGigQuickFilter,
+    setGigTypeFilter,
     setGigSearchQuery,
     setGigSort,
     setGigStatus,
@@ -300,11 +302,13 @@ function App({ appMetadata }: AppProps) {
     handleDeleteInvoice,
     handleDownloadInvoicePdf,
     handleInvoiceReissue,
+    handleInvoiceDescriptionSave,
     handleInvoiceStatusChange,
     handlePublishInvoiceGoogleDrive,
     handleSendInvoiceEmail,
     invoices,
     invoiceQuickFilter,
+    invoiceDescription,
     invoiceSearchQuery,
     invoiceSort,
     invoiceStatus,
@@ -315,6 +319,7 @@ function App({ appMetadata }: AppProps) {
     selectedInvoice,
     setAdjustmentAmount,
     setAdjustmentReason,
+    setInvoiceDescription,
     setInvoices,
     setInvoiceStatus,
     setIsInvoiceLoading,
@@ -385,6 +390,7 @@ function App({ appMetadata }: AppProps) {
           title: gig.title,
           date: gig.date,
           venue: gig.venue,
+          type: gig.type,
           status: gig.status,
           daysFromToday,
           isSelected: false,
@@ -948,7 +954,10 @@ function App({ appMetadata }: AppProps) {
   }
 
   const openInvoiceLineGig = (gigId: string) => {
-    setSelectedGigId(gigId)
+    if (!selectGig(gigId)) {
+      return
+    }
+
     setSelectedGigIds([])
     setGigSearchQuery('')
     closeInvoiceEditor()
@@ -1449,7 +1458,10 @@ function App({ appMetadata }: AppProps) {
       return
     }
 
-    setSelectedGigId(nextDashboardGig.id)
+    if (!selectGig(nextDashboardGig.id)) {
+      return
+    }
+
     setSelectedGigIds([])
     setGigSearchQuery('')
     setActiveSection('gigs')
@@ -1460,7 +1472,10 @@ function App({ appMetadata }: AppProps) {
       return
     }
 
-    setSelectedGigId(dashboardInvoiceCandidate.id)
+    if (!selectGig(dashboardInvoiceCandidate.id)) {
+      return
+    }
+
     setSelectedGigIds([])
     setGigSearchQuery('')
     setActiveSection('gigs')
@@ -1693,6 +1708,7 @@ function App({ appMetadata }: AppProps) {
         isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
         gigQuickFilter={gigQuickFilter}
+        gigTypeFilter={gigTypeFilter}
         gigSearchQuery={gigSearchQuery}
         gigSort={gigSort}
         gigStatus={gigStatus}
@@ -1720,6 +1736,7 @@ function App({ appMetadata }: AppProps) {
         onDeleteExpenseAttachment={deleteExpenseAttachment}
         onResetForm={startGigCreate}
         onQuickFilterChange={setGigQuickFilter}
+        onGigTypeFilterChange={setGigTypeFilter}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={selectGig}
         onSortChange={setGigSort}
@@ -1747,6 +1764,7 @@ function App({ appMetadata }: AppProps) {
         filteredInvoices={filteredInvoices}
         isEditorOpen={isInvoiceEditorOpen}
         invoiceQuickFilter={invoiceQuickFilter}
+        invoiceDescription={invoiceDescription}
         invoiceSearchQuery={invoiceSearchQuery}
         invoiceSort={invoiceSort}
         invoiceStatus={invoiceStatus}
@@ -1765,6 +1783,8 @@ function App({ appMetadata }: AppProps) {
         onDeleteAdjustment={handleDeleteInvoiceAdjustment}
         onDeleteInvoice={handleDeleteInvoice}
         onDownloadPdf={handleDownloadInvoicePdf}
+        onInvoiceDescriptionChange={setInvoiceDescription}
+        onInvoiceDescriptionSave={handleInvoiceDescriptionSave}
         onInvoiceStatusChange={handleInvoiceStatusChangeWithGigPrompt}
         onOpenClient={openClientShortcut}
         onOpenGig={openInvoiceLineGig}

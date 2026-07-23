@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import type { Client, GigExpenseForm, GigForm, GigStatus } from '../types'
+import type { Client, GigExpenseForm, GigForm, GigStatus, GigType } from '../types'
 
 type GigEditorPanelProps = {
   clients: Client[]
@@ -65,14 +65,20 @@ export function GigEditorPanel({
         </label>
 
         <label>
-          <span>Date</span>
-          <input
-            data-testid="gig-date-input"
+          <span>Type</span>
+          <select
+            data-testid="gig-type-select"
             required
-            type="date"
-            value={gigForm.date}
-            onChange={(event) => onUpdateGigField('date', event.target.value)}
-          />
+            value={gigForm.type}
+            onChange={(event) => onUpdateGigField('type', event.target.value as GigType)}
+          >
+            <option value="Performance">Performance</option>
+            <option value="Teaching">Teaching</option>
+            <option value="Rehearsal">Rehearsal</option>
+            <option value="Recording">Recording</option>
+            <option value="Admin">Admin</option>
+            <option value="Other">Other work</option>
+          </select>
         </label>
 
         <label className="full-width">
@@ -87,7 +93,7 @@ export function GigEditorPanel({
         </label>
 
         <label className="full-width">
-          <span>Location / venue</span>
+          <span>Location</span>
           <input
             data-testid="gig-venue-input"
             required
@@ -97,33 +103,46 @@ export function GigEditorPanel({
           />
         </label>
 
-        <label>
-          <span>Fee</span>
-          <input
-            data-testid="gig-fee-input"
-            required
-            inputMode="decimal"
-            value={gigForm.fee}
-            onChange={(event) => onUpdateGigField('fee', event.target.value)}
-            placeholder="650"
-          />
-        </label>
+        <div className="gig-editor-metrics full-width">
+          <label>
+            <span>Date</span>
+            <input
+              data-testid="gig-date-input"
+              required
+              type="date"
+              value={gigForm.date}
+              onChange={(event) => onUpdateGigField('date', event.target.value)}
+            />
+          </label>
 
-        <label>
-          <span>Status</span>
-          <select
-            data-testid="gig-status-select"
-            value={gigForm.status}
-            onChange={(event) =>
-              onUpdateGigField('status', event.target.value as GigStatus)
-            }
-          >
-            <option value="Confirmed">Planned</option>
-            <option value="Completed">Completed</option>
-            <option value="Cancelled">Cancelled</option>
-            <option value="Draft">Draft</option>
-          </select>
-        </label>
+          <label>
+            <span>Fee</span>
+            <input
+              data-testid="gig-fee-input"
+              required
+              inputMode="decimal"
+              value={gigForm.fee}
+              onChange={(event) => onUpdateGigField('fee', event.target.value)}
+              placeholder="650"
+            />
+          </label>
+
+          <label>
+            <span>Status</span>
+            <select
+              data-testid="gig-status-select"
+              value={gigForm.status}
+              onChange={(event) =>
+                onUpdateGigField('status', event.target.value as GigStatus)
+              }
+            >
+              <option value="Confirmed">Planned</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Draft">Draft</option>
+            </select>
+          </label>
+        </div>
 
         <label className="checkbox-field full-width">
           <input
