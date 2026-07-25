@@ -8,6 +8,10 @@ echo "Running backend tests..."
 dotnet test "$ROOT_DIR/glovelly.sln" -m:1
 
 echo
+echo "Running frontend tests..."
+npm --prefix "$ROOT_DIR/frontend/glovelly-web" run test
+
+echo
 echo "Running frontend lint..."
 npm --prefix "$ROOT_DIR/frontend/glovelly-web" run lint
 

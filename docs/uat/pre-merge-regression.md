@@ -127,6 +127,17 @@ Expected result: clients cannot be deleted silently. Deletion is only available 
 
 Expected result: unsaved gig edits and unsaved expense draft fields are never discarded without confirmation. Accepted navigation switches the editor to the selected gig or a blank new-gig form.
 
+### Gig History And Selection
+
+1. Create a future planned gig and a past completed or cancelled gig.
+2. Confirm the past completed or cancelled gig is hidden by default, while a past draft remains visible.
+3. Enable `Show past gigs` and confirm the historical gig appears without clearing search, type, quick-filter, or sort controls.
+4. Select a gig, then change filters or sort order while it remains visible; confirm it stays selected.
+5. Hide or delete the selected gig and confirm the first remaining visible gig is selected, or the empty state is shown.
+6. Follow an invoice-line link to a historical gig while it is hidden; confirm the workspace shows past gigs, clears incompatible filters, and explains the changed view.
+
+Expected result: the selected gig always belongs to the rendered list. Explicit navigation reveals its target, while passive list changes preserve a visible selection or select the first visible fallback.
+
 ### Admin
 
 1. Open Admin as an administrator, select a user, and click `Edit access`.

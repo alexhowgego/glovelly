@@ -123,6 +123,9 @@ jobs:
       - name: Restore frontend dependencies
         run: npm --prefix frontend/glovelly-web ci
 
+      - name: Run frontend tests
+        run: npm --prefix frontend/glovelly-web run test
+
       - name: Run frontend lint
         run: npm --prefix frontend/glovelly-web run lint
 

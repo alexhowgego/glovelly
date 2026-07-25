@@ -70,6 +70,7 @@ type GigsSectionProps = {
   onGigTypeFilterChange: (filter: GigType | 'all') => void
   onSearchQueryChange: (value: string) => void
   onSelectGig: (gigId: string) => void
+  onShowPastGigsChange: (showPastGigs: boolean) => void
   onSortChange: (sort: GigSort) => void
   onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
@@ -97,6 +98,7 @@ type GigsSectionProps = {
   selectedGig: Gig | null
   selectedGigIds: string[]
   selectedGigs: Gig[]
+  showPastGigs: boolean
 }
 
 export function GigsSection({
@@ -141,6 +143,7 @@ export function GigsSection({
   onGigTypeFilterChange,
   onSearchQueryChange,
   onSelectGig,
+  onShowPastGigsChange,
   onSortChange,
   onToggleGigSelection,
   onStartEditing,
@@ -156,6 +159,7 @@ export function GigsSection({
   selectedGig,
   selectedGigIds,
   selectedGigs,
+  showPastGigs,
 }: GigsSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
   const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
@@ -281,6 +285,15 @@ export function GigsSection({
               </button>
             </div>
             <div className="compact-filter-chips" aria-label="Gig filters">
+              <button
+                aria-pressed={showPastGigs}
+                className={`compact-filter-chip ${showPastGigs ? 'selected' : ''}`}
+                data-testid="show-past-gigs-button"
+                onClick={() => onShowPastGigsChange(!showPastGigs)}
+                type="button"
+              >
+                Show past gigs
+              </button>
               {gigFilterOptions.map((option) => (
                 <button
                   key={option.value}

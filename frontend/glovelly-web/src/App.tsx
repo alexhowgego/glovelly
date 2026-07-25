@@ -232,6 +232,7 @@ function App({ appMetadata }: AppProps) {
     selectedGig,
     selectedGigIds,
     selectedGigs,
+    showPastGigs,
     selectGig,
     setGigs,
     setGigQuickFilter,
@@ -241,8 +242,8 @@ function App({ appMetadata }: AppProps) {
     setGigStatus,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
-    setSelectedGigId,
     setSelectedGigIds,
+    setShowPastGigs,
     startExternalResourceCreate,
     startExternalResourceEdit,
     startGigCreate,
@@ -367,7 +368,7 @@ function App({ appMetadata }: AppProps) {
     getGigById: (gigId) => gigsById.get(gigId),
     onMergeSavedGig: (gig) => mergeSavedGig(gig),
     onOpenReceiptDraft: (gig) => openGigReceiptDraft(gig),
-    onSelectGig: setSelectedGigId,
+    onSelectGig: selectGig,
     onSessionExpired: expireSession,
     setGigStatus,
   })
@@ -446,7 +447,7 @@ function App({ appMetadata }: AppProps) {
     getQuickCaptureCandidates,
     onMergeSavedGig: (gig) => mergeSavedGig(gig),
     onOpenAttachmentDraft: (gig) => openGigReceiptDraft(gig),
-    onSelectGig: setSelectedGigId,
+    onSelectGig: selectGig,
     onSessionExpired: expireSession,
     setGigStatus,
   })
@@ -1739,6 +1740,7 @@ function App({ appMetadata }: AppProps) {
         onGigTypeFilterChange={setGigTypeFilter}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={selectGig}
+        onShowPastGigsChange={setShowPastGigs}
         onSortChange={setGigSort}
         onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
@@ -1754,6 +1756,7 @@ function App({ appMetadata }: AppProps) {
         selectedGig={selectedGig}
         selectedGigIds={selectedGigIds}
         selectedGigs={selectedGigs}
+        showPastGigs={showPastGigs}
       />
     ) : (
       <InvoicesSection
