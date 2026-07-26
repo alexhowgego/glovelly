@@ -61,3 +61,6 @@ nunit-*.xml
 
 # Generated handbook site
 docs/_site/
+
+# GitHub App credentials
+gha-creds-*.json
