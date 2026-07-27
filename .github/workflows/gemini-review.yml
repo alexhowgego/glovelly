@@ -72,7 +72,7 @@ jobs:
           settings: |-
             {
               "model": {
-                "maxSessionTurns": 25
+                "maxSessionTurns": 50
               },
               "telemetry": {
                 "enabled": true,
@@ -116,7 +116,7 @@ jobs:
           prompt: |-
             Review pull request #${{ github.event.pull_request.number || github.event.issue.number }} in ${{ github.repository }}.
 
-            Work within a budget of 12 tool calls. Use mcp_github_pull_request_read once to retrieve the pull request metadata and diff. Inspect only changed files and the directly relevant checked-out code context with the native file tools. Reserve enough calls to publish the review. Do not run shell commands, scan the whole repository, rerun a failed call, call activate_skill, or use a tool name other than the exact mcp_github_* names listed here.
+            Work within a budget of 16 tool calls. Use mcp_github_pull_request_read once to retrieve the pull request metadata and diff. Inspect only changed files and the directly relevant checked-out code context with the native file tools. Reserve enough calls to publish the review. Do not run shell commands, scan the whole repository, rerun a failed call, call activate_skill, or use a tool name other than the exact mcp_github_* names listed here.
 
             Report only demonstrable bugs, security issues, performance regressions, or significant maintainability problems introduced by this pull request. Raise a finding only when the changed code and available context establish a concrete failure mode. Do not make stylistic comments, naming or formatting suggestions, speculative concerns, undocumented product assumptions, or duplicate reports of the same root cause. Keep findings concise, classify them as CRITICAL, HIGH, MEDIUM, or LOW, explain the concrete failure mode and impact, and attach inline comments only to changed diff lines.
 
