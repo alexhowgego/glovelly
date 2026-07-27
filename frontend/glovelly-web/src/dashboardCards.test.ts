@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getDashboardCards } from './dashboardCards'
+import { formatDate } from './formatters'
 import type { Client, Gig, Invoice } from './types'
 
 const client = (id: string) => ({ id, name: id }) as Client
@@ -91,7 +92,9 @@ describe('getDashboardCards', () => {
       state: 'loading', value: 'Loading...',
     })
     expect(cards({ activeSection: 'invoices' })[2]).toMatchObject({
-      state: 'ready', value: '£0.00', detail: '6 Apr 2026 to 5 Apr 2027',
+      state: 'ready',
+      value: '£0.00',
+      detail: `${formatDate('2026-04-06')} to ${formatDate('2027-04-05')}`,
     })
     expect(cards({ activeSection: 'invoices', paidIncomeSummary: { status: 'error' } })[2]).toMatchObject({
       state: 'error', value: 'Unavailable',
