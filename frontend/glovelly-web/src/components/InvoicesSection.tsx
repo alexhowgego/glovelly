@@ -57,6 +57,7 @@ type InvoicesSectionProps = {
   onSelectInvoice: (invoiceId: string) => void
   onSortChange: (sort: InvoiceSort) => void
   onStartEditing: () => void
+  scrollToListRequest: number
   sellerProfileNotice: string
   selectedInvoice: Invoice | null
 }
@@ -101,10 +102,12 @@ export function InvoicesSection({
   onSelectInvoice,
   onSortChange,
   onStartEditing,
+  scrollToListRequest,
   sellerProfileNotice,
   selectedInvoice,
 }: InvoicesSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const listControlsRef = useRef<HTMLDivElement | null>(null)
   const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
   const workspaceStyle = detailPanelBlockSize > 0
     ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
@@ -127,6 +130,7 @@ export function InvoicesSection({
     { value: 'drafts', label: 'Drafts' },
     { value: 'overdue', label: 'Overdue' },
     { value: 'paid', label: 'Paid' },
+    { value: 'income-this-financial-year', label: 'Income this financial year' },
   ]
 
   useEffect(() => {
@@ -138,6 +142,12 @@ export function InvoicesSection({
       editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
   }, [isEditorOpen])
+
+  useEffect(() => {
+    if (scrollToListRequest > 0) {
+      listControlsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [scrollToListRequest])
 
   return (
     <section className="section-layout">
@@ -182,7 +192,7 @@ export function InvoicesSection({
             </article>
           </div>
 
-          <div className="compact-list-controls" aria-label="Invoice list controls">
+          <div className="compact-list-controls" aria-label="Invoice list controls" ref={listControlsRef}>
             <div className="compact-list-main-controls">
               <label className="search-field compact-search-field">
                 <span>Search</span>

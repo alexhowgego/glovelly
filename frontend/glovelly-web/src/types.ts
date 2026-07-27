@@ -585,6 +585,7 @@ export type Invoice = {
   invoiceDate: string
   dueDate: string
   status: InvoiceStatus
+  paidOn: string | null
   firstIssuedUtc: string | null
   firstIssuedByUserId: string | null
   reissueCount: number
@@ -605,6 +606,13 @@ export type Invoice = {
   lines: InvoiceLine[]
 }
 
+export type PaidIncomeSummary = {
+  financialYearStart: string
+  financialYearEnd: string
+  total: number
+  invoiceIds: string[]
+}
+
 export type InvoiceSortKey =
   | 'priority'
   | 'invoiceDate'
@@ -617,7 +625,13 @@ export type InvoiceSort = {
   key: InvoiceSortKey
   direction: SortDirection
 }
-export type InvoiceQuickFilter = 'all' | 'outstanding' | 'drafts' | 'overdue' | 'paid'
+export type InvoiceQuickFilter =
+  | 'all'
+  | 'outstanding'
+  | 'drafts'
+  | 'overdue'
+  | 'paid'
+  | 'income-this-financial-year'
 
 export type GigForm = {
   clientId: string

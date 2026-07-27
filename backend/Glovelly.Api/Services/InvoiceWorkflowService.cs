@@ -238,6 +238,7 @@ public sealed class InvoiceWorkflowService(
             cancellationToken);
         invoice.Status = InvoiceStatus.Draft;
         invoice.StatusUpdatedUtc = reissuedUtc;
+        invoice.PaidOn = null;
         invoice.ReissueCount += 1;
         invoice.LastReissuedUtc = reissuedUtc;
         invoice.LastReissuedByUserId = userId;

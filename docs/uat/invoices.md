@@ -222,6 +222,24 @@ Expected result: only draft invoices expose an editable Description and save act
 
 Status transitions are explicit, delivery state is recorded, delivered drafts can be promoted to issued by choice, issuing an invoice can complete linked gigs by choice, declined prompts leave existing invoice/gig state unchanged, PDF remains downloadable, and receipt attachments are included only when requested.
 
+## Paid Income Dashboard
+
+> **Automation:** Backend integration tests cover payment-date lifecycle, UK financial-year boundaries, income inclusion, ownership, and total reconciliation. Frontend Vitest coverage verifies the invoice dashboard card and its distinct loading, zero, and error states.
+
+### Steps
+
+1. Open an issued or overdue invoice and mark it as Paid.
+2. Open the Invoices workspace and confirm the `Income this financial year` dashboard card includes the payment.
+3. Confirm the card displays the current UK financial-year period, from 6 April through 5 April.
+4. Select the income card.
+5. Confirm the invoice list shows the `Income this financial year` filter and only invoices contributing to the card total.
+6. Re-issue the paid invoice.
+7. Return to the Invoices workspace and confirm that invoice no longer contributes to the income card or its drill-down.
+
+### Expected Results
+
+Marking an invoice Paid records its payment date using the current UK date. The dashboard total includes only paid invoices received within the displayed financial year, the drill-down reconciles with that total, and reissuing the invoice clears its payment contribution.
+
 ## Notes
 
 - Issued invoices should not be silently changed by later gig edits.
