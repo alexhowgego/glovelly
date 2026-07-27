@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   buildApiUrl,
@@ -20,6 +20,12 @@ import {
   toEditableGigForm,
 } from './gigWorkspaceHelpers'
 import type { NormalizedGigExpensePayload } from './gigWorkspaceHelpers'
+import {
+  getGigReveal,
+  getLocalDate,
+  getVisibleGigs,
+  reconcileSelectedGigId,
+} from './gigListState'
 import type {
   Client,
   Gig,
@@ -68,6 +74,7 @@ export function useGigsWorkspace({
   const [gigSearchQuery, setGigSearchQuery] = useState('')
   const [gigQuickFilter, setGigQuickFilter] = useState<GigQuickFilter>('all')
   const [gigTypeFilter, setGigTypeFilter] = useState<GigType | 'all'>('all')
+  const [showPastGigs, setShowPastGigs] = useState(false)
   const [gigSort, setGigSort] = useState<GigSort>({ key: 'priority', direction: 'asc' })
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
@@ -81,124 +88,20 @@ export function useGigsWorkspace({
   const [externalResourceForm, setExternalResourceForm] = useState<GigExternalResourceForm>(
     emptyGigExternalResourceForm()
   )
-  const deferredGigSearchQuery = useDeferredValue(gigSearchQuery)
-
   const gigsById = useMemo(() => new Map(gigs.map((gig) => [gig.id, gig])), [gigs])
 
-  const filteredGigs = useMemo(() => {
-    const query = deferredGigSearchQuery.trim().toLowerCase()
-    const today = new Date().toISOString().slice(0, 10)
-    const sortDirection = gigSort.direction === 'asc' ? 1 : -1
-    const compareText = (left: string, right: string) => left.localeCompare(right)
-    const compareNumber = (left: number, right: number) => left - right
-    const getClientName = (gig: Gig) => clientNamesById.get(gig.clientId) ?? ''
-    const getPriorityBucket = (gig: Gig) => {
-      if (gig.status === 'Cancelled') {
-        return 5
-      }
-
-      if (gig.status === 'Confirmed' && gig.date >= today) {
-        return 0
-      }
-
-      if (gig.status === 'Completed' && !gig.isInvoiced && gig.date <= today) {
-        return 1
-      }
-
-      if (gig.status === 'Confirmed' && !gig.isInvoiced && gig.date < today) {
-        return 2
-      }
-
-      if (gig.status === 'Draft') {
-        return 3
-      }
-
-      return 4
-    }
-    const comparePriority = (left: Gig, right: Gig) => {
-      const bucketComparison = getPriorityBucket(left) - getPriorityBucket(right)
-      if (bucketComparison !== 0) {
-        return bucketComparison
-      }
-
-      const bucket = getPriorityBucket(left)
-      if (bucket === 0) {
-        return compareText(left.date, right.date)
-      }
-
-      return compareText(right.date, left.date)
-    }
-    const compareByKey = (left: Gig, right: Gig) => {
-      switch (gigSort.key) {
-        case 'client':
-          return compareText(getClientName(left), getClientName(right))
-        case 'fee':
-          return compareNumber(left.fee, right.fee)
-        case 'status':
-          return compareText(left.status, right.status)
-        case 'title':
-          return compareText(left.title, right.title)
-        case 'venue':
-          return compareText(left.venue, right.venue)
-        case 'priority':
-          return comparePriority(left, right)
-        case 'date':
-        default:
-          return compareText(left.date, right.date)
-      }
-    }
-    const sortedGigs = [...gigs].sort((left, right) => {
-      const primaryComparison = compareByKey(left, right)
-      if (primaryComparison !== 0) {
-        return primaryComparison * sortDirection
-      }
-
-      const dateComparison = left.date.localeCompare(right.date)
-      if (dateComparison !== 0) {
-        return dateComparison
-      }
-
-      const titleComparison = left.title.localeCompare(right.title)
-      if (titleComparison !== 0) {
-        return titleComparison
-      }
-
-      return left.id.localeCompare(right.id)
-    })
-    const quickFilteredGigs = sortedGigs.filter((gig) => {
-      if (gigTypeFilter !== 'all' && gig.type !== gigTypeFilter) {
-        return false
-      }
-      switch (gigQuickFilter) {
-        case 'completed':
-          return gig.status === 'Completed'
-        case 'drafts':
-          return gig.status === 'Draft'
-        case 'uninvoiced':
-          return !gig.isInvoiced && gig.status !== 'Cancelled'
-        case 'upcoming':
-          return gig.status !== 'Cancelled' && gig.date >= today
-        case 'all':
-        default:
-          return true
-      }
-    })
-
-    if (!query) {
-      return quickFilteredGigs
-    }
-
-    return quickFilteredGigs.filter((gig) => {
-      const clientName = clientNamesById.get(gig.clientId) ?? ''
-
-      return [gig.title, gig.venue, gig.date, gig.status, gig.type, clientName]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    })
-  }, [clientNamesById, deferredGigSearchQuery, gigQuickFilter, gigSort, gigTypeFilter, gigs])
-
-  const selectedGig = gigsById.get(selectedGigId) ?? filteredGigs[0] ?? null
+  const today = getLocalDate()
+  const filteredGigs = useMemo(() => getVisibleGigs(gigs, clientNamesById, {
+    searchQuery: gigSearchQuery,
+    quickFilter: gigQuickFilter,
+    showPastGigs,
+    sort: gigSort,
+    typeFilter: gigTypeFilter,
+  }, today), [clientNamesById, gigQuickFilter, gigSearchQuery, gigSort, gigTypeFilter, gigs, showPastGigs, today])
+  const reconciledSelectedGigId = reconcileSelectedGigId(selectedGigId, filteredGigs)
+  const selectedGig = isGigEditorOpen
+    ? (gigsById.get(selectedGigId) ?? null)
+    : (filteredGigs.find((gig) => gig.id === reconciledSelectedGigId) ?? null)
 
   const selectedGigs = useMemo(() => {
     const selectedGigIdSet = new Set(selectedGigIds)
@@ -258,6 +161,16 @@ export function useGigsWorkspace({
   }, [gigs])
 
   useEffect(() => {
+    if (isGigEditorOpen) {
+      return
+    }
+
+    if (reconciledSelectedGigId !== selectedGigId) {
+      setSelectedGigId(reconciledSelectedGigId)
+    }
+  }, [isGigEditorOpen, reconciledSelectedGigId, selectedGigId])
+
+  useEffect(() => {
     if (gigForm.clientId || clients.length === 0) {
       return
     }
@@ -279,7 +192,6 @@ export function useGigsWorkspace({
 
   const applyGigs = useCallback((nextGigs: Gig[]) => {
     setGigs(nextGigs)
-    setSelectedGigId(nextGigs[0]?.id ?? '')
   }, [])
 
   const resetGigsWorkspace = useCallback(() => {
@@ -288,6 +200,7 @@ export function useGigsWorkspace({
     setSelectedGigIds([])
     setGigSearchQuery('')
     setGigQuickFilter('all')
+    setShowPastGigs(false)
     setGigSort({ key: 'priority', direction: 'asc' })
     setIsGigEditorOpen(false)
     setGigMode('create')
@@ -314,7 +227,6 @@ export function useGigsWorkspace({
 
   const replaceSavedGig = useCallback((savedGig: Gig) => {
     setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
-    setSelectedGigId(savedGig.id)
   }, [])
 
   const startExternalResourceCreate = () => {
@@ -723,21 +635,49 @@ export function useGigsWorkspace({
       }
 
       const savedGig = (await response.json()) as Gig
-      setGigs((current) => [
+      const nextGigs = [
         savedGig,
-        ...current.filter((gig) => gig.id !== savedGig.id),
-      ])
-      setSelectedGigId(savedGig.id)
+        ...gigs.filter((gig) => gig.id !== savedGig.id),
+      ]
+      setGigs(nextGigs)
       setSelectedGigIds([])
       setGigMode('edit')
       setGigForm(toEditableGigForm(savedGig))
       setGigStatus('Gig cloned. Update any details before saving.')
+      revealGig(savedGig, nextGigs)
       setIsGigEditorOpen(true)
     } catch (error) {
       setGigStatus(error instanceof Error ? error.message : 'Unable to clone gig.')
     } finally {
       setIsGigLoading(false)
     }
+  }
+
+  const revealGig = (nextGig: Gig, candidateGigs = gigs) => {
+    const visibleGigs = getVisibleGigs(candidateGigs, clientNamesById, {
+      searchQuery: gigSearchQuery,
+      quickFilter: gigQuickFilter,
+      showPastGigs,
+      sort: gigSort,
+      typeFilter: gigTypeFilter,
+    }, today)
+    const reveal = getGigReveal(nextGig, visibleGigs, today)
+
+    if (reveal.clearFilters) {
+      setGigSearchQuery('')
+      setGigQuickFilter('all')
+      setGigTypeFilter('all')
+      if (reveal.showPastGigs) {
+        setShowPastGigs(true)
+      }
+      setGigStatus(
+        reveal.showPastGigs
+          ? `Cleared filters and showed past gigs to open ${nextGig.title}.`
+          : `Cleared filters to open ${nextGig.title}.`
+      )
+    }
+
+    setSelectedGigId(nextGig.id)
   }
 
   const selectGig = (gigId: string) => {
@@ -765,7 +705,7 @@ export function useGigsWorkspace({
 
     cancelExternalResourceEdit()
 
-    setSelectedGigId(gigId)
+    revealGig(nextGig)
     return true
   }
 
@@ -1016,7 +956,6 @@ export function useGigsWorkspace({
 
       const nextGigs = gigs.filter((gig) => gig.id !== selectedGig.id)
       setGigs(nextGigs)
-      setSelectedGigId(nextGigs[0]?.id ?? '')
       setSelectedGigIds((current) => current.filter((gigId) => gigId !== selectedGig.id))
       setIsGigEditorOpen(false)
       setGigMode('create')
@@ -1112,7 +1051,7 @@ export function useGigsWorkspace({
 
   const openGigReceiptDraft = (savedGig: Gig) => {
     mergeSavedGig(savedGig)
-    setSelectedGigId(savedGig.id)
+    revealGig(savedGig, [savedGig, ...gigs.filter((gig) => gig.id !== savedGig.id)])
     onOpenSection('gigs')
     setGigMode('edit')
     setGigForm(toEditableGigForm(savedGig))
@@ -1335,22 +1274,15 @@ export function useGigsWorkspace({
 
       const savedGig = (await response.json()) as Gig
 
-      setGigs((current) => {
-        if (isEdit) {
-          return current.map((gig) => (gig.id === savedGig.id ? savedGig : gig))
-        }
-
-        return [
-          savedGig,
-          ...current.filter((gig) => gig.id !== savedGig.id),
-        ]
-      })
-
-      setSelectedGigId(savedGig.id)
+      const nextGigs = isEdit
+        ? gigs.map((gig) => (gig.id === savedGig.id ? savedGig : gig))
+        : [savedGig, ...gigs.filter((gig) => gig.id !== savedGig.id)]
+      setGigs(nextGigs)
       setGigMode('edit')
       setGigForm(toEditableGigForm(savedGig))
       setGigStatus(successMessage ?? (isEdit ? 'Gig updated.' : 'Gig created.'))
       setIsGigEditorOpen(!closeAfterSave)
+      revealGig(savedGig, nextGigs)
       if (previousGig) {
         await handleLinkedInvoiceAfterGigSave(
           previousGig,
@@ -1533,6 +1465,7 @@ export function useGigsWorkspace({
     selectedGig,
     selectedGigIds,
     selectedGigs,
+    showPastGigs,
     selectGig,
     setGigs,
     setGigQuickFilter,
@@ -1540,9 +1473,9 @@ export function useGigsWorkspace({
     setGigSearchQuery,
     setGigSort,
     setGigStatus,
+    setShowPastGigs,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
-    setSelectedGigId,
     setSelectedGigIds,
     saveExpenseDraft,
     startGigCreate,
@@ -1551,7 +1484,7 @@ export function useGigsWorkspace({
     startExternalResourceEdit,
     submitExternalResource,
     uninvoicedGigCount: gigs.filter((gig) => !gig.isInvoiced && gig.status !== 'Cancelled').length,
-    upcomingGigCount: gigs.filter((gig) => gig.date >= new Date().toISOString().slice(0, 10)).length,
+    upcomingGigCount: gigs.filter((gig) => gig.date >= today).length,
     updateExternalResourceField,
     updateGigField,
     updateExpenseReimbursement,
