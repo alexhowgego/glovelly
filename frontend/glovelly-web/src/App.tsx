@@ -17,7 +17,7 @@ import {
   SignInScreen,
   UserSettingsModal,
 } from './AppSections'
-import type { AppNavigationItem, DashboardSummary } from './AppSections'
+import type { AppNavigationItem } from './AppSections'
 import {
   buildApiUrl,
   buildReturnUrl,
@@ -34,7 +34,7 @@ import {
   invoiceEmailBodyTokens,
   invoiceFilenameTokens,
 } from './invoicePreview'
-import { formatCurrency, formatDate } from './formatters'
+import { getDashboardCards } from './dashboardCards'
 import { useAdminWorkspace } from './hooks/useAdminWorkspace'
 import { useClientsWorkspace } from './hooks/useClientsWorkspace'
 import { useGigsWorkspace } from './hooks/useGigsWorkspace'
@@ -95,6 +95,7 @@ function App({ appMetadata }: AppProps) {
   const { setThemePreference, themePreference } = useThemePreference()
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
+  const [invoiceListScrollRequest, setInvoiceListScrollRequest] = useState(0)
   const [isGigImportsOpen, setIsGigImportsOpen] = useState(false)
   const [forScoreSnapshot, setForScoreSnapshot] = useState<ForScoreLibrarySnapshot | null>(null)
   const [forScoreLibraryStatus, setForScoreLibraryStatus] = useState('No forScore library snapshot imported yet.')
@@ -316,6 +317,8 @@ function App({ appMetadata }: AppProps) {
     isInvoiceEditorOpen,
     issuedInvoiceCount,
     isInvoiceLoading,
+    loadPaidIncomeSummary,
+    paidIncomeSummary,
     resetInvoicesWorkspace,
     selectedInvoice,
     setAdjustmentAmount,
@@ -563,6 +566,12 @@ function App({ appMetadata }: AppProps) {
       }
     }
   }, [expireSession, isAuthenticated, setInvoices])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      void loadPaidIncomeSummary()
+    }
+  }, [isAuthenticated, loadPaidIncomeSummary])
 
   useWorkspaceEvents({
     enabled: isAuthenticated,
@@ -1033,73 +1042,19 @@ function App({ appMetadata }: AppProps) {
     (count, batch) => count + batch.pendingCount + batch.acceptedCount,
     0
   )
-  const nextDashboardGig = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-
-    return [...gigs]
-      .filter((gig) => gig.status !== 'Cancelled' && gig.date >= today)
-      .sort((left, right) => {
-        const dateComparison = left.date.localeCompare(right.date)
-        if (dateComparison !== 0) {
-          return dateComparison
-        }
-
-        return left.title.localeCompare(right.title)
-      })[0] ?? null
-  }, [gigs])
-
-  const dashboardInvoiceCandidate = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-
-    return [...gigs]
-      .filter(
-        (gig) =>
-          !gig.isInvoiced &&
-          gig.status !== 'Cancelled' &&
-          gig.status !== 'Draft' &&
-          gig.date <= today
-      )
-      .sort((left, right) => {
-        const dateComparison = right.date.localeCompare(left.date)
-        if (dateComparison !== 0) {
-          return dateComparison
-        }
-
-        const statusPriority = (gig: Gig) => (gig.status === 'Completed' ? 0 : 1)
-        const statusComparison = statusPriority(left) - statusPriority(right)
-        if (statusComparison !== 0) {
-          return statusComparison
-        }
-
-        return left.title.localeCompare(right.title)
-      })[0] ?? null
-  }, [gigs])
-
-  const dashboardSummary: DashboardSummary = useMemo(() => {
-    const outstandingInvoices = invoices.filter(
-      (invoice) => invoice.status !== 'Paid' && invoice.status !== 'Cancelled'
-    )
-    const toGigSummary = (gig: Gig) => ({
-      title: gig.title,
-      clientName: clientNamesById.get(gig.clientId) ?? 'Unknown client',
-      dateLabel: formatDate(gig.date),
-      venue: gig.venue || 'No venue set',
-    })
-
-    return {
-      outstandingBalanceLabel: formatCurrency(
-        outstandingInvoices.reduce((total, invoice) => total + invoice.total, 0)
-      ),
-      outstandingInvoiceCount: outstandingInvoices.length,
-      nextGig: nextDashboardGig ? toGigSummary(nextDashboardGig) : null,
-      invoiceCandidate: dashboardInvoiceCandidate
-        ? {
-            ...toGigSummary(dashboardInvoiceCandidate),
-            feeLabel: formatCurrency(dashboardInvoiceCandidate.fee),
-          }
-        : null,
-    }
-  }, [clientNamesById, dashboardInvoiceCandidate, invoices, nextDashboardGig])
+  const dashboardCards = useMemo(
+    () =>
+      getDashboardCards({
+        activeSection,
+        clients,
+        gigs,
+        invoices,
+        isWorkspaceLoading: isLoading,
+        paidIncomeSummary,
+        today: new Date().toISOString().slice(0, 10),
+      }),
+    [activeSection, clients, gigs, invoices, isLoading, paidIncomeSummary]
+  )
 
   const signIn = () => {
     const loginUrl = buildApiUrl(
@@ -1454,33 +1409,17 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
-  const openDashboardNextGig = () => {
-    if (!nextDashboardGig) {
-      return
-    }
-
-    if (!selectGig(nextDashboardGig.id)) {
-      return
-    }
-
-    setSelectedGigIds([])
-    setGigSearchQuery('')
-    setActiveSection('gigs')
-  }
-
-  const generateDashboardInvoice = () => {
-    if (!dashboardInvoiceCandidate) {
-      return
-    }
-
-    if (!selectGig(dashboardInvoiceCandidate.id)) {
-      return
-    }
-
-    setSelectedGigIds([])
-    setGigSearchQuery('')
-    setActiveSection('gigs')
-    void handleGenerateInvoice(dashboardInvoiceCandidate)
+  const handleDashboardCardAction = (action: 'invoices-outstanding' | 'invoices-overdue' | 'invoices-income') => {
+    setActiveSection('invoices')
+    setInvoiceSearchQuery('')
+    setInvoiceQuickFilter(
+      action === 'invoices-income'
+        ? 'income-this-financial-year'
+        : action === 'invoices-overdue'
+          ? 'overdue'
+          : 'outstanding'
+    )
+    setInvoiceListScrollRequest((request) => request + 1)
   }
 
   const handleGenerateMonthlyInvoice = async () => {
@@ -1801,6 +1740,7 @@ function App({ appMetadata }: AppProps) {
         onSelectInvoice={setSelectedInvoiceId}
         onSortChange={setInvoiceSort}
         onStartEditing={startInvoiceEdit}
+        scrollToListRequest={invoiceListScrollRequest}
         sellerProfileNotice={sellerProfileNotice}
         selectedInvoice={selectedInvoice}
       />
@@ -1813,11 +1753,10 @@ function App({ appMetadata }: AppProps) {
       authUser={authUser}
       currentSection={currentSection}
       currentSectionContent={currentSectionContent}
-      dashboardSummary={dashboardSummary}
+      dashboardCards={dashboardCards}
       isAdmin={isAdmin}
       isAdminLoading={isAdminLoading}
       isGigLoading={isGigLoading}
-      isInvoiceLoading={isInvoiceLoading}
       isLoading={isLoading}
       isProfileMenuOpen={isProfileMenuOpen}
       isQuickAttachmentSaving={isQuickAttachmentSaving}
@@ -1826,9 +1765,8 @@ function App({ appMetadata }: AppProps) {
       isUserSettingsSaving={isUserSettingsSaving}
       navigationItems={navigationItems}
       pendingGigImportCount={pendingGigImportCount}
-      onGenerateDashboardInvoice={generateDashboardInvoice}
+      onDashboardCardAction={handleDashboardCardAction}
       onOpenGigImports={openGigImports}
-      onOpenNextGig={openDashboardNextGig}
       onOpenSellerProfile={openSellerProfile}
       onOpenConnectedServices={openConnectedServices}
       onOpenUserSettings={openUserSettings}

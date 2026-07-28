@@ -32,6 +32,7 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal("Paid", updatedInvoice.GetProperty("status").GetString());
         Assert.Equal(TestAuthContext.UserId, updatedInvoice.GetProperty("updatedByUserId").GetGuid());
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("statusUpdatedUtc").ValueKind);
+        Assert.Equal("2026-01-01", updatedInvoice.GetProperty("paidOn").GetString());
     }
 
     [Fact]
@@ -195,6 +196,7 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
 
         var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("Draft", updatedInvoice.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("paidOn").ValueKind);
         Assert.Equal(JsonValueKind.String, updatedInvoice.GetProperty("statusUpdatedUtc").ValueKind);
         Assert.Equal(expectedInvoiceDate.ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("invoiceDate").GetString());
         Assert.Equal(expectedInvoiceDate.AddDays(14).ToString("yyyy-MM-dd"), updatedInvoice.GetProperty("dueDate").GetString());

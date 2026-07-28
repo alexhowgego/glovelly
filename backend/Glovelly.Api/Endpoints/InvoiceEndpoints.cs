@@ -27,6 +27,31 @@ public static class InvoiceEndpoints
             return Results.Ok(invoices);
         });
 
+        group.MapGet("/paid-income-summary", async (
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            TimeProvider timeProvider,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var period = UkFinancialYear.Current(timeProvider);
+            var contributions = await db.Invoices
+                .WhereVisibleTo(userId)
+                .WhereContributingToPaidIncome(period)
+                .AsNoTracking()
+                .Select(invoice => new PaidIncomeContribution(
+                    invoice.Id,
+                    invoice.Lines.Sum(line => (decimal?)(line.Quantity * line.UnitPrice)) ?? 0m))
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(new InvoicePaidIncomeSummary(
+                period.Start,
+                period.End,
+                contributions.Sum(contribution => contribution.Total),
+                contributions.Select(contribution => contribution.Id).ToList()));
+        });
+
         group.MapGet("/{id:guid}/pdf", async (
             Guid id,
             AppDbContext db,
@@ -118,6 +143,7 @@ public static class InvoiceEndpoints
             invoice.PdfContentType = null;
             invoice.PdfSizeBytes = null;
             invoice.PdfGeneratedAt = null;
+            invoice.PaidOn = null;
             invoice.Client = null;
             invoice.Lines = new List<InvoiceLine>();
             EndpointSupport.StampCreate(invoice, userId);
@@ -136,6 +162,7 @@ public static class InvoiceEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceWorkflowService invoiceWorkflowService,
+            TimeProvider timeProvider,
             IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -195,6 +222,9 @@ public static class InvoiceEndpoints
             {
                 invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
                 invoice.Status = request.Status;
+                invoice.PaidOn = requestedStatus is InvoiceStatus.Paid
+                    ? UkFinancialYear.CurrentDate(timeProvider)
+                    : null;
             }
             EndpointSupport.StampUpdate(invoice, userId);
 
@@ -211,6 +241,7 @@ public static class InvoiceEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceWorkflowService invoiceWorkflowService,
+            TimeProvider timeProvider,
             IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -251,6 +282,9 @@ public static class InvoiceEndpoints
 
             invoice.Status = request.Status;
             invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
+            invoice.PaidOn = request.Status is InvoiceStatus.Paid
+                ? UkFinancialYear.CurrentDate(timeProvider)
+                : null;
             EndpointSupport.StampUpdate(invoice, userId);
             await db.SaveChangesAsync();
             await businessLifecycleSignal.TrackInvoiceAsync(invoice);
@@ -498,6 +532,12 @@ public static class InvoiceEndpoints
         return group;
     }
 
+    private sealed record PaidIncomeContribution(Guid Id, decimal Total);
+    private sealed record InvoicePaidIncomeSummary(
+        DateOnly FinancialYearStart,
+        DateOnly FinancialYearEnd,
+        decimal Total,
+        IReadOnlyList<Guid> InvoiceIds);
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
     private sealed record InvoiceDescriptionUpdateRequest(string? Description);
     private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);

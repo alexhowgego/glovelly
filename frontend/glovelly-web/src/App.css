@@ -1046,7 +1046,7 @@
   margin-bottom: 2px;
 }
 
-.outstanding-card strong {
+.dashboard-card-ready strong {
   display: block;
   font-family: var(--display);
   font-size: clamp(2rem, 6vw, 3.1rem);
@@ -1054,10 +1054,15 @@
   line-height: 0.95;
 }
 
-.invoice-action-card {
+.dashboard-card-error {
   background:
-    linear-gradient(135deg, color-mix(in srgb, #f47d2a 18%, transparent), transparent 64%),
+    linear-gradient(135deg, color-mix(in srgb, #a12828 14%, transparent), transparent 64%),
     var(--surface-highlight);
+}
+
+.dashboard-card-loading strong {
+  color: var(--muted-strong);
+  font-size: 1.1rem;
 }
 
 .compact-action {
@@ -3202,7 +3207,7 @@ button:disabled {
     display: none;
   }
 
-  .outstanding-card strong {
+  .dashboard-card-ready strong {
     font-size: clamp(1.5rem, 9vw, 2.2rem);
   }
 

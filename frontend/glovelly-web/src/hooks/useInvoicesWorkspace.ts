@@ -9,7 +9,15 @@ import {
 } from '../api'
 import { defaultInvoiceStatus } from '../forms'
 import { formatCurrency, formatDateTime } from '../formatters'
-import type { Invoice, InvoiceLine, InvoiceQuickFilter, InvoiceSort, InvoiceStatus } from '../types'
+import type {
+  Invoice,
+  InvoiceLine,
+  InvoiceQuickFilter,
+  InvoiceSort,
+  InvoiceStatus,
+  PaidIncomeSummary,
+} from '../types'
+import type { PaidIncomeSummaryState } from '../dashboardCards'
 
 type GoogleDrivePublishLink = {
   href: string
@@ -46,6 +54,10 @@ export function useInvoicesWorkspace({
   const [googleDrivePublishLink, setGoogleDrivePublishLink] =
     useState<GoogleDrivePublishLink | null>(null)
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
+  const [paidIncomeSummary, setPaidIncomeSummary] = useState<PaidIncomeSummaryState>({
+    status: 'loading',
+  })
+  const [incomeInvoiceIds, setIncomeInvoiceIds] = useState<string[]>([])
   const [adjustmentAmount, setAdjustmentAmount] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [invoiceDescription, setInvoiceDescription] = useState('')
@@ -55,6 +67,23 @@ export function useInvoicesWorkspace({
     () => new Map(invoices.map((invoice) => [invoice.id, invoice])),
     [invoices]
   )
+
+  const loadPaidIncomeSummary = useCallback(async () => {
+    setPaidIncomeSummary({ status: 'loading' })
+
+    try {
+      const response = await fetchWithSession(buildApiUrl('/invoices/paid-income-summary'))
+      if (!response.ok) {
+        throw new Error('Unable to load paid income.')
+      }
+
+      const summary = (await response.json()) as PaidIncomeSummary
+      setPaidIncomeSummary({ status: 'ready', summary })
+      setIncomeInvoiceIds(summary.invoiceIds)
+    } catch {
+      setPaidIncomeSummary({ status: 'error' })
+    }
+  }, [])
 
   const filteredInvoices = useMemo(() => {
     const query = deferredInvoiceSearchQuery.trim().toLowerCase()
@@ -138,6 +167,8 @@ export function useInvoicesWorkspace({
           return invoice.status === 'Overdue'
         case 'paid':
           return invoice.status === 'Paid'
+        case 'income-this-financial-year':
+          return incomeInvoiceIds.includes(invoice.id)
         case 'all':
         default:
           return true
@@ -161,7 +192,7 @@ export function useInvoicesWorkspace({
         .toLowerCase()
         .includes(query)
     })
-  }, [clientNamesById, deferredInvoiceSearchQuery, invoiceQuickFilter, invoiceSort, invoices])
+  }, [clientNamesById, deferredInvoiceSearchQuery, incomeInvoiceIds, invoiceQuickFilter, invoiceSort, invoices])
 
   const selectedInvoice = selectedInvoiceId
     ? invoicesById.get(selectedInvoiceId) ?? null
@@ -186,6 +217,8 @@ export function useInvoicesWorkspace({
     setInvoiceStatus(defaultInvoiceStatus)
     setGoogleDrivePublishLink(null)
     setIsInvoiceLoading(false)
+    setPaidIncomeSummary({ status: 'loading' })
+    setIncomeInvoiceIds([])
     setAdjustmentAmount('')
     setAdjustmentReason('')
     setInvoiceDescription('')
@@ -264,6 +297,7 @@ export function useInvoicesWorkspace({
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
       setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
+      await loadPaidIncomeSummary()
       return updatedInvoice
     } catch (error) {
       setInvoiceStatus(error instanceof Error ? error.message : 'Unable to update invoice status.')
@@ -321,6 +355,7 @@ export function useInvoicesWorkspace({
         setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
       }
 
+      await loadPaidIncomeSummary()
       return updatedInvoice
     } catch (error) {
       setInvoiceStatus(
@@ -637,7 +672,9 @@ export function useInvoicesWorkspace({
     isInvoiceEditorOpen,
     issuedInvoiceCount: invoices.filter((invoice) => invoice.status === 'Issued').length,
     isInvoiceLoading,
+    loadPaidIncomeSummary,
     overdueInvoiceCount: invoices.filter((invoice) => invoice.status === 'Overdue').length,
+    paidIncomeSummary,
     resetInvoicesWorkspace,
     selectedInvoice,
     setAdjustmentAmount,

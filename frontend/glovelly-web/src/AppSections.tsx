@@ -16,4 +16,4 @@ export {
   SignInScreen,
   UserSettingsModal,
 } from './components'
-export type { AppNavigationItem, DashboardSummary } from './components'
+export type { AppNavigationItem } from './components'

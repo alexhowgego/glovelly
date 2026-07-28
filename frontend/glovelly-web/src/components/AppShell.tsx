@@ -8,6 +8,7 @@ import type {
   ThemePreference,
 } from '../types'
 import { formatBuildMetadata } from '../formatters'
+import type { DashboardCard, DashboardCardAction } from '../dashboardCards'
 
 export type AppNavigationItem = {
   id: AppSection
@@ -17,24 +18,6 @@ export type AppNavigationItem = {
   disabled?: boolean
 }
 
-export type DashboardGigSummary = {
-  title: string
-  clientName: string
-  dateLabel: string
-  venue: string
-}
-
-export type DashboardInvoiceCandidate = DashboardGigSummary & {
-  feeLabel: string
-}
-
-export type DashboardSummary = {
-  outstandingBalanceLabel: string
-  outstandingInvoiceCount: number
-  nextGig: DashboardGigSummary | null
-  invoiceCandidate: DashboardInvoiceCandidate | null
-}
-
 type AppShellProps = {
   activeSection: AppSection
   appMetadata: AppMetadata
@@ -42,11 +25,10 @@ type AppShellProps = {
   children: ReactNode
   currentSection: AppNavigationItem | undefined
   currentSectionContent: ReactNode
-  dashboardSummary: DashboardSummary
+  dashboardCards: DashboardCard[]
   isAdmin: boolean
   isAdminLoading: boolean
   isGigLoading: boolean
-  isInvoiceLoading: boolean
   isLoading: boolean
   isProfileMenuOpen: boolean
   isQuickAttachmentSaving: boolean
@@ -56,9 +38,8 @@ type AppShellProps = {
   navigationItems: AppNavigationItem[]
   pendingGigImportCount: number
   onOpenGigImports: () => void
-  onOpenNextGig: () => void
   onOpenSellerProfile: () => void
-  onGenerateDashboardInvoice: () => void
+  onDashboardCardAction: (action: DashboardCardAction) => void
   onOpenConnectedServices: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
@@ -79,11 +60,10 @@ export function AppShell({
   children,
   currentSection,
   currentSectionContent,
-  dashboardSummary,
+  dashboardCards,
   isAdmin,
   isAdminLoading,
   isGigLoading,
-  isInvoiceLoading,
   isLoading,
   isProfileMenuOpen,
   isQuickAttachmentSaving,
@@ -93,9 +73,8 @@ export function AppShell({
   navigationItems,
   pendingGigImportCount,
   onOpenGigImports,
-  onOpenNextGig,
   onOpenSellerProfile,
-  onGenerateDashboardInvoice,
+  onDashboardCardAction,
   onOpenConnectedServices,
   onOpenUserSettings,
   onProfileMenuToggle,
@@ -365,63 +344,27 @@ export function AppShell({
 
             <div className="content-header-aside">
               <div className="dashboard-summary" aria-label="Dashboard summary">
-                <article className="dashboard-card outstanding-card" data-testid="dashboard-outstanding-balance">
-                  <p className="section-label">Outstanding balance</p>
-                  <strong>{dashboardSummary.outstandingBalanceLabel}</strong>
-                  <span>
-                    {dashboardSummary.outstandingInvoiceCount === 1
-                      ? '1 invoice needs attention'
-                      : `${dashboardSummary.outstandingInvoiceCount} invoices need attention`}
-                  </span>
-                </article>
-
-                <article className="dashboard-card" data-testid="dashboard-next-gig">
-                  <p className="section-label">Next gig</p>
-                  {dashboardSummary.nextGig ? (
-                    <>
-                      <strong>{dashboardSummary.nextGig.title}</strong>
-                      <span>
-                        {dashboardSummary.nextGig.dateLabel} · {dashboardSummary.nextGig.clientName}
-                      </span>
-                      <span>{dashboardSummary.nextGig.venue}</span>
+                {dashboardCards.map((card) => (
+                  <article
+                    className={`dashboard-card dashboard-card-${card.state}`}
+                    data-testid={`dashboard-${card.label.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`}
+                    key={card.label}
+                  >
+                    <p className="section-label">{card.label}</p>
+                    <strong>{card.value}</strong>
+                    <span>{card.detail}</span>
+                    {card.action ? (
                       <button
                         className="ghost-button compact-action"
-                        data-testid="dashboard-open-next-gig-button"
-                        onClick={onOpenNextGig}
+                        disabled={card.state !== 'ready'}
+                        onClick={() => onDashboardCardAction(card.action!)}
                         type="button"
                       >
-                        Open gig
+                        View invoices
                       </button>
-                    </>
-                  ) : (
-                    <span>No upcoming gigs on the books.</span>
-                  )}
-                </article>
-
-                <article className="dashboard-card invoice-action-card" data-testid="dashboard-invoice-prompt">
-                  <p className="section-label">Invoice prompt</p>
-                  {dashboardSummary.invoiceCandidate ? (
-                    <>
-                      <strong>{dashboardSummary.invoiceCandidate.title}</strong>
-                      <span>
-                        {dashboardSummary.invoiceCandidate.dateLabel} ·{' '}
-                        {dashboardSummary.invoiceCandidate.clientName}
-                      </span>
-                      <span>{dashboardSummary.invoiceCandidate.feeLabel}</span>
-                      <button
-                        className="primary-button compact-action"
-                        data-testid="dashboard-generate-invoice-button"
-                        disabled={isLoading || isInvoiceLoading}
-                        onClick={onGenerateDashboardInvoice}
-                        type="button"
-                      >
-                        Generate invoice
-                      </button>
-                    </>
-                  ) : (
-                    <span>No recent uninvoiced gigs ready for a draft.</span>
-                  )}
-                </article>
+                    ) : null}
+                  </article>
+                ))}
               </div>
             </div>
           </div>

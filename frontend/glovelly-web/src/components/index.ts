@@ -1,5 +1,5 @@
 export { AppShell } from './AppShell'
-export type { AppNavigationItem, DashboardSummary } from './AppShell'
+export type { AppNavigationItem } from './AppShell'
 export { AdminSection } from './AdminSection'
 export { ClientSettingsModal } from './ClientSettingsModal'
 export { ConnectedServicesModal } from './ConnectedServicesModal'
