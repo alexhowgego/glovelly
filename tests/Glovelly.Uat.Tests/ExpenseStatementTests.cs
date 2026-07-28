@@ -225,7 +225,7 @@ public sealed class ExpenseStatementTests : InvoiceUatTestBase
     {
         await Page.GetByTestId("nav-gigs").ClickAsync();
         await Page.GetByTestId("gig-search-input").FillAsync(string.Empty);
-        await Page.GetByLabel("Type").SelectOptionAsync("all");
+        await Page.GetByTestId("gig-type-filter").SelectOptionAsync("all");
         await Page.GetByLabel("Gig filters").GetByRole(AriaRole.Button, new() { Name = "All", Exact = true }).ClickAsync();
         var card = GigCard(gigTitle);
         await card.WaitForAsync(new LocatorWaitForOptions
