@@ -240,7 +240,11 @@ export function GigsSection({
               </label>
               <label>
                 <span>Type</span>
-                <select value={gigTypeFilter} onChange={(event) => onGigTypeFilterChange(event.target.value as GigType | 'all')}>
+                <select
+                  data-testid="gig-type-filter"
+                  value={gigTypeFilter}
+                  onChange={(event) => onGigTypeFilterChange(event.target.value as GigType | 'all')}
+                >
                   <option value="all">All types</option>
                   <option value="Performance">Performance</option>
                   <option value="Teaching">Teaching</option>
