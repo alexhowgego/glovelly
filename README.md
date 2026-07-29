@@ -149,12 +149,16 @@ export Email__Invoices__FromDisplayName="Glovelly Invoices"
    - `Email__Mode`
    - `Email__AccessRequests__FromAddress`
    - `Email__AccessRequests__FromDisplayName`
-    - `Email__Invoices__FromAddress`
-    - `Email__Invoices__FromDisplayName`
-    - `SetListChartRanking__Provider`
-    - `SetListChartRanking__VertexAiProjectId`
-    - `SetListChartRanking__VertexAiLocation`
-    - `SetListChartRanking__VertexAiModel`
+   - `Email__Invoices__FromAddress`
+   - `Email__Invoices__FromDisplayName`
+   - `SetListChartRanking__Provider`
+   - `SetListChartRanking__VertexAiProjectId`
+   - `SetListChartRanking__VertexAiLocation`
+   - `SetListChartRanking__VertexAiModel`
+   - `ReceiptAnalysis__Enabled`
+   - `ReceiptAnalysis__VertexAiProjectId`
+   - `ReceiptAnalysis__VertexAiLocation`
+   - `ReceiptAnalysis__VertexAiModel`
 
 The frontend signs users in through `/auth/login`, the backend completes the Google OpenID Connect flow, and the app stores the session in a secure cookie before allowing access to `/clients`, `/gigs`, `/invoices`, and `/invoice-lines`.
 
@@ -167,11 +171,30 @@ gcloud auth application-default login
 cd backend/Glovelly.Api
 dotnet user-secrets set "SetListChartRanking:Provider" "VertexAi"
 dotnet user-secrets set "SetListChartRanking:VertexAiProjectId" "your-gcp-project-id"
-dotnet user-secrets set "SetListChartRanking:VertexAiLocation" "europe-west1"
-dotnet user-secrets set "SetListChartRanking:VertexAiModel" "gemini-2.5-flash"
+dotnet user-secrets set "SetListChartRanking:VertexAiLocation" "eu"
+dotnet user-secrets set "SetListChartRanking:VertexAiModel" "gemini-3.1-flash-lite"
 ```
 
 The configured principal must be able to call Vertex AI, for example with `roles/aiplatform.user`. If any required Vertex AI setting is missing or `Provider` remains `Deterministic`, Glovelly uses the deterministic fallback and does not call Gemini.
+
+### Vertex AI receipt analysis
+
+Receipt analysis is disabled unless `ReceiptAnalysis:Enabled` is `true` and its Vertex project, location, and model are configured. The Cloud Run service account needs `roles/aiplatform.user`. Receipt analysis defaults to Gemini 3.5 Flash, while set-list chart matching remains on Gemini 3.1 Flash Lite. A user explicitly starts analysis from a stored expense receipt; Glovelly sends supported receipt media up to the configured analysis limit to Vertex AI and presents validated suggestions for review. Analysis does not automatically change an expense.
+
+To enable it locally, authenticate with Application Default Credentials and configure the receipt-analysis options with user secrets:
+
+```bash
+gcloud auth application-default login
+cd backend/Glovelly.Api
+dotnet user-secrets set "ReceiptAnalysis:Enabled" "true"
+dotnet user-secrets set "ReceiptAnalysis:VertexAiProjectId" "your-gcp-project-id"
+dotnet user-secrets set "ReceiptAnalysis:VertexAiLocation" "eu"
+dotnet user-secrets set "ReceiptAnalysis:VertexAiModel" "gemini-3.1-flash-lite"
+```
+
+Optional limits can be configured with `ReceiptAnalysis:MaxFileSizeBytes`, `ReceiptAnalysis:Timeout`, `ReceiptAnalysis:PerUserPermitLimit`, and `ReceiptAnalysis:PerUserWindow`.
+
+Do not enable provider request/response logging for receipt analysis. Operational logs contain only identifiers, configured model, outcome, elapsed time, and failure classification. Monitor Vertex usage and cost from the Google Cloud billing console before widening access or enabling automatic/background analysis.
 
 ### Google Routes mileage estimates
 

@@ -269,8 +269,12 @@ jobs:
             Mcp__OAuth__Clients__0__Scopes__0=mcp:read
             SetListChartRanking__Provider=${{ vars.SET_LIST_CHART_RANKING_PROVIDER || 'Deterministic' }}
             SetListChartRanking__VertexAiProjectId=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_PROJECT_ID || env.GCP_PROJECT_ID }}
-            SetListChartRanking__VertexAiLocation=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_LOCATION || env.GCP_REGION }}
-            SetListChartRanking__VertexAiModel=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_MODEL || 'gemini-2.5-flash' }}
+            SetListChartRanking__VertexAiLocation=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_LOCATION || 'eu' }}
+            SetListChartRanking__VertexAiModel=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_MODEL || 'gemini-3.1-flash-lite' }}
+            ReceiptAnalysis__Enabled=${{ vars.RECEIPT_ANALYSIS_ENABLED || 'false' }}
+            ReceiptAnalysis__VertexAiProjectId=${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_PROJECT_ID || env.GCP_PROJECT_ID }}
+            ReceiptAnalysis__VertexAiLocation=${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_LOCATION || 'eu' }}
+            ReceiptAnalysis__VertexAiModel=${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_MODEL || 'gemini-3.1-flash-lite' }}
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest
@@ -455,8 +459,12 @@ jobs:
             Mcp__OAuth__Clients__0__Scopes__0=mcp:read
             SetListChartRanking__Provider=${{ vars.SET_LIST_CHART_RANKING_PROVIDER || 'Deterministic' }}
             SetListChartRanking__VertexAiProjectId=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_PROJECT_ID || env.GCP_PROJECT_ID }}
-            SetListChartRanking__VertexAiLocation=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_LOCATION || env.GCP_REGION }}
-            SetListChartRanking__VertexAiModel=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_MODEL || 'gemini-2.5-flash' }}
+            SetListChartRanking__VertexAiLocation=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_LOCATION || 'eu' }}
+            SetListChartRanking__VertexAiModel=${{ vars.SET_LIST_CHART_RANKING_VERTEX_AI_MODEL || 'gemini-3.1-flash-lite' }}
+            ReceiptAnalysis__Enabled=${{ vars.RECEIPT_ANALYSIS_ENABLED || 'false' }}
+            ReceiptAnalysis__VertexAiProjectId=${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_PROJECT_ID || env.GCP_PROJECT_ID }}
+            ReceiptAnalysis__VertexAiLocation=${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_LOCATION || 'eu' }}
+            ReceiptAnalysis__VertexAiModel=${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_MODEL || 'gemini-3.1-flash-lite' }}
           secrets: |-
             Authentication__Google__ClientId=google-client-id:latest
             Authentication__Google__ClientSecret=google-client-secret:latest

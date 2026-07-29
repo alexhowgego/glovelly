@@ -1,4 +1,3 @@
-using Google.Cloud.AIPlatform.V1;
 using Google.Cloud.Storage.V1;
 using Glovelly.Api.Configuration;
 using Microsoft.Extensions.Options;
@@ -13,6 +12,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(TimeProvider.System);
         services.AddOptions<SetListChartRankingSettings>()
             .BindConfiguration(SetListChartRankingSettings.SectionName);
+        services.AddOptions<ReceiptAnalysisSettings>()
+            .BindConfiguration(ReceiptAnalysisSettings.SectionName);
         services.AddScoped<AccessRequestWorkflowService>();
         services.AddScoped<AccessRequestRetentionService>();
         services.AddScoped<IExpenseStatementBuilder, ExpenseStatementBuilder>();
@@ -31,6 +32,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<SetListChartMatchJobProcessor>();
         services.AddScoped<DeterministicSetListChartContextualRanker>();
         services.AddScoped<VertexAiSetListChartContextualRanker>();
+        services.AddScoped<VertexReceiptAnalysisService>();
+        services.AddScoped<IReceiptAnalysisService, VertexReceiptAnalysisService>();
         services.AddScoped<ISetListChartContextualRanker>(provider =>
         {
             var settings = provider.GetRequiredService<IOptions<SetListChartRankingSettings>>().Value;
@@ -39,7 +42,7 @@ public static class ServiceCollectionExtensions
             {
                 logger.LogInformation(
                     "Set list chart ranking provider selected: VertexAi using model {Model} in {Location}.",
-                    settings.VertexAiModel ?? "gemini-2.5-flash",
+                    settings.VertexAiModel ?? "gemini-3.1-flash-lite",
                     settings.VertexAiLocation);
                 return provider.GetRequiredService<VertexAiSetListChartContextualRanker>();
             }

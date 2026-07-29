@@ -1671,6 +1671,7 @@ function App({ appMetadata }: AppProps) {
         onCloneGig={cloneSelectedGig}
         onOpenClient={openClientShortcut}
         onOpenLinkedInvoice={openSelectedGigInvoice}
+        onSessionExpired={expireSession}
         onUploadExpenseAttachment={uploadExpenseAttachment}
         onUploadExternalResourceAttachment={uploadExternalResourceAttachment}
         onDeleteExpenseAttachment={deleteExpenseAttachment}
@@ -1937,6 +1938,7 @@ function App({ appMetadata }: AppProps) {
         onGoToGig={goToQuickReceiptGig}
         onSaveDetails={saveQuickReceiptDetails}
         onSaveDraft={savePendingReceiptToSelectedGig}
+        onSessionExpired={expireSession}
         onSelectedGigChange={setQuickReceiptSelectedGigId}
         pendingFile={pendingReceiptFile}
         selectedGigId={quickReceiptSelectedGigId}
