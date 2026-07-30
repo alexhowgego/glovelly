@@ -1,14 +1,17 @@
 using Glovelly.Api.Models;
-using Google.Cloud.AIPlatform.V1;
+using Google.GenAI;
+using Google.GenAI.Types;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Text.Json;
+using GenAiClient = Google.GenAI.Client;
+using GenAiType = Google.GenAI.Types.Type;
 
 namespace Glovelly.Api.Services;
 
 public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextualRanker
 {
-    private readonly Func<GenerateContentRequest, CancellationToken, Task<GenerateContentResponse>> _generateContentAsync;
+    private readonly Func<string, List<Content>, GenerateContentConfig, CancellationToken, Task<GenerateContentResponse>> _generateContentAsync;
     private readonly SetListChartRankingSettings _settings;
     private readonly DeterministicSetListChartContextualRanker _fallback;
     private readonly ILogger<VertexAiSetListChartContextualRanker> _logger;
@@ -22,7 +25,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
     }
 
     public VertexAiSetListChartContextualRanker(
-        Func<GenerateContentRequest, CancellationToken, Task<GenerateContentResponse>> generateContentAsync,
+        Func<string, List<Content>, GenerateContentConfig, CancellationToken, Task<GenerateContentResponse>> generateContentAsync,
         IOptions<SetListChartRankingSettings> options,
         DeterministicSetListChartContextualRanker fallback,
         ILogger<VertexAiSetListChartContextualRanker> logger)
@@ -33,14 +36,10 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
         _logger = logger;
     }
 
-    private static Func<GenerateContentRequest, CancellationToken, Task<GenerateContentResponse>> CreateGenerateContentAsync(SetListChartRankingSettings settings)
+    private static Func<string, List<Content>, GenerateContentConfig, CancellationToken, Task<GenerateContentResponse>> CreateGenerateContentAsync(SetListChartRankingSettings settings)
     {
-        var client = new PredictionServiceClientBuilder
-        {
-            Endpoint = $"{settings.VertexAiLocation ?? "europe-west1"}-aiplatform.googleapis.com",
-        }.Build();
-
-        return client.GenerateContentAsync;
+        var client = new GenAiClient(project: settings.VertexAiProjectId, location: settings.VertexAiLocation, enterprise: true);
+        return (model, contents, config, cancellationToken) => client.Models.GenerateContentAsync(model, contents, config, cancellationToken);
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -63,20 +62,21 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
         var songRows = request.CandidateSets.Count(candidateSet => candidateSet.Input.Kind == GigSetListItemKind.Song && candidateSet.Input.Include);
         var candidateCount = request.CandidateSets.Sum(candidateSet => candidateSet.Candidates.Count);
 
-        var generateRequest = new GenerateContentRequest
+        var generateConfig = new GenerateContentConfig
         {
-            Model = $"projects/{_settings.VertexAiProjectId}/locations/{_settings.VertexAiLocation}/publishers/google/models/{_settings.VertexAiModel ?? "gemini-2.5-flash"}",
+            ResponseMimeType = "application/json",
+            ResponseSchema = ResponseSchema,
             SystemInstruction = new Content
             {
-                Parts = { new Part { Text = SystemPrompt } }
+                Parts = [new Part { Text = SystemPrompt }]
             },
-            Contents =
+        };
+        var contents = new List<Content>
+        {
+            new()
             {
-                new Content
-                {
-                    Role = "user",
-                    Parts = { new Part { Text = prompt } }
-                }
+                Role = "user",
+                Parts = [new Part { Text = prompt }]
             }
         };
 
@@ -84,7 +84,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
         {
             _logger.LogInformation(
                 "Calling Vertex AI chart ranker using model {Model} in {Location} for snapshot {SnapshotId}: {SongRowCount} song rows, {CandidateCount} supplied candidates, {PromptLength} prompt characters.",
-                _settings.VertexAiModel ?? "gemini-2.5-flash",
+                _settings.VertexAiModel ?? "gemini-3.1-flash-lite",
                 _settings.VertexAiLocation,
                 request.SnapshotId,
                 songRows,
@@ -92,7 +92,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
                 prompt.Length);
 
             var stopwatch = Stopwatch.StartNew();
-            var response = await _generateContentAsync(generateRequest, cancellationToken);
+            var response = await _generateContentAsync(_settings.VertexAiModel ?? "gemini-3.1-flash-lite", contents, generateConfig, cancellationToken);
             stopwatch.Stop();
             var text = response?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
             if (string.IsNullOrWhiteSpace(text))
@@ -221,7 +221,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
 
                 Guid? selectedId = null;
                 var invalidSelectedChartId = false;
-                if (decision.SelectedChartId is string idStr && Guid.TryParse(idStr, out var parsed))
+                if (!string.IsNullOrWhiteSpace(decision.SelectedChartId) && Guid.TryParse(decision.SelectedChartId, out var parsed))
                 {
                     if (!validIds.Contains(parsed))
                     {
@@ -236,7 +236,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
                         selectedId = parsed;
                     }
                 }
-                else if (decision.SelectedChartId is not null)
+                else if (!string.IsNullOrWhiteSpace(decision.SelectedChartId))
                 {
                     _logger.LogWarning(
                         "Vertex AI chart ranker response selected malformed chart id for row {SourceRowNumber} in snapshot {SnapshotId}. Marking row for review.",
@@ -344,13 +344,46 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
         1. Chart number evidence outranks title similarity when both are available.
         2. If multiple candidates have the same title, the one matching the row's chart number wins.
         3. Nearby chart numbers (+/-1) are weaker evidence and should not override clear title or context matches.
-        4. Return "selectedChartId" as the candidate's chart ID string or null if no candidate is clearly correct.
+        4. Return "selectedChartId" as the candidate's chart ID string, or an empty string if no candidate is clearly correct.
         5. Return status: "suggested" (confident), "needs_review" (ambiguous or low confidence), or "missing_from_latest_library" (no suitable candidate).
         6. Return confidence: "high", "medium", "low", or "none".
         7. You must copy selectedChartId exactly from one of the supplied candidate chartId values for the same row. Never invent, transform, truncate, or infer IDs.
-        8. If no supplied candidate chartId is clearly correct for a row, return selectedChartId as null and status as "needs_review".
-        9. Respond with valid JSON only, no other text or markdown formatting.
+        8. If no supplied candidate chartId is clearly correct for a row, return an empty selectedChartId and status as "needs_review".
+        9. Respond with a valid JSON object containing a "decisions" array only, with no other text or markdown formatting.
         """;
+
+    private static readonly Schema StringSchema = new()
+    {
+        Type = GenAiType.String,
+        Nullable = false,
+    };
+
+    private static readonly Schema ResponseSchema = new()
+    {
+        Type = GenAiType.Object,
+        Nullable = false,
+        Properties = new Dictionary<string, Schema>
+        {
+            ["decisions"] = new Schema
+            {
+                Type = GenAiType.Array,
+                Nullable = false,
+                Items = new Schema
+                {
+                    Type = GenAiType.Object,
+                    Nullable = false,
+                    Properties = new Dictionary<string, Schema>
+                    {
+                        ["rowNumber"] = new Schema { Type = GenAiType.Integer, Nullable = false },
+                        ["selectedChartId"] = StringSchema,
+                        ["status"] = StringSchema,
+                        ["confidence"] = StringSchema,
+                        ["reason"] = StringSchema,
+                    },
+                },
+            },
+        },
+    };
 
     private sealed record PromptRow
     {

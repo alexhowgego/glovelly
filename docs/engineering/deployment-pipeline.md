@@ -121,7 +121,7 @@ Secrets are bound from Secret Manager for values such as:
 - MCP OAuth client ID and client secret
 - MCP OAuth redirect URI values
 
-Set list chart matching defaults to deterministic ranking. To enable Gemini-backed ranking in a GitHub Environment, set `SET_LIST_CHART_RANKING_PROVIDER` to `VertexAi`. Optional override variables are `SET_LIST_CHART_RANKING_VERTEX_AI_PROJECT_ID`, `SET_LIST_CHART_RANKING_VERTEX_AI_LOCATION`, and `SET_LIST_CHART_RANKING_VERTEX_AI_MODEL`; the workflow otherwise uses the deployment project, deployment region, and `gemini-2.5-flash`. The Cloud Run runtime service account must have permission to call Vertex AI, for example `roles/aiplatform.user`.
+Set list chart matching defaults to deterministic ranking. To enable Gemini-backed ranking in a GitHub Environment, set `SET_LIST_CHART_RANKING_PROVIDER` to `VertexAi`. Optional override variables are `SET_LIST_CHART_RANKING_VERTEX_AI_PROJECT_ID`, `SET_LIST_CHART_RANKING_VERTEX_AI_LOCATION`, and `SET_LIST_CHART_RANKING_VERTEX_AI_MODEL`; the workflow otherwise uses the deployment project, deployment region, and `gemini-3.1-flash-lite`. The Cloud Run runtime service account must have permission to call Vertex AI, for example `roles/aiplatform.user`.
 
 Do not commit secret values, OAuth client secrets, Resend API keys, database connection strings, or user-specific credential material.
 

@@ -22,6 +22,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ForScoreLibrarySnapshot> ForScoreLibrarySnapshots => Set<ForScoreLibrarySnapshot>();
     public DbSet<ForScoreChart> ForScoreCharts => Set<ForScoreChart>();
     public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();
+    public DbSet<ReceiptAnalysis> ReceiptAnalyses => Set<ReceiptAnalysis>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<SellerProfile> SellerProfiles => Set<SellerProfile>();

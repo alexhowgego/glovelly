@@ -8,9 +8,9 @@ public sealed class SetListChartRankingSettings
 
     public string? VertexAiProjectId { get; set; }
 
-    public string? VertexAiLocation { get; set; }
+    public string? VertexAiLocation { get; set; } = "eu";
 
-    public string? VertexAiModel { get; set; }
+    public string? VertexAiModel { get; set; } = "gemini-3.1-flash-lite";
 
     public bool IsVertexAiConfigured =>
         string.Equals(Provider, "VertexAi", StringComparison.OrdinalIgnoreCase)

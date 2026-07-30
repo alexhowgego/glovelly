@@ -3,6 +3,9 @@ import type {
   QuickReceiptDraftResponse,
 } from '../types'
 import { QuickCaptureGigSelect } from './QuickCaptureGigSelect'
+import { ReceiptAnalysisModal } from './ReceiptAnalysisModal'
+import { AiSparkleIcon } from './AiSparkleIcon'
+import { useState } from 'react'
 
 type QuickReceiptModalProps = {
   candidates: QuickReceiptCandidate[]
@@ -13,7 +16,7 @@ type QuickReceiptModalProps = {
   onClose: () => void
   onDescriptionChange: (value: string) => void
   onGoToGig: () => void
-  onSaveDetails: () => void
+  onSaveDetails: (details?: { description: string; amount: string }) => Promise<void>
   onSaveDraft: () => void
   onSelectedGigChange: (gigId: string) => void
   pendingFile: File | null
@@ -21,6 +24,7 @@ type QuickReceiptModalProps = {
   status: string
   amount: string
   description: string
+  onSessionExpired: (message: string) => void
 }
 
 export function QuickReceiptModal({
@@ -40,7 +44,9 @@ export function QuickReceiptModal({
   pendingFile,
   selectedGigId,
   status,
+  onSessionExpired,
 }: QuickReceiptModalProps) {
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false)
   if (!pendingFile && !draft) {
     return null
   }
@@ -134,11 +140,20 @@ export function QuickReceiptModal({
             <>
               <button
                 className="primary-button"
-                onClick={onSaveDetails}
+                onClick={() => void onSaveDetails()}
                 type="button"
                 disabled={isSaving || !selectedGigId}
               >
                 {isSaving ? 'Saving...' : 'Save details'}
+              </button>
+              <button
+                className="ghost-button ai-button"
+                onClick={() => setIsAnalysisOpen(true)}
+                type="button"
+                disabled={isSaving}
+              >
+                <AiSparkleIcon />
+                Analyse receipt
               </button>
               <button
                 className="ghost-button"
@@ -162,6 +177,26 @@ export function QuickReceiptModal({
           <span className="status-pill">{status}</span>
         </div>
       </section>
+      {draft && isAnalysisOpen ? (
+        <ReceiptAnalysisModal
+          target={{
+            gigId: draft.gig.id,
+            expenseId: draft.expenseId,
+            attachmentId: draft.attachmentId,
+            fileName: uploadedFileName,
+          }}
+          onClose={() => setIsAnalysisOpen(false)}
+          onApply={({ merchant, totalAmount }) => {
+            const nextDescription = merchant || description
+            const nextAmount = totalAmount === null ? amount : String(totalAmount)
+            onDescriptionChange(nextDescription)
+            onAmountChange(nextAmount)
+            void onSaveDetails({ description: nextDescription, amount: nextAmount })
+            setIsAnalysisOpen(false)
+          }}
+          onSessionExpired={onSessionExpired}
+        />
+      ) : null}
     </div>
   )
 }

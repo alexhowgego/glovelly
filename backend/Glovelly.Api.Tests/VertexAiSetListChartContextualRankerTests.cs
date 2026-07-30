@@ -1,10 +1,11 @@
-using Google.Cloud.AIPlatform.V1;
+using Google.GenAI.Types;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Xunit;
+using GenAiType = Google.GenAI.Types.Type;
 
 namespace Glovelly.Api.Tests;
 
@@ -15,8 +16,8 @@ public sealed class VertexAiSetListChartContextualRankerTests
     {
         Provider = "VertexAi",
         VertexAiProjectId = "test-project",
-        VertexAiLocation = "europe-west1",
-        VertexAiModel = "gemini-2.5-flash",
+        VertexAiLocation = "eu",
+        VertexAiModel = "gemini-3.1-flash-lite",
     };
 
     private static readonly Guid ChartId = Guid.NewGuid();
@@ -66,6 +67,35 @@ public sealed class VertexAiSetListChartContextualRankerTests
         Assert.Equal(ForScoreMappingConfidence.High, decision.Confidence);
         Assert.Equal(ChartId, decision.SelectedChartId);
         Assert.Equal(1, decision.SourceRowNumber);
+    }
+
+    [Fact]
+    public async Task RankAsync_SendsJsonOnlyRequestToConfiguredModel()
+    {
+        string? capturedModel = null;
+        GenerateContentConfig? capturedConfig = null;
+        var ranker = new VertexAiSetListChartContextualRanker(
+            (model, _, config, _) =>
+            {
+                capturedModel = model;
+                capturedConfig = config;
+                return Task.FromResult(new GenerateContentResponse
+                {
+                    Candidates = [new Candidate { Content = new Content { Parts = [new Part { Text = "{\"decisions\":[]}" }] } }],
+                });
+            },
+            SettingsOptions,
+            Fallback,
+            NullLogger<VertexAiSetListChartContextualRanker>.Instance);
+
+        await ranker.RankAsync(SingleRowRequest, TestContext.Current.CancellationToken);
+
+        Assert.Equal("gemini-3.1-flash-lite", capturedModel);
+        Assert.NotNull(capturedConfig);
+        Assert.Equal("application/json", capturedConfig!.ResponseMimeType);
+        var decisionSchema = capturedConfig.ResponseSchema!.Properties!["decisions"].Items!;
+        Assert.Equal(GenAiType.String, decisionSchema.Properties!["selectedChartId"].Type);
+        Assert.All(decisionSchema.Properties.Values, schema => Assert.False(schema.Nullable));
     }
 
     [Fact]
@@ -246,25 +276,22 @@ public sealed class VertexAiSetListChartContextualRankerTests
         Assert.Null(decision.SelectedChartId);
     }
 
-    private static Func<GenerateContentRequest, CancellationToken, Task<GenerateContentResponse>> CreateGenerateContentAsync(string responseText)
+    private static Func<string, List<Content>, GenerateContentConfig, CancellationToken, Task<GenerateContentResponse>> CreateGenerateContentAsync(string responseText)
     {
-        return (_, _) =>
+        return (_, _, _, _) =>
         {
-            var response = new GenerateContentResponse();
-            response.Candidates.Add(new Candidate
+            return Task.FromResult(new GenerateContentResponse
             {
-                Content = new Content
+                Candidates = [new Candidate
                 {
-                    Parts = { new Part { Text = responseText } }
-                }
+                    Content = new Content { Parts = [new Part { Text = responseText }] }
+                }]
             });
-
-            return Task.FromResult(response);
         };
     }
 
-    private static Func<GenerateContentRequest, CancellationToken, Task<GenerateContentResponse>> CreateGenerateContentAsync(Exception exception)
+    private static Func<string, List<Content>, GenerateContentConfig, CancellationToken, Task<GenerateContentResponse>> CreateGenerateContentAsync(Exception exception)
     {
-        return (_, _) => throw exception;
+        return (_, _, _, _) => throw exception;
     }
 }

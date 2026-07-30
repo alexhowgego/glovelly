@@ -232,6 +232,38 @@ export type ExpenseAttachment = {
   createdAt: string
 }
 
+export type ReceiptAnalysisConfidence = 'None' | 'Low' | 'Medium' | 'High'
+
+export type ReceiptAnalysisField<T> = {
+  value: T
+  confidence: ReceiptAnalysisConfidence
+}
+
+export type ReceiptAnalysisResult = {
+  id: string
+  status: 'Succeeded' | 'Failed'
+  provider: string
+  model: string
+  promptVersion: string
+  requestedAt: string
+  completedAt: string
+  merchant: ReceiptAnalysisField<string | null>
+  transactionDate: ReceiptAnalysisField<string | null>
+  totalAmount: ReceiptAnalysisField<number | null>
+  currency: ReceiptAnalysisField<string | null>
+  suggestedCategory: ReceiptAnalysisField<string | null>
+  warnings: string[]
+  failureCode: string | null
+  failureMessage: string | null
+}
+
+export type ReceiptAnalysisTarget = {
+  gigId: string
+  expenseId: string
+  attachmentId: string
+  fileName: string
+}
+
 export type GigExpense = {
   id: string
   sortOrder: number

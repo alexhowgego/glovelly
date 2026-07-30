@@ -40,6 +40,7 @@ Glovelly may collect and store the following categories of information.
 - Gig details such as dates, venues, fees, mileage, passenger counts, and status.
 - Expense details such as descriptions, categories, amounts, tax treatment, reimbursement status, and receipt attachments.
 - Receipt files or images uploaded by users. These may contain personal information visible on the receipt, such as names, partial payment card details, locations, timestamps, or purchase details.
+- When you explicitly request receipt analysis, the receipt file or image, its MIME type, upload date, optional default currency, and permitted suggestion categories are sent to Google Cloud Vertex AI. Glovelly uses the result only to show reviewable suggestions; it does not automatically change an expense record.
 - Invoice details such as invoice numbers, line items, payment status, issue/reissue history, delivery details, PDF files, and Google Drive publication references.
 - Seller profile details used to generate invoices, such as trading name, address, payment details, invoice defaults, and tax or business identifiers where provided.
 
@@ -109,6 +110,7 @@ Glovelly uses personal information to:
 - maintain invoice, accounting, tax, and business administration records
 - secure the service and detect misuse
 - maintain, debug, test, and improve the service
+- provide user-requested receipt analysis and show its reviewable suggestions
 - comply with legal, accounting, tax, and record-keeping obligations
 - respond to requests, questions, and rights exercises
 
@@ -158,6 +160,7 @@ Service providers are expected to process personal information only as needed to
 Current expected subprocessors include:
 
 - Google Cloud Platform, for hosting, infrastructure, managed secrets, and related cloud services
+- Google Cloud Vertex AI, for optional user-requested receipt analysis
 - Google, for sign-in, Google Drive integration, and Google Calendar integration
 - Neon, for database hosting
 - Resend or another configured email delivery provider, for transactional email
@@ -185,6 +188,7 @@ Typical retention expectations are:
 - access request records: normally up to 12 months after handling, unless needed for security, audit, or dispute purposes
 - email delivery records: for as long as needed to confirm delivery, investigate delivery issues, or maintain business records
 - logs and diagnostic records: normally for a limited operational period, such as up to 90 days, unless needed for security investigation, debugging, legal, accounting, or dispute purposes
+- receipt-analysis attempt metadata and validated suggestions: for as long as the associated receipt is retained for business, tax, accounting, or dispute purposes; provider responses and receipt content are not included in application logs
 - documentation site technical records: according to the retention practices of GitHub or other hosting providers used to serve the site
 
 Some information may be retained for longer where required by law, tax rules, accounting obligations, security needs, dispute resolution, or backup retention.

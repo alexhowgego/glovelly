@@ -62,6 +62,7 @@ type GigsSectionProps = {
   onCloneGig: () => void
   onOpenClient: (clientId: string) => void
   onOpenLinkedInvoice: () => void
+  onSessionExpired: (message: string) => void
   onUploadExpenseAttachment: (index: number, file: File) => void
   onUploadExternalResourceAttachment: (resource: GigExternalResource, file: File) => void
   onDeleteExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
@@ -135,6 +136,7 @@ export function GigsSection({
   onCloneGig,
   onOpenClient,
   onOpenLinkedInvoice,
+  onSessionExpired,
   onUploadExpenseAttachment,
   onUploadExternalResourceAttachment,
   onDeleteExpenseAttachment,
@@ -554,6 +556,7 @@ export function GigsSection({
                 onSaveExpenseDraft={onSaveExpenseDraft}
                 onUpdateExpenseReimbursement={onUpdateExpenseReimbursement}
                 onUploadExpenseAttachment={onUploadExpenseAttachment}
+                onSessionExpired={onSessionExpired}
               />
             </>
           ) : (

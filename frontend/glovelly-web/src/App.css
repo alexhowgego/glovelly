@@ -502,6 +502,56 @@
   gap: 18px;
 }
 
+.receipt-analysis-modal {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 580px);
+}
+
+.receipt-analysis-results {
+  display: grid;
+  gap: 10px;
+}
+
+.receipt-analysis-suggestion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 14px;
+  padding: 11px 13px;
+  border: 1px solid var(--surface-border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.receipt-analysis-suggestion span,
+.receipt-analysis-suggestion small,
+.receipt-analysis-note {
+  color: var(--muted);
+}
+
+.ai-sparkle-icon {
+  width: 1em;
+  height: 1em;
+  margin-right: 0.35em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+}
+
+.receipt-analysis-suggestion strong {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.receipt-analysis-suggestion small {
+  grid-column: 1 / -1;
+}
+
+.receipt-analysis-note {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .gig-imports-modal {
   display: grid;
   gap: 18px;
@@ -2041,7 +2091,7 @@ button.compact-record-row.selected {
   margin-top: 8px;
 }
 
-.setlist-import-modal .ai-button {
+.ghost-button.ai-button {
   gap: 7px;
   border-color: color-mix(in srgb, var(--compact-control-accent) 42%, var(--surface-border));
   background: color-mix(in srgb, var(--compact-control-accent) 8%, transparent);

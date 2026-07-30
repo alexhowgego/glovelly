@@ -158,14 +158,14 @@ export function useQuickReceipt({
     void uploadQuickReceiptDraft(pendingReceiptFile, quickReceiptSelectedGigId)
   }
 
-  const saveQuickReceiptDetails = async () => {
+  const saveQuickReceiptDetails = async (details?: { description: string; amount: string }) => {
     if (!quickReceiptDraft || !quickReceiptSelectedGigId) {
       setQuickReceiptStatus('Choose a gig before saving this receipt draft.')
       return
     }
 
-    const description = quickReceiptDescription.trim()
-    const amount = Number(quickReceiptAmount || '0')
+    const description = (details?.description ?? quickReceiptDescription).trim()
+    const amount = Number((details?.amount ?? quickReceiptAmount) || '0')
 
     if (!description) {
       setQuickReceiptStatus('Add a description before saving receipt details.')

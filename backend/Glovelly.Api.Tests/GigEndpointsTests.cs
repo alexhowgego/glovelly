@@ -588,6 +588,48 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task ReceiptAnalysisEndpoints_PersistUnavailableAttemptAndReturnLatest()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId, title = "Receipt analysis test", date = "2026-06-10", venue = "Station", fee = 120m,
+            travelMiles = 0m, wasDriving = true, status = 1, expenses = new[] { new { description = "Taxi", amount = 38.42m } },
+        }, TestContext.Current.CancellationToken);
+        var gig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var gigId = gig.GetProperty("id").GetGuid();
+        var expenseId = gig.GetProperty("expenses")[0].GetProperty("id").GetGuid();
+        using var form = new MultipartFormDataContent();
+        using var file = new ByteArrayContent("receipt evidence"u8.ToArray());
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        form.Add(file, "file", "receipt.pdf");
+        var upload = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments", form, TestContext.Current.CancellationToken);
+        var attachment = await upload.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var attachmentId = attachment.GetProperty("id").GetGuid();
+
+        var analysis = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}/analysis", null, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, analysis.StatusCode);
+        var created = await analysis.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Failed", created.GetProperty("status").GetString());
+        Assert.Equal("unavailable", created.GetProperty("failureCode").GetString());
+
+        var latest = await _client.GetAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}/analysis", TestContext.Current.CancellationToken);
+        var latestResult = await latest.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(created.GetProperty("id").GetGuid(), latestResult.GetProperty("id").GetGuid());
+        var unchangedGig = await _client.GetFromJsonAsync<JsonElement>($"/gigs/{gigId}", JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Taxi", unchangedGig.GetProperty("expenses")[0].GetProperty("description").GetString());
+        Assert.Equal(38.42m, unchangedGig.GetProperty("expenses")[0].GetProperty("amount").GetDecimal());
+
+        for (var attempt = 1; attempt < 10; attempt++)
+        {
+            var retry = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}/analysis", null, TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        }
+
+        var limited = await _client.PostAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}/analysis", null, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+    }
+
+    [Fact]
     public async Task QuickReceiptDraft_WithNearbyGig_CreatesDraftExpenseAndAttachment()
     {
         var today = new DateOnly(2026, 1, 1);

@@ -28,6 +28,25 @@ Use these journeys when a change may affect gig expenses, receipt attachments, q
 
 Receipt metadata, storage, download, and deletion all work without changing the expense reimbursement state.
 
+## Receipt Analysis Journey
+
+> **Automation:** Backend automated; browser review remains manual until a consented Vertex test environment and fixture set are available.
+
+### Steps
+
+1. Open a saved gig with an existing expense receipt and select **Analyse** beside that receipt.
+2. Confirm the review dialog identifies the receipt and either shows a prior analysis or offers **Analyse receipt**.
+3. Analyse a supported test JPEG, PNG, WebP, or PDF receipt.
+4. Confirm merchant and total are clearly labelled as suggestions, confidence and warnings are visible, and date, currency, and category are labelled review-only.
+5. Select **Use merchant and total** and confirm the normal expense editor opens with the suggested values but does not save them automatically.
+6. Save the expense only after reviewing the populated fields.
+7. Repeat using a receipt saved through **Scan receipt**. Confirm **Analyse receipt** opens the same review dialog and only fills the editable draft fields after explicit use.
+8. Check an unsupported or oversized test attachment. Confirm the saved attachment and expense remain unchanged and the dialog gives a safe analysis failure message.
+
+### Expected Results
+
+Receipt analysis augments, but never blocks or silently changes, the manual expense workflow.
+
 ## Quick Receipt Journey
 
 > **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.QuickReceiptDraft_*` covers draft creation, candidate matching, updates, and reassignment; browser capture remains manual.

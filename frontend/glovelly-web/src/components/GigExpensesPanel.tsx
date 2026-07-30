@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { formatCurrency } from '../formatters'
-import type { Gig, GigExpenseForm, GigExpenseReimbursementStatus } from '../types'
+import type { Gig, GigExpenseForm, GigExpenseReimbursementStatus, ReceiptAnalysisTarget } from '../types'
+import { ReceiptAnalysisModal } from './ReceiptAnalysisModal'
+import { AiSparkleIcon } from './AiSparkleIcon'
 import { TrashIcon } from './TrashIcon'
 
 type GigExpensesPanelProps = {
@@ -21,6 +23,7 @@ type GigExpensesPanelProps = {
     status: GigExpenseReimbursementStatus
   ) => void
   onUploadExpenseAttachment: (index: number, file: File) => void
+  onSessionExpired: (message: string) => void
 }
 
 export function GigExpensesPanel({
@@ -34,11 +37,13 @@ export function GigExpensesPanel({
   onSaveExpenseDraft,
   onUpdateExpenseReimbursement,
   onUploadExpenseAttachment,
+  onSessionExpired,
 }: GigExpensesPanelProps) {
   const [expandedExpenseKey, setExpandedExpenseKey] = useState<string>('')
   const [isExpenseEditorOpen, setIsExpenseEditorOpen] = useState(false)
   const [editingExpenseIndex, setEditingExpenseIndex] = useState<number | null>(null)
   const [expenseDraft, setExpenseDraft] = useState({ description: '', amount: '' })
+  const [analysisTarget, setAnalysisTarget] = useState<(ReceiptAnalysisTarget & { expenseIndex: number }) | null>(null)
   const expenseEditorTitle = editingExpenseIndex === null ? 'Add expense' : 'Edit expense'
 
   useEffect(() => {
@@ -61,6 +66,19 @@ export function GigExpensesPanel({
     setIsExpenseEditorOpen(false)
     setEditingExpenseIndex(null)
     setExpenseDraft({ description: '', amount: '' })
+  }
+
+  const applyReceiptSuggestions = (suggestions: { merchant: string | null; totalAmount: number | null }) => {
+    if (!analysisTarget) return
+    const expense = expenses[analysisTarget.expenseIndex]
+    if (!expense) return
+    setEditingExpenseIndex(analysisTarget.expenseIndex)
+    setExpenseDraft({
+      description: suggestions.merchant || expense.description,
+      amount: suggestions.totalAmount === null ? expense.amount : String(suggestions.totalAmount),
+    })
+    setIsExpenseEditorOpen(true)
+    setAnalysisTarget(null)
   }
 
   const submitExpenseDraft = async (event: FormEvent<HTMLFormElement>) => {
@@ -216,7 +234,22 @@ export function GigExpensesPanel({
                                     onClick={() => onDownloadExpenseAttachment(expense, attachment.id)}
                                     disabled={isGigLoading}
                                   >
-                                    {attachment.fileName}
+                                   {attachment.fileName}
+                                  </button>
+                                  <button
+                                    className="ghost-button ai-button"
+                                    onClick={() => selectedGig && setAnalysisTarget({
+                                      gigId: selectedGig.id,
+                                      expenseId: expense.id,
+                                      attachmentId: attachment.id,
+                                      fileName: attachment.fileName,
+                                      expenseIndex: index,
+                                    })}
+                                    type="button"
+                                    disabled={isGigLoading}
+                                  >
+                                    <AiSparkleIcon />
+                                    Analyse
                                   </button>
                                   <button
                                     aria-label={`Delete receipt ${attachment.fileName}`}
@@ -331,6 +364,14 @@ export function GigExpensesPanel({
           </section>
         </div>
       )}
+      {analysisTarget ? (
+        <ReceiptAnalysisModal
+          target={analysisTarget}
+          onClose={() => setAnalysisTarget(null)}
+          onApply={applyReceiptSuggestions}
+          onSessionExpired={onSessionExpired}
+        />
+      ) : null}
     </>
   )
 }

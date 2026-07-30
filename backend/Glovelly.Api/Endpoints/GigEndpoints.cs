@@ -12,7 +12,8 @@ public static class GigEndpoints
             .MapGigExternalResourceEndpoints()
             .MapGigSetListImportEndpoints()
             .MapGigMileageEndpoints()
-            .MapGigAttachmentEndpoints();
+            .MapGigAttachmentEndpoints()
+            .MapGigReceiptAnalysisEndpoints();
 
         return group;
     }

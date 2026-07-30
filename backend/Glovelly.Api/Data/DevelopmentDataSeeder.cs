@@ -21,6 +21,7 @@ public sealed record DevelopmentSeedFixture(
 public static class DevelopmentDataSeeder
 {
     private static readonly DateTimeOffset SeededCreatedUtc = new(2026, 3, 15, 9, 0, 0, TimeSpan.Zero);
+    private static readonly DateOnly SeededToday = DateOnly.FromDateTime(DateTime.UtcNow);
     private static readonly byte[] SeededPdfContent = "Seeded development invoice PDF placeholder"u8.ToArray();
 
     public static async Task SeedAsync(
@@ -294,7 +295,7 @@ public static class DevelopmentDataSeeder
                 ClientId = foxAndFinchId,
                 InvoiceId = invoices[0].Id,
                 Title = "Spring Product Launch",
-                Date = new DateOnly(2026, 4, 18),
+                Date = SeededToday.AddDays(-1),
                 Venue = "Albert Hall, Manchester",
                 Fee = 650m,
                 TravelMiles = 24m,
@@ -361,7 +362,7 @@ public static class DevelopmentDataSeeder
                 Id = Guid.Parse("58dc078d-bf9d-4dfb-b515-c9ec9cb2d75b"),
                 ClientId = northlightId,
                 Title = "Lakeside Wedding Reception",
-                Date = new DateOnly(2026, 5, 2),
+                Date = SeededToday,
                 Venue = "The Glasshouse, Windermere",
                 Fee = 920m,
                 TravelMiles = 78m,
@@ -407,7 +408,7 @@ public static class DevelopmentDataSeeder
                 ClientId = riversideId,
                 InvoiceId = invoices[1].Id,
                 Title = "Community Residency Weekend",
-                Date = new DateOnly(2026, 5, 11),
+                Date = SeededToday.AddDays(1),
                 Venue = "Riverside Arts Centre",
                 Fee = 360m,
                 TravelMiles = 12m,
@@ -723,7 +724,7 @@ public static class DevelopmentDataSeeder
             .Select(index =>
             {
                 var status = statuses[index % statuses.Length];
-                var date = new DateOnly(2026, 4, 10).AddDays(index * 4);
+                var date = SeededToday.AddDays(-32 + (index * 4));
                 var invoice = index < additionalInvoices.Count ? additionalInvoices[index] : null;
 
                 return new Gig

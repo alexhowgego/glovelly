@@ -15,4 +15,6 @@ public sealed class ExpenseAttachment
 
     [JsonIgnore]
     public GigExpense? Expense { get; set; }
+    [JsonIgnore]
+    public ICollection<ReceiptAnalysis> Analyses { get; set; } = new List<ReceiptAnalysis>();
 }
