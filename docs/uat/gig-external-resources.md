@@ -30,7 +30,7 @@ The attachment is added to the selected gig only, appears without refreshing, pr
 
 ## Quick Add Attachment Journey
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickAttachmentMobileFlowSavesDraftAndOpensTargetGig` covers the mobile-sized quick attachment link flow; backend tests cover file draft matching, no-candidate handling, type inference, moves, and primary updates.
+> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickAttachmentMobileFlowSavesDraftAndOpensTargetGig` covers the mobile-sized quick attachment link flow and confirms `Go to gig` scrolls the target Gig overview into view; backend tests cover file draft matching, no-candidate handling, type inference, moves, and primary updates.
 
 ### Steps
 
@@ -38,7 +38,7 @@ The attachment is added to the selected gig only, appears without refreshing, pr
 2. Click `+` and choose `Upload file`.
 3. Upload a PDF or image when a gig exists within the quick capture window.
 4. Confirm the attachment is saved to the nearest gig and the modal shows editable title, type, purpose, URL, notes, and primary fields.
-5. Save details, then click `Go to gig` and confirm the attachment appears in the gig detail panel.
+5. Save details, then click `Go to gig` and confirm the target Gig overview scrolls into view and shows the attachment.
 6. Click `+` again, choose `Add link`, paste a Google Doc or Google Sheet URL, and save.
 
 ### Expected Results

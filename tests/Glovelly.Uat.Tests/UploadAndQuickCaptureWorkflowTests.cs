@@ -109,8 +109,7 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
                 Timeout = 30_000,
             });
             await Page.GetByTestId("quick-attachment-go-to-gig-button").ClickAsync();
-            await OpenGigAsync(gigTitle);
-            await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
+            await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeInViewportAsync(new LocatorAssertionsToBeInViewportOptions
             {
                 Timeout = 30_000,
             });
@@ -118,5 +117,34 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             {
                 HasText = attachmentTitle,
             })).ToBeVisibleAsync();
+        });
+
+    [Fact]
+    public Task QuickReceiptFlowOpensTargetGigInViewport() => RunWithDiagnosticsAsync(
+        nameof(QuickReceiptFlowOpensTargetGigInViewport),
+        async () =>
+        {
+            var runId = CreateRunId();
+            var clientName = $"{runId} Quick Receipt Client";
+            var gigTitle = $"!!! 0 {runId} Quick Receipt Gig";
+            var fixture = await CreateTinyPdfFixtureAsync(runId);
+
+            await AuthenticateWithUatSecretAsync();
+            await Page.SetViewportSizeAsync(390, 844);
+            await CreateClientAsync(clientName);
+            await CreateGigAsync(clientName, gigTitle, DateTime.UtcNow.ToString("yyyy-MM-dd"));
+
+            await Page.GetByTitle("Quick add expense receipt").Locator("input[type=file]").SetInputFilesAsync(fixture);
+            await Page.GetByRole(AriaRole.Heading, new() { Name = "Receipt saved" }).WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Go to gig" }).ClickAsync();
+
+            await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeInViewportAsync(new LocatorAssertionsToBeInViewportOptions
+            {
+                Timeout = 30_000,
+            });
         });
 }

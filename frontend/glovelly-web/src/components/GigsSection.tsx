@@ -30,6 +30,7 @@ type GigsSectionProps = {
   externalResourceForm: GigExternalResourceForm
   externalResourceMode: 'create' | 'edit'
   gigForm: GigForm
+  scrollToGigOverviewRequest: number
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
   gigQuickFilter: GigQuickFilter
@@ -110,6 +111,7 @@ export function GigsSection({
   externalResourceForm,
   externalResourceMode,
   gigForm,
+  scrollToGigOverviewRequest,
   isEditorOpen,
   gigMode,
   gigQuickFilter,
@@ -198,6 +200,18 @@ export function GigsSection({
       editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
   }, [isEditorOpen])
+
+  useEffect(() => {
+    if (!scrollToGigOverviewRequest || !selectedGig) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      detailPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+
+    return () => window.clearTimeout(timer)
+  }, [detailPanelRef, scrollToGigOverviewRequest, selectedGig])
 
   return (
     <section className="section-layout">
