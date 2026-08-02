@@ -62,8 +62,15 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal("invited-user@glovelly.local", recipient.Address);
         Assert.Equal("Invited User", recipient.DisplayName);
         Assert.Equal("You have been invited to Glovelly", email.Subject);
-        Assert.Contains("Sign in with Google using this email address", email.PlainTextBody);
+        Assert.Contains("Accept this invitation by signing in with Google using this email address", email.PlainTextBody);
+        Assert.Contains("invited-user@glovelly.local", email.PlainTextBody);
+        Assert.Contains("Accept invitation and sign in:", email.PlainTextBody);
         Assert.Contains("/auth/login", email.PlainTextBody);
+        Assert.NotNull(email.HtmlBody);
+        Assert.Contains("Accept this invitation by signing in with Google", email.HtmlBody);
+        Assert.Contains("invited-user@glovelly.local", email.HtmlBody);
+        Assert.Contains("href=\"http://localhost/auth/login\"", email.HtmlBody);
+        Assert.Contains(">Accept invitation and sign in</a>", email.HtmlBody);
     }
 
     [Fact]

@@ -291,10 +291,10 @@ public static class AdminEndpoints
             string.Empty,
             "You have been invited to use Glovelly.",
             string.Empty,
-            "Sign in with Google using this email address:",
+            "Accept this invitation by signing in with Google using this email address:",
             user.Email,
             string.Empty,
-            "Open Glovelly:",
+            "Accept invitation and sign in:",
             loginUrl,
             string.Empty,
             "If you were not expecting this invitation, you can ignore this email.",
@@ -310,12 +310,12 @@ public static class AdminEndpoints
 
         return EmailHtmlRenderer.RenderDocument(
             "You're invited",
-            "Your Glovelly account is ready for you to sign in.",
+            "Accept your invitation by signing in to Glovelly with Google.",
             $$"""
                   <div class="message-copy">
                     <p>Hi {{encodedDisplayName}},</p>
-                    <p>You have been invited to use Glovelly. Sign in with Google using <strong>{{encodedEmail}}</strong>.</p>
-                    <p><a class="button" href="{{encodedLoginUrl}}">Open Glovelly</a></p>
+                    <p>You have been invited to use Glovelly. Accept this invitation by signing in with Google using <strong>{{encodedEmail}}</strong>.</p>
+                    <p><a class="button" href="{{encodedLoginUrl}}">Accept invitation and sign in</a></p>
                   </div>
                   <div class="info-note">
                     <p>If you were not expecting this invitation, you can ignore this email.</p>

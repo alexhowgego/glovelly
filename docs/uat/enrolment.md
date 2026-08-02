@@ -68,17 +68,20 @@ Saved defaults are reused in later client, gig, or invoice workflows where expec
 1. Open Admin as an administrator.
 2. Create a user record and leave `Email this user an invitation to sign in` checked.
 3. Save.
-4. Confirm the user list updates and the status confirms the invitation was sent.
-5. Create another user record and clear `Email this user an invitation to sign in`.
-6. Save.
-7. Confirm the user list updates without an invitation-sent status.
-8. Edit a user record.
-9. Toggle active state or role.
-10. Save.
+4. Open the invitation as the recipient and confirm it identifies the Google email address to use and provides an `Accept invitation and sign in` button.
+5. Follow the button and sign in with Google using that provisioned, verified email address.
+6. Confirm Glovelly grants access and subsequent sign-ins continue to work.
+7. Return to the administrator session and confirm the user list updates and the status confirms the invitation was sent.
+8. Create another user record and clear `Email this user an invitation to sign in`.
+9. Save.
+10. Confirm the user list updates without an invitation-sent status.
+11. Edit a user record.
+12. Toggle active state or role.
+13. Save.
 
 ### Expected Results
 
-Admin changes persist and non-admin users cannot access admin workflows. New users can be invited by email during enrolment, and admins can choose not to send the invitation when needed.
+Admin changes persist and non-admin users cannot access admin workflows. New users can accept an email invitation only by signing in with the provisioned verified Google email, after which Glovelly enrols that Google identity. Admins can choose not to send the invitation when needed.
 
 ## Inactive User Deletion
 
