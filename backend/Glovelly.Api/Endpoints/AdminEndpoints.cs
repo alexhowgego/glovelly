@@ -266,7 +266,7 @@ public static class AdminEndpoints
             request.IsActive);
     }
 
-    private static string BuildLoginUrl(HttpContext httpContext)
+    internal static string BuildLoginUrl(HttpContext httpContext)
     {
         var request = httpContext.Request;
         var baseUri = new UriBuilder(request.Scheme, request.Host.Host)
@@ -282,7 +282,7 @@ public static class AdminEndpoints
         return baseUri.Uri.ToString();
     }
 
-    private static string BuildInvitationPlainTextBody(User user, string loginUrl)
+    internal static string BuildInvitationPlainTextBody(User user, string loginUrl)
     {
         var displayName = string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName;
 
@@ -301,7 +301,7 @@ public static class AdminEndpoints
         ]);
     }
 
-    private static string BuildInvitationHtmlBody(User user, string loginUrl)
+    internal static string BuildInvitationHtmlBody(User user, string loginUrl)
     {
         var displayName = string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName;
         var encodedDisplayName = EmailHtmlRenderer.Encode(displayName);

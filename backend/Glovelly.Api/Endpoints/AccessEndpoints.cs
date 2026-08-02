@@ -28,6 +28,7 @@ internal static class AccessEndpoints
             IEmailSender emailSender,
             Microsoft.Extensions.Options.IOptions<EmailSettings> emailSettingsAccessor,
             AccessRequestWorkflowService workflowService,
+            IWorkspaceEventPublisher workspaceEventPublisher,
             HttpContext httpContext,
             IDataProtectionProvider dataProtectionProvider,
             ILoggerFactory loggerFactory,
@@ -113,17 +114,33 @@ internal static class AccessEndpoints
                         new EmailMessage(
                             To: [new EmailAddress(recipient)],
                             Subject: "Glovelly access request",
-                            PlainTextBody: BuildPlainTextBody(notificationRequest, environmentLabel),
+                            PlainTextBody: BuildPlainTextBody(notificationRequest, workflowResult.AccessRequest.Id, environmentLabel, httpContext),
                             From: EmailSenderSupport.ResolveConfiguredFromAddress(
                                 emailSettingsAccessor.Value,
                                 EmailUseCase.AccessRequests),
-                            HtmlBody: BuildHtmlBody(notificationRequest, environmentLabel)),
+                            HtmlBody: BuildHtmlBody(notificationRequest, workflowResult.AccessRequest.Id, environmentLabel, httpContext)),
                         cancellationToken);
                 }
 
                 await workflowService.MarkNotificationSentAsync(
                     workflowResult.AccessRequest.Id,
                     cancellationToken);
+
+                try
+                {
+                    var workspaceEvent = new WorkspaceEvent(
+                        "access-requests",
+                        "created",
+                        workflowResult.AccessRequest.Id,
+                        DateTimeOffset.UtcNow);
+                    await Task.WhenAll(administrators.Select(administrator =>
+                        workspaceEventPublisher.PublishAsync(administrator.Id, workspaceEvent, cancellationToken)));
+                }
+                catch (Exception exception)
+                {
+                    // A missed real-time refresh must not make an access request appear unsent.
+                    logger.LogWarning(exception, "Failed to publish access-request workspace events.");
+                }
             }
             catch (Exception exception)
             {
@@ -150,7 +167,7 @@ internal static class AccessEndpoints
         return app;
     }
 
-    private static string BuildPlainTextBody(AccessRequestEmailRequest requester, string environmentLabel)
+    private static string BuildPlainTextBody(AccessRequestEmailRequest requester, Guid requestId, string environmentLabel, HttpContext httpContext)
     {
         var lines = new List<string>
         {
@@ -176,12 +193,13 @@ internal static class AccessEndpoints
         }
 
         lines.Add(string.Empty);
-        lines.Add("Review this user in the target environment and grant access if appropriate.");
+        lines.Add("Review this user in the target environment and grant access if appropriate:");
+        lines.Add(BuildReviewUrl(requestId, httpContext));
 
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string BuildHtmlBody(AccessRequestEmailRequest requester, string environmentLabel)
+    private static string BuildHtmlBody(AccessRequestEmailRequest requester, Guid requestId, string environmentLabel, HttpContext httpContext)
     {
         var encodedEmail = EmailHtmlRenderer.Encode(requester.Email);
         var encodedDisplayName = EmailHtmlRenderer.Encode(requester.DisplayName ?? "Not provided");
@@ -189,6 +207,7 @@ internal static class AccessEndpoints
         var encodedTimestamp = EmailHtmlRenderer.Encode(
             requester.RequestedAtUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'"));
         var encodedSubject = EmailHtmlRenderer.Encode(requester.Subject ?? "Not provided");
+        var encodedReviewUrl = EmailHtmlRenderer.Encode(BuildReviewUrl(requestId, httpContext));
 
         return EmailHtmlRenderer.RenderDocument(
             "Access Request",
@@ -218,8 +237,20 @@ internal static class AccessEndpoints
                   </table>
                   <div class="message-copy">
                     <p>Review this user in the target environment and grant access if appropriate.</p>
+                    <p><a class="button" href="{{encodedReviewUrl}}">Review access request</a></p>
                   </div>
             """);
+    }
+
+    private static string BuildReviewUrl(Guid requestId, HttpContext httpContext)
+    {
+        var request = httpContext.Request;
+        var url = new UriBuilder(request.Scheme, request.Host.Host)
+        {
+            Path = request.PathBase.Add($"/access-requests/{requestId}").Value,
+            Port = request.Host.Port ?? -1
+        };
+        return url.Uri.ToString();
     }
 
     private static string ResolveEnvironmentLabel(StartupSettings settings)

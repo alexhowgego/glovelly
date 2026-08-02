@@ -148,6 +148,44 @@ export type AdminSort = {
   direction: SortDirection
 }
 
+export type AccessRequestStatus = 'Pending' | 'Provisioned' | 'Declined' | 'Expired'
+
+export type AccessRequest = {
+  id: string
+  email: string
+  normalizedEmail: string
+  displayName: string | null
+  subject: string | null
+  requestedAtUtc: string
+  notificationSentAtUtc: string | null
+  notificationSuppressionReason: string | null
+  status: AccessRequestStatus
+  decisionAtUtc: string | null
+  reviewedByUserId: string | null
+  provisionedUserId: string | null
+  decisionNote: string | null
+}
+
+export type AccessRequestApproval = {
+  role: 'Admin' | 'User'
+  isActive: boolean
+  sendInvitationEmail: boolean
+  decisionNote?: string
+}
+
+export type AccessRequestApprovalResult = {
+  accessRequest: AccessRequest
+  decisionApplied: boolean
+  userCreated: boolean
+  existingUser: boolean
+  invitationEmailSent: boolean | null
+}
+
+export type AccessRequestDeclineResult = {
+  accessRequest: AccessRequest
+  decisionApplied: boolean
+}
+
 export type UserSettingsForm = {
   mileageRate: string
   passengerMileageRate: string

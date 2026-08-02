@@ -1,6 +1,7 @@
 export {
   AppShell,
   AdminSection,
+  AccessRequestsModal,
   ClientSettingsModal,
   ConnectedServicesModal,
   ClientsSection,

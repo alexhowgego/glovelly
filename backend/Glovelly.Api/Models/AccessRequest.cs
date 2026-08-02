@@ -11,4 +11,9 @@ public sealed class AccessRequest
     public string? RequestIpHash { get; set; }
     public DateTimeOffset? NotificationSentAtUtc { get; set; }
     public string? NotificationSuppressionReason { get; set; }
+    public AccessRequestStatus Status { get; set; } = AccessRequestStatus.Pending;
+    public DateTimeOffset? DecisionAtUtc { get; set; }
+    public Guid? ReviewedByUserId { get; set; }
+    public Guid? ProvisionedUserId { get; set; }
+    public string? DecisionNote { get; set; }
 }

@@ -29,6 +29,7 @@ app.MapForScoreLibraryEndpoints();
 app.MapCrudEndpoints();
 app.MapExpenseStatementEndpoints();
 app.MapAdminEndpoints();
+app.MapAccessRequestAdminEndpoints();
 app.MapHub<WorkspaceEventsHub>("/workspace-events");
 app.MapFallbackToFile("index.html");
 

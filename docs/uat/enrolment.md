@@ -83,6 +83,27 @@ Saved defaults are reused in later client, gig, or invoice workflows where expec
 
 Admin changes persist and non-admin users cannot access admin workflows. New users can accept an email invitation only by signing in with the provisioned verified Google email, after which Glovelly enrols that Google identity. Admins can choose not to send the invitation when needed.
 
+## Access-Request Approval
+
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.AccessRequestAdminEndpointsTests` covers approval, expiry, decline idempotency, invitation delivery failure, and notification review links.
+
+### Steps
+
+1. Sign in to Google with an unauthorised account with a verified email address and request access.
+2. Open the access-request notification received by an active administrator.
+3. Follow `Review access request` and, if needed, complete Google sign-in as an administrator.
+4. Confirm Glovelly opens the Access requests dialog with the requester selected and the requester email is displayed but cannot be edited.
+5. Choose the requester role and active state, leave `Send invitation email` selected, and approve access.
+6. Confirm the requester is removed from the pending list and the result confirms provisioning and invitation delivery.
+7. Sign in as the requester with the same verified Google email and confirm normal first sign-in grants the provisioned role.
+8. Open Access requests from the administrator profile menu, select another pending request, choose Decline, and cancel the confirmation.
+9. Confirm the request remains pending, then decline it again and confirm the decline.
+10. Confirm declined requests can no longer be approved and a standard user cannot see Access requests in the profile menu.
+
+### Expected Results
+
+Notification links only navigate to an authenticated administrator review; they never provision access by themselves. Approval provisions the stored request identity without retyping the email, preserves Google first-login binding, and optionally sends an invitation. Decline requires confirmation and makes no user changes. Pending request count and profile-menu indicator reflect outstanding review work.
+
 ## Inactive User Deletion
 
 > **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.AdminEndpointsTests.DeleteUser_WhenInactive_DeletesUser`, `DeleteUser_WhenActive_ReturnsValidationProblem`, and `DeleteUser_WhenCurrentUser_ReturnsValidationProblem`
