@@ -19,7 +19,7 @@ type UseQuickAttachmentOptions = {
   getGigById: (gigId: string) => Gig | undefined
   getQuickCaptureCandidates: () => QuickGigCandidate[]
   onMergeSavedGig: (gig: Gig) => void
-  onOpenAttachmentDraft: (gig: Gig) => void
+  onOpenAttachmentDraft: (gig: Gig, scrollToGig?: boolean) => void
   onSelectGig: (gigId: string) => void
   onSessionExpired: (message: string) => void
   setGigStatus: (status: string) => void
@@ -389,7 +389,7 @@ export function useQuickAttachment({
       return
     }
 
-    onOpenAttachmentDraft(targetGig)
+    onOpenAttachmentDraft(targetGig, true)
     clearQuickAttachmentDialog()
   }
 

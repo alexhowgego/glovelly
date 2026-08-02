@@ -49,7 +49,7 @@ Receipt analysis augments, but never blocks or silently changes, the manual expe
 
 ## Quick Receipt Journey
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.GigEndpointsTests.QuickReceiptDraft_*` covers draft creation, candidate matching, updates, and reassignment; browser capture remains manual.
+> **Automation:** Backend and browser automated: `Glovelly.Api.Tests.GigEndpointsTests.QuickReceiptDraft_*` covers draft creation, candidate matching, updates, and reassignment; `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickReceiptFlowOpensTargetGigInViewport` covers quick-capture navigation. Receipt analysis and visual capture variants remain manual.
 
 ### Steps
 
@@ -57,7 +57,7 @@ Receipt analysis augments, but never blocks or silently changes, the manual expe
 2. If the app suggests a nearby gig, accept it or choose a different gig.
 3. Fill in the receipt draft description and amount.
 4. Save it.
-5. Open the target gig.
+5. Click `Go to gig` and confirm the target Gig overview scrolls into view and remains selected.
 
 ### Expected Results
 

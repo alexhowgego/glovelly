@@ -76,6 +76,7 @@ export function useGigsWorkspace({
   const [gigTypeFilter, setGigTypeFilter] = useState<GigType | 'all'>('all')
   const [showPastGigs, setShowPastGigs] = useState(false)
   const [gigSort, setGigSort] = useState<GigSort>({ key: 'priority', direction: 'asc' })
+  const [gigOverviewScrollRequest, setGigOverviewScrollRequest] = useState(0)
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
@@ -1049,13 +1050,16 @@ export function useGigsWorkspace({
     }
   }
 
-  const openGigReceiptDraft = (savedGig: Gig) => {
+  const openGigReceiptDraft = (savedGig: Gig, scrollToGig = false) => {
     mergeSavedGig(savedGig)
     revealGig(savedGig, [savedGig, ...gigs.filter((gig) => gig.id !== savedGig.id)])
     onOpenSection('gigs')
     setGigMode('edit')
     setGigForm(toEditableGigForm(savedGig))
     setIsGigEditorOpen(true)
+    if (scrollToGig) {
+      setGigOverviewScrollRequest((current) => current + 1)
+    }
   }
 
   const handleLinkedInvoiceAfterGigSave = async (
@@ -1440,6 +1444,7 @@ export function useGigsWorkspace({
     externalResourceMode,
     gigForm,
     gigMode,
+    gigOverviewScrollRequest,
     gigQuickFilter,
     gigTypeFilter,
     gigSearchQuery,

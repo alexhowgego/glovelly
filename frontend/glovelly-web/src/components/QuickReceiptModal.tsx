@@ -64,6 +64,7 @@ export function QuickReceiptModal({
       <section
         aria-labelledby="quick-receipt-title"
         className="settings-modal quick-receipt-modal panel"
+        data-testid="quick-receipt-modal"
         role="dialog"
         aria-modal="true"
       >

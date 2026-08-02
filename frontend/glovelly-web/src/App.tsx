@@ -228,6 +228,7 @@ function App({ appMetadata }: AppProps) {
     externalResourceMode,
     filteredGigs,
     gigForm,
+    gigOverviewScrollRequest,
     gigMode,
     gigQuickFilter,
     gigTypeFilter,
@@ -395,7 +396,7 @@ function App({ appMetadata }: AppProps) {
   } = useQuickReceipt({
     getGigById: (gigId) => gigsById.get(gigId),
     onMergeSavedGig: (gig) => mergeSavedGig(gig),
-    onOpenReceiptDraft: (gig) => openGigReceiptDraft(gig),
+    onOpenReceiptDraft: (gig, scrollToGig) => openGigReceiptDraft(gig, scrollToGig),
     onSelectGig: selectGig,
     onSessionExpired: expireSession,
     setGigStatus,
@@ -474,7 +475,7 @@ function App({ appMetadata }: AppProps) {
     getGigById: (gigId) => gigsById.get(gigId),
     getQuickCaptureCandidates,
     onMergeSavedGig: (gig) => mergeSavedGig(gig),
-    onOpenAttachmentDraft: (gig) => openGigReceiptDraft(gig),
+    onOpenAttachmentDraft: (gig, scrollToGig) => openGigReceiptDraft(gig, scrollToGig),
     onSelectGig: selectGig,
     onSessionExpired: expireSession,
     setGigStatus,
@@ -1703,6 +1704,7 @@ function App({ appMetadata }: AppProps) {
         externalResourceForm={externalResourceForm}
         externalResourceMode={externalResourceMode}
         gigForm={gigForm}
+        scrollToGigOverviewRequest={gigOverviewScrollRequest}
         isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
         gigQuickFilter={gigQuickFilter}
