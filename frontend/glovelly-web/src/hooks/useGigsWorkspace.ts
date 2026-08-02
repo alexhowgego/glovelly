@@ -605,7 +605,7 @@ export function useGigsWorkspace({
           notes: selectedGig.notes,
           wasDriving: selectedGig.wasDriving,
           type: selectedGig.type,
-          status: selectedGig.status,
+          status: 'Draft',
           invoiceId: null,
           expenses: includeExpenses
             ? selectedGig.expenses
