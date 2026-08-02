@@ -12,5 +12,6 @@ public sealed class AccessRequestProtectionSettings
     public int GlobalNotificationDailyCap { get; set; } = 50;
     public TimeSpan GlobalNotificationWindow { get; set; } = TimeSpan.FromHours(24);
     public TimeSpan RetentionWindow { get; set; } = TimeSpan.FromDays(180);
+    public TimeSpan ApprovalWindow { get; set; } = TimeSpan.FromDays(30);
     public TimeSpan CleanupSlack { get; set; } = TimeSpan.FromDays(2);
 }

@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
         services.AddOptions<ReceiptAnalysisSettings>()
             .BindConfiguration(ReceiptAnalysisSettings.SectionName);
         services.AddScoped<AccessRequestWorkflowService>();
+        services.AddScoped<AccessRequestReviewService>();
         services.AddScoped<AccessRequestRetentionService>();
         services.AddScoped<IExpenseStatementBuilder, ExpenseStatementBuilder>();
         services.AddScoped<IExpenseStatementPdfRenderer, ExpenseStatementPdfRenderer>();

@@ -68,17 +68,41 @@ Saved defaults are reused in later client, gig, or invoice workflows where expec
 1. Open Admin as an administrator.
 2. Create a user record and leave `Email this user an invitation to sign in` checked.
 3. Save.
-4. Confirm the user list updates and the status confirms the invitation was sent.
-5. Create another user record and clear `Email this user an invitation to sign in`.
-6. Save.
-7. Confirm the user list updates without an invitation-sent status.
-8. Edit a user record.
-9. Toggle active state or role.
-10. Save.
+4. Open the invitation as the recipient and confirm it identifies the Google email address to use and provides an `Accept invitation and sign in` button.
+5. Follow the button and sign in with Google using that provisioned, verified email address.
+6. Confirm Glovelly grants access and subsequent sign-ins continue to work.
+7. Return to the administrator session and confirm the user list updates and the status confirms the invitation was sent.
+8. Create another user record and clear `Email this user an invitation to sign in`.
+9. Save.
+10. Confirm the user list updates without an invitation-sent status.
+11. Edit a user record.
+12. Toggle active state or role.
+13. Save.
 
 ### Expected Results
 
-Admin changes persist and non-admin users cannot access admin workflows. New users can be invited by email during enrolment, and admins can choose not to send the invitation when needed.
+Admin changes persist and non-admin users cannot access admin workflows. New users can accept an email invitation only by signing in with the provisioned verified Google email, after which Glovelly enrols that Google identity. Admins can choose not to send the invitation when needed.
+
+## Access-Request Approval
+
+> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.AccessRequestAdminEndpointsTests` covers approval, expiry, decline idempotency, invitation delivery failure, and notification review links.
+
+### Steps
+
+1. Sign in to Google with an unauthorised account with a verified email address and request access.
+2. Open the access-request notification received by an active administrator.
+3. Follow `Review access request` and, if needed, complete Google sign-in as an administrator.
+4. Confirm Glovelly opens the Access requests dialog with the requester selected and the requester email is displayed but cannot be edited.
+5. Choose the requester role and active state, leave `Send invitation email` selected, and approve access.
+6. Confirm the requester is removed from the pending list and the result confirms provisioning and invitation delivery.
+7. Sign in as the requester with the same verified Google email and confirm normal first sign-in grants the provisioned role.
+8. Open Access requests from the administrator profile menu, select another pending request, choose Decline, and cancel the confirmation.
+9. Confirm the request remains pending, then decline it again and confirm the decline.
+10. Confirm declined requests can no longer be approved and a standard user cannot see Access requests in the profile menu.
+
+### Expected Results
+
+Notification links only navigate to an authenticated administrator review; they never provision access by themselves. Approval provisions the stored request identity without retyping the email, preserves Google first-login binding, and optionally sends an invitation. Decline requires confirmation and makes no user changes. Pending request count and profile-menu indicator reflect outstanding review work.
 
 ## Inactive User Deletion
 

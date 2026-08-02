@@ -1,6 +1,7 @@
 export { AppShell } from './AppShell'
 export type { AppNavigationItem } from './AppShell'
 export { AdminSection } from './AdminSection'
+export { AccessRequestsModal } from './AccessRequestsModal'
 export { ClientSettingsModal } from './ClientSettingsModal'
 export { ConnectedServicesModal } from './ConnectedServicesModal'
 export { ClientsSection } from './ClientsSection'

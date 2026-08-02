@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AdminSection,
+  AccessRequestsModal,
   AppShell,
   ClientSettingsModal,
   ConnectedServicesModal,
@@ -36,6 +37,7 @@ import {
 } from './invoicePreview'
 import { getDashboardCards } from './dashboardCards'
 import { useAdminWorkspace } from './hooks/useAdminWorkspace'
+import { useAccessRequestsWorkspace } from './hooks/useAccessRequestsWorkspace'
 import { useClientsWorkspace } from './hooks/useClientsWorkspace'
 import { useGigsWorkspace } from './hooks/useGigsWorkspace'
 import { useGigImportsWorkspace } from './hooks/useGigImportsWorkspace'
@@ -71,6 +73,13 @@ function buildMonthlyInvoiceNumber(month: string, sequence: number) {
   return `GLV-${month.replace('-', '')}-${String(sequence).padStart(3, '0')}`
 }
 
+function getAccessRequestDeepLinkId(pathname: string) {
+  const match = pathname.match(
+    /^\/access-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i
+  )
+
+  return match?.[1] ?? null
+}
 
 type AppProps = {
   appMetadata: AppMetadata
@@ -97,11 +106,13 @@ function App({ appMetadata }: AppProps) {
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
   const [invoiceListScrollRequest, setInvoiceListScrollRequest] = useState(0)
   const [isGigImportsOpen, setIsGigImportsOpen] = useState(false)
+  const [isAccessRequestsOpen, setIsAccessRequestsOpen] = useState(false)
   const [forScoreSnapshot, setForScoreSnapshot] = useState<ForScoreLibrarySnapshot | null>(null)
   const [forScoreLibraryStatus, setForScoreLibraryStatus] = useState('No forScore library snapshot imported yet.')
   const [isForScoreLibraryUploading, setIsForScoreLibraryUploading] = useState(false)
 
   const isAdmin = authUser?.role === 'Admin'
+  const accessRequestDeepLinkId = getAccessRequestDeepLinkId(window.location.pathname)
   const clearSession = useCallback(() => {
     setIsAuthenticated(false)
     setAuthUser(null)
@@ -141,6 +152,20 @@ function App({ appMetadata }: AppProps) {
     totalAdmins,
     updateAdminField,
   } = useAdminWorkspace({
+    onSessionExpired: expireSession,
+  })
+  const {
+    accessRequestStatus,
+    accessRequests,
+    approveAccessRequest,
+    declineAccessRequest,
+    isAccessRequestLoading,
+    loadAccessRequests,
+    reportAccessRequestStatus,
+    resetAccessRequestsWorkspace,
+    selectAccessRequest,
+    selectedAccessRequest,
+  } = useAccessRequestsWorkspace({
     onSessionExpired: expireSession,
   })
   const {
@@ -586,6 +611,10 @@ function App({ appMetadata }: AppProps) {
           void loadGigImportBatch(selectedGigImportBatchId)
         }
       }
+
+      if (event.scope === 'access-requests' && isAdmin) {
+        void loadAccessRequests(selectedAccessRequest?.id)
+      }
     },
   })
 
@@ -603,6 +632,8 @@ function App({ appMetadata }: AppProps) {
       resetGigsWorkspace()
       resetGigImportsWorkspace()
       setIsGigImportsOpen(false)
+      resetAccessRequestsWorkspace()
+      setIsAccessRequestsOpen(false)
       setMonthlyInvoiceMonth(getCurrentMonthValue())
       setMonthlyInvoiceStatus('')
       resetInvoicesWorkspace()
@@ -729,12 +760,22 @@ function App({ appMetadata }: AppProps) {
 
         if (user.role === 'Admin') {
           try {
-            await loadAdminUsers()
+            await Promise.all([
+              loadAdminUsers(),
+              loadAccessRequests(accessRequestDeepLinkId ?? undefined),
+            ])
+            if (accessRequestDeepLinkId) {
+              setIsAccessRequestsOpen(true)
+            }
           } catch {
             if (!ignore) {
               markAdminLoadFailed()
             }
           }
+        } else if (accessRequestDeepLinkId) {
+          setStatus('Administrator access is required to review access requests.')
+          reportAccessRequestStatus('Administrator access is required to review access requests.')
+          setIsAccessRequestsOpen(true)
         }
       } catch (error) {
         if (!ignore) {
@@ -771,15 +812,19 @@ function App({ appMetadata }: AppProps) {
     clearQuickReceiptDialog,
     expireSession,
     loadAdminUsers,
+    loadAccessRequests,
+    reportAccessRequestStatus,
     loadGigImportBatch,
     markAdminLoadFailed,
     resetClientsWorkspace,
     resetAdminWorkspace,
+    resetAccessRequestsWorkspace,
     resetGigImportsWorkspace,
     resetGigsWorkspace,
     resetInvoicesWorkspace,
     resetSellerProfile,
     resetUserSettings,
+    accessRequestDeepLinkId,
   ])
 
   const uploadForScoreLibrary = async (file: File) => {
@@ -1042,6 +1087,7 @@ function App({ appMetadata }: AppProps) {
     (count, batch) => count + batch.pendingCount + batch.acceptedCount,
     0
   )
+  const pendingAccessRequestCount = accessRequests.length
   const dashboardCards = useMemo(
     () =>
       getDashboardCards({
@@ -1081,6 +1127,8 @@ function App({ appMetadata }: AppProps) {
       resetGigsWorkspace()
       resetGigImportsWorkspace()
       setIsGigImportsOpen(false)
+      resetAccessRequestsWorkspace()
+      setIsAccessRequestsOpen(false)
       resetInvoicesWorkspace()
       resetSellerProfile()
       resetAdminWorkspace()
@@ -1107,6 +1155,16 @@ function App({ appMetadata }: AppProps) {
 
   const closeGigImports = () => {
     setIsGigImportsOpen(false)
+  }
+
+  const openAccessRequests = () => {
+    closeProfileMenu()
+    setIsAccessRequestsOpen(true)
+    void loadAccessRequests()
+  }
+
+  const closeAccessRequests = () => {
+    setIsAccessRequestsOpen(false)
   }
 
   const openPreviewedInvoice = () => {
@@ -1766,8 +1824,10 @@ function App({ appMetadata }: AppProps) {
       isUserSettingsSaving={isUserSettingsSaving}
       navigationItems={navigationItems}
       pendingGigImportCount={pendingGigImportCount}
+      pendingAccessRequestCount={pendingAccessRequestCount}
       onDashboardCardAction={handleDashboardCardAction}
       onOpenGigImports={openGigImports}
+      onOpenAccessRequests={openAccessRequests}
       onOpenSellerProfile={openSellerProfile}
       onOpenConnectedServices={openConnectedServices}
       onOpenUserSettings={openUserSettings}
@@ -1831,6 +1891,25 @@ function App({ appMetadata }: AppProps) {
         }}
         onUpdateDraftField={updateGigImportDraftField}
         selectedBatchId={selectedGigImportBatchId}
+      />
+
+      <AccessRequestsModal
+        accessRequestStatus={accessRequestStatus}
+        accessRequests={accessRequests}
+        isLoading={isAccessRequestLoading}
+        isOpen={isAccessRequestsOpen}
+        onApprove={(approval) => {
+          void approveAccessRequest(approval)
+        }}
+        onClose={closeAccessRequests}
+        onDecline={(decisionNote) => {
+          void declineAccessRequest(decisionNote)
+        }}
+        onRefresh={() => {
+          void loadAccessRequests(selectedAccessRequest?.id)
+        }}
+        onSelect={selectAccessRequest}
+        selectedAccessRequest={selectedAccessRequest}
       />
 
       <UserSettingsModal

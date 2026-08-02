@@ -63,9 +63,11 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
                 Assert.Contains("User display name: New User", message.PlainTextBody);
                 Assert.Contains("Timestamp:", message.PlainTextBody);
                 Assert.Contains("Identity subject: google-sub-new-user", message.PlainTextBody);
+                Assert.Contains("/access-requests/", message.PlainTextBody);
                 Assert.NotNull(message.HtmlBody);
                 Assert.Contains("Glovelly", message.HtmlBody);
                 Assert.Contains("Testing", message.HtmlBody);
+                Assert.Contains("/access-requests/", message.HtmlBody);
             },
             message =>
             {

@@ -36,7 +36,9 @@ type AppShellProps = {
   isSellerProfileSaving: boolean
   isUserSettingsSaving: boolean
   navigationItems: AppNavigationItem[]
+  pendingAccessRequestCount: number
   pendingGigImportCount: number
+  onOpenAccessRequests: () => void
   onOpenGigImports: () => void
   onOpenSellerProfile: () => void
   onDashboardCardAction: (action: DashboardCardAction) => void
@@ -71,7 +73,9 @@ export function AppShell({
   isSellerProfileSaving,
   isUserSettingsSaving,
   navigationItems,
+  pendingAccessRequestCount,
   pendingGigImportCount,
+  onOpenAccessRequests,
   onOpenGigImports,
   onOpenSellerProfile,
   onDashboardCardAction,
@@ -186,7 +190,7 @@ export function AppShell({
                     onClick={onProfileMenuToggle}
                     type="button"
                   >
-                    {pendingGigImportCount > 0 && (
+                    {(pendingGigImportCount > 0 || (isAdmin && pendingAccessRequestCount > 0)) && (
                       <span className="notification-dot profile-notification-dot" aria-hidden="true" />
                     )}
                     <span className="profile-avatar" aria-hidden="true">
@@ -255,6 +259,24 @@ export function AppShell({
                       >
                         Seller profile
                       </button>
+                      {isAdmin && (
+                        <button
+                          className="ghost-button profile-settings profile-menu-alert-item"
+                          data-testid="profile-access-requests-menuitem"
+                          onClick={onOpenAccessRequests}
+                          role="menuitem"
+                          type="button"
+                          disabled={isLoading || isAdminLoading}
+                        >
+                          <span>
+                            Access requests
+                            {pendingAccessRequestCount > 0 ? ` (${pendingAccessRequestCount})` : ''}
+                          </span>
+                          {pendingAccessRequestCount > 0 && (
+                            <span className="notification-dot" aria-hidden="true" />
+                          )}
+                        </button>
+                      )}
                       <button
                         className="ghost-button profile-settings profile-menu-alert-item"
                         data-testid="profile-imported-gigs-menuitem"

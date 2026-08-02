@@ -25,8 +25,16 @@ internal sealed class AccessRequestConfiguration : IEntityTypeConfiguration<Acce
             .HasMaxLength(128);
         entity.Property(accessRequest => accessRequest.NotificationSuppressionReason)
             .HasMaxLength(100);
+        entity.Property(accessRequest => accessRequest.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(AccessRequestStatus.Pending)
+            .IsConcurrencyToken();
+        entity.Property(accessRequest => accessRequest.DecisionNote)
+            .HasMaxLength(1000);
         entity.HasIndex(accessRequest => accessRequest.NormalizedEmail);
         entity.HasIndex(accessRequest => accessRequest.NotificationSentAtUtc);
         entity.HasIndex(accessRequest => accessRequest.RequestedAtUtc);
+        entity.HasIndex(accessRequest => new { accessRequest.Status, accessRequest.RequestedAtUtc });
     }
 }
