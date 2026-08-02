@@ -16,7 +16,7 @@ import type {
 type UseQuickReceiptOptions = {
   getGigById: (gigId: string) => Gig | undefined
   onMergeSavedGig: (gig: Gig) => void
-  onOpenReceiptDraft: (gig: Gig) => void
+  onOpenReceiptDraft: (gig: Gig, scrollToGig?: boolean) => void
   onSelectGig: (gigId: string) => void
   onSessionExpired: (message: string) => void
   setGigStatus: (status: string) => void
@@ -246,7 +246,7 @@ export function useQuickReceipt({
       return
     }
 
-    onOpenReceiptDraft(targetGig)
+    onOpenReceiptDraft(targetGig, true)
     clearQuickReceiptDialog()
   }
 
