@@ -36,7 +36,9 @@ export function UserSettingsModal({
   const [focusedField, setFocusedField] = useState<keyof UserSettingsForm | null>(null)
   const travelOriginPlaceholder = sellerProfilePostcode?.trim() || 'BS1 1AA'
   const settingsNote =
-    focusedField === 'mileageRate'
+    focusedField === 'displayName'
+      ? 'Shown in your profile menu and used as your personal account name.'
+      : focusedField === 'mileageRate'
       ? 'Leave blank if you do not want a personal mileage default.'
       : focusedField === 'passengerMileageRate'
         ? 'Leave blank if you do not want a personal passenger mileage default.'
@@ -92,10 +94,24 @@ export function UserSettingsModal({
           <section className="settings-section">
             <div className="settings-section-heading">
               <p className="section-label">Personal defaults</p>
-              <h3>Rates and payment timing</h3>
+              <h3>Profile, rates and payment timing</h3>
             </div>
 
             <div className="form-grid">
+              <label>
+                <span>Display name</span>
+                <input
+                  autoComplete="name"
+                  data-testid="user-settings-display-name-input"
+                  maxLength={200}
+                  required
+                  type="text"
+                  value={form.displayName}
+                  onFocus={() => handleFocus('displayName')}
+                  onChange={(event) => onUpdateField('displayName', event.target.value)}
+                />
+              </label>
+
               <label>
                 <span>Mileage rate</span>
                 <input

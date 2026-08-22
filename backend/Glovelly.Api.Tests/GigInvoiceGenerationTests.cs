@@ -166,6 +166,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
     {
         var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             defaultPaymentWindowDays = 30,
@@ -209,6 +210,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
     {
         var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = (decimal?)null,
             passengerMileageRate = (decimal?)null,
             defaultPaymentWindowDays = 14,
@@ -636,6 +638,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 
         var updateUserSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "{MonthName} {Year} {InvoiceNumber}",

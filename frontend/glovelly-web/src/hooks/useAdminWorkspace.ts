@@ -12,6 +12,7 @@ import { defaultAdminStatus, emptyAdminForm } from '../forms'
 import type { AdminSort, AdminUser, AdminUserForm } from '../types'
 
 type UseAdminWorkspaceOptions = {
+  onAdminUserSaved: (user: AdminUser) => void
   onSessionExpired: (message: string) => void
 }
 
@@ -34,7 +35,10 @@ function toEditableAdminForm(user: AdminUser): AdminUserForm {
   }
 }
 
-export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions) {
+export function useAdminWorkspace({
+  onAdminUserSaved,
+  onSessionExpired,
+}: UseAdminWorkspaceOptions) {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
   const [adminSearchQuery, setAdminSearchQuery] = useState('')
@@ -150,6 +154,24 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
         : emptyAdminForm()
 
     return JSON.stringify(adminForm) !== JSON.stringify(baseline)
+  }
+
+  const updateAdminUserDisplayName = (userId: string, displayName: string) => {
+    const shouldUpdateEditor =
+      isAdminEditorOpen &&
+      adminMode === 'edit' &&
+      selectedAdminUserId === userId &&
+      !hasUnsavedAdminEditorChanges()
+
+    setAdminUsers((current) =>
+      current.map((user) =>
+        user.id === userId ? { ...user, displayName } : user
+      )
+    )
+
+    if (shouldUpdateEditor) {
+      setAdminForm((current) => ({ ...current, displayName }))
+    }
   }
 
   useEffect(() => {
@@ -299,6 +321,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
 
         return [savedUser, ...current]
       })
+      onAdminUserSaved(savedUser)
 
       setSelectedAdminUserId(savedUser.id)
       setAdminMode('edit')
@@ -442,6 +465,7 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
     startAdminCreate,
     startAdminEdit,
     totalAdmins,
+    updateAdminUserDisplayName,
     updateAdminField,
   }
 }

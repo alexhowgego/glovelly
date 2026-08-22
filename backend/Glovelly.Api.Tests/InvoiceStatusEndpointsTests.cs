@@ -139,6 +139,7 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     {
         var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             defaultPaymentWindowDays = 30,

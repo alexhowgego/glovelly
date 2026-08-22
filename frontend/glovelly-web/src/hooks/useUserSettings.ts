@@ -11,6 +11,7 @@ import { emptyUserSettingsForm } from '../forms'
 import type { AuthUser, GoogleCalendarStatus, UserSettingsForm } from '../types'
 
 type SavedUserSettings = {
+  displayName: string
   mileageRate: number | null
   passengerMileageRate: number | null
   travelOriginPostcode: string | null
@@ -25,6 +26,7 @@ type SavedUserSettings = {
 type UseUserSettingsOptions = {
   authUser: AuthUser | null
   onCloseProfileMenu: () => void
+  onDisplayNameSaved: (userId: string, displayName: string) => void
   onSessionExpired: (message: string) => void
   setAuthUser: Dispatch<SetStateAction<AuthUser | null>>
 }
@@ -34,6 +36,7 @@ const defaultUserSettingsStatus =
 
 function toUserSettingsForm(settings: SavedUserSettings): UserSettingsForm {
   return {
+    displayName: settings.displayName,
     mileageRate: settings.mileageRate === null ? '' : String(settings.mileageRate),
     passengerMileageRate:
       settings.passengerMileageRate === null
@@ -65,6 +68,7 @@ function parseOptionalDecimal(value: string) {
 export function useUserSettings({
   authUser,
   onCloseProfileMenu,
+  onDisplayNameSaved,
   onSessionExpired,
   setAuthUser,
 }: UseUserSettingsOptions) {
@@ -123,6 +127,7 @@ export function useUserSettings({
   const openUserSettings = () => {
     setUserSettingsForm(
       toUserSettingsForm({
+        displayName: authUser?.name ?? '',
         mileageRate: authUser?.mileageRate ?? null,
         passengerMileageRate: authUser?.passengerMileageRate ?? null,
         travelOriginPostcode: authUser?.travelOriginPostcode ?? null,
@@ -306,6 +311,7 @@ export function useUserSettings({
     event.preventDefault()
 
     const mileageRate = parseOptionalDecimal(userSettingsForm.mileageRate)
+    const displayName = userSettingsForm.displayName.trim()
     const passengerMileageRate = parseOptionalDecimal(
       userSettingsForm.passengerMileageRate
     )
@@ -317,6 +323,11 @@ export function useUserSettings({
     const invoiceEmailBodyTemplate = userSettingsForm.invoiceEmailBodyTemplate.trim()
     const invoiceReplyToEmail = userSettingsForm.invoiceReplyToEmail.trim()
     const invoiceUploadFolderId = userSettingsForm.invoiceUploadFolderId.trim()
+
+    if (!displayName) {
+      setUserSettingsStatus('Display name cannot be empty.')
+      return
+    }
 
     if (Number.isNaN(mileageRate) || Number.isNaN(passengerMileageRate)) {
       setUserSettingsStatus('Rates must be valid numbers, for example 0.45.')
@@ -340,6 +351,7 @@ export function useUserSettings({
       const response = await fetchWithSession(
         buildApiUrl('/auth/me/settings'),
         jsonRequestInit('PUT', {
+          displayName,
           mileageRate,
           passengerMileageRate,
           travelOriginPostcode: travelOriginPostcode || null,
@@ -375,8 +387,9 @@ export function useUserSettings({
       setAuthUser((current) =>
         current
           ? {
-              ...current,
-              mileageRate: savedSettings.mileageRate,
+            ...current,
+            name: savedSettings.displayName,
+            mileageRate: savedSettings.mileageRate,
               passengerMileageRate: savedSettings.passengerMileageRate,
               travelOriginPostcode: savedSettings.travelOriginPostcode,
               defaultPaymentWindowDays: savedSettings.defaultPaymentWindowDays,
@@ -390,6 +403,9 @@ export function useUserSettings({
             }
           : current
       )
+      if (authUser) {
+        onDisplayNameSaved(authUser.userId, savedSettings.displayName)
+      }
       setUserSettingsForm(toUserSettingsForm(savedSettings))
       setUserSettingsStatus('Settings updated.')
     } catch (error) {

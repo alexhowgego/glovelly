@@ -31,6 +31,7 @@ export const emptyAdminForm = (): AdminUserForm => ({
 })
 
 export const emptyUserSettingsForm = (): UserSettingsForm => ({
+  displayName: '',
   mileageRate: '',
   passengerMileageRate: '',
   travelOriginPostcode: '',

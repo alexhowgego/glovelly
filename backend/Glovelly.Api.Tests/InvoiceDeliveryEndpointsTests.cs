@@ -34,6 +34,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     {
         var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = (string?)null,
@@ -199,6 +200,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     {
         var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = (string?)null,
@@ -230,6 +232,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     {
         var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = (string?)null,
@@ -281,6 +284,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     {
         var updateSettingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = (string?)null,
@@ -324,6 +328,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = (string?)null,

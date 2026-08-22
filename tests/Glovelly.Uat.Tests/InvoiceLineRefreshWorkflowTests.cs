@@ -401,6 +401,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
     {
         var settingsStatus = await FetchWithSessionAsync("/auth/me/settings", "PUT", new
         {
+            displayName = "Glovelly UAT Regression User",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             defaultPaymentWindowDays = 14,
