@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Net;
+using System.Net.Http.Json;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -713,6 +715,140 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         Assert.Null(syncState.LastSyncError);
     }
 
+    [Theory]
+    [InlineData("{\"error\":{\"code\":403,\"details\":[{\"reason\":\"ACCESS_TOKEN_SCOPE_INSUFFICIENT\"}]}}")]
+    [InlineData("{\"error\":{\"code\":403,\"errors\":[{\"reason\":\"insufficientPermissions\"}]}}")]
+    public void GoogleCalendarApiException_WhenForbiddenScopeIsInsufficient_IsClassified(string responseBody)
+    {
+        var exception = new GoogleCalendarApiException("provider failure", HttpStatusCode.Forbidden, responseBody);
+
+        Assert.True(exception.IsInsufficientScope);
+    }
+
+    [Fact]
+    public void GoogleCalendarApiException_WhenForbiddenReasonIsNotScopeRelated_IsNotClassified()
+    {
+        var exception = new GoogleCalendarApiException(
+            "provider failure",
+            HttpStatusCode.Forbidden,
+            "{\"error\":{\"errors\":[{\"reason\":\"forbidden\"}]}}");
+
+        Assert.False(exception.IsInsufficientScope);
+    }
+
+    [Fact]
+    public void GoogleCalendarApiException_WhenScopeReasonIsOutsideTheCalendarErrorEnvelope_IsNotClassified()
+    {
+        var exception = new GoogleCalendarApiException(
+            "provider failure",
+            HttpStatusCode.Forbidden,
+            "{\"error\":{\"code\":403,\"metadata\":{\"reason\":\"ACCESS_TOKEN_SCOPE_INSUFFICIENT\"}}}");
+
+        Assert.False(exception.IsInsufficientScope);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_WhenGoogleCalendarScopeIsInsufficient_RequiresReconnectionWithoutExposingProviderPayload()
+    {
+        const string responseBody = "{\"error\":{\"code\":403,\"details\":[{\"reason\":\"ACCESS_TOKEN_SCOPE_INSUFFICIENT\"}]}}";
+        var calendarClient = new FakeGoogleCalendarApiClient
+        {
+            CreateEventException = new GoogleCalendarApiException("provider failure", HttpStatusCode.Forbidden, responseBody),
+        };
+        using var factory = CreateFactory(calendarClient);
+        var client = factory.CreateClient();
+        var connectionId = await SeedCalendarConnectionAsync(factory);
+        var gig = CreateGig(GigStatus.Confirmed);
+
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            var dbContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.GoogleCalendarIntegrationSettings.Add(new GoogleCalendarIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                IsEnabled = true,
+                GoogleCalendarId = "calendar-id",
+                CalendarName = "Glovelly Gigs",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            dbContext.Gigs.Add(gig);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var workItemId = await SeedWorkItemAsync(factory, CalendarSyncWorkItemReason.GigCreated, gig.Id);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+            var result = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5), TestContext.Current.CancellationToken);
+
+            Assert.Equal(new CalendarSyncDrainResult(1, 0, 0, 1, 0, 0), result);
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var workItem = await dbContext.CalendarSyncWorkItems.SingleAsync(item => item.Id == workItemId, TestContext.Current.CancellationToken);
+            var settings = await dbContext.GoogleCalendarIntegrationSettings.SingleAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(CalendarSyncWorkItemStatus.Failed, workItem.Status);
+            Assert.Equal(GoogleCalendarApiException.InsufficientScopeMessage, workItem.LastError);
+            Assert.Contains("provider failure", workItem.LastErrorDetail);
+            Assert.True(settings.RequiresReconnection);
+        }
+
+        var status = await client.GetFromJsonAsync<GoogleCalendarStatusResponse>(
+            "/integrations/google-calendar/status",
+            TestContext.Current.CancellationToken);
+        Assert.NotNull(status);
+        Assert.False(status.IsConnected);
+        Assert.True(status.RequiresReconnection);
+        Assert.Equal(GoogleCalendarApiException.InsufficientScopeMessage, status.LastError);
+        Assert.DoesNotContain("ACCESS_TOKEN_SCOPE_INSUFFICIENT", status.LastError);
+    }
+
+    [Fact]
+    public async Task EnsureCalendarAsync_WhenReconnected_ClearsReconnectionRequirement()
+    {
+        var calendarClient = new FakeGoogleCalendarApiClient();
+        using var factory = CreateFactory(calendarClient);
+        _ = factory.CreateClient();
+        var connectionId = await SeedCalendarConnectionAsync(factory);
+        var failedWorkItemId = await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.GigUpdated,
+            Guid.NewGuid(),
+            attemptCount: 1,
+            status: CalendarSyncWorkItemStatus.Failed,
+            lastError: GoogleCalendarApiException.InsufficientScopeMessage);
+
+        using (var seedScope = factory.Services.CreateScope())
+        {
+            var dbContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.GoogleCalendarIntegrationSettings.Add(new GoogleCalendarIntegrationSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestAuthContext.UserId,
+                GoogleConnectionId = connectionId,
+                IsEnabled = true,
+                RequiresReconnection = true,
+                GoogleCalendarId = "calendar-id",
+                CalendarName = "Glovelly Gigs",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IGoogleCalendarIntegrationService>();
+        await service.EnsureCalendarAsync(TestAuthContext.UserId, TestContext.Current.CancellationToken);
+
+        var assertionDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var settings = await assertionDbContext.GoogleCalendarIntegrationSettings.SingleAsync(TestContext.Current.CancellationToken);
+        var failedWorkItem = await assertionDbContext.CalendarSyncWorkItems.SingleAsync(item => item.Id == failedWorkItemId, TestContext.Current.CancellationToken);
+        Assert.False(settings.RequiresReconnection);
+        Assert.Equal(CalendarSyncWorkItemStatus.Failed, failedWorkItem.Status);
+        Assert.Equal(GoogleCalendarApiException.InsufficientScopeMessage, failedWorkItem.LastError);
+    }
+
     [Fact]
     public async Task SyncProcessor_WhenStoredCalendarIsMissing_RecreatesCalendarAndRetriesCreate()
     {
@@ -857,6 +993,122 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         Assert.Null(workItem.LastError);
         Assert.Null(workItem.LastErrorType);
         Assert.Null(workItem.LastErrorDetail);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_WhenReplacementGigWorkSucceeds_SupersedesHistoricalFailureInStatus()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        var client = factory.CreateClient();
+        var gigId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var failedWorkItemId = await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.GigUpdated,
+            gigId,
+            attemptCount: 5,
+            status: CalendarSyncWorkItemStatus.Failed,
+            lastError: "Google Calendar is not connected.",
+            createdAtUtc: now.AddMinutes(-2));
+        var replacementWorkItemId = await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.GigUpdated,
+            gigId,
+            createdAtUtc: now.AddMinutes(-1));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+            _ = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5), TestContext.Current.CancellationToken);
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var failedWorkItem = await dbContext.CalendarSyncWorkItems.SingleAsync(item => item.Id == failedWorkItemId, TestContext.Current.CancellationToken);
+            var replacementWorkItem = await dbContext.CalendarSyncWorkItems.SingleAsync(item => item.Id == replacementWorkItemId, TestContext.Current.CancellationToken);
+            Assert.Equal(CalendarSyncWorkItemStatus.Failed, failedWorkItem.Status);
+            Assert.Equal("Google Calendar is not connected.", failedWorkItem.LastError);
+            Assert.NotNull(failedWorkItem.SupersededAtUtc);
+            Assert.Equal(CalendarSyncWorkItemStatus.Succeeded, replacementWorkItem.Status);
+        }
+
+        var status = await client.GetFromJsonAsync<GoogleCalendarStatusResponse>(
+            "/integrations/google-calendar/status",
+            TestContext.Current.CancellationToken);
+        Assert.NotNull(status);
+        Assert.Equal(0, status.FailedWorkCount);
+        Assert.Null(status.LastError);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_WhenDifferentGigWorkSucceeds_DoesNotSupersedeHistoricalFailure()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        var client = factory.CreateClient();
+        var now = DateTimeOffset.UtcNow;
+        var failedWorkItemId = await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.GigUpdated,
+            Guid.NewGuid(),
+            attemptCount: 5,
+            status: CalendarSyncWorkItemStatus.Failed,
+            lastError: "Google Calendar is not connected.",
+            createdAtUtc: now.AddMinutes(-2));
+        await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.GigUpdated,
+            Guid.NewGuid(),
+            createdAtUtc: now.AddMinutes(-1));
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        _ = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5), TestContext.Current.CancellationToken);
+
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var failedWorkItem = await dbContext.CalendarSyncWorkItems.SingleAsync(item => item.Id == failedWorkItemId, TestContext.Current.CancellationToken);
+        Assert.Null(failedWorkItem.SupersededAtUtc);
+
+        var status = await client.GetFromJsonAsync<GoogleCalendarStatusResponse>(
+            "/integrations/google-calendar/status",
+            TestContext.Current.CancellationToken);
+        Assert.NotNull(status);
+        Assert.Equal(1, status.FailedWorkCount);
+        Assert.Equal("Google Calendar is not connected.", status.LastError);
+    }
+
+    [Fact]
+    public async Task QueueDrainer_WhenFullSyncSucceeds_DoesNotSupersedeHistoricalGigFailure()
+    {
+        var processor = new FakeGoogleCalendarSyncProcessor();
+        using var factory = CreateFactory(processor);
+        var client = factory.CreateClient();
+        var now = DateTimeOffset.UtcNow;
+        var failedWorkItemId = await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.GigUpdated,
+            Guid.NewGuid(),
+            attemptCount: 5,
+            status: CalendarSyncWorkItemStatus.Failed,
+            lastError: "Google Calendar is not connected.",
+            createdAtUtc: now.AddMinutes(-2));
+        await SeedWorkItemAsync(
+            factory,
+            CalendarSyncWorkItemReason.ConnectionChanged,
+            createdAtUtc: now.AddMinutes(-1));
+
+        using var scope = factory.Services.CreateScope();
+        var drainer = scope.ServiceProvider.GetRequiredService<ICalendarSyncQueueDrainer>();
+        _ = await drainer.DrainAsync(new CalendarSyncDrainOptions(MaxItems: 5), TestContext.Current.CancellationToken);
+
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var failedWorkItem = await dbContext.CalendarSyncWorkItems.SingleAsync(item => item.Id == failedWorkItemId, TestContext.Current.CancellationToken);
+        Assert.Null(failedWorkItem.SupersededAtUtc);
+
+        var status = await client.GetFromJsonAsync<GoogleCalendarStatusResponse>(
+            "/integrations/google-calendar/status",
+            TestContext.Current.CancellationToken);
+        Assert.NotNull(status);
+        Assert.Equal(1, status.FailedWorkCount);
     }
 
     [Fact]
@@ -1145,12 +1397,14 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
         DateTimeOffset? nextAttemptAtUtc = null,
         CalendarSyncWorkItemStatus status = CalendarSyncWorkItemStatus.Pending,
         string? processingOwnerId = null,
-        DateTimeOffset? processingStartedAtUtc = null)
+        DateTimeOffset? processingStartedAtUtc = null,
+        string? lastError = null,
+        DateTimeOffset? createdAtUtc = null)
     {
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var workItemId = Guid.NewGuid();
-        var now = DateTimeOffset.UtcNow;
+        var now = createdAtUtc ?? DateTimeOffset.UtcNow;
         dbContext.CalendarSyncWorkItems.Add(new CalendarSyncWorkItem
         {
             Id = workItemId,
@@ -1163,6 +1417,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             NextAttemptAtUtc = nextAttemptAtUtc ?? now,
             ProcessingOwnerId = processingOwnerId,
             ProcessingStartedAtUtc = processingStartedAtUtc,
+            LastError = lastError,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         });
@@ -1204,6 +1459,7 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
     {
         public bool CreateWasCalled { get; private set; }
         public bool ThrowNotFoundOnNextCreateEvent { get; set; }
+        public Exception? CreateEventException { get; set; }
         public string CreatedCalendarId { get; set; } = "google-calendar-id";
         public string? AccessToken { get; private set; }
         public string? Summary { get; private set; }
@@ -1244,6 +1500,11 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
                     "Not Found");
             }
 
+            if (CreateEventException is not null)
+            {
+                throw CreateEventException;
+            }
+
             return Task.FromResult(new GoogleCalendarEventResult(eventId));
         }
 
@@ -1271,6 +1532,14 @@ public sealed class GoogleCalendarIntegrationModelTests : IClassFixture<Glovelly
             DeletedEventId = eventId;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class GoogleCalendarStatusResponse
+    {
+        public bool IsConnected { get; set; }
+        public bool RequiresReconnection { get; set; }
+        public int FailedWorkCount { get; set; }
+        public string? LastError { get; set; }
     }
 
     private sealed class FakeGoogleCalendarSyncProcessor : IGoogleCalendarSyncProcessor

@@ -18,6 +18,7 @@ public sealed class CalendarSyncWorkItem
     public string? LastError { get; set; }
     public string? LastErrorType { get; set; }
     public string? LastErrorDetail { get; set; }
+    public DateTimeOffset? SupersededAtUtc { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 

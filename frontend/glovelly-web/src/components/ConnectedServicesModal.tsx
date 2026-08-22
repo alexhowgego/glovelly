@@ -51,7 +51,9 @@ export function ConnectedServicesModal({
 }: ConnectedServicesModalProps) {
   const calendarConnected = googleCalendarStatus?.isConnected ?? false
   const calendarStatusText = googleCalendarStatus
-    ? calendarConnected
+    ? googleCalendarStatus.requiresReconnection
+      ? 'Calendar reconnect required'
+      : calendarConnected
       ? `Calendar connected${googleCalendarStatus.pendingWorkCount > 0 ? `, ${googleCalendarStatus.pendingWorkCount} pending` : ''}`
       : googleCalendarStatus.hasRequiredScope
         ? 'Calendar not enabled'
@@ -189,7 +191,11 @@ export function ConnectedServicesModal({
               />
             </div>
 
-            {googleCalendarStatus?.lastError ? (
+            {googleCalendarStatus?.requiresReconnection ? (
+              <span className="connected-service-error">
+                Glovelly no longer has permission to add events to this Google Calendar. Reconnect your calendar to grant the required access.
+              </span>
+            ) : googleCalendarStatus?.lastError ? (
               <span className="connected-service-error">{googleCalendarStatus.lastError}</span>
             ) : null}
 
@@ -204,11 +210,13 @@ export function ConnectedServicesModal({
                 onClick={onConnectGoogleCalendar}
                 type="button"
               >
-                {calendarConnected ? 'Reconnect Calendar' : 'Connect Calendar'}
+                {calendarConnected || googleCalendarStatus?.requiresReconnection
+                  ? 'Reconnect Calendar'
+                  : 'Connect Calendar'}
               </button>
               <button
                 className="ghost-button"
-                disabled={!calendarConnected || isGoogleCalendarBusy}
+                disabled={(!calendarConnected && !googleCalendarStatus?.requiresReconnection) || isGoogleCalendarBusy}
                 onClick={onDisconnectGoogleCalendar}
                 type="button"
               >

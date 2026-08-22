@@ -36,6 +36,7 @@ internal sealed class CalendarSyncWorkItemConfiguration : IEntityTypeConfigurati
         entity.HasIndex(item => new { item.Status, item.ProcessingStartedAtUtc });
         entity.HasIndex(item => item.ProcessingOwnerId);
         entity.HasIndex(item => new { item.UserId, item.Provider });
+        entity.HasIndex(item => new { item.UserId, item.Provider, item.Status, item.SupersededAtUtc, item.UpdatedAtUtc });
         entity.HasIndex(item => new { item.GigId, item.Provider });
         entity.HasOne(item => item.User)
             .WithMany(user => user.CalendarSyncWorkItems)
