@@ -111,7 +111,7 @@ jobs:
         run: bash .github/scripts/validate-ef-migrations.sh
 
       - name: Run backend tests
-        run: dotnet test glovelly.sln --no-restore -m:1
+        run: dotnet test --solution glovelly.sln --no-restore --max-parallel-test-modules 1
 
       - name: Set up Node
         uses: actions/setup-node@v4

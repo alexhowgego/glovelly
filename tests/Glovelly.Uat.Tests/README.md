@@ -1,6 +1,6 @@
 # Glovelly UAT Tests
 
-This project contains Playwright-based UAT and regression smoke tests. It is intentionally kept outside `glovelly.sln` so `dotnet test glovelly.sln` remains a fast backend test command.
+This project contains Playwright-based UAT and regression smoke tests. It is intentionally kept outside `glovelly.sln` so `dotnet test --solution glovelly.sln` remains a fast backend test command.
 
 ## Install Browsers
 
@@ -29,15 +29,15 @@ The `Glovelly CI/CD` workflow deploys staging and calls the reusable `Glovelly U
 For branch UAT, run the `Glovelly CI/CD` workflow manually on the branch with `target_environment` set to `staging`. The workflow deploys staging and then runs the full Playwright UAT suite against it.
 
 ```bash
-GLOVELLY_UAT_BASE_URL=https://staging.glovelly.net dotnet test tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
+GLOVELLY_UAT_BASE_URL=https://staging.glovelly.net dotnet test --project tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
 ```
 
 To run only the production-safe smoke suite locally:
 
 ```bash
 GLOVELLY_UAT_BASE_URL=https://glovelly.net \
-dotnet test tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj \
-  --filter "Suite=Smoke"
+dotnet test --project tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj \
+  -- -trait "Suite=Smoke"
 ```
 
 To mirror CI diagnostics locally:
@@ -47,10 +47,9 @@ GLOVELLY_UAT_BASE_URL=https://staging.glovelly.net \
 GLOVELLY_UAT_SECRET=<secret> \
 GLOVELLY_UAT_INVOICE_RECIPIENT_EMAIL=uat-invoices@example.com \
 GLOVELLY_UAT_ARTIFACT_DIR=TestResults/uat \
-dotnet test tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj \
-  --logger "trx;LogFileName=uat-test-results.trx" \
-  --logger "html;LogFileName=uat-test-report.html" \
-  --results-directory TestResults/uat/test-results
+dotnet tests/Glovelly.Uat.Tests/bin/Debug/net10.0/Glovelly.Uat.Tests.dll \
+  -result-trx TestResults/uat/test-results/uat-test-results.trx \
+  -result-html TestResults/uat/test-results/uat-test-report.html
 ```
 
 On failure, tests write Playwright trace zips to `TestResults/uat/playwright-traces` and screenshots to `TestResults/uat/screenshots`.
@@ -58,5 +57,5 @@ On failure, tests write Playwright trace zips to `TestResults/uat/playwright-tra
 Tests run headless by default. To see the browser:
 
 ```bash
-GLOVELLY_UAT_BASE_URL=https://staging.glovelly.net GLOVELLY_UAT_HEADLESS=false dotnet test tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
+GLOVELLY_UAT_BASE_URL=https://staging.glovelly.net GLOVELLY_UAT_HEADLESS=false dotnet test --project tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
 ```

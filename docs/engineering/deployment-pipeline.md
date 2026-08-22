@@ -83,7 +83,7 @@ It currently:
 2. sets up .NET
 3. restores dependencies
 4. validates EF migrations against a disposable PostgreSQL database once a baseline snapshot exists
-5. runs backend tests with `dotnet test glovelly.sln --no-restore -m:1`
+5. runs backend tests with `dotnet test --solution glovelly.sln --no-restore --max-parallel-test-modules 1`
 6. authenticates to Google Cloud through Workload Identity Federation
 7. sets up Docker Buildx
 8. builds and optionally pushes the image

@@ -25,7 +25,7 @@ These are the working conventions that save future agents from rediscovering loc
 - Use `TestAuthContext` for seeded/authenticated user details.
 - Use `factory.Emails` for email assertions.
 - Add direct service tests when behavior is mostly pure or when endpoint setup would obscure the scenario.
-- Run `dotnet test glovelly.sln -m:1` after backend changes.
+- Run `dotnet test --solution glovelly.sln --max-parallel-test-modules 1` after backend changes.
 
 ## Frontend
 

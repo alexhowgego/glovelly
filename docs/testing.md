@@ -13,7 +13,7 @@ From the repo root:
 That script runs:
 
 ```bash
-dotnet test glovelly.sln -m:1
+dotnet test --solution glovelly.sln --max-parallel-test-modules 1
 npm --prefix frontend/glovelly-web run lint
 npm --prefix frontend/glovelly-web run build
 ```
@@ -33,15 +33,15 @@ Important support files:
 Run backend tests:
 
 ```bash
-dotnet test glovelly.sln -m:1
+dotnet test --solution glovelly.sln --max-parallel-test-modules 1
 ```
 
-Use `-m:1` because the test setup uses shared web application factory patterns and in-memory state; serial execution avoids noisy cross-test behavior.
+Use `--max-parallel-test-modules 1` because the test setup uses shared web application factory patterns and in-memory state; serial execution avoids noisy cross-test behavior.
 
 Focused Calendar sync checks can be run with:
 
 ```bash
-dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~GoogleCalendarIntegrationModelTests
+dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --filter-class '*GoogleCalendarIntegrationModelTests'
 ```
 
 Worker smoke checks can be run locally with:

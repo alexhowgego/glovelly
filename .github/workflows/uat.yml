@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       test_filter:
-        description: Optional dotnet test filter
+        description: Optional xUnit trait filter
         required: false
         type: string
         default: ""
@@ -38,7 +38,7 @@ on:
           - staging
           - production
       test_filter:
-        description: Optional dotnet test filter, for example Suite=Smoke
+        description: Optional xUnit trait filter, for example Suite=Smoke
         required: false
         default: ""
         type: string
@@ -145,19 +145,16 @@ jobs:
 
       - name: Run Playwright UAT suite
         run: |
+          mkdir -p "$GLOVELLY_UAT_ARTIFACT_DIR/test-results"
           test_args=(
-            tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
-            --no-build
-            --configuration Release
-            --logger "console;verbosity=normal"
-            --logger "trx;LogFileName=uat-test-results.trx"
-            --logger "html;LogFileName=uat-test-report.html"
-            --results-directory "$GLOVELLY_UAT_ARTIFACT_DIR/test-results"
+            -reporter verbose
+            -result-trx "$GLOVELLY_UAT_ARTIFACT_DIR/test-results/uat-test-results.trx"
+            -result-html "$GLOVELLY_UAT_ARTIFACT_DIR/test-results/uat-test-report.html"
           )
           if [ -n "$GLOVELLY_UAT_TEST_FILTER" ]; then
-            test_args+=(--filter "$GLOVELLY_UAT_TEST_FILTER")
+            test_args+=(-trait "$GLOVELLY_UAT_TEST_FILTER")
           fi
-          dotnet test "${test_args[@]}"
+          dotnet tests/Glovelly.Uat.Tests/bin/Release/net10.0/Glovelly.Uat.Tests.dll "${test_args[@]}"
 
       - name: Publish UAT test results
         if: always()

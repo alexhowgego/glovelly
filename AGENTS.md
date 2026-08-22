@@ -15,8 +15,8 @@ Run from repo root unless noted.
 
 ```bash
 ./run-dev.sh                                    # backend :5153 + Vite :5173; sources .glovelly.dev.local
-dotnet test glovelly.sln -m:1                  # backend suite; keep -m:1 for shared in-memory/factory state
-dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~GigEndpointsTests
+dotnet test --solution glovelly.sln --max-parallel-test-modules 1  # backend suite; keep modules serial for shared in-memory/factory state
+dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --filter-class '*GigEndpointsTests'
 npm --prefix frontend/glovelly-web run lint
 npm --prefix frontend/glovelly-web run build
 ./verify.sh                                    # dotnet test, frontend lint, frontend build
@@ -24,7 +24,7 @@ dotnet tool restore && dotnet tool run docfx docs/docfx.json
 dotnet tool run docfx docs/docfx.json --serve  # local handbook
 ```
 
-- Use `./verify.sh` before handing over broad changes. For backend-only changes, `dotnet test glovelly.sln -m:1` is the best first check.
+- Use `./verify.sh` before handing over broad changes. For backend-only changes, `dotnet test --solution glovelly.sln --max-parallel-test-modules 1` is the best first check.
 - Frontend has lint/build checks only; no unit/e2e runner is configured.
 
 ## Backend Map
