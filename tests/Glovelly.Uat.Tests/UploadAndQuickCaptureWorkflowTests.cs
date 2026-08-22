@@ -109,8 +109,7 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
                 Timeout = 30_000,
             });
             await Page.GetByTestId("quick-attachment-go-to-gig-button").ClickAsync();
-            await OpenGigAsync(gigTitle);
-            await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
+            await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeInViewportAsync(new LocatorAssertionsToBeInViewportOptions
             {
                 Timeout = 30_000,
             });
@@ -118,5 +117,48 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             {
                 HasText = attachmentTitle,
             })).ToBeVisibleAsync();
+        });
+
+    [Fact]
+    public Task QuickReceiptFlowOpensTargetGigInViewport() => RunWithDiagnosticsAsync(
+        nameof(QuickReceiptFlowOpensTargetGigInViewport),
+        async () =>
+        {
+            var runId = CreateRunId();
+            var clientName = $"{runId} Quick Receipt Client";
+            var gigTitle = $"!!! 0 {runId} Quick Receipt Gig";
+            var fixture = await CreateTinyPdfFixtureAsync(runId);
+
+            await AuthenticateWithUatSecretAsync();
+            await Page.SetViewportSizeAsync(390, 844);
+            await CreateClientAsync(clientName);
+            await CreateGigAsync(clientName, gigTitle, DateTime.UtcNow.ToString("yyyy-MM-dd"));
+
+            await Page.GetByTitle("Quick add expense receipt").Locator("input[type=file]").SetInputFilesAsync(fixture);
+            await Page.GetByRole(AriaRole.Heading, new() { Name = "Receipt saved" }).WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+            var gigSelect = Page.GetByTestId("quick-capture-gig-select");
+            var optionValue = await gigSelect.Locator("option").Filter(new LocatorFilterOptions
+            {
+                HasText = gigTitle,
+            }).GetAttributeAsync("value");
+            Assert.False(string.IsNullOrWhiteSpace(optionValue), $"Expected quick receipt candidates to include '{gigTitle}'.");
+            await gigSelect.SelectOptionAsync(optionValue);
+            var quickReceiptModal = Page.GetByTestId("quick-receipt-modal");
+            await quickReceiptModal.GetByLabel("Description").FillAsync($"{runId} Receipt draft");
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Save details" }).ClickAsync();
+            await Assertions.Expect(quickReceiptModal).ToContainTextAsync("details saved", new LocatorAssertionsToContainTextOptions
+            {
+                Timeout = 30_000,
+            });
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Go to gig" }).ClickAsync();
+
+            await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeInViewportAsync(new LocatorAssertionsToBeInViewportOptions
+            {
+                Timeout = 30_000,
+            });
         });
 }
