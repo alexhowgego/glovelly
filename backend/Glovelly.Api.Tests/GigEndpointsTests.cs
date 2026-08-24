@@ -3,7 +3,10 @@ using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Glovelly.Api.Data;
+using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -534,6 +537,12 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
         Assert.Equal("application/pdf", downloadResponse.Content.Headers.ContentType?.MediaType);
         Assert.Equal("receipt evidence", await downloadResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        await RemoveAttachmentBlobAsync(attachmentId);
+        var missingBlobResponse = await _client.GetAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, missingBlobResponse.StatusCode);
+        var missingBlobProblem = await missingBlobResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("This attachment file is no longer available.", missingBlobProblem.GetProperty("detail").GetString());
 
         var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}/expenses/{expenseId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
 
@@ -1531,10 +1540,28 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
         Assert.Equal("text/markdown", downloadResponse.Content.Headers.ContentType?.MediaType);
 
+        await RemoveAttachmentBlobAsync(attachmentId);
+        var missingBlobResponse = await _client.GetAsync($"/gigs/{gigId}/external-resources/{resourceId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, missingBlobResponse.StatusCode);
+        var missingBlobProblem = await missingBlobResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("This attachment file is no longer available.", missingBlobProblem.GetProperty("detail").GetString());
+
         var deleteResponse = await _client.DeleteAsync($"/gigs/{gigId}/external-resources/{resourceId}/attachments/{attachmentId}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
         var gigAfterDelete = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Empty(Assert.Single(gigAfterDelete.GetProperty("externalResources").EnumerateArray()).GetProperty("attachments").EnumerateArray());
+    }
+
+    private async Task RemoveAttachmentBlobAsync(Guid attachmentId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var storageKey = (await db.ExpenseAttachments.FindAsync([attachmentId], TestContext.Current.CancellationToken))?.StorageKey
+            ?? (await db.GigExternalResourceAttachments.FindAsync([attachmentId], TestContext.Current.CancellationToken))?.StorageKey;
+        Assert.NotNull(storageKey);
+
+        var attachmentStore = scope.ServiceProvider.GetRequiredService<IExpenseAttachmentStore>();
+        await attachmentStore.DeleteAsync(storageKey, TestContext.Current.CancellationToken);
     }
 
     [Fact]

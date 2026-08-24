@@ -98,7 +98,8 @@ internal static class GigAttachmentEndpoints
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
-            IExpenseAttachmentStore attachmentStore) =>
+            IExpenseAttachmentStore attachmentStore,
+            ILogger<Program> logger) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
             var attachment = await GigEndpointSupport.FindVisibleAttachmentAsync(db, userId, gigId, expenseId, attachmentId, asNoTracking: true);
@@ -116,9 +117,16 @@ internal static class GigAttachmentEndpoints
                     attachment.FileName,
                     enableRangeProcessing: true);
             }
-            catch (FileNotFoundException)
+            catch (FileNotFoundException exception)
             {
-                return Results.NotFound();
+                logger.LogWarning(
+                    exception,
+                    "Attachment object was not found: AttachmentId {AttachmentId}, StorageKey {StorageKey}.",
+                    attachment.Id,
+                    attachment.StorageKey);
+                return Results.Problem(
+                    detail: "This attachment file is no longer available.",
+                    statusCode: StatusCodes.Status404NotFound);
             }
         });
 
