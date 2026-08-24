@@ -126,6 +126,7 @@ internal static class AuthEndpoints
 
             localUser.MileageRate = request.MileageRate;
             localUser.PassengerMileageRate = request.PassengerMileageRate;
+            localUser.DisplayName = request.DisplayName!.Trim();
             localUser.TravelOriginPostcode = NormalizeOptionalText(request.TravelOriginPostcode);
             localUser.DefaultPaymentWindowDays = request.DefaultPaymentWindowDays;
             localUser.InvoiceFilenamePattern = request.InvoiceFilenamePattern?.Trim();
@@ -179,6 +180,7 @@ internal static class AuthEndpoints
 
             return Results.Ok(new
             {
+                displayName = localUser.DisplayName,
                 mileageRate = localUser.MileageRate,
                 passengerMileageRate = localUser.PassengerMileageRate,
                 travelOriginPostcode = localUser.TravelOriginPostcode,
@@ -238,6 +240,14 @@ internal static class AuthEndpoints
 
     private static Dictionary<string, string[]>? ValidateUserSettingsRequest(UserSettingsRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.DisplayName))
+        {
+            return new Dictionary<string, string[]>
+            {
+                ["displayName"] = ["Display name cannot be empty or whitespace."]
+            };
+        }
+
         if (EndpointSupport.TryValidateInvoiceFilenamePattern(
                 request.InvoiceFilenamePattern,
                 out var patternErrors))
@@ -306,6 +316,8 @@ internal static class AuthEndpoints
     }
 
     internal sealed record UserSettingsRequest(
+        [property: StringLength(200, ErrorMessage = "Display name must be 200 characters or fewer.")]
+        string? DisplayName,
         [Range(0, double.MaxValue, ErrorMessage = "Mileage rate cannot be negative.")]
         decimal? MileageRate,
         [Range(0, double.MaxValue, ErrorMessage = "Passenger mileage rate cannot be negative.")]

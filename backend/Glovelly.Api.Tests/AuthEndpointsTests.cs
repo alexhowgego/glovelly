@@ -39,6 +39,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         var updateResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             travelOriginPostcode = "BS1 1AA",
@@ -154,6 +155,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             defaultPaymentWindowDays = 14,
@@ -177,6 +179,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             defaultPaymentWindowDays = 14,
@@ -198,6 +201,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             travelOriginPostcode = "  BS2 2BB  ",
@@ -235,10 +239,127 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task UpdateSettings_PersistsTrimmedDisplayNameAndMeReturnsSavedName()
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            displayName = "  Updated Admin  ",
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Updated Admin", payload.GetProperty("displayName").GetString());
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var savedUser = await dbContext.Users.FindAsync([TestAuthContext.UserId], TestContext.Current.CancellationToken);
+            Assert.NotNull(savedUser);
+            Assert.Equal("Updated Admin", savedUser.DisplayName);
+        }
+
+        var meResponse = await _client.GetAsync("/auth/me", TestContext.Current.CancellationToken);
+        var me = await meResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Updated Admin", me.GetProperty("name").GetString());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task UpdateSettings_WithBlankDisplayName_ReturnsValidationProblemAndPreservesExistingName(string displayName)
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            displayName,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            "Display name cannot be empty or whitespace.",
+            problem.GetProperty("errors").GetProperty("displayName")[0].GetString());
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var savedUser = await dbContext.Users.FindAsync([TestAuthContext.UserId], TestContext.Current.CancellationToken);
+        Assert.NotNull(savedUser);
+        Assert.Equal("Test Admin", savedUser.DisplayName);
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WithOverlongDisplayName_ReturnsValidationProblemAndPreservesExistingName()
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            displayName = new string('a', 201),
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            "Display name must be 200 characters or fewer.",
+            problem.GetProperty("errors").GetProperty("displayName")[0].GetString());
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var savedUser = await dbContext.Users.FindAsync([TestAuthContext.UserId], TestContext.Current.CancellationToken);
+        Assert.NotNull(savedUser);
+        Assert.Equal("Test Admin", savedUser.DisplayName);
+    }
+
+    [Fact]
+    public async Task UpdateSettings_AsStandardUser_UpdatesOnlyAuthenticatedUsersDisplayName()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.Users.Add(new User
+            {
+                Id = TestAuthContext.AlternateUserId,
+                GoogleSubject = "google-sub-alternate",
+                Email = "alternate@glovelly.local",
+                DisplayName = "Alternate User",
+                Role = UserRole.User,
+                IsActive = true,
+                CreatedUtc = DateTime.UtcNow,
+            });
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Put, "/auth/me/settings")
+        {
+            Content = JsonContent.Create(new
+            {
+                displayName = "Updated Alternate",
+                userId = TestAuthContext.UserId,
+            }),
+        };
+        request.Headers.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
+        request.Headers.Add("X-Test-Role", UserRole.User.ToString());
+
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var alternateUser = await verificationDb.Users.FindAsync([TestAuthContext.AlternateUserId], TestContext.Current.CancellationToken);
+        var originalUser = await verificationDb.Users.FindAsync([TestAuthContext.UserId], TestContext.Current.CancellationToken);
+        Assert.NotNull(alternateUser);
+        Assert.NotNull(originalUser);
+        Assert.Equal("Updated Alternate", alternateUser.DisplayName);
+        Assert.Equal("Test Admin", originalUser.DisplayName);
+    }
+
+    [Fact]
     public async Task UpdateSettings_WithTooLongTravelOriginPostcode_ReturnsValidationProblem()
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             travelOriginPostcode = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -259,6 +380,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "{InvoiceNumber}",
@@ -279,6 +401,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "   ",
@@ -298,6 +421,7 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         var response = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             invoiceFilenamePattern = "{InvoiceNumber}",

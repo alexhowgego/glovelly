@@ -187,6 +187,7 @@ export type AccessRequestDeclineResult = {
 }
 
 export type UserSettingsForm = {
+  displayName: string
   mileageRate: string
   passengerMileageRate: string
   travelOriginPostcode: string

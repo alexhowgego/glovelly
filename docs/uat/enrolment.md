@@ -50,14 +50,18 @@ The invoice PDF reflects seller profile and payment details. Missing profile det
 ### Steps
 
 1. Open user settings.
-2. Change default invoice or mileage settings.
-3. Save.
-4. Create a new client or gig that uses defaults.
-5. Generate an invoice where those defaults should apply.
+2. Change the display name and save.
+3. Confirm the profile menu shows the new name immediately.
+4. As an administrator, open the Admin section and confirm the matching user row shows the new name without a browser refresh.
+5. Refresh the page or sign in again and confirm the name remains saved.
+6. Change default invoice or mileage settings.
+7. Save.
+8. Create a new client or gig that uses defaults.
+9. Generate an invoice where those defaults should apply.
 
 ### Expected Results
 
-Saved defaults are reused in later client, gig, or invoice workflows where expected. Existing records are not unexpectedly overwritten.
+The display name updates immediately in the profile menu and Administrator user list, and remains saved after refresh or a new sign-in. Saved defaults are reused in later client, gig, or invoice workflows where expected. Existing records are not unexpectedly overwritten.
 
 ## Admin Access
 
@@ -78,10 +82,12 @@ Saved defaults are reused in later client, gig, or invoice workflows where expec
 11. Edit a user record.
 12. Toggle active state or role.
 13. Save.
+14. Edit your own display name and save.
+15. Confirm the avatar dropdown updates to the saved name without a browser refresh.
 
 ### Expected Results
 
-Admin changes persist and non-admin users cannot access admin workflows. New users can accept an email invitation only by signing in with the provisioned verified Google email, after which Glovelly enrols that Google identity. Admins can choose not to send the invitation when needed.
+Admin changes persist and non-admin users cannot access admin workflows. An administrator editing their own account sees the updated display name immediately in the avatar dropdown. New users can accept an email invitation only by signing in with the provisioned verified Google email, after which Glovelly enrols that Google identity. Admins can choose not to send the invitation when needed.
 
 ## Access-Request Approval
 

@@ -53,6 +53,7 @@ import { useWorkspaceEvents } from './hooks/useWorkspaceEvents'
 import type {
   AppMetadata,
   AppSection,
+  AdminUser,
   AuthUser,
   Client,
   ForScoreLibrarySnapshot,
@@ -125,6 +126,18 @@ function App({ appMetadata }: AppProps) {
     },
     [clearSession]
   )
+  const syncCurrentUserFromAdmin = useCallback((savedUser: AdminUser) => {
+    setAuthUser((current) =>
+      current?.userId === savedUser.id
+        ? {
+            ...current,
+            email: savedUser.email,
+            name: savedUser.displayName ?? savedUser.email,
+            role: savedUser.role,
+          }
+        : current
+    )
+  }, [])
 
   const {
     activeUsersCount,
@@ -150,8 +163,10 @@ function App({ appMetadata }: AppProps) {
     startAdminCreate,
     startAdminEdit,
     totalAdmins,
+    updateAdminUserDisplayName,
     updateAdminField,
   } = useAdminWorkspace({
+    onAdminUserSaved: syncCurrentUserFromAdmin,
     onSessionExpired: expireSession,
   })
   const {
@@ -507,6 +522,7 @@ function App({ appMetadata }: AppProps) {
   } = useUserSettings({
     authUser,
     onCloseProfileMenu: closeProfileMenu,
+    onDisplayNameSaved: updateAdminUserDisplayName,
     onSessionExpired: expireSession,
     setAuthUser,
   })

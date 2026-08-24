@@ -31,7 +31,7 @@ The MCP tool catalog is treated as a public integration contract. Intentional to
 When you intentionally change MCP tool names, descriptions, safety metadata, input schemas, or output schemas, run:
 
 ```bash
-UPDATE_MCP_SNAPSHOT=1 UPDATE_MCP_DOCS=1 dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~McpToolCatalog
+UPDATE_MCP_SNAPSHOT=1 UPDATE_MCP_DOCS=1 dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --filter-class '*McpToolCatalog*'
 ```
 
 This refreshes:
@@ -43,7 +43,7 @@ This refreshes:
 After regenerating, review the diff carefully. These files should only change when the MCP public contract has intentionally changed. Then run the MCP-focused tests:
 
 ```bash
-dotnet test glovelly.sln -m:1 --filter FullyQualifiedName~Mcp
+dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --filter-class '*Mcp*'
 ```
 
 ## Current Scope (v1)

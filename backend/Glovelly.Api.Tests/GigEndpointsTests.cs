@@ -186,6 +186,7 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
 
         var settingsResponse = await _client.PutAsJsonAsync("/auth/me/settings", new
         {
+            displayName = "Test Admin",
             mileageRate = 0.45m,
             passengerMileageRate = 0.10m,
             travelOriginPostcode = "  BS9 9ZZ  ",

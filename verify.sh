@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Running backend tests..."
-dotnet test "$ROOT_DIR/glovelly.sln" -m:1
+dotnet test --solution "$ROOT_DIR/glovelly.sln" --max-parallel-test-modules 1
 
 echo
 echo "Running frontend tests..."

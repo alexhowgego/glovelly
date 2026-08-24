@@ -7,7 +7,7 @@ RUN npm ci
 COPY frontend/glovelly-web/ ./
 RUN npm run build
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.400 AS backend-build
 WORKDIR /src
 
 COPY glovelly.sln ./
@@ -36,7 +36,7 @@ RUN dotnet tool run dotnet-ef migrations bundle \
 
 COPY --from=frontend-build /src/frontend/glovelly-web/dist/ /app/api/wwwroot/
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.11 AS runtime
 WORKDIR /app
 
 ARG BUILD_COMMIT_ID=unknown
