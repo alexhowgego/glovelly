@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { buildApiUrl, downloadResponseBlob, fetchWithSession, getResponseErrorMessage, jsonRequestInit } from '../api'
+import {
+  buildApiUrl,
+  downloadResponseBlob,
+  fetchWithSession,
+  getProblemDetailsMessage,
+  getResponseErrorMessage,
+  jsonRequestInit,
+} from '../api'
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents'
+import { notifications } from '../notifications'
 import type {
   Gig,
   GigExternalResource,
@@ -24,9 +32,11 @@ type ChartMatchStage = 'locate' | 'ai'
 type ChartMatchRequestItem = Pick<ManagedSetListItem, 'sourceRowNumber' | 'kind' | 'include' | 'title' | 'padNumber' | 'key'>
 type ActiveChartMatchJob = Pick<SetListChartMatchJobResponse, 'jobId' | 'status' | 'correlationId'>
 type ForScoreExportError = {
+  detail?: string
   message?: string
   missingItems?: { title?: string; sourceRowNumber?: number }[]
   errors?: Record<string, string[]>
+  title?: string
 }
 
 const createClientRequestId = () => {
@@ -47,14 +57,14 @@ async function getExportErrorMessage(response: Response) {
 
   try {
     const payload = (await response.json()) as ForScoreExportError
-    const validationMessage = payload.errors ? Object.values(payload.errors).flat().join(' ') : ''
+    const problemMessage = getProblemDetailsMessage(payload)
     const missingTitles = payload.missingItems
       ?.slice(0, 3)
       .map((item) => item.title || (item.sourceRowNumber ? `row ${item.sourceRowNumber}` : null))
       .filter(Boolean)
       .join(', ')
     const missingSuffix = missingTitles ? ` Remaining rows: ${missingTitles}.` : ''
-    return `${payload.message || validationMessage || 'Select forScore charts for all included song rows before exporting.'}${missingSuffix}`
+    return `${problemMessage || payload.message || 'Select forScore charts for all included song rows before exporting.'}${missingSuffix}`
   } catch {
     return 'Unable to export forScore set list.'
   }
@@ -629,8 +639,13 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
 
       const fileName = await downloadResponseBlob(response, `${gig.title || 'setlist'}.4ss`)
       setStatus(`Downloaded ${fileName}. Open the .4ss file on your iPad and import it into forScore.`)
+      notifications.success(`Downloaded ${fileName}.`, {
+        dedupeKey: `gig:${gig.id}:forscore-export`,
+      })
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Unable to export forScore set list.')
+      const message = error instanceof Error ? error.message : 'Unable to export forScore set list.'
+      setStatus(message)
+      notifications.error(message, { dedupeKey: `gig:${gig.id}:forscore-export` })
     } finally {
       setIsLoading(false)
     }

@@ -169,6 +169,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 await OpenInvoiceLinesAsync();
                 await AssertInvoiceLineTypeCountAsync("Mileage", 1);
 
+                await ExpectNotificationAsync("address not found", "error");
                 await SaveUserMileageSettingsViaUiAsync(mileageRate: string.Empty, passengerMileageRate: string.Empty, travelOriginPostcode: string.Empty);
                 await PutSellerProfileAsync(postcode: string.Empty);
                 await CreateGigAsync(
@@ -181,11 +182,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 await Page.GetByTestId("gig-driving-checkbox").CheckAsync();
                 await Page.GetByTestId("gig-travel-miles-input").FillAsync("12");
                 await Page.GetByTestId("gig-estimate-mileage-button").ClickAsync();
-                await Assertions.Expect(Page.GetByTestId("gig-status")).ToContainTextAsync("travel origin postcode", new LocatorAssertionsToContainTextOptions
-                {
-                    Timeout = 30_000,
-                    IgnoreCase = true,
-                });
+                await ExpectNotificationAsync("travel origin postcode", "error");
                 await Assertions.Expect(Page.GetByTestId("gig-travel-miles-input")).ToHaveValueAsync("12");
             }
             finally
@@ -218,10 +215,15 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
 
         while (DateTime.UtcNow < deadline)
         {
-            lastStatus = await Page.GetByTestId("gig-status").InnerTextAsync();
-            if (expectedFragments.Any(fragment => lastStatus.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+            var notifications = Page.Locator("[data-sonner-toast][data-type='error']");
+            var count = await notifications.CountAsync();
+            if (count > 0)
             {
-                return;
+                lastStatus = await notifications.Last.InnerTextAsync();
+                if (expectedFragments.Any(fragment => lastStatus.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return;
+                }
             }
 
             await Task.Delay(500, TestContext.Current.CancellationToken);
@@ -259,7 +261,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
 
             AssertRedraftSucceeded(redraftResponse);
             await AssertRedraftedInvoiceLinePresenceAsync(redraftResponse, expenseDescription, status != "Reimbursed");
-            await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
+            await ExpectNotificationAsync("regenerated", "info");
         }
         finally
         {
@@ -310,7 +312,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
                 async () => await Page.GetByTestId("gig-save-close-button").ClickAsync());
 
             AssertRedraftSucceeded(redraftResponse);
-            await ExpectContainsAsync(Page.GetByTestId("gig-status"), "regenerated");
+            await ExpectNotificationAsync("regenerated", "info");
         }
         finally
         {
@@ -389,11 +391,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
         await Page.GetByTestId("user-settings-passenger-mileage-rate-input").FillAsync(passengerMileageRate);
         await Page.GetByTestId("user-settings-travel-origin-postcode-input").FillAsync(travelOriginPostcode);
         await Page.GetByTestId("user-settings-save-button").ClickAsync();
-        await Assertions.Expect(Page.GetByTestId("user-settings-status")).ToContainTextAsync("updated", new LocatorAssertionsToContainTextOptions
-        {
-            IgnoreCase = true,
-            Timeout = 30_000,
-        });
+        await Assertions.Expect(Page.GetByTestId("user-settings-status")).ToContainTextAsync("Settings updated.");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
     }
 

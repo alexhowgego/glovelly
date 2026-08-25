@@ -38,6 +38,23 @@ For local development, engineers usually run:
 
 Navigation, session state, and core reads are healthy.
 
+## Notification Feedback
+
+> **Automation:** Partially automated UAT: invoice, gig, receipt, and attachment browser journeys assert terminal Sonner notifications. Manual checks cover dismissal, modal stacking, and visual placement.
+
+### Steps
+
+1. Complete a terminal action such as saving a client, uploading a receipt, or changing an invoice status.
+2. Confirm a notification appears at the top of the viewport without needing to locate the initiating panel.
+3. Trigger a safe failure, such as an unavailable mileage estimate or attachment download.
+4. Confirm the error notification remains visible until dismissed using its accessible close control.
+5. Open and close a modal after starting an applicable action, then confirm the terminal notification remains visible.
+6. On a phone-sized viewport, confirm notifications do not cover the quick-capture controls or return-to-top button.
+
+### Expected Results
+
+Terminal success and information notifications auto-dismiss. Errors persist until dismissed. Form validation, progress, and durable configuration guidance remain in their original local context.
+
 ## Dashboard Summary
 
 > **Automation:** Automated UAT: `Glovelly.Uat.Tests.DashboardSummaryTests.DashboardHighlightsNextGigOutstandingBalanceAndInvoicePrompt`; manual balance edge-case spot checks remain useful when paid, cancelled, issued, and overdue invoices already exist together.

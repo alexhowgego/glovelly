@@ -152,8 +152,8 @@ export function useSellerProfile({
       applySellerProfile(savedProfile)
       setSellerProfileStatus(
         savedProfile.isInvoiceReady
-          ? 'Seller profile updated and ready for invoice generation.'
-          : `Seller profile saved. Missing: ${savedProfile.missingFields.join(', ')}.`
+          ? 'Seller profile updated.'
+          : `Seller profile updated. Invoice-ready fields still missing: ${savedProfile.missingFields.join(', ')}.`
       )
     } catch (error) {
       setSellerProfileStatus(

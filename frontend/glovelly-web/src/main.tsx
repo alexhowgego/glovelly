@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { loadAppMetadata } from './api'
+import { NotificationToaster } from './NotificationToaster'
 import { isThemePreference, themeStorageKey } from './theme'
 
 const applyInitialTheme = () => {
@@ -28,6 +29,7 @@ async function bootstrap() {
   root.render(
     <StrictMode>
       <App appMetadata={appMetadata} />
+      <NotificationToaster />
     </StrictMode>,
   )
 }

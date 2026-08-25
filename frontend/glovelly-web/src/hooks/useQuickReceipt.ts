@@ -28,7 +28,6 @@ export function useQuickReceipt({
   onOpenReceiptDraft,
   onSelectGig,
   onSessionExpired,
-  setGigStatus,
 }: UseQuickReceiptOptions) {
   const [pendingReceiptFile, setPendingReceiptFile] = useState<File | null>(null)
   const [quickReceiptDraft, setQuickReceiptDraft] =
@@ -131,15 +130,9 @@ export function useQuickReceipt({
           ? 'Receipt saved. There are other nearby gigs, so please check the selected gig.'
           : 'Receipt saved. Add details now or come back later.'
       )
-      setGigStatus(
-        receiptDraft.inferredGig
-          ? 'Receipt draft saved to the nearest matching gig.'
-          : 'Receipt draft saved. Add the amount and description when you are ready.'
-      )
     } catch (error) {
-      setQuickReceiptStatus(
-        error instanceof Error ? error.message : 'Unable to save receipt draft.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to save receipt draft.'
+      setQuickReceiptStatus(message)
     } finally {
       setIsQuickReceiptSaving(false)
     }
@@ -224,16 +217,14 @@ export function useQuickReceipt({
       )
       onSelectGig(update.gig.id)
       setQuickReceiptSelectedGigId(update.gig.id)
-      setGigStatus('Receipt details saved.')
       setQuickReceiptStatus(
         update.moved
-          ? 'Receipt moved and details saved.'
-          : 'Receipt details saved.'
+          ? 'Receipt moved and details saved. You can continue editing or go to the gig.'
+          : 'Receipt details saved. You can continue editing or go to the gig.'
       )
     } catch (error) {
-      setQuickReceiptStatus(
-        error instanceof Error ? error.message : 'Unable to save receipt details.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to save receipt details.'
+      setQuickReceiptStatus(message)
     } finally {
       setIsQuickReceiptSaving(false)
     }

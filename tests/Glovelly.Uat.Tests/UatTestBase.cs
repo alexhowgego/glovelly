@@ -14,6 +14,17 @@ public abstract class UatTestBase : IAsyncLifetime
 
     protected IPage Page => page ?? throw new InvalidOperationException("The Playwright page has not been initialized.");
 
+    protected Task ExpectNotificationAsync(string message, string type)
+    {
+        return Assertions.Expect(Page.Locator($"[data-sonner-toast][data-type='{type}']").Filter(new LocatorFilterOptions
+        {
+            HasText = message,
+        })).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
+        {
+            Timeout = 30_000,
+        });
+    }
+
     public async ValueTask InitializeAsync()
     {
         playwright = await Playwright.CreateAsync();

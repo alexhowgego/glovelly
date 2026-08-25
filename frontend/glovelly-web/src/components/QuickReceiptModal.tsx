@@ -175,7 +175,6 @@ export function QuickReceiptModal({
               {isSaving ? 'Saving...' : 'Save receipt draft'}
             </button>
           )}
-          <span className="status-pill">{status}</span>
         </div>
       </section>
       {draft && isAnalysisOpen ? (

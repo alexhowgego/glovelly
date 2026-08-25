@@ -362,7 +362,6 @@ export function QuickAttachmentModal({
               {isSaving ? 'Saving...' : 'Save attachment draft'}
             </button>
             ) : null}
-            <span className="status-pill">{status}</span>
           </div>
         ) : null}
       </section>

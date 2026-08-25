@@ -9,6 +9,7 @@ import {
   throwIfSessionExpired,
 } from '../api'
 import { defaultAdminStatus, emptyAdminForm } from '../forms'
+import { notifications } from '../notifications'
 import type { AdminSort, AdminUser, AdminUserForm } from '../types'
 
 type UseAdminWorkspaceOptions = {
@@ -338,16 +339,16 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
             )
           }
 
-          setAdminStatus('User added and invitation sent.')
+          notifications.success('User added and invitation sent.')
         } catch {
-          setAdminStatus('User added, but the invitation email could not be sent.')
+          notifications.info('User added, but the invitation email could not be sent.')
         }
       } else {
-        setAdminStatus(isEdit ? 'User updated.' : 'User added.')
+        notifications.success(isEdit ? 'User updated.' : 'User added.')
       }
     } catch (error) {
-      setAdminStatus(
-        error instanceof Error ? error.message : 'Unable to save right now.'
+      notifications.error(
+        error instanceof Error ? error.message : 'Unable to save user.'
       )
     } finally {
       setIsAdminLoading(false)
@@ -409,9 +410,9 @@ export function useAdminWorkspace({ onSessionExpired }: UseAdminWorkspaceOptions
       setIsAdminEditorOpen(false)
       setAdminMode('create')
       setAdminForm(emptyAdminForm())
-      setAdminStatus('User deleted.')
+      notifications.success('User deleted.')
     } catch (error) {
-      setAdminStatus(error instanceof Error ? error.message : 'Unable to delete user.')
+      notifications.error(error instanceof Error ? error.message : 'Unable to delete user.')
     } finally {
       setIsAdminLoading(false)
     }

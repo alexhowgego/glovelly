@@ -34,7 +34,6 @@ export function useQuickAttachment({
   onOpenAttachmentDraft,
   onSelectGig,
   onSessionExpired,
-  setGigStatus,
 }: UseQuickAttachmentOptions) {
   const [quickAttachmentMode, setQuickAttachmentMode] = useState<QuickAttachmentMode>('choose')
   const [pendingAttachmentFile, setPendingAttachmentFile] = useState<File | null>(null)
@@ -182,15 +181,9 @@ export function useQuickAttachment({
           ? 'Attachment saved. There are other nearby gigs, so please check the selected gig.'
           : 'Attachment saved. Add details now or come back later.'
       )
-      setGigStatus(
-        draft.inferredGig
-          ? 'Attachment draft saved to the nearest matching gig.'
-          : 'Attachment draft saved.'
-      )
     } catch (error) {
-      setQuickAttachmentStatus(
-        error instanceof Error ? error.message : 'Unable to save attachment draft.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to save attachment draft.'
+      setQuickAttachmentStatus(message)
     } finally {
       setIsQuickAttachmentSaving(false)
     }
@@ -267,15 +260,9 @@ export function useQuickAttachment({
           ? 'Attachment saved. There are other nearby gigs, so please check the selected gig.'
           : 'Attachment saved. Add details now or come back later.'
       )
-      setGigStatus(
-        draft.inferredGig
-          ? 'Attachment draft saved to the nearest matching gig.'
-          : 'Attachment draft saved.'
-      )
     } catch (error) {
-      setQuickAttachmentStatus(
-        error instanceof Error ? error.message : 'Unable to save attachment draft.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to save attachment draft.'
+      setQuickAttachmentStatus(message)
     } finally {
       setIsQuickAttachmentSaving(false)
     }
@@ -367,16 +354,14 @@ export function useQuickAttachment({
       )
       onSelectGig(update.gig.id)
       setQuickAttachmentSelectedGigId(update.gig.id)
-      setGigStatus('Attachment details saved.')
       setQuickAttachmentStatus(
         update.moved
-          ? 'Attachment moved and details saved.'
-          : 'Attachment details saved.'
+          ? 'Attachment moved and details saved. You can continue editing or go to the gig.'
+          : 'Attachment details saved. You can continue editing or go to the gig.'
       )
     } catch (error) {
-      setQuickAttachmentStatus(
-        error instanceof Error ? error.message : 'Unable to save attachment details.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to save attachment details.'
+      setQuickAttachmentStatus(message)
     } finally {
       setIsQuickAttachmentSaving(false)
     }

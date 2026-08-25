@@ -50,6 +50,7 @@ import { useSellerProfile } from './hooks/useSellerProfile'
 import { useThemePreference } from './hooks/useThemePreference'
 import { useUserSettings } from './hooks/useUserSettings'
 import { useWorkspaceEvents } from './hooks/useWorkspaceEvents'
+import { notifications } from './notifications'
 import type {
   AppMetadata,
   AppSection,
@@ -114,6 +115,7 @@ function App({ appMetadata }: AppProps) {
   const isAdmin = authUser?.role === 'Admin'
   const accessRequestDeepLinkId = getAccessRequestDeepLinkId(window.location.pathname)
   const clearSession = useCallback(() => {
+    notifications.resetSession()
     setIsAuthenticated(false)
     setAuthUser(null)
     setIsApiConnected(false)
@@ -291,7 +293,7 @@ function App({ appMetadata }: AppProps) {
         ...current.filter((value) => value.id !== invoice.id),
       ])
       setSelectedInvoiceId(invoice.id)
-      setInvoiceStatus(message)
+      notifications.info(message, { dedupeKey: `invoice:${invoice.id}:linked-gig` })
     },
     onOpenSection: (section) => setActiveSection(section),
     onSessionExpired: expireSession,
@@ -311,9 +313,8 @@ function App({ appMetadata }: AppProps) {
     setGigImportDraftStatus,
     updateGigImportDraftField,
   } = useGigImportsWorkspace({
-    onGigsCommitted: (committedGigs, message) => {
+    onGigsCommitted: (committedGigs) => {
       applyGigs(committedGigs)
-      setStatus(message)
     },
     onSessionExpired: expireSession,
   })
@@ -861,10 +862,14 @@ function App({ appMetadata }: AppProps) {
             ? `Imported ${snapshot.chartCount} chart(s). ${impact.autoRelinkedItemCount} chart link(s) were updated automatically.`
             : `Imported ${snapshot.chartCount} chart(s) from ${snapshot.originalFileName}.`
       )
-    } catch (error) {
-      setForScoreLibraryStatus(
-        error instanceof Error ? error.message : 'Unable to import forScore library snapshot.'
+      notifications.success(
+        `Imported ${snapshot.chartCount} chart(s) from ${snapshot.originalFileName}.`,
+        { dedupeKey: 'forscore-library:import' }
       )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to import forScore library snapshot.'
+      setForScoreLibraryStatus(message)
+      notifications.error(message, { dedupeKey: 'forscore-library:import' })
     } finally {
       setIsForScoreLibraryUploading(false)
     }
@@ -1001,7 +1006,10 @@ function App({ appMetadata }: AppProps) {
         ...current.filter((value) => value.id !== invoice.id),
       ])
     } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to open linked invoice.')
+      notifications.error(
+        error instanceof Error ? error.message : 'Unable to open linked invoice.',
+        { dedupeKey: `gig:${selectedGig.id}:linked-invoice` }
+      )
       return
     }
 
@@ -1204,8 +1212,10 @@ function App({ appMetadata }: AppProps) {
       `Mark ${linkedGigLabel} as completed now that invoice ${invoice.invoiceNumber} is issued?`
     )
     if (!shouldComplete) {
-      setGigStatus('Linked gig status left unchanged.')
-      setInvoiceStatus(`Invoice ${invoice.invoiceNumber} issued; linked gig status left unchanged.`)
+      notifications.info(
+        `Invoice ${invoice.invoiceNumber} issued; linked gig status left unchanged.`,
+        { dedupeKey: `invoice:${invoice.id}:linked-gig-status` }
+      )
       return
     }
 
@@ -1243,18 +1253,17 @@ function App({ appMetadata }: AppProps) {
       setGigs((current) =>
         current.map((gig) => completedGigs.find((value) => value.id === gig.id) ?? gig)
       )
-      setGigStatus(
-        completedGigs.length === 1
-          ? `"${completedGigs[0].title}" marked as completed.`
-          : `${completedGigs.length} linked gigs marked as completed.`
-      )
-      setInvoiceStatus(
+      notifications.success(
         completedGigs.length === 1
           ? `Invoice ${invoice.invoiceNumber} issued; linked gig marked as completed.`
-          : `Invoice ${invoice.invoiceNumber} issued; ${completedGigs.length} linked gigs marked as completed.`
+          : `Invoice ${invoice.invoiceNumber} issued; ${completedGigs.length} linked gigs marked as completed.`,
+        { dedupeKey: `invoice:${invoice.id}:linked-gig-status` }
       )
     } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to complete linked gig.')
+      notifications.error(
+        error instanceof Error ? error.message : 'Unable to complete linked gig.',
+        { dedupeKey: `invoice:${invoice.id}:linked-gig-status` }
+      )
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -1281,7 +1290,9 @@ function App({ appMetadata }: AppProps) {
       `Mark delivered draft invoice ${invoice.invoiceNumber} as issued?`
     )
     if (!shouldIssue) {
-      setInvoiceStatus(`Invoice ${invoice.invoiceNumber} delivered and left as Draft.`)
+      notifications.info(`Invoice ${invoice.invoiceNumber} delivered and left as Draft.`, {
+        dedupeKey: `invoice:${invoice.id}:delivery-status`,
+      })
       return invoice
     }
 
@@ -1379,17 +1390,17 @@ function App({ appMetadata }: AppProps) {
           )
         )
         setSelectedGigIds([])
-        setGigStatus(
-          `Invoice ${generatedInvoice.invoiceNumber} generated from ${invoiceGigs.length} selected gig(s).`
-        )
-        setInvoiceStatus(
+        notifications.success(
           sellerProfile.isInvoiceReady
             ? `Invoice ${generatedInvoice.invoiceNumber} is ready for review.`
-            : `Invoice ${generatedInvoice.invoiceNumber} is ready for review. ${sellerProfileNotice}`
+            : `Invoice ${generatedInvoice.invoiceNumber} is ready for review. ${sellerProfileNotice}`,
+          { dedupeKey: `invoice:${generatedInvoice.id}:generation` }
         )
         await openInvoicePreview(generatedInvoice)
       } catch (error) {
-        setGigStatus(error instanceof Error ? error.message : 'Unable to generate invoice.')
+        notifications.error(error instanceof Error ? error.message : 'Unable to generate invoice.', {
+          dedupeKey: 'invoice:generation',
+        })
       } finally {
         setIsInvoiceLoading(false)
       }
@@ -1427,8 +1438,9 @@ function App({ appMetadata }: AppProps) {
           setActiveSection('invoices')
         }
 
-        setGigStatus(conflict.message ?? 'This gig has already been invoiced.')
-        setInvoiceStatus('This gig already has an invoice. Reviewing the existing record.')
+        notifications.info(conflict.message ?? 'This gig has already been invoiced.', {
+          dedupeKey: `gig:${invoiceGig.id}:invoice-generation`,
+        })
         return
       }
 
@@ -1454,15 +1466,17 @@ function App({ appMetadata }: AppProps) {
             : gig
         )
       )
-      setGigStatus('Invoice generated and linked to this gig.')
-      setInvoiceStatus(
+      notifications.success(
         sellerProfile.isInvoiceReady
-          ? 'New invoice generated from the selected gig.'
-          : `New invoice generated from the selected gig. ${sellerProfileNotice}`
+          ? `Invoice ${generatedInvoice.invoiceNumber} is ready for review.`
+          : `Invoice ${generatedInvoice.invoiceNumber} is ready for review. ${sellerProfileNotice}`,
+        { dedupeKey: `invoice:${generatedInvoice.id}:generation` }
       )
       await openInvoicePreview(generatedInvoice)
     } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to generate invoice.')
+      notifications.error(error instanceof Error ? error.message : 'Unable to generate invoice.', {
+        dedupeKey: `gig:${invoiceGig.id}:invoice-generation`,
+      })
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -1607,18 +1621,15 @@ function App({ appMetadata }: AppProps) {
             : gig
         )
       )
-      setGigStatus(
-        `Monthly invoice ${updatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
+      notifications.success(
+        `Monthly invoice ${updatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s) and ready for review.`,
+        { dedupeKey: `invoice:${updatedInvoice.id}:monthly-generation` }
       )
-      setMonthlyInvoiceStatus(
-        `Monthly invoice ${updatedInvoice.invoiceNumber} created for ${gigsToInvoice.length} gig(s).`
-      )
-      setInvoiceStatus(`Monthly invoice ${updatedInvoice.invoiceNumber} is ready for review.`)
       await openInvoicePreview(updatedInvoice)
     } catch (error) {
-      setMonthlyInvoiceStatus(
-        error instanceof Error ? error.message : 'Unable to generate monthly invoice.'
-      )
+      notifications.error(error instanceof Error ? error.message : 'Unable to generate monthly invoice.', {
+        dedupeKey: 'invoice:monthly-generation',
+      })
     } finally {
       setIsInvoiceLoading(false)
     }

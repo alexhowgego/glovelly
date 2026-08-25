@@ -158,9 +158,10 @@ export function InvoicesSection({
               <p className="section-label">Billing</p>
               <h2>Invoices</h2>
             </div>
-            <span className="status-pill" data-testid="invoice-status">
-              <span>{invoiceStatus}</span>
-              {googleDrivePublishLink ? (
+            {(invoiceStatus || googleDrivePublishLink) && (
+              <span className="status-pill" data-testid="invoice-status">
+                {invoiceStatus ? <span>{invoiceStatus}</span> : null}
+                {googleDrivePublishLink ? (
                 <a
                   href={googleDrivePublishLink.href}
                   target="_blank"
@@ -173,8 +174,9 @@ export function InvoicesSection({
                 >
                   Open file
                 </a>
-              ) : null}
-            </span>
+                ) : null}
+              </span>
+            )}
           </div>
 
           <div className="gig-summary-grid">
