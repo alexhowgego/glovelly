@@ -15,6 +15,7 @@ public sealed class GoogleCalendarIntegrationSettings
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
     public DateTimeOffset? DisconnectedAtUtc { get; set; }
+    public bool RequiresReconnection { get; set; }
 
     [JsonIgnore]
     public User? User { get; set; }

@@ -212,9 +212,8 @@ export function useExpenseStatementWorkspace({
       return previewUrl
     } catch (error) {
       clearExpenseStatementPreviewUrl()
-      setExpenseStatementStatus(
-        error instanceof Error ? error.message : 'Unable to preview the expense statement PDF.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to preview the expense statement PDF.'
+      setExpenseStatementStatus(message)
       return null
     } finally {
       setIsExpenseStatementLoading(false)
@@ -260,13 +259,9 @@ export function useExpenseStatementWorkspace({
 
       const filename = await downloadResponseBlob(response, fallbackFilename)
       setExpenseStatementStatus(`Downloaded ${filename}.`)
-      setGigStatus(`Downloaded ${filename}.`)
     } catch (error) {
-      setExpenseStatementStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to download the expense statement PDF.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to download the expense statement PDF.'
+      setExpenseStatementStatus(message)
     } finally {
       setIsExpenseStatementLoading(false)
     }

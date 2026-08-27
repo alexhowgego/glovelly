@@ -41,6 +41,7 @@ import type {
   Invoice,
 } from '../types'
 import { useExpenseStatementWorkspace } from './useExpenseStatementWorkspace'
+import { notifications } from '../notifications'
 
 type UseGigsWorkspaceOptions = {
   clientNamesById: ReadonlyMap<string, string>
@@ -330,7 +331,7 @@ export function useGigsWorkspace({
       setEditingExternalResourceId('')
       setExternalResourceMode('create')
       setIsExternalResourceEditorOpen(false)
-      setGigStatus(isEdit ? 'Attachment updated.' : 'Attachment added.')
+      notifications.success(isEdit ? 'Attachment updated.' : 'Attachment added.')
     } catch (error) {
       setGigStatus(
         error instanceof Error
@@ -381,9 +382,9 @@ export function useGigsWorkspace({
       if (editingExternalResourceId === resource.id) {
         cancelExternalResourceEdit()
       }
-      setGigStatus('Attachment deleted.')
+      notifications.success('Attachment deleted.')
     } catch (error) {
-      setGigStatus(
+      notifications.error(
         error instanceof Error
           ? error.message
           : 'Unable to delete attachment right now.'
@@ -433,9 +434,9 @@ export function useGigsWorkspace({
 
       const savedGig = (await response.json()) as Gig
       replaceSavedGig(savedGig)
-      setGigStatus('Attachment file uploaded.')
+      notifications.success('Attachment file uploaded.')
     } catch (error) {
-      setGigStatus(
+      notifications.error(
         error instanceof Error
           ? error.message
           : 'Unable to upload attachment file right now.'
@@ -478,9 +479,9 @@ export function useGigsWorkspace({
       }
 
       const fileName = await downloadResponseBlob(response, attachment.fileName)
-      setGigStatus(`Downloaded ${fileName}.`)
+      notifications.success(`Downloaded ${fileName}.`)
     } catch (error) {
-      setGigStatus(
+      notifications.error(
         error instanceof Error
           ? error.message
           : 'Unable to download attachment file right now.'
@@ -529,9 +530,9 @@ export function useGigsWorkspace({
 
       const savedGig = (await response.json()) as Gig
       replaceSavedGig(savedGig)
-      setGigStatus('Attachment file deleted.')
+      notifications.success('Attachment file deleted.')
     } catch (error) {
-      setGigStatus(
+      notifications.error(
         error instanceof Error
           ? error.message
           : 'Unable to delete attachment file right now.'
@@ -644,11 +645,12 @@ export function useGigsWorkspace({
       setSelectedGigIds([])
       setGigMode('edit')
       setGigForm(toEditableGigForm(savedGig))
-      setGigStatus('Gig cloned. Update any details before saving.')
+      notifications.success('Gig cloned.')
+      setGigStatus('Update any details before saving.')
       revealGig(savedGig, nextGigs)
       setIsGigEditorOpen(true)
     } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to clone gig.')
+      notifications.error(error instanceof Error ? error.message : 'Unable to clone gig.')
     } finally {
       setIsGigLoading(false)
     }
@@ -779,11 +781,11 @@ export function useGigsWorkspace({
         wasDriving: true,
         travelMiles: formatEditableNumber(estimate.distanceMiles),
       }))
-      setGigStatus(
+      notifications.success(
         `Estimated ${formatEditableNumber(estimate.distanceMiles)} miles from ${estimate.originLabel} to ${estimate.destinationLabel}.`
       )
     } catch (error) {
-      setGigStatus(
+      notifications.error(
         error instanceof Error
           ? error.message
           : 'Unable to estimate mileage right now.'
@@ -807,7 +809,7 @@ export function useGigsWorkspace({
     }
 
     if (!response.ok) {
-      throw new Error('Unable to refresh gig receipts.')
+      throw new Error(await getResponseErrorMessage(response, 'Unable to refresh gig receipts.'))
     }
 
     const savedGig = (await response.json()) as Gig
@@ -850,24 +852,56 @@ export function useGigsWorkspace({
       }
 
       await refreshGig(selectedGig.id)
-      setGigStatus('Receipt uploaded.')
+      notifications.success('Receipt uploaded.')
     } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to upload receipt.')
+      notifications.error(error instanceof Error ? error.message : 'Unable to upload receipt.')
     } finally {
       setIsGigLoading(false)
     }
   }
 
-  const downloadExpenseAttachment = (expense: GigExpenseForm, attachmentId: string) => {
+  const downloadExpenseAttachment = async (
+    expense: GigExpenseForm,
+    attachmentId: string
+  ) => {
     if (!selectedGig || !expense.id) {
       return
     }
 
-    window.open(
-      buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments/${attachmentId}`),
-      '_blank',
-      'noopener,noreferrer'
-    )
+    setIsGigLoading(true)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/gigs/${selectedGig.id}/expenses/${expense.id}/attachments/${attachmentId}`)
+      )
+
+      if (
+        handleSessionExpired(
+          response,
+          onSessionExpired,
+          'Your session expired. Sign in again to keep managing gigs.'
+        )
+      ) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to download receipt.')
+        )
+      }
+
+      const attachment = expense.attachments.find((value) => value.id === attachmentId)
+      const downloadedFileName = await downloadResponseBlob(
+        response,
+        attachment?.fileName ?? 'receipt'
+      )
+      notifications.success(`Downloaded ${downloadedFileName}.`)
+    } catch (error) {
+      notifications.error(error instanceof Error ? error.message : 'Unable to download receipt.')
+    } finally {
+      setIsGigLoading(false)
+    }
   }
 
   const deleteExpenseAttachment = async (
@@ -899,13 +933,13 @@ export function useGigsWorkspace({
       }
 
       if (!response.ok) {
-        throw new Error('Unable to delete receipt.')
+        throw new Error(await getResponseErrorMessage(response, 'Unable to delete receipt.'))
       }
 
       await refreshGig(selectedGig.id)
-      setGigStatus('Receipt deleted.')
+      notifications.success('Receipt deleted.')
     } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to delete receipt.')
+      notifications.error(error instanceof Error ? error.message : 'Unable to delete receipt.')
     } finally {
       setIsGigLoading(false)
     }
@@ -961,9 +995,9 @@ export function useGigsWorkspace({
       setIsGigEditorOpen(false)
       setGigMode('create')
       setGigForm(toCreateGigForm(clients))
-      setGigStatus('Gig deleted.')
+      notifications.success('Gig deleted.')
     } catch (error) {
-      setGigStatus(error instanceof Error ? error.message : 'Unable to delete gig.')
+      notifications.error(error instanceof Error ? error.message : 'Unable to delete gig.')
     } finally {
       setIsGigLoading(false)
     }
@@ -1039,10 +1073,12 @@ export function useGigsWorkspace({
 
       const savedGig = (await response.json()) as Gig
       mergeSavedGig(savedGig)
-      setGigStatus(`Expense marked as ${formatReimbursementStatus(status).toLowerCase()}.`)
+      notifications.success(
+        `Expense marked as ${formatReimbursementStatus(status).toLowerCase()}.`
+      )
       await handleLinkedInvoiceAfterGigSave(selectedGig, savedGig, true)
     } catch (error) {
-      setGigStatus(
+      notifications.error(
         error instanceof Error ? error.message : 'Unable to update reimbursement.'
       )
     } finally {
@@ -1126,7 +1162,6 @@ export function useGigsWorkspace({
       redraftedInvoice,
       `Draft invoice ${redraftedInvoice.invoiceNumber} regenerated from updated gig details.`
     )
-    setGigStatus(`Gig updated. Draft invoice ${redraftedInvoice.invoiceNumber} regenerated.`)
   }
 
   const promptToCancelLinkedInvoice = async (invoice: Invoice) => {
@@ -1159,7 +1194,6 @@ export function useGigsWorkspace({
       cancelledInvoice,
       `Linked invoice ${cancelledInvoice.invoiceNumber} cancelled.`
     )
-    setGigStatus(`Gig updated. Linked invoice ${cancelledInvoice.invoiceNumber} cancelled.`)
   }
 
   const saveGigForm = async (
@@ -1284,7 +1318,7 @@ export function useGigsWorkspace({
       setGigs(nextGigs)
       setGigMode('edit')
       setGigForm(toEditableGigForm(savedGig))
-      setGigStatus(successMessage ?? (isEdit ? 'Gig updated.' : 'Gig created.'))
+      notifications.success(successMessage ?? (isEdit ? 'Gig updated.' : 'Gig created.'))
       setIsGigEditorOpen(!closeAfterSave)
       revealGig(savedGig, nextGigs)
       if (previousGig) {
@@ -1295,7 +1329,7 @@ export function useGigsWorkspace({
         )
       }
     } catch (error) {
-      setGigStatus(
+      notifications.error(
         error instanceof Error ? error.message : 'Unable to save this gig right now.'
       )
     } finally {

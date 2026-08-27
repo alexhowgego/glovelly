@@ -45,8 +45,15 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             await Assertions.Expect(expenseRow.GetByTestId("gig-expense-reimbursement-select")).ToHaveValueAsync("Unreimbursed");
 
             await Page.GetByTestId("add-gig-attachment-button").ClickAsync();
-            await Page.GetByTestId("gig-attachment-type-select").SelectOptionAsync("File");
+            await Page.GetByTestId("gig-attachment-type-select").SelectOptionAsync("Url");
             await Page.GetByTestId("gig-attachment-title-input").FillAsync(attachmentTitle);
+            await Page.GetByTestId("gig-attachment-url-input").FillAsync("ftp://example.com/contract");
+            await Page.GetByText("Add attachment", new PageGetByTextOptions { Exact = true }).Last.ClickAsync();
+            await Assertions.Expect(Page.GetByTestId("gig-attachment-status")).ToContainTextAsync(
+                "URL must be an absolute http or https URL.",
+                new LocatorAssertionsToContainTextOptions { Timeout = 30_000 });
+            await Assertions.Expect(Page.GetByRole(AriaRole.Dialog)).ToBeVisibleAsync();
+            await Page.GetByTestId("gig-attachment-url-input").FillAsync("https://example.com/contract");
             await Page.GetByText("Add attachment", new PageGetByTextOptions { Exact = true }).Last.ClickAsync();
 
             var attachmentRow = Page.GetByTestId("gig-attachment-item").Filter(new LocatorFilterOptions

@@ -4,6 +4,7 @@ import {
   createBlobObjectUrl,
   downloadResponseBlob,
   fetchWithSession,
+  getResponseErrorMessage,
 } from '../api'
 import type { Invoice } from '../types'
 
@@ -12,6 +13,8 @@ type UseInvoicePreviewOptions = {
 }
 
 export function useInvoicePreview({ onDownloaded }: UseInvoicePreviewOptions) {
+  // App still provides this callback; downloads now report through notifications instead.
+  void onDownloaded
   const [invoicePreviewInvoice, setInvoicePreviewInvoice] = useState<Invoice | null>(null)
   const [invoicePreviewPdfUrl, setInvoicePreviewPdfUrl] = useState<string | null>(null)
   const [invoicePreviewStatus, setInvoicePreviewStatus] = useState('')
@@ -46,7 +49,9 @@ export function useInvoicePreview({ onDownloaded }: UseInvoicePreviewOptions) {
       const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/pdf`))
 
       if (!response.ok) {
-        throw new Error('Unable to prepare the invoice PDF preview.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to prepare the invoice PDF preview.')
+        )
       }
 
       const previewUrl = await createBlobObjectUrl(response)
@@ -59,9 +64,8 @@ export function useInvoicePreview({ onDownloaded }: UseInvoicePreviewOptions) {
       })
       setInvoicePreviewStatus(`Invoice ${invoice.invoiceNumber} is ready to review.`)
     } catch (error) {
-      setInvoicePreviewStatus(
-        error instanceof Error ? error.message : 'Unable to prepare the invoice PDF preview.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to prepare the invoice PDF preview.'
+      setInvoicePreviewStatus(message)
     } finally {
       setIsInvoicePreviewLoading(false)
     }
@@ -82,17 +86,15 @@ export function useInvoicePreview({ onDownloaded }: UseInvoicePreviewOptions) {
       )
 
       if (!response.ok) {
-        throw new Error('Unable to download the invoice PDF.')
+        throw new Error(await getResponseErrorMessage(response, 'Unable to download the invoice PDF.'))
       }
 
       const filename = await downloadResponseBlob(response, fallbackFilename)
       const message = `Downloaded ${filename}.`
       setInvoicePreviewStatus(message)
-      onDownloaded(message)
     } catch (error) {
-      setInvoicePreviewStatus(
-        error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
+      setInvoicePreviewStatus(message)
     } finally {
       setIsInvoicePreviewLoading(false)
     }

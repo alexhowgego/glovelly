@@ -388,7 +388,13 @@ export function GigAttachmentsPanel({
                 >
                   Cancel
                 </button>
-                <span className="status-pill">{gigStatus}</span>
+                <span
+                  className="status-pill"
+                  data-testid="gig-attachment-status"
+                  role="status"
+                >
+                  {gigStatus}
+                </span>
               </div>
             </form>
           </section>

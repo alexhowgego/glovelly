@@ -4,6 +4,7 @@ import {
   downloadResponseBlob,
   fetchWithSession,
   getProblemDetailsMessage,
+  getResponseErrorMessage,
   jsonRequestInit,
   parseProblemDetails,
 } from '../api'
@@ -18,6 +19,7 @@ import type {
   PaidIncomeSummary,
 } from '../types'
 import type { PaidIncomeSummaryState } from '../dashboardCards'
+import { notifications } from '../notifications'
 
 type GoogleDrivePublishLink = {
   href: string
@@ -256,15 +258,18 @@ export function useInvoicesWorkspace({
     try {
       const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/pdf`))
       if (!response.ok) {
-        throw new Error('Unable to download the invoice PDF.')
+        throw new Error(await getResponseErrorMessage(response, 'Unable to download the invoice PDF.'))
       }
 
       const filename = await downloadResponseBlob(response, fallbackFilename)
-      setInvoiceStatus(`Downloaded ${filename}.`)
+      setInvoiceStatus('')
+      notifications.success(`Downloaded ${filename}.`, {
+        dedupeKey: `invoice:${invoice.id}:pdf-download`,
+      })
     } catch (error) {
-      setInvoiceStatus(
-        error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to download the invoice PDF.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:pdf-download` })
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -296,11 +301,14 @@ export function useInvoicesWorkspace({
       setInvoices((current) =>
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
-      setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
+      setInvoiceStatus('')
+      notifications.success(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
       await loadPaidIncomeSummary()
       return updatedInvoice
     } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to update invoice status.')
+      const message = error instanceof Error ? error.message : 'Unable to update invoice status.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:status` })
       return null
     } finally {
       setIsInvoiceLoading(false)
@@ -349,18 +357,19 @@ export function useInvoicesWorkspace({
       )
 
       if (isRedraft) {
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} draft regenerated.`)
+        notifications.success(`Invoice ${updatedInvoice.invoiceNumber} draft regenerated.`)
       } else {
         const reissuedAt = formatDateTime(updatedInvoice.lastReissuedUtc)
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
+        notifications.success(`Invoice ${updatedInvoice.invoiceNumber} re-issued at ${reissuedAt}.`)
       }
+      setInvoiceStatus('')
 
       await loadPaidIncomeSummary()
       return updatedInvoice
     } catch (error) {
-      setInvoiceStatus(
-        error instanceof Error ? error.message : `Unable to ${actionLabel.toLowerCase()} invoice.`
-      )
+      const message = error instanceof Error ? error.message : `Unable to ${actionLabel.toLowerCase()} invoice.`
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:${isRedraft ? 'redraft' : 'reissue'}` })
       return null
     } finally {
       setIsInvoiceLoading(false)
@@ -407,12 +416,16 @@ export function useInvoicesWorkspace({
       setInvoices((current) =>
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
-      setInvoiceStatus(
-        `Invoice ${updatedInvoice.invoiceNumber} sent to ${updatedInvoice.lastDeliveryRecipient}.`
+      setInvoiceStatus('')
+      notifications.success(
+        `Invoice ${updatedInvoice.invoiceNumber} sent to ${updatedInvoice.lastDeliveryRecipient}.`,
+        { dedupeKey: `invoice:${invoice.id}:email-delivery` }
       )
       return updatedInvoice
     } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to send invoice email.')
+      const message = error instanceof Error ? error.message : 'Unable to send invoice email.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:email-delivery` })
       return null
     } finally {
       setIsInvoiceLoading(false)
@@ -461,18 +474,21 @@ export function useInvoicesWorkspace({
           href: driveLink,
           fileName: publishResult.fileName,
         })
-        setInvoiceStatus(`Uploaded ${updatedInvoice.invoiceNumber} to Google Drive.`)
+        notifications.success(`Uploaded ${updatedInvoice.invoiceNumber} to Google Drive.`, {
+          dedupeKey: `invoice:${invoice.id}:google-drive`,
+        })
       } else {
-        setInvoiceStatus(`Invoice ${updatedInvoice.invoiceNumber} published to Google Drive.`)
+        notifications.success(`Invoice ${updatedInvoice.invoiceNumber} published to Google Drive.`, {
+          dedupeKey: `invoice:${invoice.id}:google-drive`,
+        })
       }
+      setInvoiceStatus('')
       return updatedInvoice
     } catch (error) {
       setGoogleDrivePublishLink(null)
-      setInvoiceStatus(
-        error instanceof Error
-          ? error.message
-          : 'Unable to publish invoice to Google Drive.'
-      )
+      const message = error instanceof Error ? error.message : 'Unable to publish invoice to Google Drive.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:google-drive` })
       return null
     } finally {
       setIsInvoiceLoading(false)
@@ -521,9 +537,14 @@ export function useInvoicesWorkspace({
       )
       setAdjustmentAmount('')
       setAdjustmentReason('')
-      setInvoiceStatus(`Adjustment saved. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`)
+      setInvoiceStatus('')
+      notifications.success(
+        `Adjustment saved. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`
+      )
     } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to add invoice adjustment.')
+      const message = error instanceof Error ? error.message : 'Unable to add invoice adjustment.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:adjustment` })
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -555,9 +576,14 @@ export function useInvoicesWorkspace({
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
       setInvoiceDescription(updatedInvoice.description ?? '')
-      setInvoiceStatus(`Description saved for ${updatedInvoice.invoiceNumber}. Redraft the invoice to update its PDF.`)
+      setInvoiceStatus('')
+      notifications.success(
+        `Description saved for ${updatedInvoice.invoiceNumber}. Redraft the invoice to update its PDF.`
+      )
     } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to save invoice description.')
+      const message = error instanceof Error ? error.message : 'Unable to save invoice description.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:description` })
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -583,21 +609,31 @@ export function useInvoicesWorkspace({
       )
 
       if (!deleteResponse.ok) {
-        throw new Error('Unable to remove invoice adjustment.')
+        throw new Error(await getResponseErrorMessage(deleteResponse, 'Unable to remove invoice adjustment.'))
       }
 
       const invoiceResponse = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}`))
       if (!invoiceResponse.ok) {
-        throw new Error('Adjustment removed, but the invoice could not be refreshed.')
+        throw new Error(
+          await getResponseErrorMessage(
+            invoiceResponse,
+            'Adjustment removed, but the invoice could not be refreshed.'
+          )
+        )
       }
 
       const updatedInvoice = (await invoiceResponse.json()) as Invoice
       setInvoices((current) =>
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
-      setInvoiceStatus(`Adjustment removed. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`)
+      setInvoiceStatus('')
+      notifications.success(
+        `Adjustment removed. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`
+      )
     } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to remove invoice adjustment.')
+      const message = error instanceof Error ? error.message : 'Unable to remove invoice adjustment.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:adjustment` })
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -637,10 +673,15 @@ export function useInvoicesWorkspace({
       setInvoices((current) => current.filter((value) => value.id !== invoice.id))
       onInvoiceDeleted(invoice)
       setSelectedInvoiceId((current) => (current === invoice.id ? '' : current))
-      setInvoiceStatus(`Invoice ${invoice.invoiceNumber} deleted.`)
+      setInvoiceStatus('')
+      notifications.success(`Invoice ${invoice.invoiceNumber} deleted.`, {
+        dedupeKey: `invoice:${invoice.id}:delete`,
+      })
       setIsInvoiceEditorOpen(false)
     } catch (error) {
-      setInvoiceStatus(error instanceof Error ? error.message : 'Unable to delete invoice.')
+      const message = error instanceof Error ? error.message : 'Unable to delete invoice.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:delete` })
     } finally {
       setIsInvoiceLoading(false)
     }

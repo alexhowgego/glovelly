@@ -495,6 +495,44 @@ body::before {
   min-height: 100vh;
 }
 
+[data-sonner-toaster] {
+  --normal-bg: var(--surface-elevated);
+  --normal-border: var(--surface-border);
+  --normal-text: var(--text);
+  --success-bg: color-mix(in srgb, #3f8c68 16%, var(--surface-elevated));
+  --success-border: color-mix(in srgb, #3f8c68 42%, var(--surface-border));
+  --success-text: var(--text);
+  --info-bg: color-mix(in srgb, #326b99 16%, var(--surface-elevated));
+  --info-border: color-mix(in srgb, #326b99 42%, var(--surface-border));
+  --info-text: var(--text);
+  --error-bg: color-mix(in srgb, #b54b4b 18%, var(--surface-elevated));
+  --error-border: color-mix(in srgb, #b54b4b 48%, var(--surface-border));
+  --error-text: var(--text);
+  --border-radius: 16px;
+  font-family: var(--body);
+}
+
+[data-sonner-toast][data-styled='true'] {
+  box-shadow: var(--surface-shadow-strong);
+  font-size: 0.9rem;
+}
+
+[data-sonner-toast][data-styled='true'] [data-close-button] {
+  color: inherit;
+}
+
+[data-sonner-toast]:focus-visible,
+[data-sonner-toast][data-styled='true'] [data-close-button]:focus-visible {
+  box-shadow: var(--surface-shadow-strong), var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toast],
+  [data-sonner-toast] > * {
+    transition: none !important;
+  }
+}
+
 h1,
 h2 {
   margin: 0;

@@ -43,7 +43,7 @@ The attachment is added to the selected gig only, appears without refreshing, pr
 
 ### Expected Results
 
-The quick add journey uses the same gig matching behaviour as quick receipts, supports both uploaded files and URLs, infers Google Doc/Sheet types where possible, and preserves user-facing attachment terminology.
+The quick add journey uses the same gig matching behaviour as quick receipts, supports both uploaded files and URLs, infers Google Doc/Sheet types where possible, and preserves user-facing attachment terminology. Terminal save feedback remains visible after navigating to the target gig and does not obscure the floating mobile actions.
 
 ## File-Only Attachment Journey
 
@@ -60,7 +60,7 @@ The quick add journey uses the same gig matching behaviour as quick receipts, su
 
 ### Expected Results
 
-The app allows an attachment without a URL, stores uploaded file metadata, downloads the same file, and removes the file without deleting the attachment itself.
+The app allows an attachment without a URL, stores uploaded file metadata, downloads the same file, and removes the file without deleting the attachment itself. Completed file actions show terminal notifications; unavailable stored files show a persistent, user-safe error notification.
 
 ## Primary Resource Behaviour
 

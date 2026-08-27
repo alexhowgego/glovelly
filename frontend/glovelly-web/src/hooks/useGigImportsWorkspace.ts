@@ -7,6 +7,7 @@ import {
   jsonRequestInit,
   parseProblemDetails,
 } from '../api'
+import { notifications } from '../notifications'
 import type {
   Gig,
   GigImportBatchDetail,
@@ -458,10 +459,14 @@ export function useGigImportsWorkspace({
       setGigImportStatus(
         `${result.createdCount} gig${result.createdCount === 1 ? '' : 's'} created from import.`
       )
-    } catch (error) {
-      setGigImportStatus(
-        error instanceof Error ? error.message : 'Unable to commit import rows.'
+      notifications.success(
+        `${result.createdCount} gig${result.createdCount === 1 ? '' : 's'} created from import.`,
+        { dedupeKey: `gig-import:${batchDetail.batch.batchId}:commit` }
       )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to commit import rows.'
+      setGigImportStatus(message)
+      notifications.error(message, { dedupeKey: `gig-import:${batchDetail.batch.batchId}:commit` })
     } finally {
       setIsGigImportLoading(false)
     }

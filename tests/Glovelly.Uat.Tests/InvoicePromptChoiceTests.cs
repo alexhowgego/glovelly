@@ -31,11 +31,7 @@ public sealed class InvoicePromptChoiceTests : InvoiceUatTestBase
                 await DismissNextDialogAsync(async () => await Page.GetByTestId("invoice-status-select").SelectOptionAsync("Issued"));
             }
 
-            await Assertions.Expect(Page.GetByTestId("invoice-status")).ToContainTextAsync("issued", new LocatorAssertionsToContainTextOptions
-            {
-                IgnoreCase = true,
-                Timeout = 30_000,
-            });
+            await ExpectNotificationAsync("issued", "success");
             await OpenGigAsync(gigTitle);
             await Assertions.Expect(Page.GetByTestId("selected-gig-status")).ToContainTextAsync(expectedGigStatus, new LocatorAssertionsToContainTextOptions
             {

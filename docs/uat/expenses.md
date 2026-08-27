@@ -26,7 +26,7 @@ Use these journeys when a change may affect gig expenses, receipt attachments, q
 
 ### Expected Results
 
-Receipt metadata, storage, download, and deletion all work without changing the expense reimbursement state.
+Receipt metadata, storage, download, and deletion all work without changing the expense reimbursement state. Each completed file action shows a terminal notification; a missing receipt file shows a persistent error notification with a clear unavailable-file message.
 
 ## Receipt Analysis Journey
 
@@ -61,7 +61,7 @@ Receipt analysis augments, but never blocks or silently changes, the manual expe
 
 ### Expected Results
 
-The draft becomes a normal gig expense with its receipt attached. Existing expenses and attachments remain intact.
+The draft becomes a normal gig expense with its receipt attached. Existing expenses and attachments remain intact. Completion feedback remains visible after navigating to the target gig.
 
 ## Expense Reimbursement Journey
 

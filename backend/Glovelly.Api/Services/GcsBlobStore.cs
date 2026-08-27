@@ -30,11 +30,25 @@ public sealed class GcsBlobStore(
         CancellationToken cancellationToken = default)
     {
         var memory = new MemoryStream();
-        var obj = await storageClient.DownloadObjectAsync(
-            _bucketName,
-            key,
-            memory,
-            cancellationToken: cancellationToken);
+        Google.Apis.Storage.v1.Data.Object obj;
+        try
+        {
+            obj = await storageClient.DownloadObjectAsync(
+                _bucketName,
+                key,
+                memory,
+                cancellationToken: cancellationToken);
+        }
+        catch (GoogleApiException exception) when (GoogleApiExceptionSupport.IsNotFound(exception))
+        {
+            memory.Dispose();
+            throw new FileNotFoundException("Blob was not found.", key, exception);
+        }
+        catch
+        {
+            memory.Dispose();
+            throw;
+        }
 
         memory.Position = 0;
         return new BlobReadResult(memory, obj.ContentType, (long?)obj.Size);

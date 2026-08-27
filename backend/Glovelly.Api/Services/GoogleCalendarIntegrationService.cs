@@ -44,6 +44,7 @@ public sealed class GoogleCalendarIntegrationService(
             settings.GoogleConnectionId = connection.Id;
             settings.DisconnectedAtUtc = null;
             settings.IsEnabled = true;
+            settings.RequiresReconnection = false;
             settings.UpdatedAtUtc = now;
         }
 

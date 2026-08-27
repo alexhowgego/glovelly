@@ -8,6 +8,7 @@ import {
   jsonRequestInit,
 } from '../api'
 import { emptyClientSettingsForm, emptyForm } from '../forms'
+import { notifications } from '../notifications'
 import type { Address, Client, ClientForm, ClientSettingsForm, ClientSort } from '../types'
 
 type UseClientsWorkspaceOptions = {
@@ -317,7 +318,9 @@ export function useClientsWorkspace({
       }
 
       if (!response.ok) {
-        throw new Error('Save failed.')
+        throw new Error(
+          await getResponseErrorMessage(response, 'Unable to save client right now.')
+        )
       }
 
       const savedClient = (await response.json()) as Client
@@ -334,10 +337,12 @@ export function useClientsWorkspace({
 
       setSelectedClientId(savedClient.id)
       setMode('edit')
-      setStatus(isEdit ? 'Client updated.' : 'Client created.')
+      notifications.success(isEdit ? 'Client updated.' : 'Client created.')
       setIsClientEditorOpen(!closeAfterSave)
-    } catch {
-      setStatus('Unable to save right now. Please try again.')
+    } catch (error) {
+      notifications.error(
+        error instanceof Error ? error.message : 'Unable to save client right now.'
+      )
     } finally {
       setIsLoading(false)
     }
@@ -384,11 +389,11 @@ export function useClientsWorkspace({
       setSelectedClientId(nextSelectedClientId)
       setMode('create')
       setForm(emptyForm())
-      setStatus('Client deleted.')
+      notifications.success('Client deleted.')
       setIsClientEditorOpen(false)
     } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : 'Unable to delete right now.'
+      notifications.error(
+        error instanceof Error ? error.message : 'Unable to delete client right now.'
       )
     } finally {
       setIsLoading(false)

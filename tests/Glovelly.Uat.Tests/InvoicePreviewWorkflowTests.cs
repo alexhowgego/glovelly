@@ -42,11 +42,7 @@ public sealed class InvoicePreviewWorkflowTests : InvoiceUatTestBase
         try
         {
             await Page.GetByTestId("invoice-status-select").SelectOptionAsync(new[] { "Issued" });
-            await Assertions.Expect(Page.GetByTestId("invoice-status")).ToContainTextAsync("issued", new LocatorAssertionsToContainTextOptions
-            {
-                IgnoreCase = true,
-                Timeout = 30_000,
-            });
+            await ExpectNotificationAsync("issued", "success");
         }
         finally
         {

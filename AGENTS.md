@@ -42,6 +42,7 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - `src/App.tsx` coordinates session, active section, initial data loads, modals, and cross-workspace actions. Avoid adding large workflow bodies there when a hook can own them.
 - `src/hooks/` owns stateful workspace logic for clients, gigs, gig imports, invoices, admin, user settings, seller profile, and quick receipts.
 - `src/components/` is presentational sections/modals. Preserve the current plain React/CSS approach; there is no component library.
+- Terminal frontend feedback uses Sonner: mount `NotificationToaster` from `src/NotificationToaster.tsx` in `src/main.tsx` and call the Glovelly policy wrapper in `src/notifications.ts`, rather than importing Sonner in workspace code. Use notifications for completed actions and unexpected failures that close, navigate away from, or outlive their initiating UI; keep validation, progress, durable configuration/health warnings, and terminal feedback for still-open modals inline. The notification viewport must render below modal overlays so persistent notifications cannot block modal controls.
 - Use `buildApiUrl`, `fetchWithSession`, `parseProblemDetails`, and session-expiry helpers from `src/api.ts`; avoid raw `fetch` for authenticated API calls.
 - Update `src/types.ts` whenever backend JSON shapes change.
 - When adding a frontend-consumed API prefix, update both `frontend/glovelly-web/vite.config.ts` proxy and `frontend/glovelly-web/public/sw.js` API bypass list, or local Vite/service-worker responses can hide backend data.
@@ -53,6 +54,7 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - Use `GlovellyApiFactory.WithConfiguration(...)` for auth/development-style tests that need real auth wiring.
 - Seed IDs live in `Infrastructure/TestData.cs`; default authenticated user claims live in `Infrastructure/TestAuthContext.cs`; email assertions should use `factory.Emails`.
 - When changing a user journey or cross-workspace navigation, update the matching scenario under `docs/uat/`.
+- When changing terminal frontend feedback, update the relevant UAT journey and retain its notification, persistent-error, and mobile-placement coverage.
 
 ## Local And Secrets
 

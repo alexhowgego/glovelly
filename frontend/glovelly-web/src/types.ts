@@ -55,6 +55,7 @@ export type GoogleCalendarStatus = {
   isConnected: boolean
   isEnabled: boolean
   hasRequiredScope: boolean
+  requiresReconnection: boolean
   calendarId: string | null
   calendarName: string | null
   lastSuccessfulSyncAtUtc: string | null

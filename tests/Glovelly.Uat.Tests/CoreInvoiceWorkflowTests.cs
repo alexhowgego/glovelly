@@ -46,7 +46,7 @@ public sealed class CoreInvoiceWorkflowTests : InvoiceUatTestBase
         try
         {
             await Page.GetByTestId("invoice-send-button").ClickAsync();
-            await ExpectContainsAsync(Page.GetByTestId("invoice-status"), "delivered and left as Draft");
+            await ExpectNotificationAsync("delivered and left as Draft", "info");
         }
         finally
         {

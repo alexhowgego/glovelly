@@ -140,6 +140,22 @@ public sealed class CalendarSyncQueueDrainer(
             workItem.LastErrorType = null;
             workItem.LastErrorDetail = null;
             workItem.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+            var historicalFailures = await dbContext.CalendarSyncWorkItems
+                .Where(item =>
+                    item.Id != workItem.Id &&
+                    item.UserId == workItem.UserId &&
+                    item.Provider == workItem.Provider &&
+                    item.GigId == workItem.GigId &&
+                    item.Status == CalendarSyncWorkItemStatus.Failed &&
+                    item.SupersededAtUtc == null &&
+                    item.CreatedAtUtc < workItem.CreatedAtUtc)
+                .ToListAsync(cancellationToken);
+            foreach (var historicalFailure in historicalFailures)
+            {
+                historicalFailure.SupersededAtUtc = workItem.UpdatedAtUtc;
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return CalendarSyncDrainItemOutcome.Succeeded;
@@ -147,16 +163,35 @@ public sealed class CalendarSyncQueueDrainer(
         catch (Exception ex)
         {
             workItem.AttemptCount += 1;
-            workItem.LastError = ex.Message;
+            var requiresReconnection = ex is GoogleCalendarApiException { IsInsufficientScope: true };
+            workItem.LastError = requiresReconnection
+                ? GoogleCalendarApiException.InsufficientScopeMessage
+                : ex is GoogleCalendarApiException
+                    ? GoogleCalendarApiException.GenericCalendarErrorMessage
+                    : ex.Message;
             workItem.LastErrorType = ex.GetType().FullName;
             workItem.LastErrorDetail = Truncate(ex.ToString(), MaxErrorDetailLength);
-            workItem.Status = workItem.AttemptCount >= MaxAttempts
+            workItem.Status = requiresReconnection || workItem.AttemptCount >= MaxAttempts
                 ? CalendarSyncWorkItemStatus.Failed
                 : CalendarSyncWorkItemStatus.Pending;
-            workItem.NextAttemptAtUtc = DateTimeOffset.UtcNow.Add(GetRetryDelay(workItem.AttemptCount));
+            workItem.NextAttemptAtUtc = requiresReconnection
+                ? DateTimeOffset.MaxValue
+                : DateTimeOffset.UtcNow.Add(GetRetryDelay(workItem.AttemptCount));
             workItem.ProcessingOwnerId = null;
             workItem.ProcessingStartedAtUtc = null;
             workItem.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+            if (requiresReconnection)
+            {
+                var calendarSettings = await dbContext.GoogleCalendarIntegrationSettings
+                    .SingleOrDefaultAsync(value => value.UserId == workItem.UserId, cancellationToken);
+                if (calendarSettings is not null)
+                {
+                    calendarSettings.RequiresReconnection = true;
+                    calendarSettings.UpdatedAtUtc = workItem.UpdatedAtUtc;
+                }
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogWarning(
