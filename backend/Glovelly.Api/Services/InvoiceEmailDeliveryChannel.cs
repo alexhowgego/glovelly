@@ -63,8 +63,9 @@ public sealed class InvoiceEmailDeliveryChannel(
         InvoiceDeliveryRequest request,
         CancellationToken cancellationToken)
     {
-        var invoicePdf = await invoicePdfService.OpenReadAsync(request.Invoice, cancellationToken)
-            ?? throw new InvalidOperationException("Invoice PDF is missing.");
+        var invoicePdfResult = await invoicePdfService.OpenCurrentReadAsync(request.Invoice, cancellationToken);
+        var invoicePdf = invoicePdfResult.Pdf
+            ?? throw new InvalidOperationException(invoicePdfResult.UnavailableMessage);
         await using var invoicePdfContent = invoicePdf.Content;
         using var invoicePdfMemory = new MemoryStream();
         await invoicePdf.Content.CopyToAsync(invoicePdfMemory, cancellationToken);

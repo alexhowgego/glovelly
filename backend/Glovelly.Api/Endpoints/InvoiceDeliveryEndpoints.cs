@@ -46,12 +46,12 @@ internal static class InvoiceDeliveryEndpoints
                 return EndpointSupport.ValidationProblem("recipient", "Invoice recipient email is missing.");
             }
 
-            var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
-            if (invoicePdf is null)
+            var invoicePdfResult = await invoicePdfService.OpenCurrentReadAsync(invoice, cancellationToken);
+            if (!invoicePdfResult.IsAvailable)
             {
-                return EndpointSupport.ValidationProblem("pdf", "Invoice PDF is missing.");
+                return EndpointSupport.ValidationProblem("pdf", invoicePdfResult.UnavailableMessage!);
             }
-            await invoicePdf.Content.DisposeAsync();
+            await invoicePdfResult.Pdf!.Content.DisposeAsync();
 
             var userDefaultFilenamePattern = userId.HasValue
                 ? await db.Users
@@ -162,12 +162,12 @@ internal static class InvoiceDeliveryEndpoints
                 return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
-            var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
-            if (invoicePdf is null)
+            var invoicePdfResult = await invoicePdfService.OpenCurrentReadAsync(invoice, cancellationToken);
+            if (!invoicePdfResult.IsAvailable)
             {
-                return EndpointSupport.ValidationProblem("pdf", "Invoice PDF is missing.");
+                return EndpointSupport.ValidationProblem("pdf", invoicePdfResult.UnavailableMessage!);
             }
-            await invoicePdf.Content.DisposeAsync();
+            await invoicePdfResult.Pdf!.Content.DisposeAsync();
 
             var userDefaultFilenamePattern = userId.HasValue
                 ? await db.Users

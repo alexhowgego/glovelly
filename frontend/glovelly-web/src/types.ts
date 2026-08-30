@@ -649,6 +649,7 @@ export type InvoiceLine = {
 }
 
 export type InvoiceStatus = 'Draft' | 'Issued' | 'Paid' | 'Overdue' | 'Cancelled'
+export type InvoiceDocumentState = 'Current' | 'Missing' | 'Regenerating' | 'Failed'
 
 export type Invoice = {
   id: string
@@ -674,6 +675,10 @@ export type Invoice = {
   pdfContentType: string | null
   pdfSizeBytes: number | null
   pdfGeneratedAt: string | null
+  documentState: InvoiceDocumentState
+  documentRevision: number
+  pdfDocumentRevision: number | null
+  documentFailureMessage: string | null
   total: number
   lines: InvoiceLine[]
 }

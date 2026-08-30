@@ -191,6 +191,16 @@ The same invoice PDF can be previewed reactively from the invoice pane, download
 
 Expected result: redraft and re-issue update the PDF, preserve the expected invoice history rules, and show the latest PDF in the preview modal.
 
+### Manual Adjustment PDF Freshness
+
+1. Open a draft invoice with at least one generated line and open its Line items pane.
+2. Add a manual adjustment and confirm the success notification says the PDF was regenerated.
+3. Preview or download the PDF and confirm it contains the adjustment and updated total.
+4. Remove that adjustment and confirm the success notification says the PDF was regenerated.
+5. Preview or download the PDF again and confirm the adjustment is absent and the total is restored.
+
+Expected result: adding and removing manual adjustments always regenerate the current PDF. If regeneration fails, the adjustment change remains saved, document delivery actions are disabled with an explanation, and the inline retry restores the PDF without changing invoice lifecycle history.
+
 ### Draft Description Customization
 
 1. Open a draft invoice and open its Line items pane.

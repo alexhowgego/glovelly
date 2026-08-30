@@ -537,14 +537,57 @@ export function useInvoicesWorkspace({
       )
       setAdjustmentAmount('')
       setAdjustmentReason('')
-      setInvoiceStatus('')
-      notifications.success(
-        `Adjustment saved. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`
-      )
+      if (updatedInvoice.documentState === 'Current') {
+        setInvoiceStatus('')
+        notifications.success(
+          `Adjustment saved and PDF regenerated. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`,
+          { dedupeKey: `invoice:${invoice.id}:adjustment` }
+        )
+      } else {
+        const message = updatedInvoice.documentFailureMessage ?? 'Adjustment saved, but the invoice PDF is unavailable.'
+        setInvoiceStatus(message)
+        notifications.error(message, { dedupeKey: `invoice:${invoice.id}:adjustment` })
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to add invoice adjustment.'
       setInvoiceStatus(message)
       notifications.error(message, { dedupeKey: `invoice:${invoice.id}:adjustment` })
+    } finally {
+      setIsInvoiceLoading(false)
+    }
+  }
+
+  const handleRegenerateInvoicePdf = async (invoice: Invoice) => {
+    setIsInvoiceLoading(true)
+    setInvoiceStatus(`Regenerating ${invoice.invoiceNumber} PDF...`)
+
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/regenerate-pdf`),
+        { method: 'POST' }
+      )
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, 'Unable to regenerate invoice PDF.'))
+      }
+
+      const updatedInvoice = (await response.json()) as Invoice
+      setInvoices((current) =>
+        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
+      )
+      if (updatedInvoice.documentState === 'Current') {
+        setInvoiceStatus('')
+        notifications.success(`Invoice ${updatedInvoice.invoiceNumber} PDF regenerated.`, {
+          dedupeKey: `invoice:${invoice.id}:regenerate-pdf`,
+        })
+      } else {
+        const message = updatedInvoice.documentFailureMessage ?? 'Invoice PDF could not be regenerated. Try again.'
+        setInvoiceStatus(message)
+        notifications.error(message, { dedupeKey: `invoice:${invoice.id}:regenerate-pdf` })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to regenerate invoice PDF.'
+      setInvoiceStatus(message)
+      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:regenerate-pdf` })
     } finally {
       setIsInvoiceLoading(false)
     }
@@ -603,33 +646,30 @@ export function useInvoicesWorkspace({
     setInvoiceStatus(`Removing adjustment from ${invoice.invoiceNumber}...`)
 
     try {
-      const deleteResponse = await fetchWithSession(
-        buildApiUrl(`/invoice-lines/${line.id}`),
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/adjustments/${line.id}`),
         { method: 'DELETE' }
       )
 
-      if (!deleteResponse.ok) {
-        throw new Error(await getResponseErrorMessage(deleteResponse, 'Unable to remove invoice adjustment.'))
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, 'Unable to remove invoice adjustment.'))
       }
 
-      const invoiceResponse = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}`))
-      if (!invoiceResponse.ok) {
-        throw new Error(
-          await getResponseErrorMessage(
-            invoiceResponse,
-            'Adjustment removed, but the invoice could not be refreshed.'
-          )
-        )
-      }
-
-      const updatedInvoice = (await invoiceResponse.json()) as Invoice
+      const updatedInvoice = (await response.json()) as Invoice
       setInvoices((current) =>
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
-      setInvoiceStatus('')
-      notifications.success(
-        `Adjustment removed. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`
-      )
+      if (updatedInvoice.documentState === 'Current') {
+        setInvoiceStatus('')
+        notifications.success(
+          `Adjustment removed and PDF regenerated. ${updatedInvoice.invoiceNumber} now totals ${formatCurrency(updatedInvoice.total)}.`,
+          { dedupeKey: `invoice:${invoice.id}:adjustment` }
+        )
+      } else {
+        const message = updatedInvoice.documentFailureMessage ?? 'Adjustment removed, but the invoice PDF is unavailable.'
+        setInvoiceStatus(message)
+        notifications.error(message, { dedupeKey: `invoice:${invoice.id}:adjustment` })
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to remove invoice adjustment.'
       setInvoiceStatus(message)
@@ -701,6 +741,7 @@ export function useInvoicesWorkspace({
     handleDeleteInvoice,
     handleDownloadInvoicePdf,
     handleInvoiceReissue,
+    handleRegenerateInvoicePdf,
     handleInvoiceDescriptionSave,
     handleInvoiceStatusChange,
     handlePublishInvoiceGoogleDrive,

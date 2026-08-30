@@ -346,6 +346,7 @@ function App({ appMetadata }: AppProps) {
     handleDeleteInvoice,
     handleDownloadInvoicePdf,
     handleInvoiceReissue,
+    handleRegenerateInvoicePdf,
     handleInvoiceDescriptionSave,
     handleInvoiceStatusChange,
     handlePublishInvoiceGoogleDrive,
@@ -1821,6 +1822,7 @@ function App({ appMetadata }: AppProps) {
         onOpenSellerProfile={openSellerProfile}
         onPreviewPdf={previewInvoicePdf}
         onPublishGoogleDrive={handlePublishInvoiceGoogleDriveWithIssuePrompt}
+        onRegeneratePdf={handleRegenerateInvoicePdf}
         onReissue={handleInvoiceReissueWithPreview}
         onSendEmail={handleSendInvoiceEmailWithIssuePrompt}
         onQuickFilterChange={setInvoiceQuickFilter}
