@@ -19,6 +19,19 @@ export type Client = {
   invoiceEmailSubjectPattern: string | null
 }
 
+export type InvoiceEmailReview = {
+  recipientName: string
+  recipientEmail: string
+  subject: string
+  plainTextBody: string
+  pdfFileName: string
+  pdfSizeBytes: number
+  receiptCount: number
+  receiptZipFileName: string | null
+  receiptNote: string
+  additionalMessageHeading: string
+}
+
 export type ClientForm = {
   name: string
   email: string

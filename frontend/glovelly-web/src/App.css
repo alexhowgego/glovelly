@@ -497,6 +497,37 @@
   background: var(--surface-panel);
 }
 
+.invoice-email-review-modal,
+.invoice-email-review-content {
+  display: grid;
+  gap: 18px;
+}
+
+.invoice-email-review-body {
+  margin: 0;
+  white-space: pre-wrap;
+  font: inherit;
+  color: var(--text);
+}
+
+.invoice-email-review-attachments {
+  display: grid;
+  gap: 6px;
+}
+
+.invoice-email-review-attachments > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.invoice-email-review-attachments > div > span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: right;
+}
+
 .quick-receipt-modal {
   display: grid;
   gap: 18px;

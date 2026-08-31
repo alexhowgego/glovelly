@@ -222,15 +222,16 @@ Expected result: only draft invoices expose an editable Description and save act
 2. Issue it.
 3. Accept the prompt to mark the linked gig or gigs as completed.
 4. Repeat with another linked draft invoice and decline the gig completion prompt.
-5. Open another draft invoice and send it by email if a recipient is configured.
-6. Optionally include receipt attachments, then accept the prompt to mark the delivered draft as issued.
-7. Accept or decline the follow-up linked gig completion prompt.
-8. Publish a draft invoice to Google Drive if connected, then repeat the delivered-draft issue prompt check.
-9. Re-issue an issued invoice.
+5. Open another draft invoice and select Send to client; confirm the review dialog shows the recipient, subject, plain-text email preview, and current PDF attachment before sending.
+6. Type a multi-line optional message and confirm Enter adds a line rather than sending. Cancel once and confirm no delivery is recorded, then reopen the dialog.
+7. Optionally include receipt attachments and select Mark invoice as issued after sending before explicitly selecting Send invoice.
+8. Confirm the delivery success notification appears. If the issue or linked-gig follow-up fails, confirm the email success remains visible alongside an actionable error.
+9. Publish a draft invoice to Google Drive if connected, then repeat the delivered-draft issue prompt check.
+10. Re-issue an issued invoice.
 
 ### Expected Results
 
-Status transitions are explicit, delivery state is recorded, delivered drafts can be promoted to issued by choice, issuing an invoice can complete linked gigs by choice, declined prompts leave existing invoice/gig state unchanged, PDF remains downloadable, and receipt attachments are included only when requested.
+Status transitions are explicit, email delivery is reviewed before its explicit final action, delivery state is recorded, delivered drafts can be promoted to issued by choice, issuing from the dialog completes linked gigs without another browser confirmation, PDF remains downloadable, and receipt attachments are included only when requested.
 
 ## Paid Income Dashboard
 

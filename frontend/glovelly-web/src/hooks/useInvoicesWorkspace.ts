@@ -12,6 +12,7 @@ import { defaultInvoiceStatus } from '../forms'
 import { formatCurrency, formatDateTime } from '../formatters'
 import type {
   Invoice,
+  InvoiceEmailReview,
   InvoiceLine,
   InvoiceQuickFilter,
   InvoiceSort,
@@ -63,6 +64,13 @@ export function useInvoicesWorkspace({
   const [adjustmentAmount, setAdjustmentAmount] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [invoiceDescription, setInvoiceDescription] = useState('')
+  const [invoiceEmailReviewInvoice, setInvoiceEmailReviewInvoice] = useState<Invoice | null>(null)
+  const [invoiceEmailReview, setInvoiceEmailReview] = useState<InvoiceEmailReview | null>(null)
+  const [invoiceEmailReviewMessage, setInvoiceEmailReviewMessage] = useState('')
+  const [includeInvoiceEmailReceipts, setIncludeInvoiceEmailReceipts] = useState(false)
+  const [issueInvoiceAfterEmail, setIssueInvoiceAfterEmail] = useState(false)
+  const [invoiceEmailReviewError, setInvoiceEmailReviewError] = useState('')
+  const [isInvoiceEmailReviewLoading, setIsInvoiceEmailReviewLoading] = useState(false)
   const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery)
 
   const invoicesById = useMemo(
@@ -224,6 +232,13 @@ export function useInvoicesWorkspace({
     setAdjustmentAmount('')
     setAdjustmentReason('')
     setInvoiceDescription('')
+    setInvoiceEmailReviewInvoice(null)
+    setInvoiceEmailReview(null)
+    setInvoiceEmailReviewMessage('')
+    setIncludeInvoiceEmailReceipts(false)
+    setIssueInvoiceAfterEmail(false)
+    setInvoiceEmailReviewError('')
+    setIsInvoiceEmailReviewLoading(false)
   }, [])
 
   const startInvoiceEdit = () => {
@@ -376,59 +391,107 @@ export function useInvoicesWorkspace({
     }
   }
 
-  const handleSendInvoiceEmail = async (invoice: Invoice) => {
-    const message = window.prompt(
-      `Add an optional message for ${invoice.invoiceNumber}, or leave blank to send the standard note.`
-    )
-    if (message === null) {
+  const loadInvoiceEmailReview = async (invoice: Invoice) => {
+    setIsInvoiceEmailReviewLoading(true)
+    setInvoiceEmailReviewError('')
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/email-review`),
+        { method: 'POST' }
+      )
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, 'Unable to prepare invoice email.'))
+      }
+      const review = (await response.json()) as InvoiceEmailReview
+      setInvoiceEmailReview(review)
+      setIncludeInvoiceEmailReceipts(review.receiptCount > 0)
+      setIssueInvoiceAfterEmail(true)
+    } catch (error) {
+      setInvoiceEmailReview(null)
+      setInvoiceEmailReviewError(
+        error instanceof Error ? error.message : 'Unable to prepare invoice email.'
+      )
+    } finally {
+      setIsInvoiceEmailReviewLoading(false)
+    }
+  }
+
+  const openInvoiceEmailReview = async (invoice: Invoice) => {
+    setInvoiceEmailReviewInvoice(invoice)
+    setInvoiceEmailReview(null)
+    setInvoiceEmailReviewMessage('')
+    setIncludeInvoiceEmailReceipts(false)
+    setIssueInvoiceAfterEmail(false)
+    await loadInvoiceEmailReview(invoice)
+    return invoice
+  }
+
+  const closeInvoiceEmailReview = () => {
+    if (isInvoiceEmailReviewLoading) {
       return
     }
-    const includeReceipts = window.confirm(
-      `Include any expense receipt attachments for ${invoice.invoiceNumber}?`
-    )
+    setInvoiceEmailReviewInvoice(null)
+    setInvoiceEmailReview(null)
+    setInvoiceEmailReviewError('')
+  }
 
-    setIsInvoiceLoading(true)
-    setInvoiceStatus(`Sending ${invoice.invoiceNumber} to client...`)
+  const changeInvoiceEmailReceiptInclusion = (includeReceipts: boolean) => {
+    setIncludeInvoiceEmailReceipts(includeReceipts)
+  }
 
+  const handleDownloadInvoiceReceiptArchive = async (invoice: Invoice) => {
+    setIsInvoiceEmailReviewLoading(true)
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/invoices/${invoice.id}/email-receipts`))
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, 'Unable to download receipt attachments.'))
+      }
+      const filename = await downloadResponseBlob(
+        response,
+        `Invoice-${invoice.invoiceNumber}-Receipts.zip`
+      )
+      notifications.success(`Downloaded ${filename}.`, {
+        dedupeKey: `invoice:${invoice.id}:receipt-attachments`,
+      })
+    } catch (error) {
+      notifications.error(
+        error instanceof Error ? error.message : 'Unable to download receipt attachments.',
+        { dedupeKey: `invoice:${invoice.id}:receipt-attachments` }
+      )
+    } finally {
+      setIsInvoiceEmailReviewLoading(false)
+    }
+  }
+
+  const submitInvoiceEmailReview = async () => {
+    const invoice = invoiceEmailReviewInvoice
+    if (!invoice || !invoiceEmailReview || isInvoiceEmailReviewLoading) {
+      return null
+    }
+
+    setIsInvoiceEmailReviewLoading(true)
+    setInvoiceEmailReviewError('')
     try {
       const response = await fetchWithSession(
         buildApiUrl(`/invoices/${invoice.id}/send-email`),
         jsonRequestInit('POST', {
-          message: message.trim() || null,
-          includeReceipts,
+          message: invoiceEmailReviewMessage.trim() || null,
+          includeReceipts: includeInvoiceEmailReceipts,
         })
       )
-
       if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const recipientError = problem?.errors?.recipient?.[0]
-        const pdfError = problem?.errors?.pdf?.[0]
-        const attachmentError = problem?.errors?.attachments?.[0]
-        throw new Error(
-          recipientError ??
-            pdfError ??
-            attachmentError ??
-            getProblemDetailsMessage(problem, 'Unable to send invoice email.')
-        )
+        throw new Error(await getResponseErrorMessage(response, 'Unable to send invoice email.'))
       }
-
       const updatedInvoice = (await response.json()) as Invoice
-      setInvoices((current) =>
-        current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
-      )
-      setInvoiceStatus('')
-      notifications.success(
-        `Invoice ${updatedInvoice.invoiceNumber} sent to ${updatedInvoice.lastDeliveryRecipient}.`,
-        { dedupeKey: `invoice:${invoice.id}:email-delivery` }
-      )
+      setInvoices((current) => current.map((value) => value.id === updatedInvoice.id ? updatedInvoice : value))
       return updatedInvoice
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to send invoice email.'
-      setInvoiceStatus(message)
-      notifications.error(message, { dedupeKey: `invoice:${invoice.id}:email-delivery` })
+      setInvoiceEmailReviewError(
+        error instanceof Error ? error.message : 'Unable to send invoice email.'
+      )
       return null
     } finally {
-      setIsInvoiceLoading(false)
+      setIsInvoiceEmailReviewLoading(false)
     }
   }
 
@@ -745,15 +808,26 @@ export function useInvoicesWorkspace({
     handleInvoiceDescriptionSave,
     handleInvoiceStatusChange,
     handlePublishInvoiceGoogleDrive,
-    handleSendInvoiceEmail,
+    handleDownloadInvoiceReceiptArchive,
+    changeInvoiceEmailReceiptInclusion,
+    closeInvoiceEmailReview,
+    openInvoiceEmailReview,
+    submitInvoiceEmailReview,
     invoices,
     invoiceQuickFilter,
     invoiceSearchQuery,
     invoiceSort,
     invoiceStatus,
+    invoiceEmailReview,
+    invoiceEmailReviewError,
+    invoiceEmailReviewInvoice,
+    invoiceEmailReviewMessage,
+    includeInvoiceEmailReceipts,
+    issueInvoiceAfterEmail,
     isInvoiceEditorOpen,
     issuedInvoiceCount: invoices.filter((invoice) => invoice.status === 'Issued').length,
     isInvoiceLoading,
+    isInvoiceEmailReviewLoading,
     loadPaidIncomeSummary,
     overdueInvoiceCount: invoices.filter((invoice) => invoice.status === 'Overdue').length,
     paidIncomeSummary,
@@ -764,6 +838,8 @@ export function useInvoicesWorkspace({
     setInvoiceDescription,
     setInvoices,
     setInvoiceStatus,
+    setInvoiceEmailReviewMessage,
+    setIssueInvoiceAfterEmail,
     setIsInvoiceLoading,
     setInvoiceQuickFilter,
     setSelectedInvoiceId,

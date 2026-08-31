@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
+import type { RefObject } from 'react'
 import {
   formatCurrency,
   formatDate,
@@ -62,6 +63,7 @@ type InvoicesSectionProps = {
   scrollToListRequest: number
   sellerProfileNotice: string
   selectedInvoice: Invoice | null
+  sendButtonRef: RefObject<HTMLButtonElement | null>
 }
 
 export function InvoicesSection({
@@ -108,6 +110,7 @@ export function InvoicesSection({
   scrollToListRequest,
   sellerProfileNotice,
   selectedInvoice,
+  sendButtonRef,
 }: InvoicesSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
   const listControlsRef = useRef<HTMLDivElement | null>(null)
@@ -363,6 +366,7 @@ export function InvoicesSection({
               <button
                 className="ghost-button"
                 data-testid="invoice-send-button"
+                ref={sendButtonRef}
                 onClick={() => selectedInvoice && void onSendEmail(selectedInvoice)}
                 type="button"
                 disabled={!selectedInvoice || isInvoiceLoading || !isDocumentCurrent}
