@@ -42,25 +42,12 @@ public sealed class CoreInvoiceWorkflowTests : InvoiceUatTestBase
 
     private async Task SendInvoiceAndExpectSuccessAsync(string runId)
     {
-        Page.Dialog += AcceptInvoiceMessageDialog;
-        try
-        {
-            await Page.GetByTestId("invoice-send-button").ClickAsync();
-            await ExpectNotificationAsync("delivered and left as Draft", "info");
-        }
-        finally
-        {
-            Page.Dialog -= AcceptInvoiceMessageDialog;
-        }
-
-        void AcceptInvoiceMessageDialog(object? _, Microsoft.Playwright.IDialog dialog)
-        {
-            _ = dialog.Type switch
-            {
-                "prompt" => dialog.AcceptAsync($"Automated UAT invoice delivery for {runId}."),
-                _ => dialog.DismissAsync(),
-            };
-        }
+        await Page.GetByTestId("invoice-send-button").ClickAsync();
+        await Page.GetByTestId("invoice-email-review-modal").WaitForAsync();
+        await Page.GetByTestId("invoice-email-review-message")
+            .FillAsync($"Automated UAT invoice delivery for {runId}.");
+        await Page.GetByTestId("invoice-email-review-send-button").ClickAsync();
+        await ExpectNotificationAsync("sent to", "success");
     }
 
     private static string ConfiguredInvoiceRecipientEmail()

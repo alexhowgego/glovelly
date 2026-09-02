@@ -31,6 +31,10 @@ public sealed class Invoice
     public string? PdfContentType { get; set; }
     public long? PdfSizeBytes { get; set; }
     public DateTimeOffset? PdfGeneratedAt { get; set; }
+    public InvoiceDocumentState DocumentState { get; set; } = InvoiceDocumentState.Missing;
+    public int DocumentRevision { get; set; } = 1;
+    public int? PdfDocumentRevision { get; set; }
+    public string? DocumentFailureMessage { get; set; }
 
     [JsonIgnore]
     public Client? Client { get; set; }
@@ -44,4 +48,12 @@ public sealed class Invoice
 
     [NotMapped]
     public decimal Total => Lines.Sum(line => line.LineTotal);
+}
+
+public enum InvoiceDocumentState
+{
+    Current,
+    Missing,
+    Regenerating,
+    Failed,
 }

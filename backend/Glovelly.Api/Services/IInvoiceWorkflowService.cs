@@ -15,6 +15,9 @@ public interface IInvoiceWorkflowService
     Task RedraftInvoiceAsync(Invoice invoice, Client client, Guid? userId, CancellationToken cancellationToken = default);
     Task ReissueInvoiceAsync(Invoice invoice, Client client, Guid? userId, CancellationToken cancellationToken = default);
     Task<InvoiceLine> CreateManualAdjustmentAsync(Invoice invoice, decimal amount, string reason, Guid? userId, CancellationToken cancellationToken = default);
+    void RemoveManualAdjustment(Invoice invoice, InvoiceLine adjustmentLine, Guid? userId);
+    Task RegenerateInvoicePdfAsync(Invoice invoice, Client client, Guid? userId, CancellationToken cancellationToken = default);
+    void MarkInvoicePdfRegenerationFailed(Invoice invoice, string message, Guid? userId);
 }
 
 public sealed record GenerateInvoiceFromGigSelectionResult(

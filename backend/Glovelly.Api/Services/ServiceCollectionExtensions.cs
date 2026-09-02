@@ -25,6 +25,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoicePdfRenderer, InvoicePdfRenderer>();
         services.AddScoped<IInvoiceWorkflowService, InvoiceWorkflowService>();
         services.AddScoped<IInvoicePdfService, InvoicePdfService>();
+        services.AddScoped<IInvoiceEmailPreparationService, InvoiceEmailPreparationService>();
+        services.AddScoped<IInvoiceReceiptArchiveService, InvoiceReceiptArchiveService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
         services.AddScoped<IGigImportDuplicateDetectionService, GigImportDuplicateDetectionService>();
         services.AddSingleton<ISetListSheetParser, SetListSheetParser>();

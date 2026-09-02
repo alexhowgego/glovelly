@@ -3,6 +3,7 @@ using System;
 using Glovelly.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Glovelly.Migrations.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260825210433_AddInvoiceDocumentFreshness")]
+    partial class AddInvoiceDocumentFreshness
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -149,9 +152,6 @@ namespace Glovelly.Migrations.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<DateTimeOffset?>("SupersededAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -169,8 +169,6 @@ namespace Glovelly.Migrations.Migrations
                     b.HasIndex("Status", "ProcessingStartedAtUtc");
 
                     b.HasIndex("UserId", "Provider");
-
-                    b.HasIndex("UserId", "Provider", "Status", "SupersededAtUtc", "UpdatedAtUtc");
 
                     b.ToTable("CalendarSyncWorkItems");
                 });
@@ -995,9 +993,6 @@ namespace Glovelly.Migrations.Migrations
 
                     b.Property<DateTimeOffset?>("LastSuccessfulSyncAtUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("RequiresReconnection")
-                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");

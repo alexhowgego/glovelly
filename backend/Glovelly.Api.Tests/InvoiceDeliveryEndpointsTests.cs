@@ -85,6 +85,91 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
     }
 
     [Fact]
+    public async Task EmailReview_WhenInvoiceIsDeliverable_ReturnsComposedContentWithoutDeliverySideEffects()
+    {
+        var invoice = await CreateInvoiceWithPdfAsync(
+            _factory,
+            _client,
+            "GLV-REVIEW-001",
+            TestData.FoxAndFinchId,
+            "Review delivery test.",
+            Encoding.ASCII.GetBytes("%PDF-1.4 review content"));
+        var invoiceId = invoice.GetProperty("id").GetGuid();
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/email-review", new
+        {
+            message = "Please process this one this week.",
+            includeReceipts = false,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var review = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("bookings@foxandfinch.co.uk", review.GetProperty("recipientEmail").GetString());
+        Assert.Equal("Invoice GLV-REVIEW-001 from Glovelly", review.GetProperty("subject").GetString());
+        Assert.Equal("Additional message:", review.GetProperty("additionalMessageHeading").GetString());
+        Assert.Equal("GLV-REVIEW-001.pdf", review.GetProperty("pdfFileName").GetString());
+        Assert.Empty(_factory.Emails.SentEmails);
+
+        var invoiceResponse = await _client.GetAsync($"/invoices/{invoiceId}", TestContext.Current.CancellationToken);
+        invoiceResponse.EnsureSuccessStatusCode();
+        var unchangedInvoice = await invoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(0, unchangedInvoice.GetProperty("deliveryCount").GetInt32());
+        Assert.Equal(JsonValueKind.Null, unchangedInvoice.GetProperty("lastDeliveredUtc").ValueKind);
+    }
+
+    [Fact]
+    public async Task EmailReview_WhenReceiptsRequested_ListsEligibleReceiptPackWithoutSending()
+    {
+        var (invoiceId, _) = await SeedInvoiceWithReceiptAsync(
+            "GLV-REVIEW-RECEIPTS",
+            "Parking",
+            "parking.pdf",
+            "application/pdf",
+            Encoding.ASCII.GetBytes("%PDF-1.4 receipt"));
+
+        var response = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/email-review", new
+        {
+            includeReceipts = true,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var review = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(1, review.GetProperty("receiptCount").GetInt32());
+        Assert.Equal(
+            "Expense receipts are attached in a separate ZIP file.",
+            review.GetProperty("receiptNote").GetString());
+        Assert.Empty(_factory.Emails.SentEmails);
+    }
+
+    [Fact]
+    public async Task DownloadEmailReceipts_ReturnsTheSameReceiptArchiveUsedForEmailDelivery()
+    {
+        var (invoiceId, receiptBytes) = await SeedInvoiceWithReceiptAsync(
+            "GLV-RECEIPT-DOWNLOAD",
+            "Taxi - airport",
+            "taxi/receipt.jpg",
+            "image/jpeg",
+            Encoding.ASCII.GetBytes("receipt image bytes"));
+
+        var response = await _client.GetAsync($"/invoices/{invoiceId}/email-receipts", TestContext.Current.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("application/zip", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            "Invoice-GLV-RECEIPT-DOWNLOAD-Receipts.zip",
+            response.Content.Headers.ContentDisposition?.FileNameStar);
+        using var zipStream = new MemoryStream(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        var entry = Assert.Single(archive.Entries);
+        Assert.Equal("Taxi - airport-taxi-receipt.jpg", entry.FullName);
+        await using var entryStream = entry.Open();
+        using var content = new MemoryStream();
+        await entryStream.CopyToAsync(content, TestContext.Current.CancellationToken);
+        Assert.Equal(receiptBytes, content.ToArray());
+        Assert.Empty(_factory.Emails.SentEmails);
+    }
+
+    [Fact]
     public async Task SendEmail_WhenInvoicePdfIsBlobBacked_SendsStoredAttachment()
     {
         var pdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 blob-backed invoice content");
