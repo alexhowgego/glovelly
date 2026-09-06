@@ -19,6 +19,19 @@ export type Client = {
   invoiceEmailSubjectPattern: string | null
 }
 
+export type InvoiceEmailReview = {
+  recipientName: string
+  recipientEmail: string
+  subject: string
+  plainTextBody: string
+  pdfFileName: string
+  pdfSizeBytes: number
+  receiptCount: number
+  receiptZipFileName: string | null
+  receiptNote: string
+  additionalMessageHeading: string
+}
+
 export type ClientForm = {
   name: string
   email: string
@@ -649,6 +662,7 @@ export type InvoiceLine = {
 }
 
 export type InvoiceStatus = 'Draft' | 'Issued' | 'Paid' | 'Overdue' | 'Cancelled'
+export type InvoiceDocumentState = 'Current' | 'Missing' | 'Regenerating' | 'Failed'
 
 export type Invoice = {
   id: string
@@ -674,6 +688,10 @@ export type Invoice = {
   pdfContentType: string | null
   pdfSizeBytes: number | null
   pdfGeneratedAt: string | null
+  documentState: InvoiceDocumentState
+  documentRevision: number
+  pdfDocumentRevision: number | null
+  documentFailureMessage: string | null
   total: number
   lines: InvoiceLine[]
 }

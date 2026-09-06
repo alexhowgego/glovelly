@@ -1,13 +1,11 @@
 using Glovelly.Api.Models;
 using Microsoft.Extensions.Options;
-using System.IO.Compression;
-using System.Text;
 
 namespace Glovelly.Api.Services;
 
 public sealed class InvoiceEmailDeliveryChannel(
     IEmailSender emailSender,
-    IExpenseAttachmentStore expenseAttachmentStore,
+    IInvoiceReceiptArchiveService invoiceReceiptArchiveService,
     IInvoicePdfService invoicePdfService,
     IOptions<EmailSettings> emailSettingsAccessor) : IInvoiceDeliveryChannel
 {
@@ -63,8 +61,9 @@ public sealed class InvoiceEmailDeliveryChannel(
         InvoiceDeliveryRequest request,
         CancellationToken cancellationToken)
     {
-        var invoicePdf = await invoicePdfService.OpenReadAsync(request.Invoice, cancellationToken)
-            ?? throw new InvalidOperationException("Invoice PDF is missing.");
+        var invoicePdfResult = await invoicePdfService.OpenCurrentReadAsync(request.Invoice, cancellationToken);
+        var invoicePdf = invoicePdfResult.Pdf
+            ?? throw new InvalidOperationException(invoicePdfResult.UnavailableMessage);
         await using var invoicePdfContent = invoicePdf.Content;
         using var invoicePdfMemory = new MemoryStream();
         await invoicePdf.Content.CopyToAsync(invoicePdfMemory, cancellationToken);
@@ -79,7 +78,7 @@ public sealed class InvoiceEmailDeliveryChannel(
 
         if (request.ExpenseReceiptAttachments.Count > 0)
         {
-            attachments.Add(await BuildReceiptZipAttachmentAsync(request, cancellationToken));
+            attachments.Add(await invoiceReceiptArchiveService.CreateAsync(request, cancellationToken));
         }
 
         var maxTotalAttachmentBytes = emailSettingsAccessor.Value.MaxTotalAttachmentBytes;
@@ -92,86 +91,6 @@ public sealed class InvoiceEmailDeliveryChannel(
         }
 
         return attachments;
-    }
-
-    private async Task<EmailAttachment> BuildReceiptZipAttachmentAsync(
-        InvoiceDeliveryRequest request,
-        CancellationToken cancellationToken)
-    {
-        using var zipStream = new MemoryStream();
-        using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
-        {
-            var usedEntryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var receipt in request.ExpenseReceiptAttachments)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var entryName = BuildUniqueZipEntryName(receipt, usedEntryNames);
-                var entry = archive.CreateEntry(entryName, CompressionLevel.SmallestSize);
-                await using var entryStream = entry.Open();
-                var content = await expenseAttachmentStore.OpenReadAsync(receipt.StorageKey, cancellationToken);
-                await using (content.Content)
-                {
-                    await content.Content.CopyToAsync(entryStream, cancellationToken);
-                }
-            }
-        }
-
-        return new EmailAttachment(
-            $"Invoice-{SanitizeFileNamePart(request.Invoice.InvoiceNumber, "Invoice")}-Receipts.zip",
-            "application/zip",
-            zipStream.ToArray());
-    }
-
-    private static string BuildUniqueZipEntryName(
-        InvoiceExpenseReceiptAttachment receipt,
-        HashSet<string> usedEntryNames)
-    {
-        var expenseDescription = SanitizeFileNamePart(receipt.ExpenseDescription, "Expense");
-        var originalFileName = SanitizeFileNamePart(receipt.FileName, "receipt");
-        var baseName = TrimFileNamePart($"{expenseDescription}-{originalFileName}", 180);
-        var candidate = baseName;
-        var suffix = 2;
-
-        while (!usedEntryNames.Add(candidate))
-        {
-            var extension = Path.GetExtension(baseName);
-            var nameWithoutExtension = string.IsNullOrWhiteSpace(extension)
-                ? baseName
-                : baseName[..^extension.Length];
-            candidate = $"{TrimFileNamePart(nameWithoutExtension, 170)}-{suffix++}{extension}";
-        }
-
-        return candidate;
-    }
-
-    private static string SanitizeFileNamePart(string value, string fallback)
-    {
-        var trimmed = value.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-        {
-            trimmed = fallback;
-        }
-
-        var invalidCharacters = Path.GetInvalidFileNameChars();
-        var builder = new StringBuilder(trimmed.Length);
-        foreach (var character in trimmed)
-        {
-            builder.Append(invalidCharacters.Contains(character) || char.IsControl(character)
-                ? '-'
-                : character);
-        }
-
-        var sanitized = builder.ToString().Trim(' ', '.', '-');
-        return string.IsNullOrWhiteSpace(sanitized)
-            ? fallback
-            : sanitized;
-    }
-
-    private static string TrimFileNamePart(string value, int maxLength)
-    {
-        return value.Length <= maxLength
-            ? value
-            : value[..maxLength].Trim(' ', '.', '-');
     }
 
 }

@@ -72,11 +72,13 @@ public static class InvoiceEndpoints
                 return Results.NotFound();
             }
 
-            var pdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
-            if (pdf is null)
+            var pdfResult = await invoicePdfService.OpenCurrentReadAsync(invoice, cancellationToken);
+            if (!pdfResult.IsAvailable)
             {
-                return Results.NotFound();
+                return EndpointSupport.ValidationProblem("pdf", pdfResult.UnavailableMessage!);
             }
+
+            var pdf = pdfResult.Pdf!;
 
             var userDefaultPattern = userId.HasValue
                 ? await db.Users
@@ -143,6 +145,10 @@ public static class InvoiceEndpoints
             invoice.PdfContentType = null;
             invoice.PdfSizeBytes = null;
             invoice.PdfGeneratedAt = null;
+            invoice.DocumentState = InvoiceDocumentState.Missing;
+            invoice.DocumentRevision = 1;
+            invoice.PdfDocumentRevision = null;
+            invoice.DocumentFailureMessage = null;
             invoice.PaidOn = null;
             invoice.Client = null;
             invoice.Lines = new List<InvoiceLine>();
@@ -448,6 +454,7 @@ public static class InvoiceEndpoints
             var userId = currentUserAccessor.TryGetUserId(user);
             var invoice = await db.Invoices
                 .WhereVisibleTo(userId)
+                .Include(value => value.Client)
                 .Include(value => value.Lines)
                 .FirstOrDefaultAsync(value => value.Id == id);
             if (invoice is null)
@@ -469,6 +476,118 @@ public static class InvoiceEndpoints
             _ = await invoiceWorkflowService.CreateManualAdjustmentAsync(invoice, request.Amount, reason, userId);
             await db.SaveChangesAsync();
 
+            if (invoice.Client is null)
+            {
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
+            }
+
+            try
+            {
+                await invoiceWorkflowService.RegenerateInvoicePdfAsync(invoice, invoice.Client, userId);
+            }
+            catch (Exception)
+            {
+                invoiceWorkflowService.MarkInvoicePdfRegenerationFailed(
+                    invoice,
+                    "Invoice adjustment was saved, but its PDF could not be regenerated. Try again.",
+                    userId);
+            }
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(invoice);
+        });
+
+        group.MapPost("/{id:guid}/regenerate-pdf", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceWorkflowService invoiceWorkflowService) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
+                .Include(value => value.Client)
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id);
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (invoice.Client is null)
+            {
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
+            }
+
+            try
+            {
+                await invoiceWorkflowService.RegenerateInvoicePdfAsync(invoice, invoice.Client, userId);
+            }
+            catch (Exception)
+            {
+                invoiceWorkflowService.MarkInvoicePdfRegenerationFailed(
+                    invoice,
+                    "Invoice PDF could not be regenerated. Try again.",
+                    userId);
+            }
+
+            await db.SaveChangesAsync();
+            return Results.Ok(invoice);
+        });
+
+        group.MapDelete("/{id:guid}/adjustments/{lineId:guid}", async (
+            Guid id,
+            Guid lineId,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceWorkflowService invoiceWorkflowService) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await db.Invoices
+                .WhereVisibleTo(userId)
+                .Include(value => value.Client)
+                .Include(value => value.Lines)
+                .FirstOrDefaultAsync(value => value.Id == id);
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            var adjustmentLine = invoice.Lines.FirstOrDefault(value => value.Id == lineId);
+            if (adjustmentLine is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (adjustmentLine.Type is not InvoiceLineType.ManualAdjustment)
+            {
+                return EndpointSupport.ValidationProblem("lineId", "Only manual adjustments can be removed from here.");
+            }
+
+            if (invoice.Client is null)
+            {
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
+            }
+
+            invoiceWorkflowService.RemoveManualAdjustment(invoice, adjustmentLine, userId);
+            await db.SaveChangesAsync();
+
+            try
+            {
+                await invoiceWorkflowService.RegenerateInvoicePdfAsync(invoice, invoice.Client, userId);
+            }
+            catch (Exception)
+            {
+                invoiceWorkflowService.MarkInvoicePdfRegenerationFailed(
+                    invoice,
+                    "Adjustment was removed, but its PDF could not be regenerated. Try again.",
+                    userId);
+            }
+
+            await db.SaveChangesAsync();
             return Results.Ok(invoice);
         });
 

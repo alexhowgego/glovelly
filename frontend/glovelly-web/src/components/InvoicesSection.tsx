@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
+import type { RefObject } from 'react'
 import {
   formatCurrency,
   formatDate,
@@ -8,6 +9,7 @@ import {
 } from '../formatters'
 import { TrashIcon } from './TrashIcon'
 import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
+import { getInvoiceDocumentAvailability } from '../invoiceDocumentState'
 import type {
   Invoice,
   InvoiceLine,
@@ -50,6 +52,7 @@ type InvoicesSectionProps = {
   onOpenSellerProfile: () => void
   onPreviewPdf: (invoice: Invoice) => Promise<void>
   onPublishGoogleDrive: (invoice: Invoice) => Promise<Invoice | null>
+  onRegeneratePdf: (invoice: Invoice) => Promise<void>
   onReissue: (invoice: Invoice) => Promise<Invoice | null>
   onSendEmail: (invoice: Invoice) => Promise<Invoice | null>
   onQuickFilterChange: (filter: InvoiceQuickFilter) => void
@@ -60,6 +63,7 @@ type InvoicesSectionProps = {
   scrollToListRequest: number
   sellerProfileNotice: string
   selectedInvoice: Invoice | null
+  sendButtonRef: RefObject<HTMLButtonElement | null>
 }
 
 export function InvoicesSection({
@@ -95,6 +99,7 @@ export function InvoicesSection({
   onOpenSellerProfile,
   onPreviewPdf,
   onPublishGoogleDrive,
+  onRegeneratePdf,
   onReissue,
   onSendEmail,
   onQuickFilterChange,
@@ -105,6 +110,7 @@ export function InvoicesSection({
   scrollToListRequest,
   sellerProfileNotice,
   selectedInvoice,
+  sendButtonRef,
 }: InvoicesSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
   const listControlsRef = useRef<HTMLDivElement | null>(null)
@@ -115,6 +121,9 @@ export function InvoicesSection({
   const selectedInvoiceClientName =
     (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
     'Unknown client'
+  const documentAvailability = getInvoiceDocumentAvailability(selectedInvoice)
+  const isDocumentCurrent = documentAvailability.isCurrent
+  const documentStatus = documentAvailability.message
   const invoiceSortOptions: { value: InvoiceSortKey; label: string }[] = [
     { value: 'priority', label: 'Priority' },
     { value: 'invoiceDate', label: 'Date' },
@@ -334,7 +343,8 @@ export function InvoicesSection({
                 data-testid="invoice-preview-button"
                 onClick={() => selectedInvoice && void onPreviewPdf(selectedInvoice)}
                 type="button"
-                disabled={!selectedInvoice || isInvoiceLoading}
+                disabled={!selectedInvoice || isInvoiceLoading || !isDocumentCurrent}
+                title={!isDocumentCurrent ? documentStatus : undefined}
               >
                 Preview
               </button>
@@ -342,11 +352,13 @@ export function InvoicesSection({
                 className="ghost-button"
                 onClick={() => selectedInvoice && void onPublishGoogleDrive(selectedInvoice)}
                 type="button"
-                disabled={!selectedInvoice || isInvoiceLoading || !isGoogleDriveConnected}
+                disabled={!selectedInvoice || isInvoiceLoading || !isGoogleDriveConnected || !isDocumentCurrent}
                 title={
-                  isGoogleDriveConnected
-                    ? undefined
-                    : 'Connect Google Drive from your profile menu first.'
+                  !isGoogleDriveConnected
+                    ? 'Connect Google Drive from your profile menu first.'
+                    : !isDocumentCurrent
+                      ? documentStatus
+                      : undefined
                 }
               >
                 Publish to Drive
@@ -354,9 +366,11 @@ export function InvoicesSection({
               <button
                 className="ghost-button"
                 data-testid="invoice-send-button"
+                ref={sendButtonRef}
                 onClick={() => selectedInvoice && void onSendEmail(selectedInvoice)}
                 type="button"
-                disabled={!selectedInvoice || isInvoiceLoading}
+                disabled={!selectedInvoice || isInvoiceLoading || !isDocumentCurrent}
+                title={!isDocumentCurrent ? documentStatus : undefined}
               >
                 Send to client
               </button>
@@ -379,7 +393,8 @@ export function InvoicesSection({
                 data-testid="invoice-download-pdf-button"
                 onClick={() => selectedInvoice && void onDownloadPdf(selectedInvoice)}
                 type="button"
-                disabled={!selectedInvoice || isInvoiceLoading}
+                disabled={!selectedInvoice || isInvoiceLoading || !isDocumentCurrent}
+                title={!isDocumentCurrent ? documentStatus : undefined}
               >
                 Download PDF
               </button>
@@ -473,6 +488,21 @@ export function InvoicesSection({
                 <article>
                   <p className="detail-label">Line items</p>
                   <strong>{selectedInvoice.lines.length}</strong>
+                </article>
+                <article>
+                  <p className="detail-label">Invoice PDF</p>
+                  <strong>{documentStatus}</strong>
+                  {documentAvailability.canRetry ? (
+                    <button
+                      className="link-button"
+                      data-testid="invoice-regenerate-pdf-button"
+                      disabled={isInvoiceLoading}
+                      onClick={() => void onRegeneratePdf(selectedInvoice)}
+                      type="button"
+                    >
+                      Try again
+                    </button>
+                  ) : null}
                 </article>
                 <article>
                   <p className="detail-label">Deliveries</p>

@@ -32,6 +32,15 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .HasMaxLength(255);
         entity.Property(invoice => invoice.PdfContentType)
             .HasMaxLength(100);
+        entity.Property(invoice => invoice.DocumentState)
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .HasSentinel(InvoiceDocumentState.Missing)
+            .HasDefaultValue(InvoiceDocumentState.Missing);
+        entity.Property(invoice => invoice.DocumentRevision)
+            .HasDefaultValue(1);
+        entity.Property(invoice => invoice.DocumentFailureMessage)
+            .HasMaxLength(1000);
         entity.HasIndex(invoice => invoice.PdfStorageKey)
             .IsUnique();
 

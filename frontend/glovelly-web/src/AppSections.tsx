@@ -9,6 +9,7 @@ export {
   GigImportsModal,
   GigsSection,
   InvoiceGenerationPreviewModal,
+  InvoiceEmailReviewModal,
   InvoicesSection,
   QuickAttachmentModal,
   QuickReceiptModal,

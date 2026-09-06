@@ -119,6 +119,13 @@ public static class InvoiceLineEndpoints
                 return Results.NotFound();
             }
 
+            if (line.Type is InvoiceLineType.ManualAdjustment)
+            {
+                return EndpointSupport.ValidationProblem(
+                    "lineId",
+                    "Manual adjustments must be removed through their invoice so the PDF can be regenerated.");
+            }
+
             db.InvoiceLines.Remove(line);
             await db.SaveChangesAsync();
 

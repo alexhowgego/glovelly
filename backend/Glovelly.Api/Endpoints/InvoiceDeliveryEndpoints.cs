@@ -11,6 +11,89 @@ internal static class InvoiceDeliveryEndpoints
 {
     public static RouteGroupBuilder MapInvoiceDeliveryEndpoints(this RouteGroupBuilder group)
     {
+        group.MapPost("/{id:guid}/email-review", async (
+            Guid id,
+            InvoiceEmailDeliveryRequest? request,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceEmailPreparationService invoiceEmailPreparationService,
+            IInvoiceReceiptArchiveService invoiceReceiptArchiveService,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await LoadVisibleInvoiceAsync(db, id, userId, cancellationToken);
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            try
+            {
+                var preparation = await invoiceEmailPreparationService.PrepareAsync(
+                    invoice, userId, null, includeReceipts: true, cancellationToken: cancellationToken);
+                var deliveryRequest = preparation.DeliveryRequest;
+                var baseEmail = InvoiceEmailTemplateRenderer.Render(
+                    invoice,
+                    deliveryRequest.Client,
+                    deliveryRequest.EmailBodyTemplate,
+                    deliveryRequest.BusinessName);
+                return Results.Ok(new InvoiceEmailReviewResponse(
+                    deliveryRequest.Client.Name,
+                    deliveryRequest.Client.Email!.Trim(),
+                    deliveryRequest.EmailSubject,
+                    baseEmail.PlainTextBody,
+                    deliveryRequest.AttachmentFileName,
+                    preparation.PdfSizeBytes,
+                    deliveryRequest.ExpenseReceiptAttachments.Count,
+                    deliveryRequest.ExpenseReceiptAttachments.Count > 0
+                        ? invoiceReceiptArchiveService.GetFileName(invoice.InvoiceNumber)
+                        : null,
+                    "Expense receipts are attached in a separate ZIP file.",
+                    "Additional message:"));
+            }
+            catch (InvoiceEmailPreparationException exception)
+            {
+                return EndpointSupport.ValidationProblem(exception.Field, exception.Message);
+            }
+        });
+
+        group.MapGet("/{id:guid}/email-receipts", async (
+            Guid id,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IInvoiceEmailPreparationService invoiceEmailPreparationService,
+            IInvoiceReceiptArchiveService invoiceReceiptArchiveService,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            var invoice = await LoadVisibleInvoiceAsync(db, id, userId, cancellationToken);
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            try
+            {
+                var preparation = await invoiceEmailPreparationService.PrepareAsync(
+                    invoice, userId, null, includeReceipts: true, cancellationToken: cancellationToken);
+                if (preparation.DeliveryRequest.ExpenseReceiptAttachments.Count == 0)
+                {
+                    return EndpointSupport.ValidationProblem("attachments", "No receipt attachments are available for this invoice.");
+                }
+
+                var archive = await invoiceReceiptArchiveService.CreateAsync(
+                    preparation.DeliveryRequest,
+                    cancellationToken);
+                return Results.File(archive.Content, archive.ContentType, archive.FileName);
+            }
+            catch (InvoiceEmailPreparationException exception)
+            {
+                return EndpointSupport.ValidationProblem(exception.Field, exception.Message);
+            }
+        });
+
         group.MapPost("/{id:guid}/send-email", async (
             Guid id,
             InvoiceEmailDeliveryRequest? request,
@@ -18,88 +101,46 @@ internal static class InvoiceDeliveryEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IInvoiceDeliveryService invoiceDeliveryService,
-            IInvoiceProfileDefaultsService invoiceProfileDefaultsService,
-            IInvoicePdfService invoicePdfService,
+            IInvoiceEmailPreparationService invoiceEmailPreparationService,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
             var logger = loggerFactory.CreateLogger("InvoiceEndpoints");
             var userId = currentUserAccessor.TryGetUserId(user);
-            var invoice = await db.Invoices
-                .WhereVisibleTo(userId)
-                .Include(value => value.Client)
-                .Include(value => value.Lines)
-                .FirstOrDefaultAsync(value => value.Id == id, cancellationToken);
+            var invoice = await LoadVisibleInvoiceAsync(db, id, userId, cancellationToken);
 
             if (invoice is null)
             {
                 return Results.NotFound();
             }
 
-            if (invoice.Client is null)
+            InvoiceEmailPreparation preparation;
+            try
             {
-                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
+                preparation = await invoiceEmailPreparationService.PrepareAsync(
+                    invoice, userId, request?.Message, request?.IncludeReceipts is true, cancellationToken);
             }
-
-            if (string.IsNullOrWhiteSpace(invoice.Client.Email))
+            catch (InvoiceEmailPreparationException exception)
             {
-                return EndpointSupport.ValidationProblem("recipient", "Invoice recipient email is missing.");
+                return EndpointSupport.ValidationProblem(exception.Field, exception.Message);
             }
-
-            var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
-            if (invoicePdf is null)
-            {
-                return EndpointSupport.ValidationProblem("pdf", "Invoice PDF is missing.");
-            }
-            await invoicePdf.Content.DisposeAsync();
-
-            var userDefaultFilenamePattern = userId.HasValue
-                ? await db.Users
-                    .AsNoTracking()
-                    .Where(value => value.Id == userId.Value && value.IsActive)
-                    .Select(value => value.InvoiceFilenamePattern)
-                    .FirstOrDefaultAsync(cancellationToken)
-                : null;
-            var periodDate = await InvoiceEndpointSupport.ResolveInvoicePeriodDateAsync(db, invoice.Id, cancellationToken);
-            var attachmentFileName = InvoicePdfFilenameBuilder.Build(
-                invoice,
-                invoice.Client,
-                userDefaultFilenamePattern,
-                periodDate);
-            var sendingUser = userId.HasValue
-                ? await db.Users
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(
-                        value => value.Id == userId.Value && value.IsActive,
-                        cancellationToken)
-                : null;
-            var emailSubject = InvoiceEmailSubjectBuilder.Build(
-                invoice,
-                invoice.Client,
-                sendingUser?.InvoiceEmailSubjectPattern,
-                periodDate);
-            var senderIdentity = InvoiceEmailSenderIdentityBuilder.Build(sendingUser);
-            var sellerProfile = await invoiceProfileDefaultsService.ResolveSellerProfileAsync(userId, cancellationToken);
-            var businessName = sellerProfile?.SellerName ?? sendingUser?.DisplayName;
-            IReadOnlyList<InvoiceExpenseReceiptAttachment> receiptAttachments = request?.IncludeReceipts is true
-                ? await BuildInvoiceReceiptAttachmentsAsync(db, invoice, cancellationToken)
-                : [];
 
             try
             {
+                var deliveryRequest = preparation.DeliveryRequest;
                 await invoiceDeliveryService.DeliverAsync(
                     InvoiceDeliveryChannel.Email,
                     invoice,
-                    invoice.Client,
+                    deliveryRequest.Client,
                     userId,
-                    request?.Message,
-                    emailSubject,
-                    sendingUser?.InvoiceEmailBodyTemplate,
-                    businessName,
-                    attachmentFileName,
-                    senderIdentity,
+                    deliveryRequest.Message,
+                    deliveryRequest.EmailSubject,
+                    deliveryRequest.EmailBodyTemplate,
+                    deliveryRequest.BusinessName,
+                    deliveryRequest.AttachmentFileName,
+                    deliveryRequest.SenderIdentity,
                     cancellationToken,
-                    receiptAttachments);
+                    deliveryRequest.ExpenseReceiptAttachments);
             }
             catch (InvoiceEmailAttachmentLimitExceededException exception)
             {
@@ -162,12 +203,12 @@ internal static class InvoiceDeliveryEndpoints
                 return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
-            var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken);
-            if (invoicePdf is null)
+            var invoicePdfResult = await invoicePdfService.OpenCurrentReadAsync(invoice, cancellationToken);
+            if (!invoicePdfResult.IsAvailable)
             {
-                return EndpointSupport.ValidationProblem("pdf", "Invoice PDF is missing.");
+                return EndpointSupport.ValidationProblem("pdf", invoicePdfResult.UnavailableMessage!);
             }
-            await invoicePdf.Content.DisposeAsync();
+            await invoicePdfResult.Pdf!.Content.DisposeAsync();
 
             var userDefaultFilenamePattern = userId.HasValue
                 ? await db.Users
@@ -238,55 +279,6 @@ internal static class InvoiceDeliveryEndpoints
         return group;
     }
 
-    private static async Task<IReadOnlyList<InvoiceExpenseReceiptAttachment>> BuildInvoiceReceiptAttachmentsAsync(
-        AppDbContext db,
-        Invoice invoice,
-        CancellationToken cancellationToken)
-    {
-        var expenseLineKeys = invoice.Lines
-            .Where(line => line.Type is InvoiceLineType.MiscExpense && line.GigId.HasValue)
-            .Select(line => new
-            {
-                GigId = line.GigId!.Value,
-                Description = line.Description.Trim(),
-                Amount = line.UnitPrice,
-            })
-            .ToList();
-
-        if (expenseLineKeys.Count == 0)
-        {
-            return [];
-        }
-
-        var gigIds = expenseLineKeys
-            .Select(line => line.GigId)
-            .Distinct()
-            .ToList();
-        var expenses = await db.GigExpenses
-            .AsNoTracking()
-            .Include(expense => expense.Attachments)
-            .Where(expense => gigIds.Contains(expense.GigId))
-            .OrderBy(expense => expense.SortOrder)
-            .ThenBy(expense => expense.Description)
-            .ToListAsync(cancellationToken);
-
-        return expenses
-            .Where(expense => expense.Attachments.Count > 0)
-            .Where(expense => expenseLineKeys.Any(line =>
-                line.GigId == expense.GigId &&
-                string.Equals(line.Description, expense.Description.Trim(), StringComparison.Ordinal) &&
-                line.Amount == expense.Amount))
-            .SelectMany(expense => expense.Attachments
-                .OrderBy(attachment => attachment.CreatedAt)
-                .Select(attachment => new InvoiceExpenseReceiptAttachment(
-                    expense.Description,
-                    attachment.FileName,
-                    attachment.ContentType,
-                    attachment.SizeBytes,
-                    attachment.StorageKey)))
-            .ToList();
-    }
-
     private static string FormatBytes(long byteCount)
     {
         const decimal oneMegabyte = 1024m * 1024m;
@@ -295,7 +287,30 @@ internal static class InvoiceDeliveryEndpoints
             : $"{byteCount / oneMegabyte:0.##} MB";
     }
 
+    private static Task<Invoice?> LoadVisibleInvoiceAsync(
+        AppDbContext db,
+        Guid id,
+        Guid? userId,
+        CancellationToken cancellationToken) =>
+        db.Invoices
+            .WhereVisibleTo(userId)
+            .Include(value => value.Client)
+            .Include(value => value.Lines)
+            .FirstOrDefaultAsync(value => value.Id == id, cancellationToken);
+
     private sealed record InvoiceEmailDeliveryRequest(string? Message, bool IncludeReceipts = false);
+
+    private sealed record InvoiceEmailReviewResponse(
+        string RecipientName,
+        string RecipientEmail,
+        string Subject,
+        string PlainTextBody,
+        string PdfFileName,
+        long PdfSizeBytes,
+        int ReceiptCount,
+        string? ReceiptZipFileName,
+        string ReceiptNote,
+        string AdditionalMessageHeading);
 
     private sealed record InvoiceGoogleDrivePublishResponse(
         Invoice Invoice,

@@ -2,8 +2,14 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -11,10 +17,12 @@ namespace Glovelly.Api.Tests;
 public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFactory>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly GlovellyApiFactory _factory;
     private readonly HttpClient _client;
 
     public InvoiceStatusEndpointsTests(GlovellyApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -374,6 +382,266 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         Assert.Equal(
             JsonValueKind.String,
             manualAdjustment.GetProperty("calculationNotes").ValueKind);
+        Assert.Equal("Current", updatedInvoice.GetProperty("documentState").GetString());
+        Assert.Equal(
+            updatedInvoice.GetProperty("documentRevision").GetInt32(),
+            updatedInvoice.GetProperty("pdfDocumentRevision").GetInt32());
+
+        var pdfResponse = await _client.GetAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/pdf",
+            TestContext.Current.CancellationToken);
+        pdfResponse.EnsureSuccessStatusCode();
+        var pdfText = Encoding.ASCII.GetString(
+            await pdfResponse.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("Manual adjustment: Goodwill discount", pdfText);
+        Assert.Contains("GBP 175.00", pdfText);
+    }
+
+    [Fact]
+    public async Task RegeneratePdf_WhenDocumentPreviouslyFailed_RestoresCurrentDocumentWithoutReissueAudit()
+    {
+        await SetDocumentStateAsync(InvoiceDocumentState.Failed, "PDF rendering failed.");
+
+        var response = await _client.PostAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/regenerate-pdf",
+            null,
+            TestContext.Current.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(
+            JsonOptions,
+            TestContext.Current.CancellationToken);
+        Assert.Equal("Current", updatedInvoice.GetProperty("documentState").GetString());
+        Assert.Equal(0, updatedInvoice.GetProperty("reissueCount").GetInt32());
+        Assert.Equal(JsonValueKind.Null, updatedInvoice.GetProperty("lastReissuedUtc").ValueKind);
+    }
+
+    [Fact]
+    public async Task RemoveAdjustment_RegeneratesPdfAndPreventsGenericLineDeletion()
+    {
+        var createLineResponse = await _client.PostAsJsonAsync("/invoice-lines", new
+        {
+            invoiceId = TestData.RiversideInvoiceId,
+            sortOrder = 1,
+            type = InvoiceLineType.PerformanceFee,
+            description = "Headline performance",
+            quantity = 1m,
+            unitPrice = 200m,
+        }, TestContext.Current.CancellationToken);
+        createLineResponse.EnsureSuccessStatusCode();
+
+        var addResponse = await _client.PostAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/adjustments", new
+        {
+            amount = -25m,
+            reason = "Goodwill discount",
+        }, TestContext.Current.CancellationToken);
+        addResponse.EnsureSuccessStatusCode();
+        var adjustedInvoice = await addResponse.Content.ReadFromJsonAsync<JsonElement>(
+            JsonOptions,
+            TestContext.Current.CancellationToken);
+        var adjustmentId = adjustedInvoice.GetProperty("lines")
+            .EnumerateArray()
+            .Single(line => line.GetProperty("type").GetString() == "ManualAdjustment")
+            .GetProperty("id")
+            .GetGuid();
+
+        var genericDeleteResponse = await _client.DeleteAsync(
+            $"/invoice-lines/{adjustmentId}",
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, genericDeleteResponse.StatusCode);
+
+        var removalResponse = await _client.DeleteAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/adjustments/{adjustmentId}",
+            TestContext.Current.CancellationToken);
+        removalResponse.EnsureSuccessStatusCode();
+        var updatedInvoice = await removalResponse.Content.ReadFromJsonAsync<JsonElement>(
+            JsonOptions,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(200m, updatedInvoice.GetProperty("total").GetDecimal());
+        Assert.Equal("Current", updatedInvoice.GetProperty("documentState").GetString());
+        Assert.DoesNotContain(
+            updatedInvoice.GetProperty("lines").EnumerateArray(),
+            line => line.GetProperty("type").GetString() == "ManualAdjustment");
+
+        var pdfResponse = await _client.GetAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/pdf",
+            TestContext.Current.CancellationToken);
+        pdfResponse.EnsureSuccessStatusCode();
+        var pdfText = Encoding.ASCII.GetString(
+            await pdfResponse.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        Assert.DoesNotContain("Manual adjustment: Goodwill discount", pdfText);
+        Assert.Contains("GBP 200.00", pdfText);
+    }
+
+    [Fact]
+    public async Task AddAdjustment_WhenPdfRegenerationFails_PersistsAdjustmentAndBlocksDocumentAccess()
+    {
+        using var failingFactory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IInvoicePdfRenderer>();
+                services.AddScoped<IInvoicePdfRenderer, ThrowingInvoicePdfRenderer>();
+            }));
+        using var client = failingFactory.CreateClient();
+
+        var response = await client.PostAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/adjustments", new
+        {
+            amount = -25m,
+            reason = "Goodwill discount",
+        }, TestContext.Current.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(
+            JsonOptions,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(-25m, updatedInvoice.GetProperty("total").GetDecimal());
+        Assert.Contains(
+            updatedInvoice.GetProperty("lines").EnumerateArray(),
+            line => line.GetProperty("type").GetString() == "ManualAdjustment");
+        Assert.Equal("Failed", updatedInvoice.GetProperty("documentState").GetString());
+        Assert.Contains(
+            "adjustment was saved",
+            updatedInvoice.GetProperty("documentFailureMessage").GetString(),
+            StringComparison.OrdinalIgnoreCase);
+
+        var pdfResponse = await client.GetAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/pdf",
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, pdfResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveAdjustment_WhenPdfRegenerationFails_PersistsRemovalAndBlocksDocumentAccess()
+    {
+        using var failingFactory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IInvoicePdfRenderer>();
+                services.AddScoped<IInvoicePdfRenderer, ThrowingInvoicePdfRenderer>();
+            }));
+        using var client = failingFactory.CreateClient();
+        var adjustmentId = Guid.NewGuid();
+        using (var scope = failingFactory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.InvoiceLines.Add(new InvoiceLine
+            {
+                Id = adjustmentId,
+                InvoiceId = TestData.RiversideInvoiceId,
+                CreatedByUserId = TestAuthContext.UserId,
+                CreatedUtc = DateTimeOffset.UtcNow,
+                SortOrder = 1,
+                Type = InvoiceLineType.ManualAdjustment,
+                Description = "Manual adjustment: Goodwill discount",
+                Quantity = 1,
+                UnitPrice = -25m,
+            });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var response = await client.DeleteAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/adjustments/{adjustmentId}",
+            TestContext.Current.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var updatedInvoice = await response.Content.ReadFromJsonAsync<JsonElement>(
+            JsonOptions,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0m, updatedInvoice.GetProperty("total").GetDecimal());
+        Assert.Equal("Failed", updatedInvoice.GetProperty("documentState").GetString());
+        Assert.DoesNotContain(
+            updatedInvoice.GetProperty("lines").EnumerateArray(),
+            line => line.GetProperty("id").GetGuid() == adjustmentId);
+
+        var pdfResponse = await client.GetAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/pdf",
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, pdfResponse.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(InvoiceDocumentState.Missing)]
+    [InlineData(InvoiceDocumentState.Regenerating)]
+    [InlineData(InvoiceDocumentState.Failed)]
+    public async Task UnavailableDocument_CannotBeDownloadedEmailedOrPublished(InvoiceDocumentState state)
+    {
+        await SetDocumentStateAsync(state, "PDF rendering failed.");
+
+        var downloadResponse = await _client.GetAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/pdf",
+            TestContext.Current.CancellationToken);
+        var emailResponse = await _client.PostAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/send-email",
+            null,
+            TestContext.Current.CancellationToken);
+        var publishResponse = await _client.PostAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/publish/google-drive",
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, downloadResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, emailResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, publishResponse.StatusCode);
+        var expectedMessage = state switch
+        {
+            InvoiceDocumentState.Missing => "Invoice PDF is missing.",
+            InvoiceDocumentState.Regenerating => "Invoice PDF is regenerating.",
+            _ => "PDF rendering failed.",
+        };
+        Assert.Contains(
+            expectedMessage,
+            await downloadResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(_factory.Emails.SentEmails);
+    }
+
+    [Fact]
+    public async Task StaleDocument_CannotBeDownloadedEmailedOrPublished()
+    {
+        await SetDocumentStateAsync(InvoiceDocumentState.Current, null);
+
+        var downloadResponse = await _client.GetAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/pdf",
+            TestContext.Current.CancellationToken);
+        var emailResponse = await _client.PostAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/send-email",
+            null,
+            TestContext.Current.CancellationToken);
+        var publishResponse = await _client.PostAsync(
+            $"/invoices/{TestData.RiversideInvoiceId}/publish/google-drive",
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, downloadResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, emailResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, publishResponse.StatusCode);
+        Assert.Empty(_factory.Emails.SentEmails);
+    }
+
+    private async Task SetDocumentStateAsync(InvoiceDocumentState state, string? failureMessage)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoice = await db.Invoices.SingleAsync(
+            value => value.Id == TestData.RiversideInvoiceId,
+            TestContext.Current.CancellationToken);
+        invoice.DocumentState = state;
+        invoice.DocumentRevision = 2;
+        invoice.PdfDocumentRevision = 1;
+        invoice.DocumentFailureMessage = failureMessage;
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    private sealed class ThrowingInvoicePdfRenderer : IInvoicePdfRenderer
+    {
+        public byte[] RenderInvoicePdf(
+            Invoice invoice,
+            Client client,
+            Gig? gig,
+            IReadOnlyCollection<InvoiceLine> lines,
+            SellerProfile? sellerProfile)
+        {
+            throw new InvalidOperationException("Renderer unavailable.");
+        }
     }
 
     [Fact]

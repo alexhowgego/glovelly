@@ -75,6 +75,10 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal("application/pdf", invoice.GetProperty("pdfContentType").GetString());
         Assert.True(invoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
         Assert.Equal(JsonValueKind.String, invoice.GetProperty("pdfGeneratedAt").ValueKind);
+        Assert.Equal("Current", invoice.GetProperty("documentState").GetString());
+        Assert.Equal(
+            invoice.GetProperty("documentRevision").GetInt32(),
+            invoice.GetProperty("pdfDocumentRevision").GetInt32());
         var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         Assert.Equal(today, invoice.GetProperty("invoiceDate").GetString());
         Assert.Equal(
@@ -314,6 +318,10 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal(
             DateOnly.FromDateTime(DateTime.UtcNow).AddDays(14).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             invoice.GetProperty("dueDate").GetString());
+        Assert.Equal("Current", invoice.GetProperty("documentState").GetString());
+        Assert.Equal(
+            invoice.GetProperty("documentRevision").GetInt32(),
+            invoice.GetProperty("pdfDocumentRevision").GetInt32());
 
         var lines = invoice.GetProperty("lines").EnumerateArray().OrderBy(line => line.GetProperty("sortOrder").GetInt32()).ToArray();
         Assert.Equal(2, lines.Length);

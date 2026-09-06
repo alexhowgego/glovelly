@@ -23,6 +23,9 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         invoice.PdfContentType = InvoicePdfStorage.ContentType;
         invoice.PdfSizeBytes = content.Length;
         invoice.PdfGeneratedAt = timeProvider.GetUtcNow();
+        invoice.PdfDocumentRevision = invoice.DocumentRevision;
+        invoice.DocumentState = InvoiceDocumentState.Current;
+        invoice.DocumentFailureMessage = null;
     }
 
     public async Task<InvoicePdfContent?> OpenReadAsync(
@@ -43,6 +46,31 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         return null;
     }
 
+    public async Task<InvoicePdfReadResult> OpenCurrentReadAsync(
+        Invoice invoice,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+
+        if (invoice.DocumentState is not InvoiceDocumentState.Current ||
+            invoice.PdfDocumentRevision != invoice.DocumentRevision)
+        {
+            return new InvoicePdfReadResult(null, BuildUnavailableMessage(invoice));
+        }
+
+        try
+        {
+            var pdf = await OpenReadAsync(invoice, cancellationToken);
+            return pdf is null
+                ? new InvoicePdfReadResult(null, "Invoice PDF is missing.")
+                : new InvoicePdfReadResult(pdf, null);
+        }
+        catch (FileNotFoundException)
+        {
+            return new InvoicePdfReadResult(null, "Invoice PDF is missing.");
+        }
+    }
+
     public Task DeleteAsync(Invoice invoice, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(invoice);
@@ -50,5 +78,16 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         return string.IsNullOrWhiteSpace(invoice.PdfStorageKey)
             ? Task.CompletedTask
             : blobStore.DeleteAsync(invoice.PdfStorageKey, cancellationToken);
+    }
+
+    private static string BuildUnavailableMessage(Invoice invoice)
+    {
+        return invoice.DocumentState switch
+        {
+            InvoiceDocumentState.Regenerating => "Invoice PDF is regenerating. Try again when it is complete.",
+            InvoiceDocumentState.Failed => invoice.DocumentFailureMessage ?? "Invoice PDF regeneration failed. Try regenerating it again.",
+            InvoiceDocumentState.Missing => "Invoice PDF is missing.",
+            _ => "Invoice PDF is unavailable.",
+        };
     }
 }

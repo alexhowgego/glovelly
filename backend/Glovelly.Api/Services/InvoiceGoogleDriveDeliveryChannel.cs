@@ -23,8 +23,9 @@ internal sealed class InvoiceGoogleDriveDeliveryChannel(
         }
 
         var invoice = request.Invoice;
-        var invoicePdf = await invoicePdfService.OpenReadAsync(invoice, cancellationToken)
-            ?? throw new InvalidOperationException("Invoice PDF is missing.");
+        var invoicePdfResult = await invoicePdfService.OpenCurrentReadAsync(invoice, cancellationToken);
+        var invoicePdf = invoicePdfResult.Pdf
+            ?? throw new InvalidOperationException(invoicePdfResult.UnavailableMessage);
 
         var connection = await googleConnectionService.GetActiveConnectionAsync(
             request.UserId.Value,

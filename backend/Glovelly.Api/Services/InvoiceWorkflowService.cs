@@ -279,9 +279,48 @@ public sealed class InvoiceWorkflowService(
             reason,
             userId,
             cancellationToken);
+        invoice.DocumentRevision++;
+        invoice.DocumentState = InvoiceDocumentState.Regenerating;
+        invoice.DocumentFailureMessage = null;
         StampUpdate(invoice, userId);
 
         return adjustmentLine;
+    }
+
+    public async Task RegenerateInvoicePdfAsync(
+        Invoice invoice,
+        Client client,
+        Guid? userId,
+        CancellationToken cancellationToken = default)
+    {
+        invoice.DocumentState = InvoiceDocumentState.Regenerating;
+        invoice.DocumentFailureMessage = null;
+        var sellerProfile = await invoiceProfileDefaultsService.ResolveSellerProfileAsync(userId, cancellationToken);
+        await invoicePdfService.SaveGeneratedPdfAsync(
+            invoice,
+            userId,
+            invoicePdfRenderer.RenderInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
+            cancellationToken);
+        StampUpdate(invoice, userId);
+    }
+
+    public void RemoveManualAdjustment(Invoice invoice, InvoiceLine adjustmentLine, Guid? userId)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+        ArgumentNullException.ThrowIfNull(adjustmentLine);
+
+        dbContext.InvoiceLines.Remove(adjustmentLine);
+        invoice.DocumentRevision++;
+        invoice.DocumentState = InvoiceDocumentState.Regenerating;
+        invoice.DocumentFailureMessage = null;
+        StampUpdate(invoice, userId);
+    }
+
+    public void MarkInvoicePdfRegenerationFailed(Invoice invoice, string message, Guid? userId)
+    {
+        invoice.DocumentState = InvoiceDocumentState.Failed;
+        invoice.DocumentFailureMessage = message;
+        StampUpdate(invoice, userId);
     }
 
     private static void StampCreate(Invoice invoice, Guid? userId)
