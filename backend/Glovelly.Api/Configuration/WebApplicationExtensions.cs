@@ -44,6 +44,19 @@ internal static class WebApplicationExtensions
             app.UseCors(settings.DevCorsPolicy);
         }
 
+        app.Use(async (context, next) =>
+        {
+            if (settings.IsLegacyApplicationHost(context.Request.Host))
+            {
+                var destination = settings.BuildPublicUrl(
+                    $"{context.Request.PathBase}{context.Request.Path}{context.Request.QueryString}");
+                context.Response.Redirect(destination, permanent: false, preserveMethod: true);
+                return;
+            }
+
+            await next();
+        });
+
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseAuthorization();

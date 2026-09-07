@@ -1,4 +1,5 @@
 using Glovelly.Api.Auth;
+using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
@@ -10,7 +11,7 @@ namespace Glovelly.Api.Endpoints;
 
 internal static class AccessRequestAdminEndpoints
 {
-    public static IEndpointRouteBuilder MapAccessRequestAdminEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapAccessRequestAdminEndpoints(this IEndpointRouteBuilder app, StartupSettings settings)
     {
         var requests = app.MapGroup("/admin/access-requests")
             .WithTags("Admin")
@@ -72,7 +73,7 @@ internal static class AccessRequestAdminEndpoints
             if (decision.DecisionApplied && decision.UserCreated && request.SendInvitationEmail && decision.AccessRequest.ProvisionedUserId.HasValue)
             {
                 invitationEmailSent = await TrySendInvitationAsync(
-                    decision.AccessRequest, emailSender, emailSettingsAccessor.Value, httpContext, loggerFactory, cancellationToken);
+                    decision.AccessRequest, emailSender, emailSettingsAccessor.Value, settings, loggerFactory, cancellationToken);
             }
 
             return Results.Ok(new
@@ -155,7 +156,7 @@ internal static class AccessRequestAdminEndpoints
         AccessRequest request,
         IEmailSender emailSender,
         EmailSettings emailSettings,
-        HttpContext httpContext,
+        StartupSettings settings,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -164,7 +165,7 @@ internal static class AccessRequestAdminEndpoints
             Email = request.Email,
             DisplayName = request.DisplayName
         };
-        var loginUrl = AdminEndpoints.BuildLoginUrl(httpContext);
+        var loginUrl = AdminEndpoints.BuildLoginUrl(settings);
 
         try
         {

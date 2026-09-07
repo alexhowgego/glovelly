@@ -114,11 +114,11 @@ internal static class AccessEndpoints
                         new EmailMessage(
                             To: [new EmailAddress(recipient)],
                             Subject: "Glovelly access request",
-                            PlainTextBody: BuildPlainTextBody(notificationRequest, workflowResult.AccessRequest.Id, environmentLabel, httpContext),
+                            PlainTextBody: BuildPlainTextBody(notificationRequest, workflowResult.AccessRequest.Id, environmentLabel, settings),
                             From: EmailSenderSupport.ResolveConfiguredFromAddress(
                                 emailSettingsAccessor.Value,
                                 EmailUseCase.AccessRequests),
-                            HtmlBody: BuildHtmlBody(notificationRequest, workflowResult.AccessRequest.Id, environmentLabel, httpContext)),
+                            HtmlBody: BuildHtmlBody(notificationRequest, workflowResult.AccessRequest.Id, environmentLabel, settings)),
                         cancellationToken);
                 }
 
@@ -167,7 +167,7 @@ internal static class AccessEndpoints
         return app;
     }
 
-    private static string BuildPlainTextBody(AccessRequestEmailRequest requester, Guid requestId, string environmentLabel, HttpContext httpContext)
+    private static string BuildPlainTextBody(AccessRequestEmailRequest requester, Guid requestId, string environmentLabel, StartupSettings settings)
     {
         var lines = new List<string>
         {
@@ -194,12 +194,12 @@ internal static class AccessEndpoints
 
         lines.Add(string.Empty);
         lines.Add("Review this user in the target environment and grant access if appropriate:");
-        lines.Add(BuildReviewUrl(requestId, httpContext));
+        lines.Add(BuildReviewUrl(requestId, settings));
 
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string BuildHtmlBody(AccessRequestEmailRequest requester, Guid requestId, string environmentLabel, HttpContext httpContext)
+    private static string BuildHtmlBody(AccessRequestEmailRequest requester, Guid requestId, string environmentLabel, StartupSettings settings)
     {
         var encodedEmail = EmailHtmlRenderer.Encode(requester.Email);
         var encodedDisplayName = EmailHtmlRenderer.Encode(requester.DisplayName ?? "Not provided");
@@ -207,7 +207,7 @@ internal static class AccessEndpoints
         var encodedTimestamp = EmailHtmlRenderer.Encode(
             requester.RequestedAtUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'"));
         var encodedSubject = EmailHtmlRenderer.Encode(requester.Subject ?? "Not provided");
-        var encodedReviewUrl = EmailHtmlRenderer.Encode(BuildReviewUrl(requestId, httpContext));
+        var encodedReviewUrl = EmailHtmlRenderer.Encode(BuildReviewUrl(requestId, settings));
 
         return EmailHtmlRenderer.RenderDocument(
             "Access Request",
@@ -242,15 +242,9 @@ internal static class AccessEndpoints
             """);
     }
 
-    private static string BuildReviewUrl(Guid requestId, HttpContext httpContext)
+    private static string BuildReviewUrl(Guid requestId, StartupSettings settings)
     {
-        var request = httpContext.Request;
-        var url = new UriBuilder(request.Scheme, request.Host.Host)
-        {
-            Path = request.PathBase.Add($"/access-requests/{requestId}").Value,
-            Port = request.Host.Port ?? -1
-        };
-        return url.Uri.ToString();
+        return settings.BuildPublicUrl($"/access-requests/{requestId}");
     }
 
     private static string ResolveEnvironmentLabel(StartupSettings settings)

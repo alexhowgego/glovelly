@@ -18,7 +18,10 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
     private readonly object _databaseResetLock = new();
     private readonly FakeEmailSender _fakeEmailSender = new();
     private readonly FakeMileageEstimationService _fakeMileageEstimationService = new();
-    private readonly Dictionary<string, string?> _configuration = new();
+    private readonly Dictionary<string, string?> _configuration = new()
+    {
+        ["App:PublicBaseUrl"] = "http://localhost",
+    };
     private bool _useRealAuthentication;
     private string _environmentName = "Testing";
 
@@ -47,6 +50,11 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environmentName);
+        builder.UseSetting("App:PublicBaseUrl", _configuration["App:PublicBaseUrl"]);
+        if (_configuration.TryGetValue("App:LegacyApplicationHost", out var legacyApplicationHost))
+        {
+            builder.UseSetting("App:LegacyApplicationHost", legacyApplicationHost);
+        }
         builder.ConfigureAppConfiguration(configurationBuilder =>
         {
             if (_configuration.Count > 0)

@@ -67,7 +67,7 @@ internal static class TestAuthEndpoints
 
             if (!string.IsNullOrWhiteSpace(returnUrl))
             {
-                return Results.Redirect(AuthFlowSupport.BuildSafeRedirectUri(httpContext, returnUrl));
+                return Results.Redirect(AuthFlowSupport.BuildSafeRedirectUri(settings, returnUrl));
             }
 
             return Results.Ok(new

@@ -55,7 +55,7 @@ internal static class GoogleSheetsIntegrationEndpoints
                 new Dictionary<string, string?>
                 {
                     ["client_id"] = settings.GoogleClientId,
-                    ["redirect_uri"] = BuildCallbackUri(httpContext),
+                    ["redirect_uri"] = BuildCallbackUri(settings),
                     ["response_type"] = "code",
                     ["scope"] = authorizationScope,
                     ["access_type"] = "offline",
@@ -120,7 +120,7 @@ internal static class GoogleSheetsIntegrationEndpoints
 
             var tokenResponse = await tokenClient.ExchangeCodeAsync(
                 code!,
-                BuildCallbackUri(httpContext),
+                BuildCallbackUri(settings),
                 settings.GoogleClientId,
                 settings.GoogleClientSecret,
                 cancellationToken);
@@ -218,10 +218,9 @@ internal static class GoogleSheetsIntegrationEndpoints
         return userExists ? currentUserId.Value : null;
     }
 
-    private static string BuildCallbackUri(HttpContext httpContext)
+    private static string BuildCallbackUri(StartupSettings settings)
     {
-        var request = httpContext.Request;
-        return $"{request.Scheme}://{request.Host}{request.PathBase}/integrations/google-sheets/callback";
+        return settings.BuildPublicUrl("/integrations/google-sheets/callback");
     }
 
     private static string BuildIntegrationStatusRedirectUri(StartupSettings settings)

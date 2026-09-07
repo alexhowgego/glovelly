@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
+using Glovelly.Api.Configuration;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -10,29 +11,22 @@ internal static class AuthFlowSupport
     private const string AccessRequestProtectionPurpose = "Glovelly.AccessRequest";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static string BuildSafeRedirectUri(HttpContext httpContext, string? returnUrl)
+    public static string BuildSafeRedirectUri(StartupSettings settings, string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(returnUrl))
         {
-            return "/";
+            return settings.BuildPublicUrl("/");
         }
 
         if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absoluteUri))
         {
-            var request = httpContext.Request;
-            var sameHost = string.Equals(absoluteUri.Host, request.Host.Host, StringComparison.OrdinalIgnoreCase);
-            var localhostRedirect =
-                absoluteUri.IsLoopback &&
-                (absoluteUri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
-                 absoluteUri.Host.Equals("127.0.0.1"));
-
-            if (sameHost || localhostRedirect)
+            if (settings.IsAllowedReturnUri(absoluteUri))
             {
                 return absoluteUri.ToString();
             }
         }
 
-        return returnUrl.StartsWith('/') ? returnUrl : "/";
+        return returnUrl.StartsWith('/') ? settings.BuildPublicUrl(returnUrl) : settings.BuildPublicUrl("/");
     }
 
     public static string BuildDeniedPath(string failureCode, string? accessRequestToken = null)

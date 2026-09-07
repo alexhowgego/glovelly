@@ -86,7 +86,12 @@ internal static class AuthenticationServiceCollectionExtensions
                 options.TokenValidationParameters.RoleClaimType = "role";
                 options.Events = new OpenIdConnectEvents
                 {
-                    OnTokenValidated = context => HandleTokenValidatedAsync(context, settings.IsDevelopment),
+                    OnRedirectToIdentityProvider = context =>
+                    {
+                        context.ProtocolMessage.RedirectUri = settings.BuildPublicUrl(options.CallbackPath.Value!);
+                        return Task.CompletedTask;
+                    },
+                    OnTokenValidated = context => HandleTokenValidatedAsync(context, settings),
                     OnRemoteFailure = context =>
                     {
                         context.HandleResponse();
@@ -96,7 +101,7 @@ internal static class AuthenticationServiceCollectionExtensions
                         context.Properties?.Items.TryGetValue("access_request_token", out requestToken);
                         var deniedPath = AuthFlowSupport.BuildDeniedPath(failureCode, requestToken);
                         var redirectUri = AuthFlowSupport.BuildSafeRedirectUri(
-                            context.HttpContext,
+                            settings,
                             deniedPath);
 
                         context.Response.Redirect(redirectUri);
@@ -109,7 +114,7 @@ internal static class AuthenticationServiceCollectionExtensions
         return services;
     }
 
-    private static async Task HandleTokenValidatedAsync(TokenValidatedContext context, bool isDevelopment)
+    private static async Task HandleTokenValidatedAsync(TokenValidatedContext context, StartupSettings settings)
     {
         var principal = context.Principal;
         if (principal?.Identity is not ClaimsIdentity identity || !identity.IsAuthenticated)
@@ -118,7 +123,7 @@ internal static class AuthenticationServiceCollectionExtensions
             return;
         }
 
-        if (isDevelopment &&
+        if (settings.IsDevelopment &&
             context.Properties?.Items.TryGetValue("debug_google_claims", out var debugGoogleClaims) == true &&
             string.Equals(debugGoogleClaims, "true", StringComparison.OrdinalIgnoreCase))
         {
@@ -182,7 +187,7 @@ internal static class AuthenticationServiceCollectionExtensions
                     principal,
                     context.HttpContext.RequestServices.GetRequiredService<IDataProtectionProvider>());
                 var redirectUri = AuthFlowSupport.BuildSafeRedirectUri(
-                    context.HttpContext,
+                    settings,
                     AuthFlowSupport.BuildDeniedPath("not_authorized", requestToken));
 
                 context.HandleResponse();

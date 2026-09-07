@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Microsoft.AspNetCore.WebUtilities;
@@ -44,6 +45,7 @@ public interface IMcpOAuthService
 
 public sealed class McpOAuthService(
     AppDbContext db,
+    StartupSettings startupSettings,
     IOptions<McpOAuthOptions> optionsAccessor) : IMcpOAuthService
 {
     private const string DefaultScope = "mcp:read";
@@ -58,12 +60,12 @@ public sealed class McpOAuthService(
 
     public string GetIssuer(HttpRequest request)
     {
-        return NormalizeBaseUri(_options.Issuer) ?? BuildRequestBaseUri(request);
+        return NormalizeBaseUri(_options.Issuer) ?? startupSettings.PublicBaseUri.ToString().TrimEnd('/');
     }
 
     public string GetResource(HttpRequest request)
     {
-        return NormalizeResourceUri(_options.Resource) ?? $"{BuildRequestBaseUri(request)}/mcp";
+        return NormalizeResourceUri(_options.Resource) ?? startupSettings.BuildPublicUrl("/mcp");
     }
 
     public string GetProtectedResourceMetadataUrl(HttpRequest request)
@@ -295,13 +297,6 @@ public sealed class McpOAuthService(
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim().TrimEnd('/');
     }
 
-    private static string BuildRequestBaseUri(HttpRequest request)
-    {
-        var scheme = request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? request.Scheme;
-        var host = request.Headers["X-Forwarded-Host"].FirstOrDefault() ?? request.Host.Value;
-        return $"{scheme}://{host}".TrimEnd('/');
-    }
-
     private string GetResourceOrigin(HttpRequest request)
     {
         var resource = GetResource(request);
@@ -310,7 +305,7 @@ public sealed class McpOAuthService(
             return uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
         }
 
-        return BuildRequestBaseUri(request);
+        return startupSettings.PublicBaseUri.ToString().TrimEnd('/');
     }
 }
 
