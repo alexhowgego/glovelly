@@ -40,6 +40,8 @@
       href: engineering/authentication.md
     - name: Deployment pipeline
       href: engineering/deployment-pipeline.md
+    - name: Public surface routing
+      href: engineering/public-surface-routing.md
     - name: Database
       href: engineering/database.md
     - name: Email

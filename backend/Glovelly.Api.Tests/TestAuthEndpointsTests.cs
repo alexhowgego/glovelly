@@ -113,6 +113,7 @@ public sealed class TestAuthEndpointsTests
         return new GlovellyApiFactory()
             .WithConfiguration(new Dictionary<string, string?>
             {
+                ["App:PublicBaseUrl"] = "https://staging.glovelly.test",
                 ["Uat:Secret"] = UatSecret,
             })
             .WithEnvironment(environmentName);

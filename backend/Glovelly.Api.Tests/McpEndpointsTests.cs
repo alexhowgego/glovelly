@@ -252,6 +252,20 @@ public sealed class McpEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task OAuthMetadata_UsesConfiguredPublicBaseUrlWhenMcpUrlsAreNotConfigured()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("App:PublicBaseUrl", "https://menu.glovelly.net"));
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/.well-known/oauth-protected-resource", TestContext.Current.CancellationToken);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("https://menu.glovelly.net/mcp", payload.GetProperty("resource").GetString());
+        Assert.Equal("https://menu.glovelly.net", payload.GetProperty("authorization_servers").EnumerateArray().Single().GetString());
+    }
+
+    [Fact]
     public async Task OAuthAuthorizationServerMetadata_AdvertisesCodeFlowWithPkce()
     {
         using var factory = CreateMcpOAuthFactory();

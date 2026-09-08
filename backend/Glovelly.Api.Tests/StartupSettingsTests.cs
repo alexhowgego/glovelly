@@ -35,6 +35,50 @@ public sealed class StartupSettingsTests
         Assert.True(settings.ShouldSeedDevelopmentData);
     }
 
+    [Fact]
+    public void From_ProductionWithoutPublicBaseUrl_Throws()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            StartupSettings.From(configuration, new TestHostEnvironment("Production")));
+
+        Assert.Equal("App:PublicBaseUrl must be configured outside Development and Testing.", exception.Message);
+    }
+
+    [Fact]
+    public void From_ProductionWithPublicBaseUrl_UsesCanonicalOrigin()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["App:PublicBaseUrl"] = "https://menu.glovelly.net/"
+            })
+            .Build();
+
+        var settings = StartupSettings.From(configuration, new TestHostEnvironment("Production"));
+
+        Assert.Equal("https://menu.glovelly.net/", settings.PublicBaseUri.ToString());
+        Assert.Equal("https://menu.glovelly.net/auth/login", settings.BuildPublicUrl("/auth/login"));
+    }
+
+    [Fact]
+    public void From_LegacyApplicationHostMatchesPublicOrigin_Throws()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["App:PublicBaseUrl"] = "https://menu.glovelly.net",
+                ["App:LegacyApplicationHost"] = "menu.glovelly.net",
+            })
+            .Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            StartupSettings.From(configuration, new TestHostEnvironment("Production")));
+
+        Assert.Equal("App:LegacyApplicationHost must differ from App:PublicBaseUrl.", exception.Message);
+    }
+
     private sealed class TestHostEnvironment(string environmentName) : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = environmentName;

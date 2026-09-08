@@ -66,6 +66,27 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
     }
 
     [Fact]
+    public async Task Connect_UsesConfiguredPublicBaseUrlForCallback()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("App:PublicBaseUrl", "https://menu.glovelly.net");
+            builder.UseSetting("Authentication:Google:ClientId", "google-client-id");
+            builder.UseSetting("Authentication:Google:ClientSecret", "google-client-secret");
+        });
+        var client = factory.CreateClient(new()
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await client.GetAsync("/integrations/google-drive/connect", TestContext.Current.CancellationToken);
+
+        var location = Assert.IsType<Uri>(response.Headers.Location);
+        var query = QueryHelpers.ParseQuery(location.Query);
+        Assert.Equal("https://menu.glovelly.net/integrations/google-drive/callback", query["redirect_uri"]);
+    }
+
+    [Fact]
     public async Task Connect_WhenSheetsScopeExists_RequestsDriveAndSheetsScopes()
     {
         using var factory = _factory.WithWebHostBuilder(builder =>

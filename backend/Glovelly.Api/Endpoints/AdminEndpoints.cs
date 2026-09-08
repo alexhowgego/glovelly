@@ -1,4 +1,5 @@
 using Glovelly.Api.Auth;
+using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
@@ -10,7 +11,7 @@ namespace Glovelly.Api.Endpoints;
 
 public static class AdminEndpoints
 {
-    public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app, StartupSettings settings)
     {
         var users = app.MapGroup("/admin/users")
             .WithTags("Admin")
@@ -78,7 +79,7 @@ public static class AdminEndpoints
                 return EndpointSupport.ValidationProblem("isActive", "Only active users can be invited to sign in.");
             }
 
-            var loginUrl = BuildLoginUrl(httpContext);
+            var loginUrl = BuildLoginUrl(settings);
             var logger = loggerFactory.CreateLogger("Glovelly.UserInvitations");
 
             try
@@ -266,20 +267,9 @@ public static class AdminEndpoints
             request.IsActive);
     }
 
-    internal static string BuildLoginUrl(HttpContext httpContext)
+    internal static string BuildLoginUrl(StartupSettings settings)
     {
-        var request = httpContext.Request;
-        var baseUri = new UriBuilder(request.Scheme, request.Host.Host)
-        {
-            Path = request.PathBase.Add("/auth/login").Value,
-        };
-
-        if (request.Host.Port.HasValue)
-        {
-            baseUri.Port = request.Host.Port.Value;
-        }
-
-        return baseUri.Uri.ToString();
+        return settings.BuildPublicUrl("/auth/login");
     }
 
     internal static string BuildInvitationPlainTextBody(User user, string loginUrl)

@@ -28,8 +28,8 @@ app.MapInvoiceEmailTemplateEndpoints();
 app.MapForScoreLibraryEndpoints();
 app.MapCrudEndpoints();
 app.MapExpenseStatementEndpoints();
-app.MapAdminEndpoints();
-app.MapAccessRequestAdminEndpoints();
+app.MapAdminEndpoints(startupSettings);
+app.MapAccessRequestAdminEndpoints(startupSettings);
 app.MapHub<WorkspaceEventsHub>("/workspace-events");
 app.MapFallbackToFile("index.html");
 

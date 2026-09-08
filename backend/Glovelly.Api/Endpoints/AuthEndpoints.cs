@@ -19,7 +19,7 @@ internal static class AuthEndpoints
     {
         var auth = app.MapGroup("/auth").AllowAnonymous();
 
-        auth.MapGet("/login", (HttpContext httpContext, string? returnUrl) =>
+        auth.MapGet("/login", (string? returnUrl) =>
         {
             if (string.IsNullOrWhiteSpace(settings.GoogleClientId) ||
                 string.IsNullOrWhiteSpace(settings.GoogleClientSecret))
@@ -29,7 +29,7 @@ internal static class AuthEndpoints
                     statusCode: StatusCodes.Status500InternalServerError);
             }
 
-            var redirectUri = AuthFlowSupport.BuildSafeRedirectUri(httpContext, returnUrl);
+            var redirectUri = AuthFlowSupport.BuildSafeRedirectUri(settings, returnUrl);
             return Results.Challenge(
                 new AuthenticationProperties { RedirectUri = redirectUri },
                 authenticationSchemes: [OpenIdConnectDefaults.AuthenticationScheme]);

@@ -56,7 +56,7 @@ internal static class GoogleCalendarIntegrationEndpoints
                 new Dictionary<string, string?>
                 {
                     ["client_id"] = settings.GoogleClientId,
-                    ["redirect_uri"] = BuildCallbackUri(httpContext),
+                    ["redirect_uri"] = BuildCallbackUri(settings),
                     ["response_type"] = "code",
                     ["scope"] = authorizationScope,
                     ["access_type"] = "offline",
@@ -118,7 +118,7 @@ internal static class GoogleCalendarIntegrationEndpoints
 
             var tokenResponse = await tokenClient.ExchangeCodeAsync(
                 code,
-                BuildCallbackUri(httpContext),
+                BuildCallbackUri(settings),
                 settings.GoogleClientId,
                 settings.GoogleClientSecret,
                 cancellationToken);
@@ -282,10 +282,9 @@ internal static class GoogleCalendarIntegrationEndpoints
         return userExists ? currentUserId.Value : null;
     }
 
-    private static string BuildCallbackUri(HttpContext httpContext)
+    private static string BuildCallbackUri(StartupSettings settings)
     {
-        var request = httpContext.Request;
-        return $"{request.Scheme}://{request.Host}{request.PathBase}/integrations/google-calendar/callback";
+        return settings.BuildPublicUrl("/integrations/google-calendar/callback");
     }
 
     private static string BuildIntegrationStatusRedirectUri(StartupSettings settings)

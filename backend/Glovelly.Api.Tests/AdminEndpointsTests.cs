@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -71,6 +73,34 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
         Assert.Contains("invited-user@glovelly.local", email.HtmlBody);
         Assert.Contains("href=\"http://localhost/auth/login\"", email.HtmlBody);
         Assert.Contains(">Accept invitation and sign in</a>", email.HtmlBody);
+    }
+
+    [Fact]
+    public async Task SendInvitationEmail_UsesConfiguredPublicBaseUrl()
+    {
+        using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("App:PublicBaseUrl", "https://menu.glovelly.net"));
+        var client = factory.CreateClient();
+        var createResponse = await client.PostAsJsonAsync("/admin/users", new
+        {
+            email = "menu-invite@glovelly.local",
+            displayName = "Menu Invite",
+            googleSubject = (string?)null,
+            mileageRate = (decimal?)null,
+            passengerMileageRate = (decimal?)null,
+            role = "User",
+            isActive = true,
+        }, TestContext.Current.CancellationToken);
+        var createdUser = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        var inviteResponse = await client.PostAsync(
+            $"/admin/users/{createdUser.GetProperty("id").GetGuid()}/invitation-email",
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, inviteResponse.StatusCode);
+        var emails = Assert.IsType<FakeEmailSender>(factory.Services.GetRequiredService<IEmailSender>());
+        Assert.Contains("https://menu.glovelly.net/auth/login", Assert.Single(emails.SentEmails).PlainTextBody);
     }
 
     [Fact]

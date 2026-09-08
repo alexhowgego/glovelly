@@ -9,6 +9,7 @@ The goal is durable context rather than exhaustive implementation notes. Keep th
 - [Architecture](architecture.md): system shape, boundaries, integrations, and security posture.
 - [Authentication](authentication.md): Google OIDC, Glovelly user mapping, enrolment, and roles.
 - [Deployment pipeline](deployment-pipeline.md): container build, GitHub Actions, Artifact Registry, Cloud Run, and runtime configuration.
+- [Public surface routing](public-surface-routing.md): canonical hostnames, Firebase Hosting, Menu origin configuration, and migration checks.
 - [Database](database.md): PostgreSQL, EF Core, data ownership, and migration posture.
 - [Email](email.md): outbound email abstraction, Resend integration, and delivery assumptions.
 - [Mileage and routes](mileage-routes.md): Google Routes mileage estimation and fallback behavior.
