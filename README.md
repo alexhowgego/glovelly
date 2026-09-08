@@ -7,9 +7,10 @@ Glovelly is a personal business platform for managing my self-employed music wor
 
 ## Public URLs
 
-- Production site: [https://glovelly.net](https://glovelly.net)
+- Public site: [https://glovelly.net](https://glovelly.net)
+- Production application: [https://menu.glovelly.net](https://menu.glovelly.net)
 - Staging site: [https://staging.glovelly.net](https://staging.glovelly.net)
-- Docs site: [https://docs.glovelly.net](https://docs.glovelly.net)
+- Technical handbook: [https://handbook.glovelly.net](https://handbook.glovelly.net)
 
 ## Handbook
 
@@ -22,7 +23,7 @@ dotnet tool restore
 dotnet tool run docfx docs/docfx.json --serve
 ```
 
-Changes pushed to `main` are published to GitHub Pages at `https://docs.glovelly.net`.
+Changes pushed to `main` are published to GitHub Pages at `https://handbook.glovelly.net`.
 
 ### MCP contract snapshots and generated docs
 
