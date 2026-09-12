@@ -10,7 +10,6 @@ public sealed record StartupSettings(
     string? BuildCommitId,
     string? BuildTimestamp,
     Uri PublicBaseUri,
-    string? LegacyApplicationHost,
     bool UsePostgres,
     bool IsDevelopment,
     bool IsStaging,
@@ -31,7 +30,6 @@ public sealed record StartupSettings(
         var buildCommitId = configuration["App:BuildCommitId"];
         var buildTimestamp = configuration["App:BuildTimestamp"];
         var publicBaseUri = GetPublicBaseUri(configuration["App:PublicBaseUrl"], environment, allowedCorsOrigins);
-        var legacyApplicationHost = GetLegacyApplicationHost(configuration["App:LegacyApplicationHost"], publicBaseUri);
         var usePostgres = !string.IsNullOrWhiteSpace(glovellyConnectionString);
         var isDevelopment = environment.IsDevelopment();
         var isStaging = environment.IsStaging() ||
@@ -48,7 +46,6 @@ public sealed record StartupSettings(
             buildCommitId,
             buildTimestamp,
             publicBaseUri,
-            legacyApplicationHost,
             usePostgres,
             isDevelopment,
             isStaging,
@@ -70,12 +67,6 @@ public sealed record StartupSettings(
         }
 
         return (IsDevelopment || IsTesting) && uri.IsLoopback;
-    }
-
-    public bool IsLegacyApplicationHost(HostString host)
-    {
-        return !string.IsNullOrWhiteSpace(LegacyApplicationHost) &&
-               string.Equals(host.Host, LegacyApplicationHost, StringComparison.OrdinalIgnoreCase);
     }
 
     private static Uri GetPublicBaseUri(string? configuredValue, IHostEnvironment environment, string[] allowedCorsOrigins)
@@ -109,24 +100,4 @@ public sealed record StartupSettings(
         return new Uri(publicBaseUri.GetLeftPart(UriPartial.Authority));
     }
 
-    private static string? GetLegacyApplicationHost(string? configuredValue, Uri publicBaseUri)
-    {
-        if (string.IsNullOrWhiteSpace(configuredValue))
-        {
-            return null;
-        }
-
-        var host = configuredValue.Trim().TrimEnd('.');
-        if (Uri.CheckHostName(host) != UriHostNameType.Dns)
-        {
-            throw new InvalidOperationException("App:LegacyApplicationHost must be a DNS hostname.");
-        }
-
-        if (string.Equals(host, publicBaseUri.Host, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("App:LegacyApplicationHost must differ from App:PublicBaseUrl.");
-        }
-
-        return host;
-    }
 }

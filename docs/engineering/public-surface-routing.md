@@ -17,9 +17,9 @@ The Firebase sites are in the `glovelly-dev` Google Cloud project. They are deli
 - Cloud Run runs in `glovelly-dev`, region `europe-west1`. The production service is `glovelly`; staging is `glovelly-staging`.
 - `menu.glovelly.net` is mapped to the production application and its Google OAuth redirects have been registered and verified.
 - Production `DEPLOYMENT_URL` is `https://menu.glovelly.net`. Staging remains `https://staging.glovelly.net`.
-- Production `App:LegacyApplicationHost` is `glovelly.net` while Cloud Run still serves the apex. It redirects every apex application request to Menu before authentication begins.
-- The existing GitHub Pages handbook remains at `docs.glovelly.net` until the `handbook.glovelly.net` DNS and GitHub Pages custom-domain move is ready.
-- Google OAuth retains apex callback registrations through the migration and rollback window. Do not remove them while `glovelly.net` can still receive an in-flight callback.
+- `glovelly.net` is served by the Firebase Hosting landing target; it does not route through Cloud Run.
+- The DocFX handbook is published at `handbook.glovelly.net`; `docs.glovelly.net` is reserved for the user guide.
+- Google OAuth uses the Menu sign-in and integration callback registrations. The former apex registrations have been retired.
 
 ## Application Origin
 
@@ -27,14 +27,13 @@ The Firebase sites are in the `glovelly-dev` Google Cloud project. They are deli
 
 The application derives its Google sign-in redirect, Drive, Sheets, and Calendar callbacks, invitation links, access-review links, and fallback MCP metadata from this origin. It does not derive deployed public URLs from request headers. The authentication cookie remains host-only, so users moving from the apex application to Menu sign in again rather than sharing a cookie with the public landing site.
 
-## Migration And Rollback
+## Steady-State Ownership
 
-1. Record current Squarespace DNS, Cloud Run domain mappings, GitHub Environment variables, Google OAuth registrations, and GitHub Pages custom-domain settings before each cutover.
-2. Confirm Menu sign-in, sign-out, invitations, access-review links, all Google integration callbacks, and MCP metadata with the configured Menu origin.
-3. Keep the old apex application mapping and Google callback registrations for the agreed callback/session overlap window. The legacy-host middleware preserves paths and query strings while redirecting new apex requests to Menu before an OIDC challenge can set an apex-only correlation cookie.
-4. Move DocFX to `handbook.glovelly.net`, confirm its GitHub Pages certificate and sitemap, then release `docs.glovelly.net` to the Starlight guide.
-5. Attach `glovelly.net` to the Firebase landing target only after the Menu checks and overlap window are complete.
-6. To roll back during the overlap, restore the apex Cloud Run mapping and the prior `App:PublicBaseUrl`/deployment URL. Keep both old and Menu OAuth registrations until rollback is no longer required.
+- Firebase Hosting owns the apex landing site and its TLS certificate.
+- Cloud Run owns only the Menu application origin and API.
+- GitHub Pages owns the handbook hostname and its DocFX output.
+- The user-guide Firebase target owns `docs.glovelly.net` when the guide is released.
+- Application URLs, OAuth callback URLs, and MCP metadata are constructed from `App:PublicBaseUrl`; deployed environments never infer a public origin from an incoming request host.
 
 ## Post-Deployment Checks
 
@@ -44,4 +43,3 @@ The application derives its Google sign-in redirect, Drive, Sheets, and Calendar
 - Start and complete Drive, Sheets, and Calendar authorization; confirm each provider callback uses the configured application origin.
 - Request `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`; confirm Menu issuer and resource URLs.
 - Confirm GitHub Pages serves the handbook at its new hostname and Firebase Hosting serves the intended landing and user-guide artifacts.
-- Keep the previous Cloud Run mapping, DNS records, and Google OAuth registrations available until all checks pass and the rollback window closes.

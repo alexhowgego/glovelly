@@ -15,15 +15,15 @@
 
 ## 3. Meet Public-Site Quality Requirements
 
-- [ ] 3.1 Verify semantic landmarks, heading hierarchy, keyboard navigation, visible focus states, meaningful alternative text, and decorative-art treatment for every composition.
-- [ ] 3.2 Verify the layout, navigation, text, and compositions at narrow mobile, tablet, and desktop viewports without horizontal overflow or clipped controls.
+- [x] 3.1 Verify semantic landmarks, heading hierarchy, keyboard navigation, visible focus states, meaningful alternative text, and decorative-art treatment for every composition.
+- [x] 3.2 Verify the layout, navigation, text, and compositions at narrow mobile, tablet, and desktop viewports without horizontal overflow or clipped controls.
 - [x] 3.3 Implement and verify reduced-motion behaviour and confirm the site adds no authentication calls, analytics, tracking, embeds, forms, or non-essential browser storage.
 - [x] 3.4 Run the landing-site production build and static checks, and record any manual accessibility/responsive verification in the appropriate project documentation or UAT material.
 
 ## 4. Deploy And Cut Over Safely
 
 - [x] 4.1 Add a least-privilege GitHub Actions build, preview, and Firebase Hosting deployment path for the `landing` (`glovelly-landing`) target, reusing the established GCP identity model.
-- [ ] 4.2 Deploy and verify the landing artifact at its Firebase Hosting platform or preview URL before attaching the production apex.
-- [ ] 4.3 Confirm the handbook-domain migration is merged and that the final user-guide, handbook, legal, Menu, and GitHub destinations resolve correctly.
-- [ ] 4.4 After the `reorganize-public-routing` Menu smoke checks and overlap window complete, attach `glovelly.net` to the verified Firebase landing target using its documented cutover and rollback procedure.
-- [ ] 4.5 Run and record post-cutover smoke checks for the apex content, Menu CTA, guide, handbook, GitHub, privacy, and terms links, certificate state, responsive navigation, and no-tracking baseline.
+- [x] 4.2 Deploy and verify the landing artifact at its Firebase Hosting platform or preview URL before attaching the production apex.
+- [x] 4.3 Confirm the handbook-domain migration is merged and that the final user-guide, handbook, legal, Menu, and GitHub destinations resolve correctly.
+- [x] 4.4 After the `reorganize-public-routing` Menu smoke checks and overlap window complete, attach `glovelly.net` to the verified Firebase landing target using its documented cutover and rollback procedure.
+- [x] 4.5 Run and record post-cutover smoke checks for the apex content, Menu CTA, guide, handbook, GitHub, privacy, and terms links, certificate state, responsive navigation, and no-tracking baseline.

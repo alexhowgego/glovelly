@@ -51,10 +51,6 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment(_environmentName);
         builder.UseSetting("App:PublicBaseUrl", _configuration["App:PublicBaseUrl"]);
-        if (_configuration.TryGetValue("App:LegacyApplicationHost", out var legacyApplicationHost))
-        {
-            builder.UseSetting("App:LegacyApplicationHost", legacyApplicationHost);
-        }
         builder.ConfigureAppConfiguration(configurationBuilder =>
         {
             if (_configuration.Count > 0)

@@ -30,7 +30,7 @@ npm --prefix frontend/glovelly-landing run build
 
 ## Release Checks
 
-Before the `glovelly.net` cutover, verify the Firebase preview, keyboard navigation, mobile and desktop layouts, and every public destination. The apex must remain on its current mapping until the Menu migration and overlap window documented in `docs/engineering/public-surface-routing.md` are complete.
+Verify the Firebase preview, keyboard navigation, mobile and desktop layouts, and every public destination before releasing a landing-site change.
 
 ### Manual Accessibility And Responsive Checklist
 
