@@ -35,7 +35,7 @@ GLOVELLY_UAT_BASE_URL=https://staging.glovelly.net dotnet test --project tests/G
 To run only the production-safe smoke suite locally:
 
 ```bash
-GLOVELLY_UAT_BASE_URL=https://glovelly.net \
+GLOVELLY_UAT_BASE_URL=https://menu.glovelly.net \
 dotnet test --project tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj \
   -- -trait "Suite=Smoke"
 ```

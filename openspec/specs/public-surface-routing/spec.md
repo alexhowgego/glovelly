@@ -41,34 +41,22 @@ The application SHALL construct deployed-environment OAuth redirect URIs, integr
 - **WHEN** Google returns a production user to `/signin-oidc`
 - **THEN** the configured Menu origin is used for the provider redirect URI and the user is returned only to an allowed Menu destination
 
-### Requirement: Google OAuth registration migration
-The deployment SHALL register the Menu origin and all required Menu callbacks with Google before Menu becomes the production application origin, and SHALL retain the old apex registrations through the documented overlap and rollback window.
+### Requirement: Canonical Google OAuth registrations
+The production Google OAuth configuration SHALL authorize the Menu origin and its sign-in, Drive, Sheets, and Calendar callback URLs. It SHALL not retain apex application callback registrations after the apex has moved to Firebase Hosting.
 
-#### Scenario: Menu is prepared for production traffic
-- **WHEN** the Menu Cloud Run domain mapping is ready for production verification
-- **THEN** Google authorizes the Menu sign-in callback and each configured Menu integration callback before users are directed to Menu
+#### Scenario: A production user starts a Google flow
+- **WHEN** a production user starts sign-in or a configured Google integration flow
+- **THEN** Google authorizes the corresponding callback under `https://menu.glovelly.net`
 
-#### Scenario: The migration is still reversible
-- **WHEN** the documented overlap or rollback window remains open
-- **THEN** the prior apex OAuth registrations remain configured alongside the Menu registrations
+### Requirement: Apex landing isolation
+The apex `glovelly.net` SHALL be served by Firebase Hosting as the public landing site and SHALL not route requests through the Cloud Run application.
 
-### Requirement: Safe apex migration
-The production migration SHALL establish and verify Menu before reassigning the apex to Firebase Hosting. During the defined overlap, legacy application requests to the apex SHALL preserve their path and query string when redirected to Menu, while the apex root remains available for the public landing site once cut over.
-
-#### Scenario: A user opens a legacy application link during overlap
-- **WHEN** a user requests a legacy apex application path with query parameters during the overlap window
-- **THEN** the user is redirected to the equivalent Menu URL with its query parameters preserved
-
-#### Scenario: The apex cutover is approved
-- **WHEN** Menu sign-in, sign-out, application links, integration callbacks, and MCP smoke checks have passed and the callback overlap has elapsed
-- **THEN** `glovelly.net` can be assigned to Firebase Hosting without making Menu unavailable
-
-#### Scenario: The migration requires rollback
-- **WHEN** a post-deployment smoke check fails during the documented rollback window
-- **THEN** operators can restore the apex application mapping and prior application-origin configuration using the documented rollback procedure
+#### Scenario: A visitor opens the apex
+- **WHEN** a visitor requests `https://glovelly.net`
+- **THEN** Firebase Hosting serves the public landing site without an application-host redirect
 
 ### Requirement: Public-surface verification
-The deployment documentation SHALL define post-deployment smoke checks covering every public hostname, Menu authentication, generated application links, Google integration callbacks, MCP discovery metadata, and rollback readiness.
+The deployment documentation SHALL define post-deployment smoke checks covering every public hostname, Menu authentication, generated application links, Google integration callbacks, and MCP discovery metadata.
 
 #### Scenario: An operator deploys the routing change
 - **WHEN** the operator reaches the post-deployment verification stage

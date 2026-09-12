@@ -139,7 +139,8 @@ The deployment depends on:
 - Google Secret Manager secrets for production runtime values
 - Google Cloud Storage bucket for blob-backed features where configured
 - Vertex AI API and runtime service account permissions when Gemini-backed chart ranking is enabled
-- custom domain mapping for `glovelly.net`
+- Firebase Hosting custom domain mapping for `glovelly.net`
+- custom domain mapping for `menu.glovelly.net`
 - custom domain mapping for `staging.glovelly.net`
 - GitHub Pages custom domain mapping for `handbook.glovelly.net`
 

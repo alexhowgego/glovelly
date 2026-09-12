@@ -258,7 +258,6 @@ jobs:
           env_vars: |-
             App__DeploymentName=${{ vars.DEPLOYMENT_NAME }}
             App__PublicBaseUrl=${{ vars.DEPLOYMENT_URL }}
-            App__LegacyApplicationHost=${{ vars.LEGACY_APPLICATION_HOST }}
             BlobStorage__BucketName=${{ vars.GCP_BUCKET_NAME }}
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly
@@ -450,7 +449,6 @@ jobs:
           env_vars: |-
             App__DeploymentName=${{ vars.DEPLOYMENT_NAME }}
             App__PublicBaseUrl=${{ vars.DEPLOYMENT_URL }}
-            App__LegacyApplicationHost=${{ vars.LEGACY_APPLICATION_HOST }}
             BlobStorage__BucketName=${{ vars.GCP_BUCKET_NAME }}
             Email__Mode=Resend
             Email__AccessRequests__FromDisplayName=Glovelly

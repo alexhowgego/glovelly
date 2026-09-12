@@ -4,8 +4,9 @@ Last updated: 31 May 2026
 
 This privacy policy explains how Glovelly handles personal information when you use:
 
+- the public landing site at `https://glovelly.net`
 - the production service at `https://menu.glovelly.net`
-- the technical and operator handbook at `https://handbook.glovelly.net`
+- the technical and operator handbooks at `https://docs.glovelly.net` and `https://handbook.glovelly.net`
 
 Glovelly is a small business administration tool, currently focused on self-employed music work. It is used to manage clients, gigs, expenses, receipts, invoices, seller profile details, invoice delivery, Google Drive invoice publishing, Google Calendar gig sync, access administration, and related operational records.
 
