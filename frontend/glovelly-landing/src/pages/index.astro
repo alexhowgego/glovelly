@@ -1,0 +1,103 @@
+---
+import '../styles/global.css'
+
+const menuUrl = 'https://menu.glovelly.net'
+const docsUrl = 'https://docs.glovelly.net'
+const handbookUrl = 'https://handbook.glovelly.net'
+const repositoryUrl = 'https://github.com/alexhowgego/glovelly'
+---
+
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="Glovelly keeps gigs, clients, expenses and invoices together for working musicians and small creative businesses."
+    />
+    <title>Glovelly | Music work, less admin</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header shell">
+      <a class="wordmark" href="/" aria-label="Glovelly home">Glovelly<span aria-hidden="true">.</span></a>
+      <nav aria-label="Primary navigation">
+        <a href="#how-it-works">How it works</a>
+        <a href={docsUrl}>User guide</a>
+        <a class="nav-cta" href={menuUrl}>Open Glovelly Menu <span aria-hidden="true">&#8599;</span></a>
+      </nav>
+    </header>
+
+    <main id="main-content">
+      <section class="hero shell" aria-labelledby="hero-heading">
+        <div class="hero-copy">
+          <p class="eyebrow">A calmer place for paid creative work</p>
+          <h1 id="hero-heading">Music work, less admin.</h1>
+          <p class="lede">Glovelly brings gigs, clients, expenses and invoices into one calm place for working musicians and small creative businesses.</p>
+          <a class="button" href={menuUrl}>Open Glovelly Menu <span aria-hidden="true">&#8594;</span></a>
+          <p class="quiet-note">For the work around the work.</p>
+        </div>
+
+        <div class="hero-art art-frame" aria-hidden="true">
+          <div class="art-orbit orbit-one"></div>
+          <div class="art-orbit orbit-two"></div>
+          <article class="art-window gig-window">
+            <div class="window-bar"><span></span><span></span><span></span></div>
+            <div class="window-heading"><div><b>April gigs</b><small>Things are looking rather booked.</small></div><strong>+3</strong></div>
+            <div class="gig-row"><time>12<br /><em>APR</em></time><div><b>Quartet at the Lantern</b><small>Leeds, 19:30</small></div><span class="tag">Confirmed</span></div>
+            <div class="gig-row"><time>18<br /><em>APR</em></time><div><b>Studio session</b><small>Manchester, 10:00</small></div><span class="tag amber">Draft</span></div>
+            <div class="gig-row"><time>26<br /><em>APR</em></time><div><b>Riverside wedding</b><small>York, 14:00</small></div><span class="tag">Confirmed</span></div>
+          </article>
+          <article class="art-window receipt-window"><p>RECEIPT</p><b>Travel to Riverside</b><small>26 April</small><strong>£48.20</strong><i>Kept somewhere sensible.</i></article>
+        </div>
+      </section>
+
+      <section class="story shell" aria-labelledby="story-heading">
+        <p class="eyebrow">The small, important bits</p>
+        <div class="story-body">
+          <div>
+            <h2 id="story-heading">A gig is rarely just a gig.</h2>
+            <p>There is a client to remember, a fee to agree, travel to record, a receipt to keep and an invoice to send. Glovelly gives those details one practical home, so they stop auditioning for roles in every spreadsheet and coat pocket you own.</p>
+          </div>
+          <div class="story-art" aria-hidden="true">
+            <div class="story-note"><small>Riverside Arts Centre</small><b>26 APR</b><span>Soundcheck 14:00</span></div>
+            <div class="story-slip"><span>Parking</span><strong>£8.00</strong><i>receipt kept</i></div>
+            <div class="story-tick">&#10003;</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" class="outcomes shell" aria-labelledby="outcomes-heading">
+        <div class="section-intro"><p class="eyebrow">How it works</p><h2 id="outcomes-heading">The work flows. The record follows.</h2></div>
+
+        <article class="outcome plan">
+          <div class="outcome-copy"><p class="step">01</p><h3>Plan the work</h3><p>Keep the date, client, venue and fee in view before the details start multiplying.</p><p class="aside">The calendar may still be lively. At least it knows why.</p></div>
+          <div class="composition booking-composition" aria-hidden="true"><div class="date-card"><span>18</span><small>APR</small></div><div class="booking-card"><small>Confirmed gig</small><b>The Lantern Quartet</b><p>Leeds · 19:30</p><div><span>Fee agreed</span><strong>£350</strong></div></div><div class="route-line"></div></div>
+        </article>
+
+        <article class="outcome record reverse">
+          <div class="outcome-copy"><p class="step">02</p><h3>Keep the record</h3><p>Capture expenses, receipts and travel while they still look familiar. Future you will be quietly impressed.</p><p class="aside">Even the receipt that has been living under the passenger seat.</p></div>
+          <div class="composition receipt-composition" aria-hidden="true"><div class="expense-card"><small>New expense</small><b>Travel and parking</b><div class="expense-meta"><span>26 Apr</span><strong>£48.20</strong></div><div class="expense-rule"></div><p>Receipt attached</p></div><div class="paper-receipt"><small>RIVERSIDE PARKING</small><span>£8.00</span><i>Thank you kindly</i></div><div class="paperclip"></div></div>
+        </article>
+
+        <article class="outcome see">
+          <div class="outcome-copy"><p class="step">03</p><h3>See where things stand</h3><p>Send invoices, follow their progress and keep a clearer view of the year as it takes shape.</p><p class="aside">Less ritual spreadsheet archaeology. More useful answers.</p></div>
+          <div class="composition invoice-composition" aria-hidden="true"><div class="invoice-card"><div><small>Invoice 1042</small><span class="paid">Paid</span></div><b>The Lantern Quartet</b><strong>£350.00</strong><div class="invoice-lines"><i></i><i></i><i></i></div></div><div class="year-card"><small>Tax year at a glance</small><div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span></div><b>Clearer than a pile of envelopes.</b></div></div>
+        </article>
+      </section>
+
+      <section class="closing shell" aria-labelledby="closing-heading">
+        <div><p class="eyebrow">Ready when you are</p><h2 id="closing-heading">The interesting part of the job is waiting.</h2><p>Glovelly keeps the admin in its place, so you can get back to the work that brought you here.</p></div>
+        <a class="button light" href={menuUrl}>Open Glovelly Menu <span aria-hidden="true">&#8594;</span></a>
+      </section>
+    </main>
+
+    <footer class="site-footer shell">
+      <a class="wordmark" href="/" aria-label="Glovelly home">Glovelly<span aria-hidden="true">.</span></a>
+      <div><a href={docsUrl}>User guide</a><a href={handbookUrl}>Handbook</a><a href={repositoryUrl}>GitHub</a></div>
+      <div><a href={`${handbookUrl}/privacy.html`}>Privacy</a><a href={`${handbookUrl}/terms.html`}>Terms</a></div>
+      <p>Built for the small details that make work work.</p>
+    </footer>
+  </body>
+</html>

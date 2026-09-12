@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "glovelly-dev"
+  },
+  "targets": {
+    "glovelly-dev": {
+      "hosting": {
+        "landing": [
+          "glovelly-landing"
+        ]
+      }
+    }
+  }
+}
