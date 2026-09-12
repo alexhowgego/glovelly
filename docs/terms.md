@@ -2,9 +2,9 @@
 
 Last updated: 31 May 2026
 
-These terms apply to use of the Glovelly application at `https://glovelly.net`.
+These terms apply to use of the Glovelly application at `https://menu.glovelly.net`.
 
-They also apply to related Glovelly documentation and support material at `https://docs.glovelly.net`, unless a page says otherwise.
+They also apply to related Glovelly documentation and support material at `https://handbook.glovelly.net`, unless a page says otherwise.
 
 ## Who Operates Glovelly
 

@@ -141,7 +141,7 @@ The deployment depends on:
 - Vertex AI API and runtime service account permissions when Gemini-backed chart ranking is enabled
 - custom domain mapping for `glovelly.net`
 - custom domain mapping for `staging.glovelly.net`
-- GitHub Pages custom domain mapping for `docs.glovelly.net`
+- GitHub Pages custom domain mapping for `handbook.glovelly.net`
 
 ## Pull Requests
 
@@ -154,4 +154,4 @@ The Glovelly Handbook is built with DocFX from the Markdown files under `docs/`.
 - `.github/workflows/docs-pr.yml` validates the handbook build on pull requests that touch documentation.
 - `.github/workflows/docs.yml` builds the handbook from `main` and publishes `docs/_site` to GitHub Pages.
 
-The public handbook URL is `https://docs.glovelly.net`.
+The public handbook URL is `https://handbook.glovelly.net`.

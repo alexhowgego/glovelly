@@ -397,13 +397,13 @@ export function AppShell({
 
       <div className="app-footer">
         <nav className="legal-links" aria-label="Legal">
-          <a href="https://docs.glovelly.net/about.html" target="_blank" rel="noreferrer">
+          <a href="https://handbook.glovelly.net/about.html" target="_blank" rel="noreferrer">
             About
           </a>
-          <a href="https://docs.glovelly.net/privacy.html" target="_blank" rel="noreferrer">
+          <a href="https://handbook.glovelly.net/privacy.html" target="_blank" rel="noreferrer">
             Privacy policy
           </a>
-          <a href="https://docs.glovelly.net/terms.html" target="_blank" rel="noreferrer">
+          <a href="https://handbook.glovelly.net/terms.html" target="_blank" rel="noreferrer">
             Terms of Service
           </a>
         </nav>
