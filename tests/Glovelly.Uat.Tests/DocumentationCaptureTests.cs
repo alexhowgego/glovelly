@@ -38,14 +38,16 @@ public sealed class DocumentationCaptureTests : UatTestBase
             await AuthenticateDocumentationFixtureAsync();
             await Page.EvaluateAsync("async () => { await document.fonts.ready; }");
             await Page.GetByTestId("nav-gigs").ClickAsync();
-            await Page.GetByTestId("gig-card").Filter(new LocatorFilterOptions { HasText = "Spring concert" }).ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("gig-card") });
+            await Page.Locator(".section-layout").ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("gig-workspace") });
             await Page.GetByTestId("nav-invoices").ClickAsync();
             var invoiceCard = Page.GetByTestId("invoice-card").Filter(new LocatorFilterOptions { HasText = "GLV-202604-001" });
-            await invoiceCard.ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("invoice-card") });
             await invoiceCard.ClickAsync();
+            await Page.Locator(".section-layout").ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("invoice-status") });
             await Page.GetByTestId("invoice-send-button").ClickAsync();
             var review = Page.GetByTestId("invoice-email-review-modal");
             await review.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await review.Locator(".invoice-email-review-content").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await Assertions.Expect(Page.GetByTestId("invoice-email-review-send-button")).ToBeEnabledAsync();
             await review.ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("invoice-email-review") });
         }
         finally

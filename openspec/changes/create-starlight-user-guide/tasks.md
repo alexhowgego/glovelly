@@ -31,10 +31,10 @@
 
 ## 5. Informational screenshot freshness CI
 
-- [ ] 5.1 Add a post-staging-UAT documentation capture job for same-repository pull requests with narrowly scoped staging-secret and PR-comment permissions.
-- [ ] 5.2 Compare capture candidates with checked-in guide screenshots, create a human-readable changed/current report, and upload candidates plus comparison output as a named artifact.
-- [ ] 5.3 Add or update one marker-based PR comment that reports screenshot freshness, affected assets, and the candidate artifact location without failing the pipeline for drift.
-- [ ] 5.4 Ensure forked pull requests do not run the credentialed capture/comment path, and document how maintainers review and manually replace approved screenshot assets.
+- [x] 5.1 Add a post-staging-UAT documentation capture job for same-repository pull requests with narrowly scoped staging-secret and PR-comment permissions.
+- [x] 5.2 Compare capture candidates with checked-in guide screenshots, create a human-readable changed/current report, and upload candidates plus comparison output as a named artifact.
+- [x] 5.3 Add or update one marker-based PR comment that reports screenshot freshness, affected assets, and the candidate artifact location without failing the pipeline for drift.
+- [x] 5.4 Ensure forked pull requests do not run the credentialed capture/comment path, and document how maintainers review and manually replace approved screenshot assets.
 
 ## 6. Verification and release
 
