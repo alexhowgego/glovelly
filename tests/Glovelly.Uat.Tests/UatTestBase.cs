@@ -32,10 +32,8 @@ public abstract class UatTestBase : IAsyncLifetime
         {
             Headless = Headless(),
         });
-        context = await browser.NewContextAsync(new BrowserNewContextOptions
-        {
-            BaseURL = BaseUrl(),
-        });
+        context = await browser.NewContextAsync(CreateContextOptions());
+        await ConfigureContextAsync(context);
         await context.Tracing.StartAsync(new TracingStartOptions
         {
             Screenshots = true,
@@ -79,6 +77,13 @@ public abstract class UatTestBase : IAsyncLifetime
             throw;
         }
     }
+
+    protected virtual BrowserNewContextOptions CreateContextOptions() => new()
+    {
+        BaseURL = BaseUrl(),
+    };
+
+    protected virtual Task ConfigureContextAsync(IBrowserContext browserContext) => Task.CompletedTask;
 
     protected async Task AuthenticateWithUatSecretAsync()
     {
@@ -311,7 +316,7 @@ public abstract class UatTestBase : IAsyncLifetime
         }
     }
 
-    private static string BaseUrl()
+    protected static string BaseUrl()
     {
         var baseUrl = Environment.GetEnvironmentVariable("GLOVELLY_UAT_BASE_URL")?.Trim();
 

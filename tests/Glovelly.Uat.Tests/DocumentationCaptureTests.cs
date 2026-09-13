@@ -6,18 +6,47 @@ namespace Glovelly.Uat.Tests;
 [Trait("Suite", "DocumentationCapture")]
 public sealed class DocumentationCaptureTests : UatTestBase
 {
+    protected override BrowserNewContextOptions CreateContextOptions() => new()
+    {
+        BaseURL = BaseUrl(),
+        Locale = "en-GB",
+        TimezoneId = "Europe/London",
+        ColorScheme = ColorScheme.Light,
+        ViewportSize = new ViewportSize { Width = 1440, Height = 960 },
+    };
+
+    protected override Task ConfigureContextAsync(IBrowserContext browserContext) => browserContext.AddInitScriptAsync(
+        """
+        (() => {
+          const fixedNow = Date.parse('2026-04-06T09:00:00.000Z');
+          const NativeDate = Date;
+          class FixedDate extends NativeDate {
+            constructor(...args) { super(...(args.length ? args : [fixedNow])); }
+            static now() { return fixedNow; }
+          }
+          Object.setPrototypeOf(FixedDate, NativeDate);
+          window.Date = FixedDate;
+        })();
+        """);
+
     [Fact]
     public Task CapturesCoreWorkflowViews() => RunWithDiagnosticsAsync(nameof(CapturesCoreWorkflowViews), async () =>
     {
         try
         {
-            await Page.SetViewportSizeAsync(1440, 960);
             await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ReducedMotion = ReducedMotion.Reduce, ColorScheme = ColorScheme.Light });
             await AuthenticateDocumentationFixtureAsync();
+            await Page.EvaluateAsync("async () => { await document.fonts.ready; }");
             await Page.GetByTestId("nav-gigs").ClickAsync();
             await Page.GetByTestId("gig-card").Filter(new LocatorFilterOptions { HasText = "Spring concert" }).ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("gig-card") });
             await Page.GetByTestId("nav-invoices").ClickAsync();
-            await Page.GetByTestId("invoice-card").Filter(new LocatorFilterOptions { HasText = "GLV-202604-001" }).ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("invoice-card") });
+            var invoiceCard = Page.GetByTestId("invoice-card").Filter(new LocatorFilterOptions { HasText = "GLV-202604-001" });
+            await invoiceCard.ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("invoice-card") });
+            await invoiceCard.ClickAsync();
+            await Page.GetByTestId("invoice-send-button").ClickAsync();
+            var review = Page.GetByTestId("invoice-email-review-modal");
+            await review.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await review.ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("invoice-email-review") });
         }
         finally
         {

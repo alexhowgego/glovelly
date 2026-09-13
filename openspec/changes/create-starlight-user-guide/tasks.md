@@ -24,8 +24,8 @@
 ## 4. Playwright screenshot capture suite
 
 - [x] 4.1 Add a separately selectable documentation-capture suite and configurable candidate artifact directory while preserving ordinary UAT selection and failure diagnostics.
-- [ ] 4.2 Configure deterministic capture contexts with fixed Chromium settings, desktop/mobile viewports, locale, timezone, colour scheme, reduced motion, frozen browser clock, and settled-font/data waiting.
-- [ ] 4.3 Capture named, selected element screenshots for representative core workflow views, including an invoice email-review state before sending any email.
+- [x] 4.2 Configure deterministic capture contexts with fixed Chromium settings, desktop/mobile viewports, locale, timezone, colour scheme, reduced motion, frozen browser clock, and settled-font/data waiting.
+- [x] 4.3 Capture named, selected element screenshots for representative core workflow views, including an invoice email-review state before sending any email.
 - [ ] 4.4 Reset the documentation fixture before capture and in guaranteed cleanup paths; add coverage showing repeat runs do not mutate the UAT fixture.
 - [x] 4.5 Add the initial reviewed screenshot assets to the guide and use semantic guide markup/CSS for any explanatory callouts rather than raster annotations.
 

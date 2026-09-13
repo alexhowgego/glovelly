@@ -118,6 +118,15 @@ public static class DocumentationFixtureSeeder
         db.Invoices.Add(invoice);
         db.SellerProfiles.Add(sellerProfile);
         await db.SaveChangesAsync(cancellationToken);
+
+        gig.InvoiceId = invoice.Id;
+        gig.InvoicedAt = SeededAt;
+        await invoicePdfService.SaveGeneratedPdfAsync(
+            invoice,
+            UserId,
+            "%PDF-1.1\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n"u8.ToArray(),
+            cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public static async Task ResetAsync(
