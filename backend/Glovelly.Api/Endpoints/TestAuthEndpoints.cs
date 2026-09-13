@@ -2,6 +2,7 @@ using Glovelly.Api.Auth;
 using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
@@ -93,6 +94,49 @@ internal static class TestAuthEndpoints
             }
 
             await UatRegressionDataSeeder.ResetAndSeedAsync(dbContext, attachmentStore, invoicePdfService);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/documentation/login", async (
+            HttpContext httpContext,
+            AppDbContext dbContext,
+            IConfiguration configuration,
+            IExpenseAttachmentStore attachmentStore,
+            IInvoicePdfService invoicePdfService) =>
+        {
+            var secretCheck = ValidateSecret(httpContext, configuration);
+            if (secretCheck is not null)
+            {
+                return secretCheck;
+            }
+
+            await DocumentationFixtureSeeder.ResetAndSeedAsync(dbContext, attachmentStore, invoicePdfService);
+            var user = await dbContext.Users.AsNoTracking().SingleAsync(value => value.Id == DocumentationFixtureSeeder.UserId);
+            await SignInAsync(httpContext, user, DocumentationFixtureSeeder.GoogleSubject);
+
+            return Results.Ok(new
+            {
+                userId = user.Id,
+                email = user.Email,
+                name = user.DisplayName,
+                role = user.Role.ToString(),
+            });
+        });
+
+        group.MapPost("/documentation/reset", async (
+            HttpContext httpContext,
+            AppDbContext dbContext,
+            IConfiguration configuration,
+            IExpenseAttachmentStore attachmentStore,
+            IInvoicePdfService invoicePdfService) =>
+        {
+            var secretCheck = ValidateSecret(httpContext, configuration);
+            if (secretCheck is not null)
+            {
+                return secretCheck;
+            }
+
+            await DocumentationFixtureSeeder.ResetAsync(dbContext, attachmentStore, invoicePdfService);
             return Results.NoContent();
         });
 
@@ -196,6 +240,31 @@ internal static class TestAuthEndpoints
         }
 
         return SecretsMatch(suppliedSecret, configuredSecret) ? null : Results.Forbid();
+    }
+
+    private static Task SignInAsync(HttpContext httpContext, User user, string subject)
+    {
+        var claims = new[]
+        {
+            new Claim(GlovellyClaimTypes.UserId, user.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Email, user.Email),
+            new Claim("email", user.Email),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim("role", user.Role.ToString()),
+            new Claim(ClaimTypes.Name, user.DisplayName ?? user.Email),
+            new Claim("name", user.DisplayName ?? user.Email),
+            new Claim("sub", user.GoogleSubject ?? subject),
+        };
+
+        return httpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)),
+            new AuthenticationProperties
+            {
+                IsPersistent = false,
+                IssuedUtc = DateTimeOffset.UtcNow,
+            });
     }
 
     private static bool SecretsMatch(string suppliedSecret, string configuredSecret)

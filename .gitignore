@@ -62,6 +62,14 @@ nunit-*.xml
 # Generated handbook site
 docs/_site/
 
+# Frontend dependencies and build output
+**/node_modules/
+**/dist/
+**/.astro/
+
+# Local editor settings
+.vscode/
+
 # gemini-cli settings
 .gemini/
 

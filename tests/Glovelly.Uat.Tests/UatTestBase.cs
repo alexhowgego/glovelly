@@ -130,6 +130,32 @@ public abstract class UatTestBase : IAsyncLifetime
         });
     }
 
+    protected async Task AuthenticateDocumentationFixtureAsync()
+    {
+        var secret = RequiredEnvironmentVariable("GLOVELLY_UAT_SECRET", "Set GLOVELLY_UAT_SECRET to authenticate the staging documentation fixture.");
+        await Page.GotoAsync("/", new PageGotoOptions { WaitUntil = WaitUntilState.Load });
+        var status = await Page.EvaluateAsync<int>(
+            """
+            async (secret) => (await fetch('/test-auth/documentation/login', {
+              method: 'POST', headers: { 'X-Glovelly-Uat-Secret': secret }, credentials: 'include'
+            })).status
+            """, secret);
+        Assert.Equal(200, status);
+        await Page.GotoAsync("/", new PageGotoOptions { WaitUntil = WaitUntilState.Load });
+        await Page.GetByTestId("nav-gigs").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    protected Task ResetDocumentationFixtureAsync()
+    {
+        var secret = RequiredEnvironmentVariable("GLOVELLY_UAT_SECRET", "Set GLOVELLY_UAT_SECRET to reset the staging documentation fixture.");
+        return Page.EvaluateAsync(
+            """
+            async (secret) => { const response = await fetch('/test-auth/documentation/reset', {
+              method: 'POST', headers: { 'X-Glovelly-Uat-Secret': secret }, credentials: 'include'
+            }); if (!response.ok) throw new Error(`Documentation reset failed with ${response.status}`); }
+            """, secret);
+    }
+
     protected static string RequiredEnvironmentVariable(string name, string message)
     {
         var value = Environment.GetEnvironmentVariable(name)?.Trim();
