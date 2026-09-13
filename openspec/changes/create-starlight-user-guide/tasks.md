@@ -17,16 +17,16 @@
 ## 3. Documentation fixture lifecycle
 
 - [x] 3.1 Define a fixed staging-only `Glovelly Docs` account and deterministic core-workflow seed scenario, separate from the existing UAT regression account.
-- [ ] 3.2 Implement ownership-scoped reset/seed support that removes documentation account data, related relational records, and associated attachment/blob storage without affecting UAT or other users.
+- [x] 3.2 Implement ownership-scoped reset/seed support that removes documentation account data, related relational records, and associated attachment/blob storage without affecting UAT or other users.
 - [x] 3.3 Extend protected staging test-auth support to reset, seed, and authenticate only the predefined documentation fixture account.
-- [ ] 3.4 Add backend integration coverage proving reset idempotency, fixture isolation, profile/default restoration, and storage cleanup.
+- [x] 3.4 Add backend integration coverage proving reset idempotency, fixture isolation, profile/default restoration, and storage cleanup.
 
 ## 4. Playwright screenshot capture suite
 
 - [x] 4.1 Add a separately selectable documentation-capture suite and configurable candidate artifact directory while preserving ordinary UAT selection and failure diagnostics.
 - [x] 4.2 Configure deterministic capture contexts with fixed Chromium settings, desktop/mobile viewports, locale, timezone, colour scheme, reduced motion, frozen browser clock, and settled-font/data waiting.
 - [x] 4.3 Capture named, selected element screenshots for representative core workflow views, including an invoice email-review state before sending any email.
-- [ ] 4.4 Reset the documentation fixture before capture and in guaranteed cleanup paths; add coverage showing repeat runs do not mutate the UAT fixture.
+- [x] 4.4 Reset the documentation fixture before capture and in guaranteed cleanup paths; add coverage showing repeat runs do not mutate the UAT fixture.
 - [x] 4.5 Add the initial reviewed screenshot assets to the guide and use semantic guide markup/CSS for any explanatory callouts rather than raster annotations.
 
 ## 5. Informational screenshot freshness CI
