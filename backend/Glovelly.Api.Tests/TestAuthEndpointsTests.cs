@@ -5,6 +5,7 @@ using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -80,6 +81,42 @@ public sealed class TestAuthEndpointsTests
         Assert.NotNull(await dbContext.Users.FindAsync([UatRegressionDataSeeder.UserId], TestContext.Current.CancellationToken));
         Assert.NotNull(await dbContext.Clients.FindAsync([UatRegressionDataSeeder.ClientId], TestContext.Current.CancellationToken));
         Assert.NotNull(await dbContext.SellerProfiles.FindAsync([UatRegressionDataSeeder.SellerProfileId], TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Reset_WithValidSecret_RemovesUatDataAndRestoresBaselineFixture()
+    {
+        await using var factory = CreateFactory("Staging");
+        var client = factory.CreateClient();
+        var loginRequest = new HttpRequestMessage(HttpMethod.Post, "/test-auth/login");
+        loginRequest.Headers.Add("X-Glovelly-Uat-Secret", UatSecret);
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(loginRequest, TestContext.Current.CancellationToken)).StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.Clients.Add(new Client
+            {
+                Id = Guid.NewGuid(),
+                Name = "Temporary UAT client",
+                CreatedByUserId = UatRegressionDataSeeder.UserId,
+                UpdatedByUserId = UatRegressionDataSeeder.UserId,
+            });
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var resetRequest = new HttpRequestMessage(HttpMethod.Post, "/test-auth/reset");
+        resetRequest.Headers.Add("X-Glovelly-Uat-Secret", UatSecret);
+        var resetResponse = await client.SendAsync(resetRequest, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, resetResponse.StatusCode);
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var clients = await verificationDb.Clients
+            .Where(value => value.CreatedByUserId == UatRegressionDataSeeder.UserId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        Assert.Single(clients);
+        Assert.Equal(UatRegressionDataSeeder.ClientId, clients[0].Id);
     }
 
     [Fact]

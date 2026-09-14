@@ -7,6 +7,9 @@
       "hosting": {
         "landing": [
           "glovelly-landing"
+        ],
+        "user-guide": [
+          "glovelly-docs"
         ]
       }
     }

@@ -6,7 +6,7 @@ Compact, repo-specific context for future OpenCode sessions. Keep only facts an 
 
 - Glovelly is a personal business platform for authenticated music-work admin: clients, gigs, expenses/receipts, invoices, seller profile, Google Drive/email delivery, admin users, and a small MCP surface.
 - Backend: ASP.NET Core minimal API on .NET 10, EF Core, PostgreSQL when `ConnectionStrings:Glovelly` exists, EF in-memory otherwise. Shared package versions live in `Directory.Packages.props`; target framework/nullable/implicit usings live in `Directory.Build.props`.
-- Frontend: React 19 + TypeScript + Vite in `frontend/glovelly-web`. `npm run build` is `tsc -b && vite build`.
+- Frontend: React 19 + TypeScript + Vite in `frontend/glovelly-web`; independent Astro sites live in `frontend/glovelly-landing` and `frontend/glovelly-guide`. `npm run build` is `tsc -b && vite build` for the authenticated app.
 - Deployment builds one Docker image: Vite `dist` is copied into ASP.NET Core `wwwroot`, then the API serves the SPA and API from one process. CI deploys same-repo PRs to shared Cloud Run staging and `main` to production.
 
 ## Commands
@@ -19,6 +19,8 @@ dotnet test --solution glovelly.sln --max-parallel-test-modules 1  # backend sui
 dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --filter-class '*GigEndpointsTests'
 npm --prefix frontend/glovelly-web run lint
 npm --prefix frontend/glovelly-web run build
+npm --prefix frontend/glovelly-guide run check
+npm --prefix frontend/glovelly-guide run build
 ./verify.sh                                    # dotnet test, frontend lint, frontend build
 dotnet tool restore && dotnet tool run docfx docs/docfx.json
 dotnet tool run docfx docs/docfx.json --serve  # local handbook
@@ -42,6 +44,7 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - `src/App.tsx` coordinates session, active section, initial data loads, modals, and cross-workspace actions. Avoid adding large workflow bodies there when a hook can own them.
 - `src/hooks/` owns stateful workspace logic for clients, gigs, gig imports, invoices, admin, user settings, seller profile, and quick receipts.
 - `src/components/` is presentational sections/modals. Preserve the current plain React/CSS approach; there is no component library.
+- `frontend/glovelly-guide` is the public, task-led user guide. Write in a practical "do this next" voice for musicians and sole traders; keep technical/operator reference material in the DocFX handbook at `handbook.glovelly.net`.
 - Terminal frontend feedback uses Sonner: mount `NotificationToaster` from `src/NotificationToaster.tsx` in `src/main.tsx` and call the Glovelly policy wrapper in `src/notifications.ts`, rather than importing Sonner in workspace code. Use notifications for completed actions and unexpected failures that close, navigate away from, or outlive their initiating UI; keep validation, progress, durable configuration/health warnings, and terminal feedback for still-open modals inline. The notification viewport must render below modal overlays so persistent notifications cannot block modal controls.
 - Use `buildApiUrl`, `fetchWithSession`, `parseProblemDetails`, and session-expiry helpers from `src/api.ts`; avoid raw `fetch` for authenticated API calls.
 - Update `src/types.ts` whenever backend JSON shapes change.

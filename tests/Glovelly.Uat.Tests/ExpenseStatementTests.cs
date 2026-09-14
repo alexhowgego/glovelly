@@ -135,7 +135,7 @@ public sealed class ExpenseStatementTests : InvoiceUatTestBase
         await Page.GetByTestId("gig-title-input").FillAsync(gigTitle);
         await Page.GetByTestId("gig-venue-input").FillAsync("UAT Expense Hall");
         await Page.GetByTestId("gig-fee-input").FillAsync("100.00");
-        await Page.GetByTestId("gig-save-close-button").ClickAsync();
+        await SaveGigAndWaitForResponseAsync();
 
         await GigCard(gigTitle).WaitForAsync(new LocatorWaitForOptions
         {
@@ -149,13 +149,22 @@ public sealed class ExpenseStatementTests : InvoiceUatTestBase
         });
         await Page.GetByTestId("gig-expense-amount-input").FillAsync("62.50");
         await Page.GetByTestId("gig-expense-description-input").FillAsync(expenseDescription);
-        await Page.GetByTestId("add-gig-expense-button").ClickAsync();
-        await Assertions.Expect(Page.GetByTestId("gig-expense-item").Locator("strong").First).ToContainTextAsync(
-            expenseDescription,
-            new LocatorAssertionsToContainTextOptions
+        var expenseResponse = await Page.RunAndWaitForResponseAsync(
+            async () => await Page.GetByTestId("add-gig-expense-button").ClickAsync(),
+            response =>
+            {
+                var path = new Uri(response.Url).AbsolutePath;
+                return response.Request.Method == "PUT" && path.StartsWith("/gigs/", StringComparison.Ordinal);
+            });
+        Assert.True(expenseResponse.Ok, $"Expected expense save to succeed, got HTTP {expenseResponse.Status} for {expenseResponse.Url}.");
+        await Assertions.Expect(Page.GetByTestId("gig-expense-item").Filter(new LocatorFilterOptions
         {
-            Timeout = 30_000,
-        });
+            HasText = expenseDescription,
+        })).ToBeVisibleAsync(
+            new LocatorAssertionsToBeVisibleOptions
+            {
+                Timeout = 30_000,
+            });
     }
 
     private async Task GeneratePreviewAndDownloadAsync(string gigTitle, string expenseDescription)

@@ -32,10 +32,8 @@ public abstract class UatTestBase : IAsyncLifetime
         {
             Headless = Headless(),
         });
-        context = await browser.NewContextAsync(new BrowserNewContextOptions
-        {
-            BaseURL = BaseUrl(),
-        });
+        context = await browser.NewContextAsync(CreateContextOptions());
+        await ConfigureContextAsync(context);
         await context.Tracing.StartAsync(new TracingStartOptions
         {
             Screenshots = true,
@@ -80,6 +78,13 @@ public abstract class UatTestBase : IAsyncLifetime
         }
     }
 
+    protected virtual BrowserNewContextOptions CreateContextOptions() => new()
+    {
+        BaseURL = BaseUrl(),
+    };
+
+    protected virtual Task ConfigureContextAsync(IBrowserContext browserContext) => Task.CompletedTask;
+
     protected async Task AuthenticateWithUatSecretAsync()
     {
         var secret = RequiredEnvironmentVariable(
@@ -91,7 +96,21 @@ public abstract class UatTestBase : IAsyncLifetime
             WaitUntil = WaitUntilState.Load,
         });
 
-        var status = await Page.EvaluateAsync<int>(
+        var resetStatus = await Page.EvaluateAsync<int>(
+            """
+            async (secret) => {
+              const response = await fetch('/test-auth/reset', {
+                method: 'POST',
+                headers: { 'X-Glovelly-Uat-Secret': secret },
+                credentials: 'include'
+              });
+              return response.status;
+            }
+            """,
+            secret);
+        Assert.Equal(204, resetStatus);
+
+        var loginStatus = await Page.EvaluateAsync<int>(
             """
             async (secret) => {
               const response = await fetch('/test-auth/login', {
@@ -104,7 +123,7 @@ public abstract class UatTestBase : IAsyncLifetime
             """,
             secret);
 
-        Assert.Equal(200, status);
+        Assert.Equal(200, loginStatus);
 
         await Page.GotoAsync("/", new PageGotoOptions
         {
@@ -114,6 +133,32 @@ public abstract class UatTestBase : IAsyncLifetime
         {
             State = WaitForSelectorState.Visible,
         });
+    }
+
+    protected async Task AuthenticateDocumentationFixtureAsync()
+    {
+        var secret = RequiredEnvironmentVariable("GLOVELLY_UAT_SECRET", "Set GLOVELLY_UAT_SECRET to authenticate the staging documentation fixture.");
+        await Page.GotoAsync("/", new PageGotoOptions { WaitUntil = WaitUntilState.Load });
+        var status = await Page.EvaluateAsync<int>(
+            """
+            async (secret) => (await fetch('/test-auth/documentation/login', {
+              method: 'POST', headers: { 'X-Glovelly-Uat-Secret': secret }, credentials: 'include'
+            })).status
+            """, secret);
+        Assert.Equal(200, status);
+        await Page.GotoAsync("/", new PageGotoOptions { WaitUntil = WaitUntilState.Load });
+        await Page.GetByTestId("nav-gigs").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    protected Task ResetDocumentationFixtureAsync()
+    {
+        var secret = RequiredEnvironmentVariable("GLOVELLY_UAT_SECRET", "Set GLOVELLY_UAT_SECRET to reset the staging documentation fixture.");
+        return Page.EvaluateAsync(
+            """
+            async (secret) => { const response = await fetch('/test-auth/documentation/reset', {
+              method: 'POST', headers: { 'X-Glovelly-Uat-Secret': secret }, credentials: 'include'
+            }); if (!response.ok) throw new Error(`Documentation reset failed with ${response.status}`); }
+            """, secret);
     }
 
     protected static string RequiredEnvironmentVariable(string name, string message)
@@ -271,7 +316,7 @@ public abstract class UatTestBase : IAsyncLifetime
         }
     }
 
-    private static string BaseUrl()
+    protected static string BaseUrl()
     {
         var baseUrl = Environment.GetEnvironmentVariable("GLOVELLY_UAT_BASE_URL")?.Trim();
 

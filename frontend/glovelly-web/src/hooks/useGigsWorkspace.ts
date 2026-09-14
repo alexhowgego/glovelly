@@ -1218,19 +1218,19 @@ export function useGigsWorkspace({
 
     if (!payload.clientId || !payload.title || !payload.date || !payload.venue) {
       setGigStatus('Client, title, date and location are required.')
-      return
+      return false
     }
 
     const fee = Number(payload.fee)
     if (!Number.isFinite(fee) || fee < 0) {
       setGigStatus('Fee must be a valid non-negative number.')
-      return
+      return false
     }
 
     const travelMiles = payload.travelMiles ? Number(payload.travelMiles) : 0
     if (!Number.isFinite(travelMiles) || travelMiles < 0) {
       setGigStatus('Travel miles must be a valid non-negative number.')
-      return
+      return false
     }
 
     const passengerCount = payload.passengerCount ? Number(payload.passengerCount) : 0
@@ -1239,7 +1239,7 @@ export function useGigsWorkspace({
       passengerCount < 0
     ) {
       setGigStatus('Passenger count must be a valid whole number.')
-      return
+      return false
     }
 
     const normalizedExpenses: NormalizedGigExpensePayload[] = []
@@ -1249,12 +1249,12 @@ export function useGigsWorkspace({
 
       if (!description) {
         setGigStatus(`Expense ${index + 1} needs a description.`)
-        return
+        return false
       }
 
       if (!Number.isFinite(amount) || amount < 0) {
         setGigStatus(`Expense ${index + 1} must have a valid non-negative amount.`)
-        return
+        return false
       }
 
       normalizedExpenses.push({
@@ -1303,7 +1303,7 @@ export function useGigsWorkspace({
           'Your session expired. Sign in again to keep managing gigs.'
         )
       ) {
-        return
+        return false
       }
 
       if (!response.ok) {
@@ -1328,10 +1328,12 @@ export function useGigsWorkspace({
           hasInvoiceRelevantChanges
         )
       }
+      return true
     } catch (error) {
       notifications.error(
         error instanceof Error ? error.message : 'Unable to save this gig right now.'
       )
+      return false
     } finally {
       setIsGigLoading(false)
     }
@@ -1393,12 +1395,11 @@ export function useGigsWorkspace({
       }
     }
 
-    await saveGigForm(
+    return await saveGigForm(
       false,
       nextExpenses,
       expenseIndex === null ? 'Expense added.' : 'Expense updated.'
     )
-    return true
   }
 
   const deleteExpenseDraft = async (expenseIndex: number) => {

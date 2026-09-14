@@ -376,6 +376,83 @@ jobs:
       require_invoice_recipient: true
       artifact_name: glovelly-staging-uat-diagnostics
 
+  documentation_capture:
+    name: Capture documentation screenshots
+    needs: staging_uat
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    env:
+      GLOVELLY_UAT_BASE_URL: ${{ vars.DEPLOYMENT_URL }}
+      GLOVELLY_UAT_SECRET_ID: ${{ vars.GCP_UAT_SECRET_ID }}
+      GLOVELLY_DOCUMENTATION_CAPTURE_DIR: ${{ github.workspace }}/TestResults/documentation-captures/candidates
+      GLOVELLY_DOCUMENTATION_REPORT_DIR: ${{ github.workspace }}/TestResults/documentation-captures/report
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Load UAT secret
+        run: |
+          secret_value="$(gcloud secrets versions access latest --secret="$GLOVELLY_UAT_SECRET_ID" --project="${{ vars.GCP_PROJECT_ID }}")"
+          echo "::add-mask::$secret_value"
+          echo "GLOVELLY_UAT_SECRET=$secret_value" >> "$GITHUB_ENV"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build and install Playwright Chromium
+        run: |
+          dotnet restore tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj
+          dotnet build tests/Glovelly.Uat.Tests/Glovelly.Uat.Tests.csproj --no-restore --configuration Release
+          pwsh tests/Glovelly.Uat.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Capture candidates
+        run: dotnet tests/Glovelly.Uat.Tests/bin/Release/net10.0/Glovelly.Uat.Tests.dll -trait "Suite=DocumentationCapture"
+
+      - name: Compare candidates with approved screenshots
+        id: comparison
+        run: |
+          bash .github/scripts/compare-documentation-screenshots.sh "$GLOVELLY_DOCUMENTATION_CAPTURE_DIR" "frontend/glovelly-guide/public/screenshots" "$GLOVELLY_DOCUMENTATION_REPORT_DIR/freshness.md"
+          changed="$(sed '/^$/d' "$GLOVELLY_DOCUMENTATION_REPORT_DIR/freshness.txt" | paste -sd ';' | sed 's/;/; /g')"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Upload documentation screenshot candidates
+        uses: actions/upload-artifact@v7
+        with:
+          name: glovelly-documentation-screenshots
+          path: TestResults/documentation-captures
+          retention-days: 14
+
+      - name: Publish screenshot freshness
+        uses: actions/github-script@v8
+        env:
+          CHANGED: ${{ steps.comparison.outputs.changed }}
+        with:
+          script: |
+            const marker = '<!-- glovelly-documentation-screenshots -->'
+            const changed = process.env.CHANGED
+            const status = changed ? `Review needed: ${changed}.` : 'All approved screenshots are current.'
+            const body = `${marker}\n### Documentation screenshots\n${status}\n\nCandidates and the freshness report are in the [workflow artifacts](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}). Review approved images before copying them into \`frontend/glovelly-guide/public/screenshots/\`.`
+            const comments = await github.paginate(github.rest.issues.listComments, { owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number })
+            const existing = comments.find(comment => comment.body?.includes(marker))
+            if (existing) await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body })
+            else await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body })
+
   migrate_production:
     name: Migrate production database
     needs:
