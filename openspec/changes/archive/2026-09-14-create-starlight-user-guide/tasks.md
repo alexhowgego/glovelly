@@ -38,6 +38,6 @@
 
 ## 6. Verification and release
 
-- [ ] 6.1 Run Starlight checks and production build, and verify guide navigation, search, mobile layout, keyboard navigation, and all canonical outbound links in a preview.
-- [ ] 6.2 Run backend integration tests, ordinary UAT coverage, and the documentation capture suite against staging; verify fixture cleanup and candidate artifact output.
-- [ ] 6.3 Run `openspec validate --change "create-starlight-user-guide" --strict` and update relevant UAT/engineering documentation for the new capture workflow.
+- [x] 6.1 Run Starlight checks and production build, and verify guide navigation, search, mobile layout, keyboard navigation, and all canonical outbound links in a preview.
+- [x] 6.2 Run backend integration tests, ordinary UAT coverage, and the documentation capture suite against staging; verify fixture cleanup and candidate artifact output.
+- [x] 6.3 Run `openspec validate --change "create-starlight-user-guide" --strict` and update relevant UAT/engineering documentation for the new capture workflow.

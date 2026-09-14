@@ -122,3 +122,14 @@ The project SHALL keep manual UAT documentation aligned with browser-level UAT c
 #### Scenario: External service checks remain marked manual when not automated
 - **WHEN** a documented UAT journey still requires real OAuth, external service configuration, asynchronous worker verification, real delivery, or human visual judgement
 - **THEN** the documentation SHALL continue to mark that portion as manual or environment/manual UAT
+
+### Requirement: Documentation capture automation is isolated from regression UAT
+The browser automation project SHALL support a separately selectable documentation-capture suite that uses the dedicated documentation fixture and its own artifact output. It SHALL preserve the existing UAT regression account, diagnostics behavior, and normal test coverage.
+
+#### Scenario: Documentation capture is selected
+- **WHEN** CI or a developer selects the documentation-capture suite
+- **THEN** it authenticates and operates only through the documentation fixture and writes named capture candidates to the configured documentation artifact directory
+
+#### Scenario: Normal UAT is selected
+- **WHEN** CI or a developer runs the ordinary UAT suite without the documentation-capture selector
+- **THEN** its existing regression fixture and failure-diagnostic behavior remain unchanged
