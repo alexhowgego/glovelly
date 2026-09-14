@@ -24,8 +24,9 @@ append_csv_value() {
 }
 
 common_worker_env_vars() {
-  printf 'App__DeploymentName=%s,BlobStorage__BucketName=%s,Email__Mode=Resend,Email__AccessRequests__FromDisplayName=Glovelly,Email__Invoices__FromDisplayName=Glovelly,ExpenseAttachments__BucketName=%s,Mcp__OAuth__Issuer=%s,Mcp__OAuth__Resource=%s/mcp,Mcp__OAuth__Clients__0__DisplayName=ChatGPT,Mcp__OAuth__Clients__0__Scopes__0=mcp:read' \
+  printf 'App__DeploymentName=%s,App__PublicBaseUrl=%s,BlobStorage__BucketName=%s,Email__Mode=Resend,Email__AccessRequests__FromDisplayName=Glovelly,Email__Invoices__FromDisplayName=Glovelly,ExpenseAttachments__BucketName=%s,Mcp__OAuth__Issuer=%s,Mcp__OAuth__Resource=%s/mcp,Mcp__OAuth__Clients__0__DisplayName=ChatGPT,Mcp__OAuth__Clients__0__Scopes__0=mcp:read' \
     "$DEPLOYMENT_NAME" \
+    "$DEPLOYMENT_URL" \
     "$GCP_BUCKET_NAME" \
     "$GCP_BUCKET_NAME" \
     "$DEPLOYMENT_URL" \
