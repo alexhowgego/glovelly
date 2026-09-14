@@ -91,7 +91,21 @@ public abstract class UatTestBase : IAsyncLifetime
             WaitUntil = WaitUntilState.Load,
         });
 
-        var status = await Page.EvaluateAsync<int>(
+        var resetStatus = await Page.EvaluateAsync<int>(
+            """
+            async (secret) => {
+              const response = await fetch('/test-auth/reset', {
+                method: 'POST',
+                headers: { 'X-Glovelly-Uat-Secret': secret },
+                credentials: 'include'
+              });
+              return response.status;
+            }
+            """,
+            secret);
+        Assert.Equal(204, resetStatus);
+
+        var loginStatus = await Page.EvaluateAsync<int>(
             """
             async (secret) => {
               const response = await fetch('/test-auth/login', {
@@ -104,7 +118,7 @@ public abstract class UatTestBase : IAsyncLifetime
             """,
             secret);
 
-        Assert.Equal(200, status);
+        Assert.Equal(200, loginStatus);
 
         await Page.GotoAsync("/", new PageGotoOptions
         {

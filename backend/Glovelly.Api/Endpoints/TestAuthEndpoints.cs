@@ -79,6 +79,23 @@ internal static class TestAuthEndpoints
             });
         });
 
+        group.MapPost("/reset", async (
+            HttpContext httpContext,
+            AppDbContext dbContext,
+            IConfiguration configuration,
+            IExpenseAttachmentStore attachmentStore,
+            IInvoicePdfService invoicePdfService) =>
+        {
+            var secretCheck = ValidateSecret(httpContext, configuration);
+            if (secretCheck is not null)
+            {
+                return secretCheck;
+            }
+
+            await UatRegressionDataSeeder.ResetAndSeedAsync(dbContext, attachmentStore, invoicePdfService);
+            return Results.NoContent();
+        });
+
         group.MapPost("/gig-import-batches", async (
             HttpContext httpContext,
             AppDbContext dbContext,

@@ -1,4 +1,5 @@
 using Glovelly.Api.Models;
+using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Glovelly.Api.Data;
@@ -21,6 +22,16 @@ public static class UatRegressionDataSeeder
     public static async Task SeedAsync(AppDbContext dbContext)
     {
         await SeedAsync(new UatRegressionSeedContext(dbContext));
+    }
+
+    public static async Task ResetAndSeedAsync(
+        AppDbContext dbContext,
+        IExpenseAttachmentStore attachmentStore,
+        IInvoicePdfService invoicePdfService,
+        CancellationToken cancellationToken = default)
+    {
+        await UserFixtureReset.ResetAsync(dbContext, UserId, attachmentStore, invoicePdfService, cancellationToken);
+        await SeedAsync(dbContext);
     }
 
     public static async Task SeedAsync(UatRegressionSeedContext context)

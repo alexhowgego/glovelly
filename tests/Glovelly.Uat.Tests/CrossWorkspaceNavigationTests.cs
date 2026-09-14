@@ -138,8 +138,14 @@ public sealed class CrossWorkspaceNavigationTests : InvoiceUatTestBase
     private async Task SelectGigForBatchInvoiceAsync(string gigTitle)
     {
         await Page.GetByTestId("nav-gigs").ClickAsync();
-        await Page.GetByTestId("gig-search-input").FillAsync(string.Empty);
-        await GigCard(gigTitle).Locator("input[type=checkbox]").CheckAsync();
+        await Page.GetByTestId("gig-search-input").FillAsync(gigTitle);
+        var card = GigCard(gigTitle);
+        await card.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+        await card.Locator("input[type=checkbox]").CheckAsync();
     }
 
     private async Task UpdateExpenseAndAcceptLinkedRedraftAsync(string currentDescription, string nextDescription)
