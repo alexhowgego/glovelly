@@ -61,11 +61,7 @@ public sealed class ImportedGigReviewTests : UatTestBase
             await Assertions.Expect(pendingRow).ToBeVisibleAsync();
 
             await Page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("Commit decisions") }).ClickAsync();
-            await Assertions.Expect(Page.GetByTestId("gig-imports-modal")).ToContainTextAsync("created", new LocatorAssertionsToContainTextOptions
-            {
-                IgnoreCase = true,
-                Timeout = 30_000,
-            });
+            await ExpectNotificationAsync("1 gig created from import.", "success");
 
             await Page.GetByTestId("gig-imports-modal").GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
             await Page.GetByTestId("nav-gigs").ClickAsync();
