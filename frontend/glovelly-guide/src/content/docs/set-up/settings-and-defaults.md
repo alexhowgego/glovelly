@@ -7,6 +7,12 @@ description: Set the details Glovelly can reuse for future work.
 
 Open the profile menu and choose **Your settings**. You can update your display name and defaults that save time when you create future clients, gigs, and invoices.
 
+<figure class="product-shot">
+  <img class="product-shot-light" src="/screenshots/user-settings-light.png" alt="The Your settings dialog showing profile, mileage, and invoice default fields." />
+  <img class="product-shot-dark" src="/screenshots/user-settings-dark.png" alt="The Your settings dialog showing profile, mileage, and invoice default fields." />
+  <figcaption>Set reusable defaults once, then check they suit your next piece of work.</figcaption>
+</figure>
+
 ## Useful defaults
 
 Set defaults for things you use regularly, such as:

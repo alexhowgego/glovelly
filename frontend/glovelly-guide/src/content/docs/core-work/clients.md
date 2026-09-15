@@ -14,6 +14,12 @@ description: Keep booking contacts and billing details ready for the next gig.
 
 The client is now available when you create a gig. Their email and billing details can be used when you create an invoice.
 
+<figure class="product-shot">
+  <img class="product-shot-light" src="/screenshots/client-workspace-light.png" alt="The Clients workspace showing The Lantern Quartet selected with its billing details." />
+  <img class="product-shot-dark" src="/screenshots/client-workspace-dark.png" alt="The Clients workspace showing The Lantern Quartet selected with its billing details." />
+  <figcaption>Keep the billing details you need for the next gig or invoice in one client record.</figcaption>
+</figure>
+
 ## Keep details useful
 
 Open a client to update their details when they change. Client settings can also hold invoice filename, email-subject, payment-window, and mileage defaults for that client.

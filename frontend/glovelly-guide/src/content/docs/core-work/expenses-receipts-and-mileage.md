@@ -22,6 +22,12 @@ A saved receipt stays with that expense. You can download or remove the attachme
 
 Mileage uses the applicable saved rate when an invoice is generated. If mileage estimation is unavailable, you can still enter the miles yourself.
 
+<figure class="product-shot">
+  <img class="product-shot-light" src="/screenshots/gig-expenses-mileage-light.png" alt="A saved gig showing its travel mileage and a claimable travel and parking expense." />
+  <img class="product-shot-dark" src="/screenshots/gig-expenses-mileage-dark.png" alt="A saved gig showing its travel mileage and a claimable travel and parking expense." />
+  <figcaption>Expenses and mileage stay with the gig, ready to check before you create an invoice.</figcaption>
+</figure>
+
 ## Claimable or reimbursed
 
 Claimable expenses can appear on a newly generated invoice. Mark an expense **Reimbursed** when it has already been paid back; it is then excluded from new invoice lines by default.

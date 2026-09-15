@@ -49,6 +49,9 @@ h1, h2, h3 { font-family: "Fraunces", Georgia, serif; letter-spacing: -0.045em; 
 .help-panel p:last-child { margin-bottom: 0; }
 .product-shot { margin: 2rem 0; border: 1px solid var(--sl-color-gray-4); border-radius: 1rem; overflow: hidden; background: var(--sl-color-gray-5); }
 .product-shot img { display: block; width: 100%; height: auto; }
+.product-shot .product-shot-dark { display: none; }
+[data-theme='dark'] .product-shot .product-shot-light { display: none; }
+[data-theme='dark'] .product-shot .product-shot-dark { display: block; }
 .product-shot figcaption { padding: .8rem 1rem; color: var(--sl-color-gray-2); font-size: .92rem; }
 .product-shot.pending { padding: 1.25rem; }
 .product-shot.pending p { margin-bottom: 0; }

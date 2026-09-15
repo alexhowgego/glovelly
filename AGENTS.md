@@ -58,6 +58,9 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - Seed IDs live in `Infrastructure/TestData.cs`; default authenticated user claims live in `Infrastructure/TestAuthContext.cs`; email assertions should use `factory.Emails`.
 - When changing a user journey or cross-workspace navigation, update the matching scenario under `docs/uat/`.
 - When changing terminal frontend feedback, update the relevant UAT journey and retain its notification, persistent-error, and mobile-placement coverage.
+- Do not run Playwright UAT or documentation-capture tests locally. The pinned Chromium is unsupported on the local macOS runner, and documentation capture also requires staging-only credentials. Run them in the Ubuntu CI pipeline instead.
+- Documentation captures use the isolated `Glovelly Docs` staging fixture. CI resets it before/after the suite, writes candidates to `TestResults/documentation-captures/`, compares them with `frontend/glovelly-guide/public/screenshots/`, and uploads a non-blocking review artifact/PR comment. Review candidates before adding or replacing checked-in PNGs; never create substitute screenshots manually.
+- Guide screenshots are paired `*-light.png` and `*-dark.png` assets. Select pairs with the active Starlight `[data-theme]` attribute, not `<picture>` `prefers-color-scheme`, which does not follow the guide's theme toggle. The dark asset is Glovelly's actual `dark` product preference, not another product theme.
 
 ## Local And Secrets
 
