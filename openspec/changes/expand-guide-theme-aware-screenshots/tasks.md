@@ -17,3 +17,4 @@
 - [ ] 3.1 Run the documentation capture suite against staging and review the candidate artifact plus freshness report, confirming all fourteen names are compared without blocking the pull request.
 - [x] 3.2 Run `npm --prefix frontend/glovelly-guide run check` and `npm --prefix frontend/glovelly-guide run build`.
 - [ ] 3.3 Manually review the seven documented pages in Starlight light and dark themes at narrow and wide viewports for correct asset selection, alt text, captions, and responsive layout.
+- [x] 3.4 Compare byte-different PNG candidates by decoded pixels, suppress encoding-only drift, and include visual diffs for real pixel changes in the review artifact.

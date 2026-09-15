@@ -43,7 +43,7 @@ Alternatives considered:
 
 ### Extend the existing capture and review path, not its safety boundary
 
-The documentation-capture test will add stable navigation and modal interactions for the four additional states, capturing controlled elements after the application is settled. It will continue to avoid send actions and uploaded receipts. Candidate names will exactly match the checked-in paired asset names so the existing comparison script automatically reports new or changed files, uploads them as the existing artifact, and refreshes the existing PR comment.
+The documentation-capture test will add stable navigation and modal interactions for the four additional states, capturing controlled elements after the application is settled. It will continue to avoid send actions and uploaded receipts. Candidate names will exactly match the checked-in paired asset names so the comparison script can first fast-path byte-identical files, then compare decoded pixels for byte-different PNGs. Pixel-identical re-encodings are reported as current; any nonzero pixel difference remains reviewable with its changed-pixel count and generated visual diff in the existing artifact and PR comment flow.
 
 The fixture reset before authentication and in `finally` remains unchanged. Its existing seeded client, gig/expense/mileage, seller profile, and defaults are deliberately the source of all new states, avoiding fixture data with personal or external-service content.
 
@@ -53,6 +53,7 @@ The fixture reset before authentication and in `finally` remains unchanged. Its 
 - [A product asset starts in the wrong theme] -> Set the explicit local-storage preference through Playwright init scripts before navigation and assert the expected application theme before capture.
 - [New modal or detail captures are unstable] -> Use existing test IDs or stable semantic selectors, wait for visibility and settled fonts/data, and keep the same frozen browser conditions.
 - [A future workflow adds user-owned data that the fixture reset misses] -> Continue using the ownership-scoped reset and extend it with the captured workflow, as required by the existing fixture contract.
+- [PNG encoding changes create noisy review requests] -> Compare decoded pixels after the byte-identical fast path, report pixel-identical re-encodings as current, and generate reviewable diffs only for nonzero pixel changes.
 - [Fourteen binary assets increase review overhead] -> Keep only task-completing states, name pairs predictably, and retain review-first CI rather than automatically publishing candidates.
 
 ## Migration Plan
