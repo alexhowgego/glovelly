@@ -24,7 +24,8 @@ Glovelly links the gig to the invoice and creates lines from the fee, claimable 
 The review screen is deliberately the last step. Closing it does not send anything.
 
 <figure class="product-shot">
-  <img src="/screenshots/invoice-email-review.png" alt="The Review and send invoice dialog showing the recipient, email preview, PDF attachment, and Send invoice button." />
+  <img class="product-shot-light" src="/screenshots/invoice-email-review-light.png" alt="The Review and send invoice dialog showing the recipient, email preview, PDF attachment, and Send invoice button." />
+  <img class="product-shot-dark" src="/screenshots/invoice-email-review-dark.png" alt="The Review and send invoice dialog showing the recipient, email preview, PDF attachment, and Send invoice button." />
   <figcaption>The confirmation dialog gives you one last check before sending the invoice.</figcaption>
 </figure>
 

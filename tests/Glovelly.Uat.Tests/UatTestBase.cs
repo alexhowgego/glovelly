@@ -19,7 +19,7 @@ public abstract class UatTestBase : IAsyncLifetime
         return Assertions.Expect(Page.Locator($"[data-sonner-toast][data-type='{type}']").Filter(new LocatorFilterOptions
         {
             HasText = message,
-        })).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
+        }).First).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
         {
             Timeout = 30_000,
         });

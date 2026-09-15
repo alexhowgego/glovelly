@@ -16,7 +16,8 @@ description: Record the work before the details start multiplying.
 Use **Planned** for confirmed future work, **Completed** once it is finished, **Cancelled** when it will not go ahead, and **Draft** while the details are still taking shape.
 
 <figure class="product-shot">
-  <img src="/screenshots/gig-workspace.png" alt="The Gigs workspace showing a planned Spring concert with its fee and summary." />
+  <img class="product-shot-light" src="/screenshots/gig-workspace-light.png" alt="The Gigs workspace showing a planned Spring concert with its fee and summary." />
+  <img class="product-shot-dark" src="/screenshots/gig-workspace-dark.png" alt="The Gigs workspace showing a planned Spring concert with its fee and summary." />
   <figcaption>A saved planned gig keeps its key details ready for the next step.</figcaption>
 </figure>
 

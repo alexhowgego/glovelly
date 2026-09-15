@@ -10,7 +10,8 @@ description: See what needs attention and record when payment arrives.
 Use the **Invoices** workspace to filter invoices by drafts, outstanding invoices, overdue invoices, and paid invoices. Open an invoice to preview its PDF, review its line items, or take the next available status action.
 
 <figure class="product-shot">
-  <img src="/screenshots/invoice-status.png" alt="The Invoices workspace with a selected draft invoice and its available actions." />
+  <img class="product-shot-light" src="/screenshots/invoice-status-light.png" alt="The Invoices workspace with a selected draft invoice and its available actions." />
+  <img class="product-shot-dark" src="/screenshots/invoice-status-dark.png" alt="The Invoices workspace with a selected draft invoice and its available actions." />
   <figcaption>Open an invoice to see its current status and the actions available to it.</figcaption>
 </figure>
 

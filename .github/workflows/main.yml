@@ -424,6 +424,9 @@ jobs:
       - name: Capture candidates
         run: dotnet tests/Glovelly.Uat.Tests/bin/Release/net10.0/Glovelly.Uat.Tests.dll -trait "Suite=DocumentationCapture"
 
+      - name: Install screenshot comparison tools
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes imagemagick
+
       - name: Compare candidates with approved screenshots
         id: comparison
         run: |
