@@ -30,6 +30,13 @@ The system SHALL regenerate the invoice PDF from the updated invoice data after 
 - **WHEN** a user removes a manual adjustment from an invoice and PDF regeneration succeeds
 - **THEN** the adjustment removal response identifies a current PDF whose content and total no longer include the removed adjustment
 
+### Requirement: Generated-line changes regenerate draft invoice PDFs
+The system SHALL treat a successful generated-line refresh for a draft invoice as PDF-relevant data change. It SHALL persist the updated lines and advance the document revision before generating a replacement PDF, and SHALL report the document as current only when that replacement represents the latest revision.
+
+#### Scenario: Draft generated lines refresh successfully
+- **WHEN** a draft invoice's generated lines are refreshed from changed linked gig data and PDF generation succeeds
+- **THEN** the invoice SHALL report a current PDF revision whose content represents the refreshed lines and total
+
 ### Requirement: Failed PDF regeneration is recoverable and safe
 The system SHALL preserve a successfully saved adjustment when its PDF regeneration fails, SHALL mark the document as failed or unavailable, and SHALL provide a transient inline regeneration retry that does not repeat the adjustment or alter invoice lifecycle audit fields.
 
@@ -40,6 +47,13 @@ The system SHALL preserve a successfully saved adjustment when its PDF regenerat
 #### Scenario: User retries a failed regeneration from its failure state
 - **WHEN** a user selects the inline retry offered for an invoice with a failed or unavailable document and rendering succeeds
 - **THEN** the system SHALL create a current PDF from the latest invoice data without adding another adjustment or delivery record
+
+### Requirement: Failed generated-line PDF regeneration is recoverable and safe
+The system SHALL preserve successfully rebuilt draft generated lines when their replacement PDF cannot be rendered or stored, SHALL mark the affected document unavailable, and SHALL retain the existing retry and delivery-boundary blocking behavior.
+
+#### Scenario: Generated-line PDF regeneration fails
+- **WHEN** a draft invoice's generated lines are persisted but replacement PDF generation fails
+- **THEN** the invoice SHALL report a failed or unavailable document, the previous PDF SHALL NOT be treated as current, and download, email delivery, and publishing SHALL be blocked until regeneration succeeds
 
 ### Requirement: Non-current invoice PDFs are blocked at delivery boundaries
 The system SHALL refuse to download, email, or publish an invoice PDF unless it is current for the invoice's latest PDF-relevant data revision.

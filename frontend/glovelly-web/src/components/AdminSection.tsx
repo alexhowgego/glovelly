@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react'
-import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { formatDateTime } from '../formatters'
-import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type { AdminSort, AdminSortKey, AdminUser, AdminUserForm } from '../types'
 import { TrashIcon } from './TrashIcon'
 
@@ -54,10 +52,6 @@ export function AdminSection({
   totalAdmins,
 }: AdminSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
-  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
-  const workspaceStyle = detailPanelBlockSize > 0
-    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
-    : undefined
   const adminSortOptions: { value: AdminSortKey; label: string }[] = [
     { value: 'displayName', label: 'User' },
     { value: 'email', label: 'Email' },
@@ -104,7 +98,7 @@ export function AdminSection({
         </div>
       </div>
 
-      <div className="admin-workspace" style={workspaceStyle}>
+      <div className="admin-workspace">
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -200,7 +194,7 @@ export function AdminSection({
           </div>
         </div>
 
-        <div ref={detailPanelRef} className="panel">
+        <div className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Access Overview</p>

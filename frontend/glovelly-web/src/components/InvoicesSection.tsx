@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import type { CSSProperties } from 'react'
 import type { RefObject } from 'react'
 import {
   formatCurrency,
@@ -8,7 +7,6 @@ import {
   getAllowedInvoiceStatusTransitions,
 } from '../formatters'
 import { TrashIcon } from './TrashIcon'
-import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import { getInvoiceDocumentAvailability } from '../invoiceDocumentState'
 import type {
   Invoice,
@@ -114,10 +112,6 @@ export function InvoicesSection({
 }: InvoicesSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
   const listControlsRef = useRef<HTMLDivElement | null>(null)
-  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
-  const workspaceStyle = detailPanelBlockSize > 0
-    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
-    : undefined
   const selectedInvoiceClientName =
     (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
     'Unknown client'
@@ -160,7 +154,7 @@ export function InvoicesSection({
 
   return (
     <section className="section-layout">
-      <div className="gig-workspace" style={workspaceStyle}>
+      <div className="gig-workspace">
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -307,7 +301,7 @@ export function InvoicesSection({
           </div>
         </div>
 
-        <div ref={detailPanelRef} className="panel">
+        <div className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Invoice Overview</p>

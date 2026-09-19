@@ -537,7 +537,7 @@ export type GigSort = {
   key: GigSortKey
   direction: SortDirection
 }
-export type GigQuickFilter = 'all' | 'upcoming' | 'uninvoiced' | 'drafts' | 'completed'
+export type GigQuickFilter = 'work-queue' | 'all' | 'upcoming' | 'uninvoiced' | 'drafts' | 'completed'
 
 export type GigImportDraftConfidence = 'Low' | 'Medium' | 'High'
 export type GigImportDraftStatus = 'Pending' | 'Accepted' | 'Rejected' | 'Committed'
@@ -627,6 +627,7 @@ export type QuickReceiptDraftUpdateResponse = {
   previousGig: Gig | null
   expenseId: string
   moved: boolean
+  invoices: Invoice[]
 }
 
 export type QuickExternalResourceDraftResponse = {

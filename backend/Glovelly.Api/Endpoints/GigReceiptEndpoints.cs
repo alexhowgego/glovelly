@@ -207,15 +207,14 @@ internal static class GigReceiptEndpoints
                 .Where(value => affectedGigIds.Contains(value.Id))
                 .ToListAsync();
 
-            foreach (var affectedGig in affectedGigs)
-            {
-                await invoiceWorkflowService.SyncGeneratedInvoiceLinesForGigAsync(affectedGig, userId);
-            }
-
-            await db.SaveChangesAsync();
+            var refreshedInvoices = await invoiceWorkflowService.RefreshDraftInvoicesForGigsAsync(affectedGigs, userId);
             foreach (var affectedGigId in affectedGigIds)
             {
                 await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", affectedGigId, DateTimeOffset.UtcNow));
+            }
+            foreach (var invoice in refreshedInvoices)
+            {
+                await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("invoices", "updated", invoice.Id, DateTimeOffset.UtcNow));
             }
 
             var savedGigs = await db.Gigs
@@ -236,6 +235,7 @@ internal static class GigReceiptEndpoints
                 previousGig,
                 expenseId,
                 moved,
+                invoices = refreshedInvoices,
             });
         });
 

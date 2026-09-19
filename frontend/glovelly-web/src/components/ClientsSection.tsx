@@ -1,7 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
-import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type { Client, ClientForm, ClientSort, ClientSortKey } from '../types'
 import { TrashIcon } from './TrashIcon'
 
@@ -69,10 +67,6 @@ export function ClientsSection({
   status,
 }: ClientsSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
-  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
-  const workspaceStyle = detailPanelBlockSize > 0
-    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
-    : undefined
   const clientSortOptions: { value: ClientSortKey; label: string }[] = [
     { value: 'name', label: 'Client' },
     { value: 'email', label: 'Email' },
@@ -92,7 +86,7 @@ export function ClientsSection({
 
   return (
     <section className="section-layout">
-      <div className="workspace" style={workspaceStyle}>
+      <div className="workspace">
         <div className="clients-panel panel">
           <div className="panel-heading">
             <div>
@@ -194,7 +188,7 @@ export function ClientsSection({
           </div>
         </div>
 
-        <div ref={detailPanelRef} className="detail-panel panel">
+        <div className="detail-panel panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Overview</p>

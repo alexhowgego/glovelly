@@ -49,19 +49,21 @@ Receipt analysis augments, but never blocks or silently changes, the manual expe
 
 ## Quick Receipt Journey
 
-> **Automation:** Backend and browser automated: `Glovelly.Api.Tests.GigEndpointsTests.QuickReceiptDraft_*` covers draft creation, candidate matching, updates, and reassignment; `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickReceiptFlowOpensTargetGigInViewport` covers quick-capture navigation. Receipt analysis and visual capture variants remain manual.
+> **Automation:** Backend and browser automated: `Glovelly.Api.Tests.GigEndpointsTests.QuickReceiptDraft_*` and `UpdateQuickReceiptDraft_*` cover draft creation, candidate matching, draft-invoice refresh, finalized-invoice immutability, updates, and reassignment; `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickReceiptFlowOpensTargetGigInViewport` covers quick-capture navigation. Receipt analysis and visual capture variants remain manual.
 
 ### Steps
 
 1. Use quick receipt capture to upload a receipt.
 2. If the app suggests a nearby gig, accept it or choose a different gig.
 3. Fill in the receipt draft description and amount.
-4. Save it.
-5. Click `Go to gig` and confirm the target Gig overview scrolls into view and remains selected.
+4. Save it and, when the selected gig has a linked draft invoice, confirm the invoice lines and PDF refresh.
+5. Repeat with an issued or other non-draft invoice and confirm its lines and PDF do not change automatically.
+6. If draft PDF regeneration fails, confirm the receipt remains saved, the invoice explains that its PDF is unavailable, and retry succeeds before delivery or download.
+7. Click `Go to gig` and confirm the target Gig overview scrolls into view and remains selected.
 
 ### Expected Results
 
-The draft becomes a normal gig expense with its receipt attached. Existing expenses and attachments remain intact. Completion feedback remains visible after navigating to the target gig.
+The draft becomes a normal gig expense with its receipt attached. Linked draft invoices refresh their generated lines and PDF automatically; issued, overdue, paid, and cancelled invoices remain unchanged. A failed draft PDF regeneration preserves the receipt and lines while blocking document delivery actions until retry succeeds. Existing expenses and attachments remain intact. Completion feedback remains visible after navigating to the target gig.
 
 ## Expense Reimbursement Journey
 

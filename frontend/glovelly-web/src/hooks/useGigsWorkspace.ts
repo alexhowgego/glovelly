@@ -73,9 +73,8 @@ export function useGigsWorkspace({
   const [selectedGigId, setSelectedGigId] = useState<string>('')
   const [selectedGigIds, setSelectedGigIds] = useState<string[]>([])
   const [gigSearchQuery, setGigSearchQuery] = useState('')
-  const [gigQuickFilter, setGigQuickFilter] = useState<GigQuickFilter>('all')
+  const [gigQuickFilter, setGigQuickFilter] = useState<GigQuickFilter>('work-queue')
   const [gigTypeFilter, setGigTypeFilter] = useState<GigType | 'all'>('all')
-  const [showPastGigs, setShowPastGigs] = useState(false)
   const [gigSort, setGigSort] = useState<GigSort>({ key: 'priority', direction: 'asc' })
   const [gigOverviewScrollRequest, setGigOverviewScrollRequest] = useState(0)
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
@@ -96,10 +95,9 @@ export function useGigsWorkspace({
   const filteredGigs = useMemo(() => getVisibleGigs(gigs, clientNamesById, {
     searchQuery: gigSearchQuery,
     quickFilter: gigQuickFilter,
-    showPastGigs,
     sort: gigSort,
     typeFilter: gigTypeFilter,
-  }, today), [clientNamesById, gigQuickFilter, gigSearchQuery, gigSort, gigTypeFilter, gigs, showPastGigs, today])
+  }, today), [clientNamesById, gigQuickFilter, gigSearchQuery, gigSort, gigTypeFilter, gigs, today])
   const reconciledSelectedGigId = reconcileSelectedGigId(selectedGigId, filteredGigs)
   const selectedGig = isGigEditorOpen
     ? (gigsById.get(selectedGigId) ?? null)
@@ -201,8 +199,7 @@ export function useGigsWorkspace({
     setSelectedGigId('')
     setSelectedGigIds([])
     setGigSearchQuery('')
-    setGigQuickFilter('all')
-    setShowPastGigs(false)
+    setGigQuickFilter('work-queue')
     setGigSort({ key: 'priority', direction: 'asc' })
     setIsGigEditorOpen(false)
     setGigMode('create')
@@ -660,24 +657,16 @@ export function useGigsWorkspace({
     const visibleGigs = getVisibleGigs(candidateGigs, clientNamesById, {
       searchQuery: gigSearchQuery,
       quickFilter: gigQuickFilter,
-      showPastGigs,
       sort: gigSort,
       typeFilter: gigTypeFilter,
     }, today)
-    const reveal = getGigReveal(nextGig, visibleGigs, today)
+    const reveal = getGigReveal(nextGig, visibleGigs)
 
     if (reveal.clearFilters) {
       setGigSearchQuery('')
-      setGigQuickFilter('all')
+      setGigQuickFilter(reveal.quickFilter)
       setGigTypeFilter('all')
-      if (reveal.showPastGigs) {
-        setShowPastGigs(true)
-      }
-      setGigStatus(
-        reveal.showPastGigs
-          ? `Cleared filters and showed past gigs to open ${nextGig.title}.`
-          : `Cleared filters to open ${nextGig.title}.`
-      )
+      setGigStatus(`Cleared filters to open ${nextGig.title}.`)
     }
 
     setSelectedGigId(nextGig.id)
@@ -1505,7 +1494,6 @@ export function useGigsWorkspace({
     selectedGig,
     selectedGigIds,
     selectedGigs,
-    showPastGigs,
     selectGig,
     setGigs,
     setGigQuickFilter,
@@ -1513,7 +1501,6 @@ export function useGigsWorkspace({
     setGigSearchQuery,
     setGigSort,
     setGigStatus,
-    setShowPastGigs,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
     setSelectedGigIds,

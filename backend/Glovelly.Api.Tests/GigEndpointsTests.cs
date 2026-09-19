@@ -4,9 +4,13 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Glovelly.Api.Data;
+using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -395,6 +399,8 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     [Fact]
     public async Task UpdateGig_WithExpenses_ReplacesExpenseCollectionAndReturnsUpdatedGig()
     {
+        await SetInvoiceStatusAsync(TestData.FoxInvoiceId, InvoiceStatus.Draft);
+
         var createResponse = await _client.PostAsJsonAsync("/gigs", new
         {
             clientId = TestData.FoxAndFinchId,
@@ -957,8 +963,252 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task UpdateQuickReceiptDraft_RefreshesLinkedDraftInvoiceLinesAndPdf()
+    {
+        var gigId = await CreateLinkedGigAsync(TestData.RiversideId, TestData.RiversideInvoiceId, "Draft receipt target");
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf", gigId);
+        var quickResponse = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
+        quickResponse.EnsureSuccessStatusCode();
+        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        var updateResponse = await _client.PatchAsJsonAsync($"/gigs/receipt-drafts/{quickDraft.GetProperty("expenseId").GetGuid()}", new
+        {
+            gigId,
+            description = "Taxi to Riverside",
+            amount = 18.75m,
+        }, TestContext.Current.CancellationToken);
+
+        updateResponse.EnsureSuccessStatusCode();
+        var update = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var invoice = Assert.Single(update.GetProperty("invoices").EnumerateArray());
+        Assert.Equal(TestData.RiversideInvoiceId, invoice.GetProperty("id").GetGuid());
+        Assert.Equal("Current", invoice.GetProperty("documentState").GetString());
+        Assert.Equal(2, invoice.GetProperty("documentRevision").GetInt32());
+        Assert.Equal(2, invoice.GetProperty("pdfDocumentRevision").GetInt32());
+        Assert.Contains(invoice.GetProperty("lines").EnumerateArray(), line => line.GetProperty("description").GetString() == "Taxi to Riverside");
+
+        var pdfResponse = await _client.GetAsync($"/invoices/{TestData.RiversideInvoiceId}/pdf", TestContext.Current.CancellationToken);
+        pdfResponse.EnsureSuccessStatusCode();
+        var pdfText = Encoding.ASCII.GetString(await pdfResponse.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("Taxi to Riverside", pdfText);
+    }
+
+    [Fact]
+    public async Task UpdateQuickReceiptDraft_WhenPdfRegenerationFails_PersistsReceiptAndBlocksDocumentActions()
+    {
+        using var failingFactory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IInvoicePdfRenderer>();
+                services.AddScoped<IInvoicePdfRenderer, ThrowingInvoicePdfRenderer>();
+            }));
+        using var client = failingFactory.CreateClient();
+        var createResponse = await client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.RiversideId,
+            invoiceId = TestData.RiversideInvoiceId,
+            title = "Failing PDF receipt target",
+            date = "2026-06-12",
+            venue = "Test venue",
+            fee = 120m,
+            travelMiles = 0m,
+            wasDriving = false,
+            status = "Completed",
+            expenses = Array.Empty<object>(),
+        }, TestContext.Current.CancellationToken);
+        createResponse.EnsureSuccessStatusCode();
+        var gig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var gigId = gig.GetProperty("id").GetGuid();
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf", gigId);
+        var quickResponse = await client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
+        quickResponse.EnsureSuccessStatusCode();
+        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        var updateResponse = await client.PatchAsJsonAsync($"/gigs/receipt-drafts/{quickDraft.GetProperty("expenseId").GetGuid()}", new
+        {
+            gigId,
+            description = "Saved despite PDF failure",
+            amount = 18.75m,
+        }, TestContext.Current.CancellationToken);
+        updateResponse.EnsureSuccessStatusCode();
+        var update = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var invoice = Assert.Single(update.GetProperty("invoices").EnumerateArray());
+        Assert.Equal("Failed", invoice.GetProperty("documentState").GetString());
+        Assert.Contains(invoice.GetProperty("lines").EnumerateArray(), line => line.GetProperty("description").GetString() == "Saved despite PDF failure");
+
+        var downloadResponse = await client.GetAsync($"/invoices/{TestData.RiversideInvoiceId}/pdf", TestContext.Current.CancellationToken);
+        var emailResponse = await client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/send-email", null, TestContext.Current.CancellationToken);
+        var publishResponse = await client.PostAsync($"/invoices/{TestData.RiversideInvoiceId}/publish/google-drive", null, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, downloadResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, emailResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, publishResponse.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(InvoiceStatus.Issued)]
+    [InlineData(InvoiceStatus.Overdue)]
+    [InlineData(InvoiceStatus.Paid)]
+    [InlineData(InvoiceStatus.Cancelled)]
+    public async Task UpdateQuickReceiptDraft_LeavesNonDraftInvoiceUnchanged(InvoiceStatus status)
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var invoice = await db.Invoices.SingleAsync(value => value.Id == TestData.FoxInvoiceId, TestContext.Current.CancellationToken);
+            invoice.Status = status;
+            invoice.DocumentState = InvoiceDocumentState.Current;
+            invoice.DocumentRevision = 4;
+            invoice.PdfDocumentRevision = 4;
+            invoice.PdfGeneratedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            db.InvoiceLines.Add(new InvoiceLine
+            {
+                Id = Guid.NewGuid(),
+                InvoiceId = invoice.Id,
+                GigId = Guid.NewGuid(),
+                SortOrder = 1,
+                Type = InvoiceLineType.PerformanceFee,
+                Description = "Issued invoice line",
+                Quantity = 1m,
+                UnitPrice = 100m,
+                IsSystemGenerated = true,
+            });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var gigId = await CreateLinkedGigAsync(TestData.FoxAndFinchId, TestData.FoxInvoiceId, "Finalized receipt target");
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf", gigId);
+        var quickResponse = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
+        quickResponse.EnsureSuccessStatusCode();
+        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        var updateResponse = await _client.PatchAsJsonAsync($"/gigs/receipt-drafts/{quickDraft.GetProperty("expenseId").GetGuid()}", new
+        {
+            gigId,
+            description = "Taxi to final invoice",
+            amount = 18.75m,
+        }, TestContext.Current.CancellationToken);
+        updateResponse.EnsureSuccessStatusCode();
+        var update = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Empty(update.GetProperty("invoices").EnumerateArray());
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unchangedInvoice = await verificationDb.Invoices
+            .Include(value => value.Lines)
+            .SingleAsync(value => value.Id == TestData.FoxInvoiceId, TestContext.Current.CancellationToken);
+        Assert.Equal(status, unchangedInvoice.Status);
+        Assert.Equal(4, unchangedInvoice.DocumentRevision);
+        Assert.Equal(4, unchangedInvoice.PdfDocumentRevision);
+        Assert.Equal(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), unchangedInvoice.PdfGeneratedAt);
+        Assert.Single(unchangedInvoice.Lines);
+    }
+
+    [Fact]
+    public async Task UpdateQuickReceiptDraft_MovingBetweenDraftInvoicesRefreshesEachInvoice()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var foxInvoice = await db.Invoices.SingleAsync(value => value.Id == TestData.FoxInvoiceId, TestContext.Current.CancellationToken);
+            foxInvoice.Status = InvoiceStatus.Draft;
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var firstGigId = await CreateLinkedGigAsync(TestData.RiversideId, TestData.RiversideInvoiceId, "First draft target");
+        var secondGigId = await CreateLinkedGigAsync(TestData.FoxAndFinchId, TestData.FoxInvoiceId, "Second draft target");
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf", firstGigId);
+        var quickResponse = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
+        quickResponse.EnsureSuccessStatusCode();
+        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        var updateResponse = await _client.PatchAsJsonAsync($"/gigs/receipt-drafts/{quickDraft.GetProperty("expenseId").GetGuid()}", new
+        {
+            gigId = secondGigId,
+            description = "Moved taxi",
+            amount = 18.75m,
+        }, TestContext.Current.CancellationToken);
+        updateResponse.EnsureSuccessStatusCode();
+        var update = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var invoices = update.GetProperty("invoices").EnumerateArray().ToArray();
+
+        Assert.Equal(2, invoices.Length);
+        Assert.All(invoices, invoice => Assert.Equal("Current", invoice.GetProperty("documentState").GetString()));
+        Assert.Contains(invoices, invoice => invoice.GetProperty("id").GetGuid() == TestData.RiversideInvoiceId);
+        Assert.Contains(invoices, invoice => invoice.GetProperty("id").GetGuid() == TestData.FoxInvoiceId);
+    }
+
+    [Fact]
+    public async Task UpdateQuickReceiptDraft_MovingWithinMonthlyDraftInvoiceRefreshesItOnce()
+    {
+        var firstGigId = await CreateLinkedGigAsync(TestData.RiversideId, TestData.RiversideInvoiceId, "Monthly first target");
+        var secondGigId = await CreateLinkedGigAsync(TestData.RiversideId, TestData.RiversideInvoiceId, "Monthly second target");
+        using var form = BuildReceiptDraftForm("receipt"u8.ToArray(), "receipt.pdf", "application/pdf", firstGigId);
+        var quickResponse = await _client.PostAsync("/gigs/receipt-drafts", form, TestContext.Current.CancellationToken);
+        quickResponse.EnsureSuccessStatusCode();
+        var quickDraft = await quickResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        var updateResponse = await _client.PatchAsJsonAsync($"/gigs/receipt-drafts/{quickDraft.GetProperty("expenseId").GetGuid()}", new
+        {
+            gigId = secondGigId,
+            description = "Monthly moved taxi",
+            amount = 18.75m,
+        }, TestContext.Current.CancellationToken);
+        updateResponse.EnsureSuccessStatusCode();
+        var update = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var invoice = Assert.Single(update.GetProperty("invoices").EnumerateArray());
+
+        Assert.Equal(TestData.RiversideInvoiceId, invoice.GetProperty("id").GetGuid());
+        Assert.Equal(2, invoice.GetProperty("documentRevision").GetInt32());
+        Assert.Equal("Current", invoice.GetProperty("documentState").GetString());
+    }
+
+    private async Task<Guid> CreateLinkedGigAsync(Guid clientId, Guid invoiceId, string title)
+    {
+        var response = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId,
+            invoiceId,
+            title,
+            date = "2026-06-12",
+            venue = "Test venue",
+            fee = 120m,
+            travelMiles = 0m,
+            wasDriving = false,
+            status = "Completed",
+            expenses = Array.Empty<object>(),
+        }, TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        var gig = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        return gig.GetProperty("id").GetGuid();
+    }
+
+    private async Task SetInvoiceStatusAsync(Guid invoiceId, InvoiceStatus status)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoice = await db.Invoices.SingleAsync(value => value.Id == invoiceId, TestContext.Current.CancellationToken);
+        invoice.Status = status;
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    private sealed class ThrowingInvoicePdfRenderer : IInvoicePdfRenderer
+    {
+        public byte[] RenderInvoicePdf(
+            Invoice invoice,
+            Client client,
+            Gig? gig,
+            IReadOnlyCollection<InvoiceLine> lines,
+            SellerProfile? sellerProfile)
+        {
+            throw new InvalidOperationException("Renderer unavailable.");
+        }
+    }
+
+    [Fact]
     public async Task CreateGig_WithInvoice_GeneratesMileagePassengerAndExpenseLines()
     {
+        await SetInvoiceStatusAsync(TestData.FoxInvoiceId, InvoiceStatus.Draft);
+
         var response = await _client.PostAsJsonAsync("/gigs", new
         {
             clientId = TestData.FoxAndFinchId,

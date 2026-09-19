@@ -278,7 +278,6 @@ function App({ appMetadata }: AppProps) {
     selectedGig,
     selectedGigIds,
     selectedGigs,
-    showPastGigs,
     selectGig,
     setGigs,
     setGigQuickFilter,
@@ -289,7 +288,6 @@ function App({ appMetadata }: AppProps) {
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
     setSelectedGigIds,
-    setShowPastGigs,
     startExternalResourceCreate,
     startExternalResourceEdit,
     startGigCreate,
@@ -427,6 +425,14 @@ function App({ appMetadata }: AppProps) {
     setQuickReceiptSelectedGigId,
   } = useQuickReceipt({
     getGigById: (gigId) => gigsById.get(gigId),
+    onMergeInvoices: (updatedInvoices) => {
+      if (updatedInvoices.length === 0) {
+        return
+      }
+
+      const updatesById = new Map(updatedInvoices.map((invoice) => [invoice.id, invoice]))
+      setInvoices((current) => current.map((invoice) => updatesById.get(invoice.id) ?? invoice))
+    },
     onMergeSavedGig: (gig) => mergeSavedGig(gig),
     onOpenReceiptDraft: (gig, scrollToGig) => openGigReceiptDraft(gig, scrollToGig),
     onSelectGig: selectGig,
@@ -637,6 +643,10 @@ function App({ appMetadata }: AppProps) {
     onWorkspaceChanged: (event) => {
       if (event.scope === 'gigs') {
         void refreshGigsFromServer('realtime')
+      }
+
+      if (event.scope === 'invoices') {
+        void refreshInvoicesFromServer('realtime')
       }
 
       if (event.scope === 'gig-imports') {
@@ -1804,7 +1814,6 @@ function App({ appMetadata }: AppProps) {
         onGigTypeFilterChange={setGigTypeFilter}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={selectGig}
-        onShowPastGigsChange={setShowPastGigs}
         onSortChange={setGigSort}
         onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
@@ -1820,7 +1829,6 @@ function App({ appMetadata }: AppProps) {
         selectedGig={selectedGig}
         selectedGigIds={selectedGigIds}
         selectedGigs={selectedGigs}
-        showPastGigs={showPastGigs}
       />
     ) : (
       <InvoicesSection

@@ -1,12 +1,10 @@
 import { useEffect, useRef } from 'react'
-import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { GigAttachmentsPanel } from './GigAttachmentsPanel'
 import { GigEditorPanel } from './GigEditorPanel'
 import { GigExpensesPanel } from './GigExpensesPanel'
 import { TrashIcon } from './TrashIcon'
 import { formatCurrency, formatDate, formatGigStatus, formatGigType } from '../formatters'
-import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Client,
   Gig,
@@ -72,7 +70,6 @@ type GigsSectionProps = {
   onGigTypeFilterChange: (filter: GigType | 'all') => void
   onSearchQueryChange: (value: string) => void
   onSelectGig: (gigId: string) => void
-  onShowPastGigsChange: (showPastGigs: boolean) => void
   onSortChange: (sort: GigSort) => void
   onToggleGigSelection: (gigId: string) => void
   onStartEditing: () => void
@@ -100,7 +97,6 @@ type GigsSectionProps = {
   selectedGig: Gig | null
   selectedGigIds: string[]
   selectedGigs: Gig[]
-  showPastGigs: boolean
 }
 
 export function GigsSection({
@@ -147,7 +143,6 @@ export function GigsSection({
   onGigTypeFilterChange,
   onSearchQueryChange,
   onSelectGig,
-  onShowPastGigsChange,
   onSortChange,
   onToggleGigSelection,
   onStartEditing,
@@ -163,13 +158,9 @@ export function GigsSection({
   selectedGig,
   selectedGigIds,
   selectedGigs,
-  showPastGigs,
 }: GigsSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
-  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
-  const workspaceStyle = detailPanelBlockSize > 0
-    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
-    : undefined
+  const detailPanelRef = useRef<HTMLDivElement | null>(null)
   const selectedGigClientName =
     (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
   const selectedClientId = selectedGigs[0]?.clientId ?? null
@@ -185,11 +176,12 @@ export function GigsSection({
     { value: 'status', label: 'Status' },
   ]
   const gigFilterOptions: { value: GigQuickFilter; label: string }[] = [
-    { value: 'all', label: 'All' },
+    { value: 'work-queue', label: 'Work queue' },
     { value: 'upcoming', label: 'Upcoming' },
     { value: 'uninvoiced', label: 'Uninvoiced' },
     { value: 'drafts', label: 'Drafts' },
     { value: 'completed', label: 'Completed' },
+    { value: 'all', label: 'All' },
   ]
   useEffect(() => {
     if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
@@ -215,7 +207,7 @@ export function GigsSection({
 
   return (
     <section className="section-layout">
-      <div className="gig-workspace" style={workspaceStyle}>
+      <div className="gig-workspace">
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -305,20 +297,12 @@ export function GigsSection({
               </button>
             </div>
             <div className="compact-filter-chips" aria-label="Gig filters">
-              <button
-                aria-pressed={showPastGigs}
-                className={`compact-filter-chip ${showPastGigs ? 'selected' : ''}`}
-                data-testid="show-past-gigs-button"
-                onClick={() => onShowPastGigsChange(!showPastGigs)}
-                type="button"
-              >
-                Show past gigs
-              </button>
               {gigFilterOptions.map((option) => (
                 <button
                   key={option.value}
                   className={`compact-filter-chip ${gigQuickFilter === option.value ? 'selected' : ''}`}
                   type="button"
+                  aria-pressed={gigQuickFilter === option.value}
                   onClick={() => onQuickFilterChange(option.value)}
                 >
                   {option.label}

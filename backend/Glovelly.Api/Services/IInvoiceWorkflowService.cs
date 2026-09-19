@@ -10,6 +10,10 @@ public interface IInvoiceWorkflowService
         Guid? userId,
         CancellationToken cancellationToken = default);
     Task SyncGeneratedInvoiceLinesForGigAsync(Gig gig, Guid? userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Invoice>> RefreshDraftInvoicesForGigsAsync(
+        IReadOnlyCollection<Gig> gigs,
+        Guid? userId,
+        CancellationToken cancellationToken = default);
     Task<bool> RemoveSystemGeneratedInvoiceLinesForGigAsync(Guid gigId, CancellationToken cancellationToken = default);
     Task IssueInvoiceAsync(Invoice invoice, Client client, Guid? userId, CancellationToken cancellationToken = default);
     Task RedraftInvoiceAsync(Invoice invoice, Client client, Guid? userId, CancellationToken cancellationToken = default);
