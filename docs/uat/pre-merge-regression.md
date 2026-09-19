@@ -38,6 +38,20 @@ For local development, engineers usually run:
 
 Navigation, session state, and core reads are healthy.
 
+## Empty List Views
+
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.GigListVisibilityTests.EmptyListViewsRemainUsableAndGigFiltersCanBeCleared`; retain a desktop spot check when changing workspace layout.
+
+### Steps
+
+1. At a desktop viewport wider than 1180px, sign in to an account with no clients, gigs, or invoices.
+2. Open Clients, Gigs, and Invoices in turn and confirm each list's controls and empty state are visible.
+3. Create a future planned gig, select `Drafts` to show no results, then select `All`.
+
+### Expected Results
+
+The left list pane remains usable when no record is selected. Filter controls remain visible and can restore a filtered-out list.
+
 ## Notification Feedback
 
 > **Automation:** Partially automated UAT: invoice, gig, receipt, and attachment browser journeys assert terminal Sonner notifications. Manual checks cover dismissal, modal stacking, and visual placement.

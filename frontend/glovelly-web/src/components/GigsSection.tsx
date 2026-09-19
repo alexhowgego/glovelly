@@ -1,12 +1,10 @@
 import { useEffect, useRef } from 'react'
-import type { CSSProperties } from 'react'
 import type { FormEvent } from 'react'
 import { GigAttachmentsPanel } from './GigAttachmentsPanel'
 import { GigEditorPanel } from './GigEditorPanel'
 import { GigExpensesPanel } from './GigExpensesPanel'
 import { TrashIcon } from './TrashIcon'
 import { formatCurrency, formatDate, formatGigStatus, formatGigType } from '../formatters'
-import { useMeasuredBlockSize } from '../hooks/useMeasuredBlockSize'
 import type {
   Client,
   Gig,
@@ -162,10 +160,7 @@ export function GigsSection({
   selectedGigs,
 }: GigsSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
-  const { ref: detailPanelRef, blockSize: detailPanelBlockSize } = useMeasuredBlockSize<HTMLDivElement>()
-  const workspaceStyle = detailPanelBlockSize > 0
-    ? ({ '--workspace-detail-height': `${detailPanelBlockSize}px` } as CSSProperties)
-    : undefined
+  const detailPanelRef = useRef<HTMLDivElement | null>(null)
   const selectedGigClientName =
     (selectedGig ? clientNamesById.get(selectedGig.clientId) : null) ?? 'Unknown client'
   const selectedClientId = selectedGigs[0]?.clientId ?? null
@@ -212,7 +207,7 @@ export function GigsSection({
 
   return (
     <section className="section-layout">
-      <div className="gig-workspace" style={workspaceStyle}>
+      <div className="gig-workspace">
         <div className="panel">
           <div className="panel-heading">
             <div>

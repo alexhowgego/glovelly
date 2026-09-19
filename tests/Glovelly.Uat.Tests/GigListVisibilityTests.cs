@@ -6,6 +6,46 @@ namespace Glovelly.Uat.Tests;
 public sealed class GigListVisibilityTests : InvoiceUatTestBase
 {
     [Fact]
+    public Task EmptyListViewsRemainUsableAndGigFiltersCanBeCleared() => RunWithDiagnosticsAsync(
+        nameof(EmptyListViewsRemainUsableAndGigFiltersCanBeCleared),
+        async () =>
+        {
+            var runId = CreateRunId();
+            var clientName = $"{runId} Empty View Client";
+            var gigTitle = $"{runId} Empty View Gig";
+
+            await Page.SetViewportSizeAsync(1440, 960);
+            await AuthenticateWithUatSecretAsync();
+
+            await Page.GetByTestId("nav-clients").ClickAsync();
+            await Assertions.Expect(Page.GetByLabel("Client list controls")).ToBeVisibleAsync();
+            await Page.GetByTestId("client-search-input").FillAsync(runId);
+            await Assertions.Expect(Page.GetByText("No clients match that search.", new() { Exact = true })).ToBeVisibleAsync();
+
+            await Page.GetByTestId("nav-gigs").ClickAsync();
+            await Assertions.Expect(Page.GetByLabel("Gig list controls")).ToBeVisibleAsync();
+            await Assertions.Expect(Page.GetByLabel("Gig filters").GetByRole(AriaRole.Button, new() { Name = "All", Exact = true })).ToBeVisibleAsync();
+            await Page.GetByTestId("gig-search-input").FillAsync(runId);
+            await Assertions.Expect(Page.GetByText("No gigs match that search.", new() { Exact = true })).ToBeVisibleAsync();
+
+            await Page.GetByTestId("nav-invoices").ClickAsync();
+            await Assertions.Expect(Page.GetByLabel("Invoice list controls")).ToBeVisibleAsync();
+            await Assertions.Expect(Page.GetByText("No invoices yet.", new() { Exact = true })).ToBeVisibleAsync();
+
+            await CreateClientAsync(clientName);
+            await CreateGigAsync(clientName, gigTitle, DateTime.UtcNow.AddDays(14).ToString("yyyy-MM-dd"));
+
+            var gigFilters = Page.GetByLabel("Gig filters");
+            await gigFilters.GetByRole(AriaRole.Button, new() { Name = "Drafts", Exact = true }).ClickAsync();
+            await Assertions.Expect(GigCard(gigTitle)).ToHaveCountAsync(0);
+
+            var allGigsFilter = gigFilters.GetByRole(AriaRole.Button, new() { Name = "All", Exact = true });
+            await Assertions.Expect(allGigsFilter).ToBeVisibleAsync();
+            await allGigsFilter.ClickAsync();
+            await Assertions.Expect(GigCard(gigTitle)).ToBeVisibleAsync();
+        });
+
+    [Fact]
     public Task InvoiceLineNavigationRevealsHistoricalGig() => RunWithDiagnosticsAsync(
         nameof(InvoiceLineNavigationRevealsHistoricalGig),
         async () =>

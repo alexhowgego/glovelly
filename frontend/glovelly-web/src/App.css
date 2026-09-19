@@ -1247,7 +1247,7 @@
   display: grid;
   gap: 24px;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: stretch;
 }
 
 .admin-zone {
@@ -1264,14 +1264,14 @@
   display: grid;
   gap: 24px;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: stretch;
 }
 
 .gig-workspace {
   display: grid;
   gap: 24px;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: stretch;
 }
 
 .gig-import-workspace {
@@ -1469,11 +1469,11 @@
   transition:
     width 280ms ease,
     opacity 180ms ease;
-  contain: layout paint;
 }
 
 .editor-slot.open {
   width: clamp(320px, 30vw, 480px);
+  overflow: visible;
   opacity: 1;
 }
 
@@ -1582,22 +1582,14 @@
 
   .workspace > .panel:has(> .compact-record-list),
   .admin-workspace > .panel:has(> .compact-record-list),
-  .gig-workspace > .panel:has(> .compact-record-list),
-  .editor-slot.open {
-    height: var(--workspace-detail-height);
-    min-height: 0;
-  }
-
-  .workspace > .panel:has(> .compact-record-list),
-  .admin-workspace > .panel:has(> .compact-record-list),
   .gig-workspace > .panel:has(> .compact-record-list) {
     overflow: hidden;
   }
 
   .editor-slot.open > .panel {
-    height: 100%;
+    min-height: 100%;
     max-height: none;
-    overflow: auto;
+    box-sizing: border-box;
   }
 
   .compact-record-list {
