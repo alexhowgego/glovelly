@@ -8,6 +8,7 @@ import {
 } from '../api'
 import type {
   Gig,
+  Invoice,
   QuickReceiptCandidate,
   QuickReceiptDraftResponse,
   QuickReceiptDraftUpdateResponse,
@@ -15,6 +16,7 @@ import type {
 
 type UseQuickReceiptOptions = {
   getGigById: (gigId: string) => Gig | undefined
+  onMergeInvoices: (invoices: Invoice[]) => void
   onMergeSavedGig: (gig: Gig) => void
   onOpenReceiptDraft: (gig: Gig, scrollToGig?: boolean) => void
   onSelectGig: (gigId: string) => void
@@ -24,6 +26,7 @@ type UseQuickReceiptOptions = {
 
 export function useQuickReceipt({
   getGigById,
+  onMergeInvoices,
   onMergeSavedGig,
   onOpenReceiptDraft,
   onSelectGig,
@@ -204,6 +207,7 @@ export function useQuickReceipt({
       if (update.previousGig) {
         onMergeSavedGig(update.previousGig)
       }
+      onMergeInvoices(update.invoices)
 
       setQuickReceiptDraft((current) =>
         current
@@ -217,11 +221,24 @@ export function useQuickReceipt({
       )
       onSelectGig(update.gig.id)
       setQuickReceiptSelectedGigId(update.gig.id)
-      setQuickReceiptStatus(
-        update.moved
-          ? 'Receipt moved and details saved. You can continue editing or go to the gig.'
-          : 'Receipt details saved. You can continue editing or go to the gig.'
-      )
+      const failedInvoice = update.invoices.find((invoice) => invoice.documentState !== 'Current')
+      if (failedInvoice) {
+        setQuickReceiptStatus(
+          `Receipt details saved, but ${failedInvoice.invoiceNumber} PDF is unavailable. Retry it from Invoices.`
+        )
+      } else if (update.invoices.length > 0) {
+        setQuickReceiptStatus(
+          update.moved
+            ? 'Receipt moved, details saved, and linked draft invoices refreshed.'
+            : 'Receipt details saved and linked draft invoices refreshed.'
+        )
+      } else {
+        setQuickReceiptStatus(
+          update.moved
+            ? 'Receipt moved and details saved. You can continue editing or go to the gig.'
+            : 'Receipt details saved. You can continue editing or go to the gig.'
+        )
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save receipt details.'
       setQuickReceiptStatus(message)

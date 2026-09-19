@@ -149,12 +149,19 @@ public sealed class InvoiceWorkflowService(
         Guid? userId,
         CancellationToken cancellationToken = default)
     {
-        _ = await invoiceLineGenerationService.RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, cancellationToken);
-
         if (!gig.InvoiceId.HasValue)
         {
             return;
         }
+
+        var invoice = dbContext.Invoices.Local.FirstOrDefault(value => value.Id == gig.InvoiceId.Value)
+            ?? await dbContext.Invoices.FirstOrDefaultAsync(value => value.Id == gig.InvoiceId.Value, cancellationToken);
+        if (invoice?.Status is not InvoiceStatus.Draft)
+        {
+            return;
+        }
+
+        _ = await invoiceLineGenerationService.RemoveSystemGeneratedInvoiceLinesForGigAsync(gig.Id, cancellationToken);
 
         var lines = await invoiceLineGenerationService.BuildGeneratedInvoiceLinesForGigAsync(gig, userId, cancellationToken);
         if (lines.Count == 0)
@@ -163,6 +170,79 @@ public sealed class InvoiceWorkflowService(
         }
 
         dbContext.InvoiceLines.AddRange(lines);
+    }
+
+    public async Task<IReadOnlyList<Invoice>> RefreshDraftInvoicesForGigsAsync(
+        IReadOnlyCollection<Gig> gigs,
+        Guid? userId,
+        CancellationToken cancellationToken = default)
+    {
+        var affectedGigs = gigs
+            .Where(gig => gig.InvoiceId.HasValue)
+            .GroupBy(gig => gig.Id)
+            .Select(group => group.First())
+            .ToList();
+        if (affectedGigs.Count == 0)
+        {
+            return [];
+        }
+
+        var invoiceIds = affectedGigs
+            .Select(gig => gig.InvoiceId!.Value)
+            .Distinct()
+            .ToList();
+        var invoices = await dbContext.Invoices
+            .Where(invoice => invoiceIds.Contains(invoice.Id) && invoice.Status == InvoiceStatus.Draft)
+            .Include(invoice => invoice.Client)
+            .Include(invoice => invoice.Lines)
+            .ToListAsync(cancellationToken);
+        if (invoices.Count == 0)
+        {
+            return [];
+        }
+
+        var invoiceIdsToRefresh = invoices.Select(invoice => invoice.Id).ToHashSet();
+        foreach (var gig in affectedGigs.Where(gig => invoiceIdsToRefresh.Contains(gig.InvoiceId!.Value)))
+        {
+            await SyncGeneratedInvoiceLinesForGigAsync(gig, userId, cancellationToken);
+        }
+
+        foreach (var invoice in invoices)
+        {
+            invoice.DocumentRevision++;
+            invoice.DocumentState = InvoiceDocumentState.Regenerating;
+            invoice.DocumentFailureMessage = null;
+            StampUpdate(invoice, userId);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var invoice in invoices)
+        {
+            dbContext.Entry(invoice).Collection(value => value.Lines).IsLoaded = false;
+            await dbContext.Entry(invoice).Collection(value => value.Lines).LoadAsync(cancellationToken);
+
+            try
+            {
+                if (invoice.Client is null)
+                {
+                    throw new InvalidOperationException("Client does not exist.");
+                }
+
+                await RegenerateInvoicePdfAsync(invoice, invoice.Client, userId, cancellationToken);
+            }
+            catch (Exception)
+            {
+                MarkInvoicePdfRegenerationFailed(
+                    invoice,
+                    "Gig details were saved, but the invoice PDF could not be regenerated. Try again.",
+                    userId);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return invoices;
     }
 
     public Task<bool> RemoveSystemGeneratedInvoiceLinesForGigAsync(

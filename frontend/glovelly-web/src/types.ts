@@ -627,6 +627,7 @@ export type QuickReceiptDraftUpdateResponse = {
   previousGig: Gig | null
   expenseId: string
   moved: boolean
+  invoices: Invoice[]
 }
 
 export type QuickExternalResourceDraftResponse = {

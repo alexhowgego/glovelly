@@ -113,27 +113,32 @@ export function QuickReceiptModal({
         />
 
         {draft ? (
-          <div className="form-grid quick-receipt-details">
-            <label>
-              <span>Amount</span>
-              <input
-                inputMode="decimal"
-                value={amount}
-                onChange={(event) => onAmountChange(event.target.value)}
-                placeholder="0.00"
-                disabled={isSaving}
-              />
-            </label>
-            <label>
-              <span>Description</span>
-              <input
-                value={description}
-                onChange={(event) => onDescriptionChange(event.target.value)}
-                placeholder="Taxi, parking, hotel..."
-                disabled={isSaving}
-              />
-            </label>
-          </div>
+          <>
+            <div className="form-grid quick-receipt-details">
+              <label>
+                <span>Amount</span>
+                <input
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(event) => onAmountChange(event.target.value)}
+                  placeholder="0.00"
+                  disabled={isSaving}
+                />
+              </label>
+              <label>
+                <span>Description</span>
+                <input
+                  value={description}
+                  onChange={(event) => onDescriptionChange(event.target.value)}
+                  placeholder="Taxi, parking, hotel..."
+                  disabled={isSaving}
+                />
+              </label>
+            </div>
+            <p className="form-hint">
+              Receipt changes automatically refresh linked draft invoices only. Issued and other non-draft invoices are unchanged.
+            </p>
+          </>
         ) : null}
 
         <div className="form-actions">
