@@ -537,7 +537,7 @@ export type GigSort = {
   key: GigSortKey
   direction: SortDirection
 }
-export type GigQuickFilter = 'all' | 'upcoming' | 'uninvoiced' | 'drafts' | 'completed'
+export type GigQuickFilter = 'work-queue' | 'all' | 'upcoming' | 'uninvoiced' | 'drafts' | 'completed'
 
 export type GigImportDraftConfidence = 'Low' | 'Medium' | 'High'
 export type GigImportDraftStatus = 'Pending' | 'Accepted' | 'Rejected' | 'Committed'

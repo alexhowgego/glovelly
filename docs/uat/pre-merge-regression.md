@@ -146,14 +146,15 @@ Expected result: unsaved gig edits and unsaved expense draft fields are never di
 
 ### Gig History And Selection
 
-1. Create a future planned gig and a past completed or cancelled gig.
-2. Confirm the past completed or cancelled gig is hidden by default, while a past draft remains visible.
-3. Enable `Show past gigs` and confirm the historical gig appears without clearing search, type, quick-filter, or sort controls.
-4. Select a gig, then change filters or sort order while it remains visible; confirm it stays selected.
-5. Hide or delete the selected gig and confirm the first remaining visible gig is selected, or the empty state is shown.
-6. Follow an invoice-line link to a historical gig while it is hidden; confirm the workspace shows past gigs, clears incompatible filters, and explains the changed view.
+1. Create a future planned gig, a past completed uninvoiced gig, a past completed invoiced gig, a past draft, and a past cancelled gig.
+2. Confirm `Work queue` is selected by default and includes the future planned gig, past completed uninvoiced gig, and past draft, but not the past completed invoiced or cancelled gigs.
+3. Confirm `Upcoming` includes non-cancelled gigs dated today or later, `Uninvoiced` includes the historical completed uninvoiced gig, and `Drafts` and `Completed` include matching historical records.
+4. Select `All` and confirm every stored gig, including the historical cancelled gig, appears.
+5. Select a gig, then change filters or sort order while it remains visible; confirm it stays selected.
+6. Hide or delete the selected gig and confirm the first remaining visible gig is selected, or the empty state is shown.
+7. Follow an invoice-line link to a historical gig while it is hidden; confirm the workspace selects `All`, clears incompatible filters, and explains the changed view.
 
-Expected result: the selected gig always belongs to the rendered list. Explicit navigation reveals its target, while passive list changes preserve a visible selection or select the first visible fallback.
+Expected result: every named gig view describes its complete result set without a separate historical-gig control. The selected gig always belongs to the rendered list. Explicit navigation reveals its target through `All`, while passive list changes preserve a visible selection or select the first visible fallback.
 
 ### Admin
 

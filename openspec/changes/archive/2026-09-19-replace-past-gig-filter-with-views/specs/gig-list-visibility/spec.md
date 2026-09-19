@@ -1,25 +1,4 @@
-# Gig List Visibility Specification
-
-## Purpose
-
-Define how the gig workspace prioritizes active work through named views and maintains selection during list changes and explicit navigation.
-
-## Requirements
-
-### Requirement: Default gig visibility prioritizes active work
-The system SHALL use the `Work queue` view as the default gig workspace view. The Work queue SHALL include all Draft gigs, non-cancelled gigs dated on or after the user's local calendar date, and completed gigs that are not invoiced. Gig date comparisons SHALL use the local `YYYY-MM-DD` calendar date.
-
-#### Scenario: Historical completed uninvoiced gigs remain actionable
-- **WHEN** the gig workspace contains a completed, uninvoiced gig dated before the user's local calendar date
-- **THEN** the gig is included in the default Work queue
-
-#### Scenario: Past drafts remain visible
-- **WHEN** the gig workspace contains a Draft gig dated before the user's local calendar date
-- **THEN** the gig is included in the default Work queue
-
-#### Scenario: A gig dated today is upcoming
-- **WHEN** a non-cancelled gig's date equals the user's local calendar date
-- **THEN** the gig is included in the default Work queue and the Upcoming view
+## ADDED Requirements
 
 ### Requirement: Named gig-list views define complete result sets
 The system SHALL provide the following terse named views in the gig workspace: `Work queue`, `Upcoming`, `Uninvoiced`, `Drafts`, `Completed`, and `All`. A selected view SHALL determine its complete candidate set without an additional historical-date visibility control. Search, type filtering, and sorting SHALL refine or order that candidate set without changing the view definition.
@@ -44,26 +23,28 @@ The system SHALL provide the following terse named views in the gig workspace: `
 - **WHEN** a user selects `All`
 - **THEN** the list includes every stored gig, including historical and cancelled gigs
 
-### Requirement: Gig selection follows the visible ordered list
-The system SHALL derive initial and fallback gig selection from the same filtered and sorted collection rendered in the gig list. A selected gig SHALL remain selected while it remains visible, regardless of list reordering. If the selected gig is no longer visible, the system SHALL select the first visible gig, or clear selection when no gigs are visible.
+## MODIFIED Requirements
 
-#### Scenario: Initial selection uses the first rendered gig
-- **WHEN** gig data is first loaded into the workspace
-- **THEN** the selected gig is the first gig after active visibility, filtering, and sorting are applied
+### Requirement: Default gig visibility prioritizes active work
+The system SHALL use the `Work queue` view as the default gig workspace view. The Work queue SHALL include all Draft gigs, non-cancelled gigs dated on or after the user's local calendar date, and completed gigs that are not invoiced. Gig date comparisons SHALL use the local `YYYY-MM-DD` calendar date.
 
-#### Scenario: Existing visible selection is retained
-- **WHEN** sorting or a non-excluding list change occurs while the selected gig remains visible
-- **THEN** the system keeps that gig selected instead of selecting the new first row
+#### Scenario: Historical completed uninvoiced gigs remain actionable
+- **WHEN** the gig workspace contains a completed, uninvoiced gig dated before the user's local calendar date
+- **THEN** the gig is included in the default Work queue
 
-#### Scenario: Hidden or deleted selection falls back
-- **WHEN** a selected gig is removed from the visible list by a filter, update, deletion, or refresh
-- **THEN** the system selects the first remaining visible gig or clears selection if the result is empty
+#### Scenario: Past drafts remain visible
+- **WHEN** the gig workspace contains a Draft gig dated before the user's local calendar date
+- **THEN** the gig is included in the default Work queue
+
+#### Scenario: A gig dated today is upcoming
+- **WHEN** a non-cancelled gig's date equals the user's local calendar date
+- **THEN** the gig is included in the default Work queue and the Upcoming view
 
 ### Requirement: Explicit gig navigation reveals its target
 The system SHALL treat an explicit request to select a gig that is not in the visible list as intent to reveal that gig. It SHALL clear active search and type filters, select the `All` view, preserve sort order, and display a workspace message explaining the changed view. When the explicit navigation is initiated by `Go to gig` after quick receipt or quick attachment capture, the system SHALL scroll the selected Gig overview into the viewport using smooth, start-aligned positioning while keeping that gig selected.
 
 #### Scenario: Invoice-line navigation opens a hidden historical gig
-- **WHEN** a user follows an invoice-line link to a past `Completed` or `Cancelled` gig hidden by the current view
+- **WHEN** a user follows an invoice-line link to a past Completed or Cancelled gig hidden by the current view
 - **THEN** the workspace selects `All`, clears incompatible filters, selects the target, and displays an explanation
 
 #### Scenario: Saved gig is hidden by active filters
@@ -81,3 +62,10 @@ The system SHALL treat an explicit request to select a gig that is not in the vi
 #### Scenario: Quick attachment navigation scrolls to its selected gig
 - **WHEN** a user chooses `Go to gig` after saving a quick attachment
 - **THEN** the Gigs workspace opens with the attachment's associated gig selected and its Gig overview scrolled into the viewport
+
+## REMOVED Requirements
+
+### Requirement: Users can include historical gigs
+**Reason**: The separate `Show past gigs` control makes named quick filters incomplete and can conceal historical records that the selected filter claims to show.
+
+**Migration**: Use `Work queue`, `Upcoming`, `Uninvoiced`, `Drafts`, `Completed`, or `All`; select `All` to inspect every gig.

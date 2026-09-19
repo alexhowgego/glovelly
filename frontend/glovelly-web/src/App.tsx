@@ -278,7 +278,6 @@ function App({ appMetadata }: AppProps) {
     selectedGig,
     selectedGigIds,
     selectedGigs,
-    showPastGigs,
     selectGig,
     setGigs,
     setGigQuickFilter,
@@ -289,7 +288,6 @@ function App({ appMetadata }: AppProps) {
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
     setSelectedGigIds,
-    setShowPastGigs,
     startExternalResourceCreate,
     startExternalResourceEdit,
     startGigCreate,
@@ -1804,7 +1802,6 @@ function App({ appMetadata }: AppProps) {
         onGigTypeFilterChange={setGigTypeFilter}
         onSearchQueryChange={setGigSearchQuery}
         onSelectGig={selectGig}
-        onShowPastGigsChange={setShowPastGigs}
         onSortChange={setGigSort}
         onToggleGigSelection={handleToggleGigSelection}
         onStartEditing={startGigEdit}
@@ -1820,7 +1817,6 @@ function App({ appMetadata }: AppProps) {
         selectedGig={selectedGig}
         selectedGigIds={selectedGigIds}
         selectedGigs={selectedGigs}
-        showPastGigs={showPastGigs}
       />
     ) : (
       <InvoicesSection

@@ -3,20 +3,19 @@ import type { Gig, GigQuickFilter, GigSort, GigType } from '../types'
 export type GigListFilters = {
   searchQuery: string
   quickFilter: GigQuickFilter
-  showPastGigs: boolean
   sort: GigSort
   typeFilter: GigType | 'all'
 }
+
+type GigReveal =
+  | { clearFilters: false }
+  | { clearFilters: true; quickFilter: 'all' }
 
 export function getLocalDate(date = new Date()) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
-}
-
-export function isNormallyHiddenPastGig(gig: Gig, today: string) {
-  return gig.date < today && (gig.status === 'Completed' || gig.status === 'Cancelled')
 }
 
 export function getVisibleGigs(
@@ -59,18 +58,20 @@ export function getVisibleGigs(
   }
 
   return gigs
-    .filter((gig) => filters.showPastGigs || !isNormallyHiddenPastGig(gig, today))
-    .filter((gig) => filters.typeFilter === 'all' || gig.type === filters.typeFilter)
     .filter((gig) => {
       switch (filters.quickFilter) {
         case 'completed': return gig.status === 'Completed'
         case 'drafts': return gig.status === 'Draft'
-        case 'uninvoiced': return !gig.isInvoiced && gig.status !== 'Cancelled'
+        case 'uninvoiced': return gig.status === 'Completed' && !gig.isInvoiced
         case 'upcoming': return gig.status !== 'Cancelled' && gig.date >= today
+        case 'work-queue': return gig.status === 'Draft'
+          || (gig.status !== 'Cancelled' && gig.date >= today)
+          || (gig.status === 'Completed' && !gig.isInvoiced)
         case 'all':
         default: return true
       }
     })
+    .filter((gig) => filters.typeFilter === 'all' || gig.type === filters.typeFilter)
     .filter((gig) => !query || [gig.title, gig.venue, gig.date, gig.status, gig.type, getClientName(gig)]
       .join(' ')
       .toLowerCase()
@@ -90,13 +91,10 @@ export function reconcileSelectedGigId(selectedGigId: string, visibleGigs: Gig[]
     : (visibleGigs[0]?.id ?? '')
 }
 
-export function getGigReveal(target: Gig, visibleGigs: Gig[], today: string) {
+export function getGigReveal(target: Gig, visibleGigs: Gig[]): GigReveal {
   if (visibleGigs.some((gig) => gig.id === target.id)) {
-    return { clearFilters: false, showPastGigs: false }
+    return { clearFilters: false }
   }
 
-  return {
-    clearFilters: true,
-    showPastGigs: isNormallyHiddenPastGig(target, today),
-  }
+  return { clearFilters: true, quickFilter: 'all' as const }
 }
