@@ -27,27 +27,61 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
-    public async Task Preview_ReadsPrimaryGoogleSheetAndReturnsParsedRows()
+    public async Task Interpretation_ReadsSelectedGridAndReturnsValidatedDraft()
     {
         var sheetsClient = new FakeGoogleSheetsApiClient();
-        using var factory = CreateFactory(sheetsClient);
+        using var factory = CreateFactory(sheetsClient, services =>
+        {
+            services.RemoveAll<ISetListInterpreter>();
+            services.AddSingleton<ISetListInterpreter>(new FakeSetListInterpreter());
+        });
         var client = factory.CreateClient();
         var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
 
-        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/preview", new
+        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/interpretations", new
         {
             resourceId,
             worksheetId = "0",
             worksheetName = "Set list",
         }, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal("spreadsheet-123", payload.GetProperty("spreadsheetId").GetString());
         Assert.Equal("Set list", payload.GetProperty("worksheetName").GetString());
-        var items = payload.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal("0", payload.GetProperty("sourceGrid").GetProperty("worksheetId").GetString());
+        var jobId = payload.GetProperty("jobId").GetGuid();
+        var completed = await WaitForInterpretationJobStatusAsync(client, gigId, jobId, "Completed");
+        var items = completed.GetProperty("resultItems").EnumerateArray().ToList();
         Assert.Contains(items, item => item.GetProperty("kind").GetString() == "Separator" && !item.GetProperty("include").GetBoolean());
-        Assert.Contains(items, item => item.GetProperty("title").GetString() == "L-O-V-E" && item.GetProperty("include").GetBoolean());
+        Assert.Contains(items, item => item.GetProperty("title").GetString() == "Signal Fire" && item.GetProperty("include").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Interpretation_StatusIsScopedToOwningUser()
+    {
+        var sheetsClient = new FakeGoogleSheetsApiClient();
+        using var factory = CreateFactory(sheetsClient, services =>
+        {
+            services.RemoveAll<ISetListInterpreter>();
+            services.AddSingleton<ISetListInterpreter>(new FakeSetListInterpreter());
+        });
+        var client = factory.CreateClient();
+        var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
+
+        var startResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/interpretations", new
+        {
+            resourceId,
+            worksheetId = "0",
+            worksheetName = "Set list",
+        }, TestContext.Current.CancellationToken);
+        startResponse.EnsureSuccessStatusCode();
+        var started = await startResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+
+        client.DefaultRequestHeaders.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
+        var otherResponse = await client.GetAsync($"/gigs/{gigId}/setlist-imports/interpretations/{started.GetProperty("jobId").GetGuid()}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, otherResponse.StatusCode);
     }
 
     [Fact]
@@ -131,14 +165,14 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
-    public async Task Preview_WhenValuesReadFails_ReturnsBadGateway()
+    public async Task Interpretation_WhenGridReadFails_ReturnsBadGateway()
     {
         var sheetsClient = new FakeGoogleSheetsApiClient { ThrowOnValuesRead = true };
         using var factory = CreateFactory(sheetsClient);
         var client = factory.CreateClient();
         var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
 
-        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/preview", new
+        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/interpretations", new
         {
             resourceId,
             worksheetId = "0",
@@ -147,7 +181,7 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
-        Assert.Equal("Google Sheet worksheet could not be read", problem.GetProperty("title").GetString());
+        Assert.Equal("Google Sheet worksheet could not be read for interpretation", problem.GetProperty("title").GetString());
     }
 
     [Fact]
@@ -286,56 +320,68 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
     }
 
     [Fact]
-    public async Task Preview_ParsesRowsWithoutForScoreChartMatches()
+    public async Task DraftChartMatches_WhenNoChartMatches_ReturnsMissingStatus()
     {
         var sheetsClient = new FakeGoogleSheetsApiClient();
         using var factory = CreateFactory(sheetsClient);
         var client = factory.CreateClient();
-        var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
-        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+        var (gigId, _) = await SeedGigWithSetListAsync(factory);
+        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("Signal Fire.pdf", "Signal Fire"));
+        var itemId = Guid.NewGuid();
 
-        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/preview", new
+        var response = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/chart-matches/preview", new
         {
-            resourceId,
-            worksheetId = "0",
-            worksheetName = "Set list",
+            items = new[]
+            {
+                new { itemId, sourceRowNumber = 3, kind = "Song", include = true, title = "Unmatched song", padNumber = "74-G", key = "G" },
+            },
         }, TestContext.Current.CancellationToken);
 
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
-        var love = payload.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "L-O-V-E");
-        Assert.True(love.GetProperty("forScoreMatch").ValueKind is JsonValueKind.Null);
-        Assert.True(love.GetProperty("forScoreChartId").ValueKind is JsonValueKind.Null);
+        var match = Assert.Single(payload.GetProperty("items").EnumerateArray());
+        Assert.Equal(itemId, match.GetProperty("itemId").GetGuid());
+        Assert.Equal("MissingFromLatestLibrary", match.GetProperty("status").GetString());
+        Assert.True(match.GetProperty("selectedChart").ValueKind is JsonValueKind.Null);
+        Assert.Empty(match.GetProperty("candidates").EnumerateArray());
     }
 
     [Fact]
-    public async Task DraftChartMatchesPreview_ReturnsForScoreChartMatches()
+    public async Task DraftChartMatches_InterpretationDraftReturnsForScoreChartMatches()
     {
         var sheetsClient = new FakeGoogleSheetsApiClient();
-        using var factory = CreateFactory(sheetsClient);
+        using var factory = CreateFactory(sheetsClient, services =>
+        {
+            services.RemoveAll<ISetListInterpreter>();
+            services.AddSingleton<ISetListInterpreter>(new FakeSetListInterpreter());
+        });
         var client = factory.CreateClient();
         var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
-        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
+        await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("Signal Fire.pdf", "Signal Fire"));
 
-        var previewResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/preview", new
+        var interpretationResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/interpretations", new
         {
             resourceId,
             worksheetId = "0",
             worksheetName = "Set list",
         }, TestContext.Current.CancellationToken);
-        previewResponse.EnsureSuccessStatusCode();
-        var previewPayload = await previewResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        interpretationResponse.EnsureSuccessStatusCode();
+        var interpretation = await interpretationResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var completed = await WaitForInterpretationJobStatusAsync(client, gigId, interpretation.GetProperty("jobId").GetGuid(), "Completed");
+        var draftItems = completed.GetProperty("resultItems");
+        var signalFireDraft = draftItems.EnumerateArray().Single(item => item.GetProperty("title").GetString() == "Signal Fire");
 
         var matchResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/chart-matches/preview", new
         {
-            items = previewPayload.GetProperty("items"),
+            items = draftItems,
         }, TestContext.Current.CancellationToken);
 
         matchResponse.EnsureSuccessStatusCode();
         var payload = await matchResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
-        var love = payload.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("sourceRowNumber").GetInt32() == 3);
-        Assert.Equal("Suggested", love.GetProperty("status").GetString());
-        Assert.Equal("L-O-V-E", love.GetProperty("selectedChart").GetProperty("title").GetString());
+        var signalFire = payload.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("itemId").GetGuid() == signalFireDraft.GetProperty("itemId").GetGuid());
+        Assert.Equal(signalFireDraft.GetProperty("itemId").GetGuid(), signalFire.GetProperty("itemId").GetGuid());
+        Assert.Equal("Suggested", signalFire.GetProperty("status").GetString());
+        Assert.Equal("Signal Fire", signalFire.GetProperty("selectedChart").GetProperty("title").GetString());
     }
 
     [Fact]
@@ -483,46 +529,19 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         var (gigId, resourceId) = await SeedGigWithSetListAsync(factory);
         await SeedForScoreSnapshotAsync(factory, TestAuthContext.UserId, ("LOVE.pdf", "L-O-V-E"));
 
-        var previewResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/preview", new
-        {
-            resourceId,
-            worksheetId = "0",
-            worksheetName = "Set list",
-        }, TestContext.Current.CancellationToken);
-        previewResponse.EnsureSuccessStatusCode();
-        var previewPayload = await previewResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
-
+        var draftItemId = Guid.NewGuid();
         var matchResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports/chart-matches/preview", new
         {
-            items = previewPayload.GetProperty("items"),
+            items = new[]
+            {
+                new { itemId = draftItemId, sourceRowNumber = 3, kind = "Song", include = true, title = "L-O-V-E", padNumber = "74-G", key = "G" },
+            },
         }, TestContext.Current.CancellationToken);
         matchResponse.EnsureSuccessStatusCode();
         var matchPayload = await matchResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
-        var matchesByRow = matchPayload.GetProperty("items").EnumerateArray().ToDictionary(item => item.GetProperty("sourceRowNumber").GetInt32());
-
-        var items = previewPayload.GetProperty("items").EnumerateArray().Select(item =>
-        {
-            var row = item.GetProperty("sourceRowNumber").GetInt32();
-            var match = matchesByRow.GetValueOrDefault(row);
-            return new
-            {
-                sourceRowNumber = row,
-                sortOrder = item.GetProperty("sortOrder").GetInt32(),
-                kind = item.GetProperty("kind").GetString(),
-                include = item.GetProperty("include").GetBoolean(),
-                section = JsonStringOrNull(item.GetProperty("section")),
-                padNumber = JsonStringOrNull(item.GetProperty("padNumber")),
-                key = JsonStringOrNull(item.GetProperty("key")),
-                title = item.GetProperty("title").GetString(),
-                notes = JsonStringOrNull(item.GetProperty("notes")),
-                rawCellsJson = item.GetProperty("rawCellsJson").GetString(),
-                confidence = item.GetProperty("confidence").GetString(),
-                forScoreChartId = match.ValueKind == JsonValueKind.Object && match.GetProperty("selectedChart").ValueKind == JsonValueKind.Object
-                    ? match.GetProperty("selectedChart").GetProperty("id").GetString()
-                    : null,
-                forScoreMatch = match.ValueKind == JsonValueKind.Object ? match : (JsonElement?)null,
-            };
-        }).ToList();
+        var match = Assert.Single(matchPayload.GetProperty("items").EnumerateArray());
+        Assert.Equal(draftItemId, match.GetProperty("itemId").GetGuid());
+        var chartId = match.GetProperty("selectedChart").GetProperty("id").GetGuid();
 
         var saveResponse = await client.PostAsJsonAsync($"/gigs/{gigId}/setlist-imports", new
         {
@@ -530,7 +549,25 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
             worksheetId = "0",
             worksheetName = "Set list",
             replaceActiveImport = false,
-            items,
+            items = new[]
+            {
+                new
+                {
+                    sourceRowNumber = 3,
+                    sortOrder = 0,
+                    kind = "Song",
+                    include = true,
+                    section = "Set One",
+                    padNumber = "74-G",
+                    key = "G",
+                    title = "L-O-V-E",
+                    notes = (string?)null,
+                    rawCellsJson = "[\"74-G\",\"G\",\"L-O-V-E\"]",
+                    confidence = "High",
+                    forScoreChartId = chartId,
+                    forScoreMatch = match,
+                },
+            },
         }, TestContext.Current.CancellationToken);
         saveResponse.EnsureSuccessStatusCode();
 
@@ -793,6 +830,24 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
         throw new TimeoutException($"Timed out waiting for chart match job {jobId} to reach {expectedStatus}.");
     }
 
+    private static async Task<JsonElement> WaitForInterpretationJobStatusAsync(HttpClient client, Guid gigId, Guid jobId, string expectedStatus)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var response = await client.GetAsync($"/gigs/{gigId}/setlist-imports/interpretations/{jobId}", TestContext.Current.CancellationToken);
+            response.EnsureSuccessStatusCode();
+            var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+            if (string.Equals(payload.GetProperty("status").GetString(), expectedStatus, StringComparison.Ordinal))
+            {
+                return payload;
+            }
+
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException($"Timed out waiting for interpretation job {jobId} to reach {expectedStatus}.");
+    }
+
     private static async Task<(Guid GigId, Guid ResourceId)> SeedGigWithSetListAsync(WebApplicationFactory<Program> factory, bool addConnection = true, string title = "Setlist test gig")
     {
         using var scope = factory.Services.CreateScope();
@@ -971,6 +1026,46 @@ public sealed class SetListImportEndpointsTests : IClassFixture<GlovellyApiFacto
                 ["", "", "Please delete old parts"],
             ];
             return Task.FromResult(new GoogleSheetValues("Set list", rows));
+        }
+
+        public Task<GoogleSheetGrid> GetWorksheetGridAsync(
+            GoogleConnectionAccessToken accessToken,
+            string spreadsheetId,
+            string worksheetName,
+            int maxRows,
+            int maxColumns,
+            CancellationToken cancellationToken)
+        {
+            if (ThrowOnValuesRead)
+            {
+                throw new InvalidOperationException("Google returned 404.");
+            }
+
+            return Task.FromResult(new GoogleSheetGrid(worksheetName, 3, 3,
+            [
+                new GoogleSheetGridCell(1, 1, "A1", "Midnight Medley"),
+                new GoogleSheetGridCell(1, 2, "B1", string.Empty),
+                new GoogleSheetGridCell(1, 3, "C1", string.Empty),
+                new GoogleSheetGridCell(2, 1, "A2", string.Empty),
+                new GoogleSheetGridCell(2, 2, "B2", "74-G"),
+                new GoogleSheetGridCell(2, 3, "C2", "Signal Fire"),
+                new GoogleSheetGridCell(3, 1, "A3", "SPARES"),
+                new GoogleSheetGridCell(3, 2, "B3", string.Empty),
+                new GoogleSheetGridCell(3, 3, "C3", string.Empty),
+            ]));
+        }
+    }
+
+    private sealed class FakeSetListInterpreter : ISetListInterpreter
+    {
+        public Task<IReadOnlyList<SetListImportItemDraft>> InterpretAsync(GoogleSheetGrid grid, CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<SetListImportItemDraft> result =
+            [
+                new(1, 0, GigSetListItemKind.Separator, false, "Midnight Medley", null, null, "Midnight Medley", null, "[]", GigSetListItemConfidence.High, ItemId: Guid.NewGuid(), SourceEvidenceJson: "[{\"coordinate\":\"A1\",\"displayValue\":\"Midnight Medley\"}]"),
+                new(2, 1, GigSetListItemKind.Song, true, "Midnight Medley", "74-G", null, "Signal Fire", null, "[]", GigSetListItemConfidence.High, ItemId: Guid.NewGuid(), SourceEvidenceJson: "[{\"coordinate\":\"B2\",\"displayValue\":\"74-G\"},{\"coordinate\":\"C2\",\"displayValue\":\"Signal Fire\"}]"),
+            ];
+            return Task.FromResult(result);
         }
     }
 

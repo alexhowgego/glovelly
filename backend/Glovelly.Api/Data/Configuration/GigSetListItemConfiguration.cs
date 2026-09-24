@@ -35,6 +35,8 @@ internal sealed class GigSetListItemConfiguration : IEntityTypeConfiguration<Gig
             .HasMaxLength(4000);
         entity.Property(item => item.RawCellsJson)
             .HasColumnType("jsonb");
+        entity.Property(item => item.SourceEvidenceJson)
+            .HasColumnType("jsonb");
         entity.Property(item => item.ForScoreMatchJson)
             .HasColumnType("jsonb");
         entity.Property(item => item.ForScoreChartTitle)

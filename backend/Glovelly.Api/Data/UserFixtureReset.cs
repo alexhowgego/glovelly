@@ -38,6 +38,7 @@ internal static class UserFixtureReset
         db.GigSetListItems.RemoveRange(db.GigSetListItems.Where(value => setListImportIds.Contains(value.GigSetListImportId)));
         db.GigSetListImports.RemoveRange(db.GigSetListImports.Where(value => gigIds.Contains(value.GigId)));
         db.SetListChartMatchJobs.RemoveRange(db.SetListChartMatchJobs.Where(value => value.UserId == userId));
+        db.SetListInterpretationJobs.RemoveRange(db.SetListInterpretationJobs.Where(value => value.UserId == userId));
         db.GigCalendarSyncStates.RemoveRange(db.GigCalendarSyncStates.Where(value => value.UserId == userId));
         db.CalendarSyncWorkItems.RemoveRange(db.CalendarSyncWorkItems.Where(value => value.UserId == userId));
         db.GigImportDrafts.RemoveRange(db.GigImportDrafts.Where(value => importBatchIds.Contains(value.BatchId)));
