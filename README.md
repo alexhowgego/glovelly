@@ -155,7 +155,10 @@ export Email__Invoices__FromDisplayName="Glovelly Invoices"
    - `SetListChartRanking__Provider`
    - `SetListChartRanking__VertexAiProjectId`
    - `SetListChartRanking__VertexAiLocation`
-   - `SetListChartRanking__VertexAiModel`
+    - `SetListChartRanking__VertexAiModel`
+    - `SetListInterpretation__VertexAiProjectId`
+    - `SetListInterpretation__VertexAiLocation`
+    - `SetListInterpretation__VertexAiModel`
    - `ReceiptAnalysis__Enabled`
    - `ReceiptAnalysis__VertexAiProjectId`
    - `ReceiptAnalysis__VertexAiLocation`
@@ -177,6 +180,20 @@ dotnet user-secrets set "SetListChartRanking:VertexAiModel" "gemini-3.1-flash-li
 ```
 
 The configured principal must be able to call Vertex AI, for example with `roles/aiplatform.user`. If any required Vertex AI setting is missing or `Provider` remains `Deterministic`, Glovelly uses the deterministic fallback and does not call Gemini.
+
+### Vertex AI set-list interpretation
+
+Set-list import interprets the complete selected Google Sheet layout with Vertex AI before locating forScore candidates. It has no deterministic row-parser fallback: if Vertex is unavailable or returns invalid output, the user can retry or author an empty draft from the retained worksheet grid. Authenticate locally with Application Default Credentials and configure:
+
+```bash
+gcloud auth application-default login
+cd backend/Glovelly.Api
+dotnet user-secrets set "SetListInterpretation:VertexAiProjectId" "your-gcp-project-id"
+dotnet user-secrets set "SetListInterpretation:VertexAiLocation" "eu"
+dotnet user-secrets set "SetListInterpretation:VertexAiModel" "gemini-3.1-flash-lite"
+```
+
+Optional limits are `SetListInterpretation:MaxRows`, `SetListInterpretation:MaxColumns`, `SetListInterpretation:MaxSourcePayloadBytes`, and `SetListInterpretation:SourceGridRetentionDays`. The Cloud Run runtime service account needs `roles/aiplatform.user`. Do not log worksheet grids, prompts, or model responses; they can contain personal and rehearsal information.
 
 ### Vertex AI receipt analysis
 
@@ -255,7 +272,7 @@ The workflow:
 - Tags images with `latest` on the default branch and with a commit SHA tag for each build
 - Injects Google Secret Manager secrets into Cloud Run, including `Authentication__Google__ClientId`, `Authentication__Google__ClientSecret`, and `ConnectionStrings__Glovelly`
 - Injects the Resend API key into Cloud Run as `Email__Resend__ApiKey`
-- Passes optional set list chart ranking variables for Vertex AI/Gemini; environments remain deterministic unless `SET_LIST_CHART_RANKING_PROVIDER` is set to `VertexAi`
+- Passes Vertex AI interpretation project/location/model variables and optional set-list chart-ranking variables; the runtime service account needs Vertex AI access for either feature
 - Deploys `main` to the `glovelly` Cloud Run service
 - Deploys each internal pull request to the shared `glovelly-staging` Cloud Run service and comments the preview URL on the PR
 - Deploys the Calendar sync and Business lifecycle Cloud Run Jobs and Cloud Scheduler triggers for eligible environments

@@ -108,7 +108,7 @@ Avoid duplicating secret ownership unnecessarily. Runtime secrets should general
 
 ## Runtime Configuration
 
-Cloud Run receives non-secret environment variables for values such as deployment name, bucket names, email mode/display names, MCP issuer/resource URLs, client display/scopes, and optional set list chart ranking provider settings.
+Cloud Run receives non-secret environment variables for values such as deployment name, bucket names, email mode/display names, MCP issuer/resource URLs, client display/scopes, and Vertex AI set-list interpretation/chart-ranking settings.
 
 The app uses SignalR for authenticated workspace invalidation events at `/workspace-events`. Cloud Run supports these WebSocket connections, but deployments should use a timeout long enough for active browser sessions and reconnects. While the default in-memory SignalR hub has no distributed backplane, keep the service on a single instance or treat events as best-effort with the frontend focus/visibility refresh as a fallback.
 
@@ -122,6 +122,8 @@ Secrets are bound from Secret Manager for values such as:
 - MCP OAuth redirect URI values
 
 Set list chart matching defaults to deterministic ranking. To enable Gemini-backed ranking in a GitHub Environment, set `SET_LIST_CHART_RANKING_PROVIDER` to `VertexAi`. Optional override variables are `SET_LIST_CHART_RANKING_VERTEX_AI_PROJECT_ID`, `SET_LIST_CHART_RANKING_VERTEX_AI_LOCATION`, and `SET_LIST_CHART_RANKING_VERTEX_AI_MODEL`; the workflow otherwise uses the deployment project, deployment region, and `gemini-3.1-flash-lite`. The Cloud Run runtime service account must have permission to call Vertex AI, for example `roles/aiplatform.user`.
+
+Set-list interpretation is AI-only. The workflow always supplies `SetListInterpretation__VertexAiProjectId`, `SetListInterpretation__VertexAiLocation`, and `SetListInterpretation__VertexAiModel`, using `GCP_PROJECT_ID`, `eu`, and `gemini-3.1-flash-lite` unless the GitHub Environment overrides them with `SET_LIST_INTERPRETATION_VERTEX_AI_PROJECT_ID`, `SET_LIST_INTERPRETATION_VERTEX_AI_LOCATION`, or `SET_LIST_INTERPRETATION_VERTEX_AI_MODEL`. The runtime service account must have `roles/aiplatform.user`, and the Vertex AI API must be enabled before deploying this feature. These are non-secret variables; do not put service-account credentials in GitHub secrets.
 
 Do not commit secret values, OAuth client secrets, Resend API keys, database connection strings, or user-specific credential material.
 
@@ -138,7 +140,7 @@ The deployment depends on:
 - Google service accounts for deployment and runtime
 - Google Secret Manager secrets for production runtime values
 - Google Cloud Storage bucket for blob-backed features where configured
-- Vertex AI API and runtime service account permissions when Gemini-backed chart ranking is enabled
+- Vertex AI API and runtime service account permissions when set-list interpretation or Gemini-backed chart ranking is enabled
 - Firebase Hosting custom domain mapping for `glovelly.net`
 - custom domain mapping for `menu.glovelly.net`
 - custom domain mapping for `staging.glovelly.net`

@@ -5,4 +5,5 @@ public enum GigSetListItemKind
     Song,
     Separator,
     Comment,
+    Transition,
 }

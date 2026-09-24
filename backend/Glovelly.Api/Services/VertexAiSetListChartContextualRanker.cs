@@ -144,6 +144,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
 
             rows.Add(new PromptRow
             {
+                ItemId = item.ItemId?.ToString(),
                 RowNumber = item.SourceRowNumber,
                 Title = item.Title,
                 PadNumber = item.PadNumber,
@@ -168,8 +169,12 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
 
     private IReadOnlyList<SetListChartRankingDecision>? ParseDecisions(string text, SetListChartRankingRequest request)
     {
-        var candidateSetsByRow = request.CandidateSets
+        var candidateSetsByItemId = request.CandidateSets
             .Where(cs => cs.Input.Kind == GigSetListItemKind.Song && cs.Input.Include)
+            .Where(cs => cs.Input.ItemId.HasValue)
+            .ToDictionary(cs => cs.Input.ItemId!.Value.ToString());
+        var candidateSetsByRow = request.CandidateSets
+            .Where(cs => cs.Input.Kind == GigSetListItemKind.Song && cs.Input.Include && !cs.Input.ItemId.HasValue)
             .ToDictionary(cs => cs.Input.SourceRowNumber);
 
         try
@@ -208,7 +213,10 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
             var result = new List<SetListChartRankingDecision>();
             foreach (var decision in decisions)
             {
-                if (!candidateSetsByRow.TryGetValue(decision.RowNumber, out var candidateSet))
+                SetListChartCandidateSet? candidateSet = null;
+                if (!string.IsNullOrWhiteSpace(decision.ItemId)) candidateSetsByItemId.TryGetValue(decision.ItemId, out candidateSet);
+                else candidateSetsByRow.TryGetValue(decision.RowNumber, out candidateSet);
+                if (candidateSet is null)
                 {
                     _logger.LogWarning(
                         "Vertex AI chart ranker response referenced unknown row {SourceRowNumber} for snapshot {SnapshotId}.",
@@ -251,7 +259,8 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
                     : decision.Reason;
 
                 result.Add(new SetListChartRankingDecision(
-                    decision.RowNumber,
+                    candidateSet.Input.ItemId,
+                    candidateSet.Input.SourceRowNumber,
                     selectedId,
                     status,
                     invalidSelectedChartId ? ForScoreMappingConfidence.Low : NormalizeConfidence(decision.Confidence),
@@ -374,6 +383,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
                     Nullable = false,
                     Properties = new Dictionary<string, Schema>
                     {
+                        ["itemId"] = StringSchema,
                         ["rowNumber"] = new Schema { Type = GenAiType.Integer, Nullable = false },
                         ["selectedChartId"] = StringSchema,
                         ["status"] = StringSchema,
@@ -387,6 +397,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
 
     private sealed record PromptRow
     {
+        public string? ItemId { get; init; }
         public int RowNumber { get; init; }
         public string Title { get; init; } = string.Empty;
         public string? PadNumber { get; init; }
@@ -404,6 +415,7 @@ public sealed class VertexAiSetListChartContextualRanker : ISetListChartContextu
 
     private sealed record PromptDecision
     {
+        public string? ItemId { get; init; }
         public int RowNumber { get; init; }
         public string? SelectedChartId { get; init; }
         public string? Status { get; init; }

@@ -176,15 +176,18 @@ internal static class GigSetListImportEndpoints
                 metadataResult.Metadata.Sheets));
         });
 
-        group.MapPost("/{gigId:guid}/setlist-imports/preview", async (
+        group.MapPost("/{gigId:guid}/setlist-imports/interpretations", async (
             Guid gigId,
-            SetListPreviewRequest request,
+            SetListInterpretationRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IGoogleConnectionService googleConnectionService,
             IGoogleSheetsApiClient sheetsApiClient,
-            ISetListSheetParser parser,
+            ISetListInterpretationJobQueue queue,
+            TimeProvider timeProvider,
+            HttpContext httpContext,
+            Microsoft.Extensions.Options.IOptions<SetListInterpretationSettings> options,
             CancellationToken cancellationToken) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
@@ -224,27 +227,49 @@ internal static class GigSetListImportEndpoints
                 return worksheetNameResult.Result;
             }
 
-            var valuesResult = await ReadWorksheetValuesAsync(
-                sheetsApiClient,
-                accessTokenResult.AccessToken!,
-                sourceResult.SpreadsheetId!,
-                worksheetNameResult.WorksheetName!,
-                cancellationToken);
-            if (valuesResult.Result is not null)
+            var settings = options.Value;
+            GoogleSheetGrid grid;
+            try
             {
-                return valuesResult.Result;
+                grid = await sheetsApiClient.GetWorksheetGridAsync(
+                    accessTokenResult.AccessToken!, sourceResult.SpreadsheetId!, worksheetNameResult.WorksheetName!, settings.MaxRows, settings.MaxColumns, cancellationToken);
             }
+            catch (InvalidOperationException exception)
+            {
+                return SheetsReadProblem("Google Sheet worksheet could not be read for interpretation", $"The selected worksheet document could not be read for interpretation. {exception.Message}");
+            }
+            if (grid.RowCount >= settings.MaxRows || grid.ColumnCount >= settings.MaxColumns)
+            {
+                return Results.Problem(title: "Worksheet is too large to interpret", detail: $"Choose a worksheet within {settings.MaxRows} rows and {settings.MaxColumns} columns before interpretation.", statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+            var gridJson = JsonSerializer.Serialize(grid, JsonOptions);
+            if (System.Text.Encoding.UTF8.GetByteCount(gridJson) > settings.MaxSourcePayloadBytes)
+            {
+                return Results.Problem(title: "Worksheet is too large to interpret", detail: "The selected worksheet document is too large for safe interpretation. Reduce its used range and try again.", statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+            if (!userId.HasValue) return Results.Unauthorized();
+            var now = timeProvider.GetUtcNow();
+            var job = new SetListInterpretationJob
+            {
+                Id = Guid.NewGuid(), UserId = userId.Value, GigId = gigId, GigExternalResourceId = sourceResult.Resource!.Id,
+                SpreadsheetId = sourceResult.SpreadsheetId!, WorksheetId = request.WorksheetId?.Trim(), WorksheetName = worksheetNameResult.WorksheetName!,
+                Status = SetListInterpretationJobStatus.Pending, SourceGridJson = gridJson,
+                CorrelationId = httpContext.Request.Headers.TryGetValue("X-Glovelly-Request-Id", out var requestId) ? requestId.ToString() : httpContext.TraceIdentifier,
+                CreatedAtUtc = now, UpdatedAtUtc = now, SourceGridExpiresAtUtc = now.AddDays(Math.Max(1, settings.SourceGridRetentionDays)),
+            };
+            db.SetListInterpretationJobs.Add(job); await db.SaveChangesAsync(cancellationToken); await queue.EnqueueAsync(job.Id, cancellationToken);
+            return Results.Accepted($"/gigs/{gigId}/setlist-imports/interpretations/{job.Id}", ToInterpretationJobResponse(job, grid, null));
+        });
 
-            var items = parser.Parse(valuesResult.Values!.Rows);
-
-            return Results.Ok(new SetListPreviewResponse(
-                sourceResult.Resource!.Id,
-                sourceResult.Resource.Title,
-                sourceResult.Resource.Url!,
-                sourceResult.SpreadsheetId!,
-                request.WorksheetId,
-                worksheetNameResult.WorksheetName!,
-                items));
+        group.MapGet("/{gigId:guid}/setlist-imports/interpretations/{jobId:guid}", async (Guid gigId, Guid jobId, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor, CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!userId.HasValue) return Results.Unauthorized();
+            var job = await db.SetListInterpretationJobs.AsNoTracking().FirstOrDefaultAsync(value => value.Id == jobId && value.GigId == gigId && value.UserId == userId.Value, cancellationToken);
+            if (job is null) return Results.NotFound();
+            var grid = job.SourceGridJson == "{}" ? null : JsonSerializer.Deserialize<GoogleSheetGrid>(job.SourceGridJson, JsonOptions);
+            var result = string.IsNullOrWhiteSpace(job.ResultJson) ? null : JsonSerializer.Deserialize<IReadOnlyList<SetListImportItemDraft>>(job.ResultJson, JsonOptions);
+            return Results.Ok(ToInterpretationJobResponse(job, grid, result));
         });
 
         group.MapPost("/{gigId:guid}/setlist-imports/chart-matches/preview", async (
@@ -473,6 +498,7 @@ internal static class GigSetListImportEndpoints
                         Title = item.Title.Trim(),
                         Notes = NormalizeOptional(item.Notes),
                         RawCellsJson = NormalizeRawCellsJson(item.RawCellsJson),
+                        SourceEvidenceJson = NormalizeRawCellsJson(item.SourceEvidenceJson),
                         Confidence = item.Confidence,
                         ForScoreChartId = item.ForScoreChartId,
                         ForScoreLibrarySnapshotId = item.ForScoreChartId.HasValue ? chartValidation.ChartsById[item.ForScoreChartId.Value].ForScoreLibrarySnapshotId : null,
@@ -548,6 +574,7 @@ internal static class GigSetListImportEndpoints
                 item.Title = requestItem.Title.Trim();
                 item.Notes = NormalizeOptional(requestItem.Notes);
                 item.Confidence = requestItem.Confidence;
+                item.SourceEvidenceJson = NormalizeRawCellsJson(requestItem.SourceEvidenceJson);
                 item.ForScoreMatchJson = SerializeMatch(requestItem.ForScoreMatch);
                 ApplyChartMapping(item, requestItem.ForScoreChartId, chartValidation.ChartsById, timeProvider.GetUtcNow());
             }
@@ -718,26 +745,6 @@ internal static class GigSetListImportEndpoints
             return new SpreadsheetMetadataResolution(null, SheetsReadProblem(
                 "Google Sheet could not be read",
                 $"The linked Google Sheet could not be read. {exception.Message}"));
-        }
-    }
-
-    private static async Task<WorksheetValuesResolution> ReadWorksheetValuesAsync(
-        IGoogleSheetsApiClient sheetsApiClient,
-        GoogleConnectionAccessToken accessToken,
-        string spreadsheetId,
-        string worksheetName,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var values = await sheetsApiClient.GetWorksheetValuesAsync(accessToken, spreadsheetId, worksheetName, cancellationToken);
-            return new WorksheetValuesResolution(values, null);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return new WorksheetValuesResolution(null, SheetsReadProblem(
-                "Google Sheet worksheet could not be read",
-                $"The selected worksheet rows could not be read. {exception.Message}"));
         }
     }
 
@@ -923,6 +930,7 @@ internal static class GigSetListImportEndpoints
     {
         return new SetListImportItemResponse(
             item.Id,
+            item.Id,
             item.SourceRowNumber,
             item.SortOrder,
             item.Kind,
@@ -933,6 +941,7 @@ internal static class GigSetListImportEndpoints
             item.Title,
             item.Notes,
             item.RawCellsJson,
+            item.SourceEvidenceJson,
             item.Confidence,
             item.ForScoreChartId,
             DeserializeMatch(item.ForScoreMatchJson),
@@ -947,7 +956,7 @@ internal static class GigSetListImportEndpoints
     }
 
     private static SetListChartMatchInput ToMatchInput(SetListImportItemDraft item) => new(
-        null,
+        item.ItemId,
         item.SourceRowNumber,
         item.Kind,
         item.Include,
@@ -956,7 +965,7 @@ internal static class GigSetListImportEndpoints
         item.Key);
 
     private static SetListChartMatchInput ToMatchInput(SetListDraftChartMatchPreviewItem item) => new(
-        null,
+        item.ItemId,
         item.SourceRowNumber,
         item.Kind,
         item.Include,
@@ -965,7 +974,7 @@ internal static class GigSetListImportEndpoints
         item.Key);
 
     private static SetListChartMatchInput ToMatchInput(SetListDraftChartMatchJobItem item) => new(
-        null,
+        item.ItemId,
         item.SourceRowNumber,
         item.Kind,
         item.Include,
@@ -1017,6 +1026,17 @@ internal static class GigSetListImportEndpoints
             job.StartedAtUtc,
             job.CompletedAtUtc,
             result);
+
+    private static SetListInterpretationJobResponse ToInterpretationJobResponse(SetListInterpretationJob job, GoogleSheetGrid? grid, IReadOnlyList<SetListImportItemDraft>? result) => new(
+        job.Id, job.GigId, job.GigExternalResourceId, job.SpreadsheetId, job.WorksheetId, job.WorksheetName, job.Status,
+        job.CorrelationId, job.SafeErrorMessage, job.CreatedAtUtc, job.UpdatedAtUtc, job.StartedAtUtc, job.CompletedAtUtc,
+        grid is null ? null : new SetListSourceGridResponse(
+            job.WorksheetId ?? string.Empty,
+            grid.WorksheetName,
+            grid.RowCount,
+            grid.ColumnCount,
+            grid.Cells.Select(cell => new SetListSourceGridCellResponse(cell.Coordinate, cell.Row, cell.Column, cell.DisplayValue)).ToList()),
+        result);
 
     private static JsonSerializerOptions CreateJsonOptions()
     {
@@ -1091,7 +1111,6 @@ internal static class GigSetListImportEndpoints
 
     private sealed record WorksheetNameResolution(string? WorksheetName, IResult? Result);
 
-    private sealed record WorksheetValuesResolution(GoogleSheetValues? Values, IResult? Result);
 
     private sealed record SetListSourceResponse(
         Guid ResourceId,
@@ -1100,16 +1119,10 @@ internal static class GigSetListImportEndpoints
         string SpreadsheetId,
         IReadOnlyList<GoogleSheetMetadata> Worksheets);
 
-    private sealed record SetListPreviewRequest(Guid? ResourceId, string? WorksheetId, string? WorksheetName);
-
-    private sealed record SetListPreviewResponse(
-        Guid ResourceId,
-        string ResourceTitle,
-        string ResourceUrl,
-        string SpreadsheetId,
-        string? WorksheetId,
-        string WorksheetName,
-        IReadOnlyList<SetListImportItemDraft> Items);
+    private sealed record SetListInterpretationRequest(Guid? ResourceId, string? WorksheetId, string? WorksheetName);
+    private sealed record SetListInterpretationJobResponse(Guid JobId, Guid GigId, Guid ResourceId, string SpreadsheetId, string? WorksheetId, string WorksheetName, SetListInterpretationJobStatus Status, string? CorrelationId, string? ErrorMessage, DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, DateTimeOffset? StartedAtUtc, DateTimeOffset? CompletedAtUtc, SetListSourceGridResponse? SourceGrid, IReadOnlyList<SetListImportItemDraft>? ResultItems);
+    private sealed record SetListSourceGridResponse(string WorksheetId, string WorksheetName, int RowCount, int ColumnCount, IReadOnlyList<SetListSourceGridCellResponse> Cells);
+    private sealed record SetListSourceGridCellResponse(string Coordinate, int RowNumber, int ColumnNumber, string DisplayValue);
 
     private sealed record SetListSaveImportRequest(
         Guid? ResourceId,
@@ -1121,6 +1134,7 @@ internal static class GigSetListImportEndpoints
     private sealed record SetListDraftChartMatchPreviewRequest(IReadOnlyList<SetListDraftChartMatchPreviewItem> Items, bool UseAi = true);
 
     private sealed record SetListDraftChartMatchPreviewItem(
+        Guid? ItemId,
         int SourceRowNumber,
         GigSetListItemKind Kind,
         bool Include,
@@ -1133,6 +1147,7 @@ internal static class GigSetListImportEndpoints
     private sealed record SetListDraftChartMatchJobRequest(IReadOnlyList<SetListDraftChartMatchJobItem> Items);
 
     private sealed record SetListDraftChartMatchJobItem(
+        Guid? ItemId,
         int SourceRowNumber,
         GigSetListItemKind Kind,
         bool Include,
@@ -1168,6 +1183,7 @@ internal static class GigSetListImportEndpoints
         string Title,
         string? Notes,
         string RawCellsJson,
+        string? SourceEvidenceJson,
         GigSetListItemConfidence Confidence,
         Guid? ForScoreChartId,
         SetListChartMatchResult? ForScoreMatch);
@@ -1186,6 +1202,7 @@ internal static class GigSetListImportEndpoints
 
     private sealed record SetListImportItemResponse(
         Guid Id,
+        Guid ItemId,
         int SourceRowNumber,
         int SortOrder,
         GigSetListItemKind Kind,
@@ -1196,6 +1213,7 @@ internal static class GigSetListImportEndpoints
         string Title,
         string? Notes,
         string RawCellsJson,
+        string SourceEvidenceJson,
         GigSetListItemConfidence Confidence,
         Guid? ForScoreChartId,
         SetListChartMatchResult? ForScoreMatch,

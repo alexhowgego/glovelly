@@ -67,6 +67,7 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - `.glovelly.dev.local` is git-ignored and sourced by `run-dev.sh`; do not read or edit it unless explicitly asked.
 - Store local secrets such as Google OIDC, Resend, Routes API key, and PostgreSQL connection string with `dotnet user-secrets` under `backend/Glovelly.Api`, not in repo files.
 - Local admin seeding requires `DevelopmentSeeding__AdminGoogleSubject` and only applies when using the in-memory development DB.
+- When adding or changing any runtime setting/environment variable, update `backend/Glovelly.Api/appsettings.json`, both staging and production blocks in `.github/workflows/main.yml`, `README.md`, and the relevant `docs/engineering/` page in the same change. Update this guide when the setting changes agent-relevant operating constraints; never add secret values to repository files.
 
 ## High-Token Files
 

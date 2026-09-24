@@ -19,4 +19,8 @@
     <ProjectReference Include="..\Glovelly.Api\Glovelly.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Fixtures\SetLists\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

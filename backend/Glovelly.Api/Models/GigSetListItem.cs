@@ -16,6 +16,7 @@ public sealed class GigSetListItem
     public string Title { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public string RawCellsJson { get; set; } = "[]";
+    public string SourceEvidenceJson { get; set; } = "[]";
     public GigSetListItemConfidence Confidence { get; set; } = GigSetListItemConfidence.Medium;
     public Guid? ForScoreLibrarySnapshotId { get; set; }
     public Guid? ForScoreChartId { get; set; }
