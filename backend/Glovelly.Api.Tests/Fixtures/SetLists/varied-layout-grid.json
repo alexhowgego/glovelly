@@ -1,0 +1,14 @@
+{
+  "worksheetName": "Festival set",
+  "rowCount": 10,
+  "columnCount": 6,
+  "cells": [
+    { "row": 1, "column": 2, "coordinate": "B1", "displayValue": "Festival set" },
+    { "row": 3, "column": 2, "coordinate": "B3", "displayValue": "Opener" },
+    { "row": 3, "column": 5, "coordinate": "E3", "displayValue": "Valerie" },
+    { "row": 4, "column": 5, "coordinate": "E4", "displayValue": "vocal: lead" },
+    { "row": 6, "column": 1, "coordinate": "A6", "displayValue": "Acoustic corner" },
+    { "row": 7, "column": 4, "coordinate": "D7", "displayValue": "Fast Car" },
+    { "row": 9, "column": 6, "coordinate": "F9", "displayValue": "Do not play if late" }
+  ]
+}

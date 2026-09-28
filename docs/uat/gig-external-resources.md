@@ -91,20 +91,23 @@ Only one `Set list` attachment is primary for the gig. The primary `Gig plan` re
 1. Open Gigs and select the gig with the primary Google Sheet set list attachment.
 2. Expand the attachment and click `Import set list`.
 3. If Google Sheets is not connected, click `Connect Google Sheets`, complete OAuth, and return to the gig.
-4. Choose the worksheet/tab and click `Import rows`.
-5. Confirm likely songs appear as included rows and non-song headings/instructions appear as greyed review notes.
-6. Confirm song rows show forScore chart status such as suggested, choose chart, missing from latest library, or no library.
-7. Confirm common title variants such as `LOVE`/`L-O-V-E` and `Jump Jive & Wail`/`Jump Jive And Wail` appear as plausible chart matches when present in the library.
-8. Confirm rows with chart numbers such as `61-E`, `17`, or `104` prefer chart-number candidates over title-only candidates, while ambiguous or nearby-number-only candidates still require review.
-9. Click `Ask AI to choose`, confirm the modal shows queued/running progress without a long blocking browser request, then confirm completed AI choices apply to matching rows.
-10. Expand a song row, choose or clear the forScore chart, adjust title/pad/key/section/notes, and save the import.
-11. Re-open the attachment and click `Review set list`.
-12. Click `Ask AI to choose`, confirm existing rows can be matched without re-importing the Google Sheet, and save a chart mapping change.
-13. Re-run `Import set list` and confirm replacing the active import requires confirmation and preserves historical imports.
+4. Choose the worksheet/tab and click `Interpret set list`.
+5. Confirm the modal shows queued/running AI interpretation progress without holding a long browser request open, then review the interpreted draft.
+6. Confirm supported songs appear as included rows, medley/section headings and transitions appear as non-song review items, and singers, instruments, keys, durations, and rehearsal notes are not promoted to song titles.
+7. Confirm spare or otherwise excluded sections remain visible but are excluded by default.
+8. If interpretation fails, confirm the safe failure message offers retry and `Create manual draft`; confirm manual authoring starts empty beside the retained source worksheet grid and does not pre-parse rows.
+9. Confirm song rows show forScore chart status such as suggested, choose chart, missing from latest library, or no library only after an interpreted or manual draft exists.
+10. Confirm common title variants such as `LOVE`/`L-O-V-E` and `Jump Jive & Wail`/`Jump Jive And Wail` appear as plausible chart matches when present in the library.
+11. Confirm rows with chart numbers such as `61-E`, `17`, or `104` prefer chart-number candidates over title-only candidates, while ambiguous or nearby-number-only candidates still require review.
+12. Click `Ask AI to choose`, confirm the modal shows queued/running progress without a long blocking browser request, then confirm completed AI choices apply to matching rows.
+13. Expand a song row, choose or clear the forScore chart, adjust title/pad/key/section/notes, and save the import.
+14. Re-open the attachment and click `Review set list`.
+15. Click `Ask AI to choose`, confirm existing rows can be matched without re-importing the Google Sheet, and save a chart mapping change.
+16. Re-run `Interpret set list` and confirm replacing the active import requires confirmation and preserves historical imports.
 
 ### Expected Results
 
-Imported setlists preserve source worksheet order and row numbers. Separators/comments are retained for audit but are not included as songs. Importing rows locates deterministic chart candidates immediately; optional AI matching runs as a recoverable background job, uses SignalR/polling for completion, and keeps deterministic/manual choices available if AI is pending or fails. Chart mappings are saved only for selected song rows, show copied forScore title/path context, and can be reviewed later without replacing the set list import. Match chips and reasons distinguish chart-number matches from title-similarity matches where possible. Reviewing and saving edits updates the active import without changing the linked Google Sheet. Re-importing creates a new active snapshot only after explicit confirmation.
+AI interpretation receives the selected worksheet as a bounded coordinate-preserving display grid, then produces a reviewable set-list draft with source evidence and confidence. Imported setlists preserve interpreted source order and primary source rows; separators, transitions, comments, and excluded material are retained for audit but are not included as songs. AI interpretation and optional AI chart matching are recoverable background jobs using SignalR/polling; interpretation failure retains the source grid for retry or manual draft authoring. Deterministic candidate lookup only runs after a valid interpreted or manual draft exists. Chart mappings are saved only for selected song rows, show copied forScore title/path context, and can be reviewed later without replacing the set list import. Reviewing and saving edits updates the active import without changing the linked Google Sheet. Re-importing creates a new active snapshot only after explicit confirmation.
 
 ## forScore Library Drift Journey
 

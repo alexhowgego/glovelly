@@ -14,6 +14,8 @@ public static class ServiceCollectionExtensions
             .BindConfiguration(SetListChartRankingSettings.SectionName);
         services.AddOptions<ReceiptAnalysisSettings>()
             .BindConfiguration(ReceiptAnalysisSettings.SectionName);
+        services.AddOptions<SetListInterpretationSettings>()
+            .BindConfiguration(SetListInterpretationSettings.SectionName);
         services.AddScoped<AccessRequestWorkflowService>();
         services.AddScoped<AccessRequestReviewService>();
         services.AddScoped<AccessRequestRetentionService>();
@@ -29,7 +31,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInvoiceReceiptArchiveService, InvoiceReceiptArchiveService>();
         services.AddScoped<IInvoiceDeliveryService, InvoiceDeliveryService>();
         services.AddScoped<IGigImportDuplicateDetectionService, GigImportDuplicateDetectionService>();
-        services.AddSingleton<ISetListSheetParser, SetListSheetParser>();
+        services.AddScoped<ISetListInterpreter, VertexAiSetListInterpreter>();
+        services.AddSingleton<ISetListInterpretationJobQueue, SetListInterpretationJobQueue>();
+        services.AddScoped<SetListInterpretationJobProcessor>();
+        services.AddScoped<SetListInterpretationRetentionService>();
         services.AddScoped<ISetListChartMatcher, SetListChartMatcher>();
         services.AddSingleton<ISetListChartMatchJobQueue, SetListChartMatchJobQueue>();
         services.AddScoped<SetListChartMatchJobProcessor>();

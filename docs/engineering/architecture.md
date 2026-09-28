@@ -118,7 +118,13 @@ Glovelly responsibility: request only `drive.file` for this journey, upload gene
 
 Purpose: read linked Google Sheet setlists for gigs.
 
-Glovelly responsibility: request `spreadsheets.readonly` only through the separate Sheets service journey, read worksheet metadata/values for user-reviewed import, preserve source order/row numbers, and store imported setlists separately from the live sheet.
+Glovelly responsibility: request `spreadsheets.readonly` only through the separate Sheets service journey, read bounded coordinate-preserving formatted worksheet grids for Vertex-backed set-list interpretation, preserve item source evidence/order, and store imported setlists separately from the live sheet. Raw grids are retained only in owner-scoped interpretation jobs for their configured retention period.
+
+### Google Cloud Vertex AI
+
+Purpose: constrained, review-first interpretation of linked Google Sheet set-list layouts and optional forScore chart ranking.
+
+Glovelly responsibility: send only bounded worksheet grids or already-reviewed candidate data, validate structured model output before it reaches the user, keep source grids/prompts/responses out of logs, and require `roles/aiplatform.user` on the Cloud Run runtime service account.
 
 ### Google Artifact Registry
 

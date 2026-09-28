@@ -940,6 +940,10 @@ namespace Glovelly.Migrations.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<string>("SourceEvidenceJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
                     b.Property<int>("SourceRowNumber")
                         .HasColumnType("integer");
 
@@ -1663,6 +1667,81 @@ namespace Glovelly.Migrations.Migrations
                     b.ToTable("SetListChartMatchJobs");
                 });
 
+            modelBuilder.Entity("Glovelly.Api.Models.SetListInterpretationJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GigExternalResourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GigId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("SafeErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("SourceGridExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceGridJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("SpreadsheetId")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WorksheetId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("WorksheetName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GigId");
+
+                    b.HasIndex("Status", "SourceGridExpiresAtUtc");
+
+                    b.HasIndex("UserId", "GigId", "CreatedAtUtc");
+
+                    b.ToTable("SetListInterpretationJobs");
+                });
+
             modelBuilder.Entity("Glovelly.Api.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2239,6 +2318,25 @@ namespace Glovelly.Migrations.Migrations
                 });
 
             modelBuilder.Entity("Glovelly.Api.Models.SetListChartMatchJob", b =>
+                {
+                    b.HasOne("Glovelly.Api.Models.Gig", "Gig")
+                        .WithMany()
+                        .HasForeignKey("GigId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Glovelly.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Gig");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.SetListInterpretationJob", b =>
                 {
                     b.HasOne("Glovelly.Api.Models.Gig", "Gig")
                         .WithMany()

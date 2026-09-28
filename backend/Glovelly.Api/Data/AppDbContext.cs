@@ -19,6 +19,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<GigSetListImport> GigSetListImports => Set<GigSetListImport>();
     public DbSet<GigSetListItem> GigSetListItems => Set<GigSetListItem>();
     public DbSet<SetListChartMatchJob> SetListChartMatchJobs => Set<SetListChartMatchJob>();
+    public DbSet<SetListInterpretationJob> SetListInterpretationJobs => Set<SetListInterpretationJob>();
     public DbSet<ForScoreLibrarySnapshot> ForScoreLibrarySnapshots => Set<ForScoreLibrarySnapshot>();
     public DbSet<ForScoreChart> ForScoreCharts => Set<ForScoreChart>();
     public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();

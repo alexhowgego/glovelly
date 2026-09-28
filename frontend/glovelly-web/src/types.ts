@@ -353,7 +353,7 @@ export type GigExternalResourceAttachment = {
   createdAt: string
 }
 
-export type GigSetListItemKind = 'Song' | 'Separator' | 'Comment'
+export type GigSetListItemKind = 'Song' | 'Separator' | 'Transition' | 'Comment'
 export type GigSetListItemConfidence = 'Low' | 'Medium' | 'High'
 export type ForScoreMappingStatus = 'Unmapped' | 'Linked' | 'Suggested' | 'NeedsReview' | 'MissingFromLatestLibrary' | 'NotApplicable' | 'NoActiveLibrary'
 export type ForScoreMappingConfidence = 'None' | 'Low' | 'Medium' | 'High' | 'Manual'
@@ -374,7 +374,7 @@ export type SetListChartMatchCandidate = {
 }
 
 export type SetListChartMatchResult = {
-  itemId: string | null
+  itemId: string
   sourceRowNumber: number
   status: ForScoreMappingStatus
   confidence: ForScoreMappingConfidence
@@ -423,6 +423,7 @@ export type GigSetListSource = {
 }
 
 export type GigSetListImportItemDraft = {
+  itemId: string
   sourceRowNumber: number
   sortOrder: number
   kind: GigSetListItemKind
@@ -433,9 +434,41 @@ export type GigSetListImportItemDraft = {
   title: string
   notes: string | null
   rawCellsJson: string
+  sourceEvidenceJson: string | null
   confidence: GigSetListItemConfidence
   forScoreChartId: string | null
   forScoreMatch: SetListChartMatchResult | null
+}
+
+export type GigSetListSourceGridCell = {
+  coordinate: string
+  rowNumber: number
+  columnNumber: number
+  displayValue: string
+}
+
+export type GigSetListSourceGrid = {
+  worksheetId: string
+  worksheetName: string
+  rowCount: number
+  columnCount: number
+  cells: GigSetListSourceGridCell[]
+}
+
+export type SetListInterpretationJobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Cancelled'
+
+export type SetListInterpretationJobResponse = {
+  jobId: string
+  gigId: string
+  status: SetListInterpretationJobStatus
+  correlationId: string | null
+  errorMessage: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  startedAtUtc: string | null
+  completedAtUtc: string | null
+  sourceGrid: GigSetListSourceGrid | null
+  resultItems: GigSetListImportItemDraft[] | null
 }
 
 export type GigSetListPreview = {

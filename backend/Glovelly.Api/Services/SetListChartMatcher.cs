@@ -82,9 +82,10 @@ public sealed partial class SetListChartMatcher(
             snapshot.Id,
             useConfiguredRanker ? "configured" : "deterministic");
         var decisions = await ranker.RankAsync(new SetListChartRankingRequest(snapshot.Id, items, candidateSets), cancellationToken);
-        var decisionsByRow = decisions.ToDictionary(decision => decision.SourceRowNumber);
+        var decisionsByItemId = decisions.Where(decision => decision.ItemId.HasValue).ToDictionary(decision => decision.ItemId!.Value);
+        var decisionsByRow = decisions.Where(decision => !decision.ItemId.HasValue).ToDictionary(decision => decision.SourceRowNumber);
 
-        var results = candidateSets.Select(candidateSet => ToResult(candidateSet, decisionsByRow.GetValueOrDefault(candidateSet.Input.SourceRowNumber))).ToList();
+        var results = candidateSets.Select(candidateSet => ToResult(candidateSet, candidateSet.Input.ItemId.HasValue ? decisionsByItemId.GetValueOrDefault(candidateSet.Input.ItemId.Value) : decisionsByRow.GetValueOrDefault(candidateSet.Input.SourceRowNumber))).ToList();
         var suggested = results.Count(result => result.Status == ForScoreMappingStatus.Suggested);
         var needsReview = results.Count(result => result.Status == ForScoreMappingStatus.NeedsReview);
         var missing = results.Count(result => result.Status == ForScoreMappingStatus.MissingFromLatestLibrary);
@@ -350,12 +351,12 @@ public sealed class DeterministicSetListChartContextualRanker : ISetListChartCon
         var item = candidateSet.Input;
         if (item.Kind != GigSetListItemKind.Song || !item.Include)
         {
-            return new SetListChartRankingDecision(item.SourceRowNumber, null, ForScoreMappingStatus.NotApplicable, ForScoreMappingConfidence.None, "Only included song rows can be linked to forScore charts.");
+            return new SetListChartRankingDecision(item.ItemId, item.SourceRowNumber, null, ForScoreMappingStatus.NotApplicable, ForScoreMappingConfidence.None, "Only included song rows can be linked to forScore charts.");
         }
 
         if (candidateSet.Candidates.Count == 0)
         {
-            return new SetListChartRankingDecision(item.SourceRowNumber, null, ForScoreMappingStatus.MissingFromLatestLibrary, ForScoreMappingConfidence.None, "No chart in the latest forScore library looks like this song.");
+            return new SetListChartRankingDecision(item.ItemId, item.SourceRowNumber, null, ForScoreMappingStatus.MissingFromLatestLibrary, ForScoreMappingConfidence.None, "No chart in the latest forScore library looks like this song.");
         }
 
         var exactNumberCandidates = candidateSet.Candidates
@@ -375,6 +376,7 @@ public sealed class DeterministicSetListChartContextualRanker : ISetListChartCon
         }
 
         return new SetListChartRankingDecision(
+            item.ItemId,
             item.SourceRowNumber,
             null,
             ForScoreMappingStatus.NeedsReview,
@@ -383,6 +385,7 @@ public sealed class DeterministicSetListChartContextualRanker : ISetListChartCon
     }
 
     private static SetListChartRankingDecision Suggested(SetListChartMatchInput item, SetListChartMatchCandidate candidate, string reason) => new(
+        item.ItemId,
         item.SourceRowNumber,
         candidate.Chart.Id,
         ForScoreMappingStatus.Suggested,
@@ -417,11 +420,16 @@ public sealed record SetListChartRankingRequest(
     IReadOnlyList<SetListChartCandidateSet> CandidateSets);
 
 public sealed record SetListChartRankingDecision(
+    Guid? ItemId,
     int SourceRowNumber,
     Guid? SelectedChartId,
     ForScoreMappingStatus Status,
     ForScoreMappingConfidence Confidence,
-    string Reason);
+    string Reason)
+{
+    public SetListChartRankingDecision(int sourceRowNumber, Guid? selectedChartId, ForScoreMappingStatus status, ForScoreMappingConfidence confidence, string reason)
+        : this(null, sourceRowNumber, selectedChartId, status, confidence, reason) { }
+}
 
 public sealed record SetListChartMatchResult(
     Guid? ItemId,

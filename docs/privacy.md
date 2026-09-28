@@ -42,6 +42,7 @@ Glovelly may collect and store the following categories of information.
 - Expense details such as descriptions, categories, amounts, tax treatment, reimbursement status, and receipt attachments.
 - Receipt files or images uploaded by users. These may contain personal information visible on the receipt, such as names, partial payment card details, locations, timestamps, or purchase details.
 - When you explicitly request receipt analysis, the receipt file or image, its MIME type, upload date, optional default currency, and permitted suggestion categories are sent to Google Cloud Vertex AI. Glovelly uses the result only to show reviewable suggestions; it does not automatically change an expense record.
+- When you request set-list interpretation from a linked Google Sheet, the selected bounded worksheet grid, including displayed cell values and positions, is sent to Google Cloud Vertex AI. Glovelly validates the result and presents an editable draft; it does not alter the linked sheet or automatically select forScore charts.
 - Invoice details such as invoice numbers, line items, payment status, issue/reissue history, delivery details, PDF files, and Google Drive publication references.
 - Seller profile details used to generate invoices, such as trading name, address, payment details, invoice defaults, and tax or business identifiers where provided.
 

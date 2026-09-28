@@ -2269,9 +2269,42 @@ button.compact-record-row.selected {
 }
 
 .setlist-review-summary {
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 4px;
   padding: 0;
+}
+
+.setlist-order-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 8px;
+}
+
+.setlist-order-button {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.setlist-order-button:hover:not(:disabled),
+.setlist-order-button:focus-visible {
+  color: var(--heading);
+  border-color: var(--compact-control-accent);
+  outline: none;
+}
+
+.setlist-order-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .setlist-include-toggle {

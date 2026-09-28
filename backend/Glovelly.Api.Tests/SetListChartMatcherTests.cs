@@ -150,6 +150,27 @@ public sealed class SetListChartMatcherTests : IClassFixture<GlovellyApiFactory>
         Assert.Null(result.SelectedChart);
     }
 
+    [Fact]
+    public async Task MatchAsync_SameSourceRowWithDistinctItemIdsDoesNotCollide()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SeedSnapshotAsync(db, ("First.pdf", "First", null), ("Second.pdf", "Second", null));
+        var firstItemId = Guid.NewGuid();
+        var secondItemId = Guid.NewGuid();
+        var matcher = scope.ServiceProvider.GetRequiredService<ISetListChartMatcher>();
+
+        var results = await matcher.MatchAsync(TestAuthContext.UserId,
+        [
+            new SetListChartMatchInput(firstItemId, 7, GigSetListItemKind.Song, true, "First"),
+            new SetListChartMatchInput(secondItemId, 7, GigSetListItemKind.Song, true, "Second"),
+        ], TestContext.Current.CancellationToken, useConfiguredRanker: false);
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal("First", results.Single(result => result.ItemId == firstItemId).SelectedChart?.Title);
+        Assert.Equal("Second", results.Single(result => result.ItemId == secondItemId).SelectedChart?.Title);
+    }
+
     private static async Task SeedSnapshotAsync(AppDbContext db, params (string FilePath, string Title, string? Keywords)[] charts)
     {
         db.ForScoreLibrarySnapshots.Add(new ForScoreLibrarySnapshot

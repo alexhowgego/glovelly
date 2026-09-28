@@ -22,9 +22,9 @@ Preview the built guide with `npm --prefix frontend/glovelly-guide run preview`.
 
 ## Screenshots
 
-Published screenshots live in `public/screenshots/` and are reviewed repository assets. The staging documentation-capture job produces candidate replacements and reports drift on same-repository pull requests without modifying the branch.
+Published screenshots live in `public/screenshots/` and are reviewed repository assets. The staging documentation-capture job produces candidate replacements and reports material drift on same-repository pull requests without modifying the branch. It tolerates up to 0.05% differing decoded pixels to avoid notifying on harmless browser rasterisation drift.
 
-To review a candidate, download the `glovelly-documentation-screenshots` artifact from the workflow run, inspect its report and PNGs, then replace approved files in `public/screenshots/` in the pull request. Do not copy screenshots from production or use personal data.
+To review a candidate, download the `glovelly-documentation-screenshots` artifact from the workflow run, inspect its report, candidate PNGs, and `report/diffs/` images. Each candidate with decoded-pixel differences has a raw diff, a red-overlay diff, and a padded, magnified crop of the affected area. Then replace approved files in `public/screenshots/` in the pull request. Do not copy screenshots from production or use personal data.
 
 ## Release checks
 

@@ -1091,7 +1091,8 @@ Output schema:
                 "enum": [
                   "song",
                   "separator",
-                  "comment"
+                  "comment",
+                  "transition"
                 ],
                 "type": "string"
               },

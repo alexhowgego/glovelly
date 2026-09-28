@@ -903,7 +903,8 @@
                       "enum": [
                         "song",
                         "separator",
-                        "comment"
+                        "comment",
+                        "transition"
                       ],
                       "type": "string"
                     },
