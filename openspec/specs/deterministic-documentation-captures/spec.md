@@ -41,9 +41,13 @@ The documentation capture suite SHALL capture light and actual-dark candidates f
 - **WHEN** the documentation capture suite authenticates the isolated fixture
 - **THEN** it produces one named light candidate and one named actual-dark candidate for each of the seven selected workflow states using only fixture data
 
-#### Scenario: Documentation candidate changes
-- **WHEN** a paired screenshot candidate is new or has one or more decoded-pixel differences from its checked-in asset
+#### Scenario: Documentation candidate changes materially
+- **WHEN** a paired screenshot candidate is new or its decoded-pixel difference exceeds the documented rasterisation tolerance
 - **THEN** the comparison workflow includes its filename, changed-pixel count, and visual diff in the artifact and non-blocking pull-request freshness report
+
+#### Scenario: Documentation candidate differs within tolerance
+- **WHEN** a paired screenshot candidate has decoded-pixel differences at or below the documented rasterisation tolerance
+- **THEN** the comparison workflow records its changed-pixel count and raw, red-overlay, and magnified-crop diffs in the artifact without requesting pull-request review
 
 #### Scenario: Candidate is re-encoded without pixel changes
 - **WHEN** a paired screenshot candidate has different PNG bytes but no decoded-pixel differences from its checked-in asset

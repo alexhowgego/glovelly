@@ -394,6 +394,7 @@ jobs:
       GLOVELLY_UAT_SECRET_ID: ${{ vars.GCP_UAT_SECRET_ID }}
       GLOVELLY_DOCUMENTATION_CAPTURE_DIR: ${{ github.workspace }}/TestResults/documentation-captures/candidates
       GLOVELLY_DOCUMENTATION_REPORT_DIR: ${{ github.workspace }}/TestResults/documentation-captures/report
+      DOCUMENTATION_SCREENSHOT_MAX_DIFF_PER_10000: 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
