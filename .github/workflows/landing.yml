@@ -8,12 +8,18 @@ on:
       - ".github/workflows/landing.yml"
       - ".firebaserc"
       - "firebase.json"
+      - "frontend/copy-public-site-analytics.mjs"
+      - "frontend/verify-public-site-analytics.mjs"
+      - "frontend/public-site-analytics/**"
       - "frontend/glovelly-landing/**"
   pull_request:
     paths:
       - ".github/workflows/landing.yml"
       - ".firebaserc"
       - "firebase.json"
+      - "frontend/copy-public-site-analytics.mjs"
+      - "frontend/verify-public-site-analytics.mjs"
+      - "frontend/public-site-analytics/**"
       - "frontend/glovelly-landing/**"
 
 permissions:

@@ -56,6 +56,10 @@ export default defineConfig({
           tag: 'meta',
           attrs: { name: 'theme-color', content: '#1d5575' },
         },
+        {
+          tag: 'script',
+          attrs: { src: '/public-site-analytics.js', defer: true },
+        },
       ],
     }),
   ],
