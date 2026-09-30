@@ -21,10 +21,69 @@ public sealed class GigEndpointsTests : IClassFixture<GlovellyApiFactory>
     private readonly GlovellyApiFactory _factory;
     private readonly HttpClient _client;
 
+    private static int CompareQuickCaptureCandidates(JsonElement left, JsonElement right)
+    {
+        var distance = left.GetProperty("daysFromToday").GetInt32().CompareTo(right.GetProperty("daysFromToday").GetInt32());
+        if (distance != 0) return distance;
+        var date = string.CompareOrdinal(left.GetProperty("date").GetString(), right.GetProperty("date").GetString());
+        if (date != 0) return date;
+        var title = string.CompareOrdinal(left.GetProperty("title").GetString(), right.GetProperty("title").GetString());
+        return title != 0 ? title : left.GetProperty("id").GetGuid().CompareTo(right.GetProperty("id").GetGuid());
+    }
+
     public GigEndpointsTests(GlovellyApiFactory factory)
     {
         _factory = factory;
         _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task QuickCaptureCandidates_PagesVisibleEligibleGigsWithoutDuplicates()
+    {
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            for (var index = 0; index < 25; index++)
+            {
+                db.Gigs.Add(new Gig
+                {
+                    Id = Guid.NewGuid(), ClientId = TestData.FoxAndFinchId,
+                    CreatedByUserId = TestAuthContext.UserId, UpdatedByUserId = TestAuthContext.UserId,
+                    Title = $"Paged candidate {index:D2}", Date = new DateOnly(2026, 1, 1).AddDays(-60 - index),
+                    Venue = "Archive", Status = GigStatus.Completed,
+                });
+            }
+
+            db.Gigs.AddRange(
+                new Gig { Id = Guid.NewGuid(), ClientId = TestData.FoxAndFinchId, CreatedByUserId = TestAuthContext.UserId, Title = "Cancelled candidate", Date = new DateOnly(2025, 1, 1), Venue = "Archive", Status = GigStatus.Cancelled },
+                new Gig { Id = Guid.NewGuid(), ClientId = TestData.FoxAndFinchId, CreatedByUserId = TestAuthContext.AlternateUserId, Title = "Private candidate", Date = new DateOnly(2025, 1, 1), Venue = "Archive", Status = GigStatus.Completed });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var allCandidates = new List<JsonElement>();
+        string? continuation = null;
+        var hasMore = true;
+        while (hasMore)
+        {
+            var url = continuation is null ? "/gigs/quick-capture-candidates" : $"/gigs/quick-capture-candidates?continuation={Uri.EscapeDataString(continuation)}";
+            var response = await _client.GetAsync(url, TestContext.Current.CancellationToken);
+            response.EnsureSuccessStatusCode();
+            var page = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+            var candidates = page.GetProperty("candidates").EnumerateArray().ToArray();
+            Assert.Equal(candidates.Length, candidates.Select(candidate => candidate.GetProperty("id").GetGuid()).Distinct().Count());
+            allCandidates.AddRange(candidates);
+            hasMore = page.GetProperty("hasMore").GetBoolean();
+            continuation = page.GetProperty("continuation").GetString();
+            Assert.Equal(hasMore, continuation is not null);
+        }
+
+        Assert.Equal(allCandidates.Count, allCandidates.Select(candidate => candidate.GetProperty("id").GetGuid()).Distinct().Count());
+        Assert.DoesNotContain(allCandidates, candidate => candidate.GetProperty("title").GetString() == "Cancelled candidate" || candidate.GetProperty("title").GetString() == "Private candidate");
+        Assert.All(Enumerable.Range(0, 25), index => Assert.Contains(allCandidates, candidate => candidate.GetProperty("title").GetString() == $"Paged candidate {index:D2}"));
+        for (var index = 1; index < allCandidates.Count; index++)
+        {
+            Assert.True(CompareQuickCaptureCandidates(allCandidates[index - 1], allCandidates[index]) <= 0);
+        }
     }
 
     [Fact]

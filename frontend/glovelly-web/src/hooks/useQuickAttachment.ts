@@ -14,10 +14,10 @@ import type {
   QuickExternalResourceDraftUpdateResponse,
   QuickGigCandidate,
 } from '../types'
+import { getQuickCaptureCandidatePage } from '../quickCaptureCandidates'
 
 type UseQuickAttachmentOptions = {
   getGigById: (gigId: string) => Gig | undefined
-  getQuickCaptureCandidates: () => QuickGigCandidate[]
   onMergeSavedGig: (gig: Gig) => void
   onOpenAttachmentDraft: (gig: Gig, scrollToGig?: boolean) => void
   onSelectGig: (gigId: string) => void
@@ -29,7 +29,6 @@ export type QuickAttachmentMode = 'choose' | 'file' | 'link'
 
 export function useQuickAttachment({
   getGigById,
-  getQuickCaptureCandidates,
   onMergeSavedGig,
   onOpenAttachmentDraft,
   onSelectGig,
@@ -52,6 +51,16 @@ export function useQuickAttachment({
   const [quickAttachmentIsPrimary, setQuickAttachmentIsPrimary] = useState(false)
   const [quickAttachmentStatus, setQuickAttachmentStatus] = useState('')
   const [isQuickAttachmentSaving, setIsQuickAttachmentSaving] = useState(false)
+  const [quickAttachmentContinuation, setQuickAttachmentContinuation] = useState<string | null>(null)
+  const [quickAttachmentHasMoreCandidates, setQuickAttachmentHasMoreCandidates] = useState(false)
+  const [isQuickAttachmentLoadingCandidates, setIsQuickAttachmentLoadingCandidates] = useState(false)
+  const [quickAttachmentCandidateLoadError, setQuickAttachmentCandidateLoadError] = useState('')
+
+  const setCandidatePage = (page: { hasMore: boolean; continuation: string | null }) => {
+    setQuickAttachmentHasMoreCandidates(page.hasMore)
+    setQuickAttachmentContinuation(page.continuation)
+    setQuickAttachmentCandidateLoadError('')
+  }
 
   const syncDraftFields = (draft: QuickExternalResourceDraftResponse) => {
     const resource = draft.gig.externalResources.find((item) => item.id === draft.resourceId)
@@ -85,7 +94,8 @@ export function useQuickAttachment({
     mode: QuickAttachmentMode,
     candidates: QuickGigCandidate[],
     message: string,
-    file?: File
+    file?: File,
+    page?: { hasMoreCandidates?: boolean; candidateContinuation?: string | null }
   ) => {
     setQuickAttachmentMode(mode)
     setPendingAttachmentFile(file ?? null)
@@ -93,6 +103,9 @@ export function useQuickAttachment({
     setQuickAttachmentCandidates(candidates)
     setQuickAttachmentSelectedGigId(candidates[0]?.id ?? '')
     setQuickAttachmentStatus(message)
+    setQuickAttachmentHasMoreCandidates(page?.hasMoreCandidates ?? false)
+    setQuickAttachmentContinuation(page?.candidateContinuation ?? null)
+    setQuickAttachmentCandidateLoadError('')
   }
 
   const clearQuickAttachmentDialog = useCallback(() => {
@@ -108,6 +121,10 @@ export function useQuickAttachment({
     setQuickAttachmentNotes('')
     setQuickAttachmentIsPrimary(false)
     setQuickAttachmentStatus('')
+    setQuickAttachmentContinuation(null)
+    setQuickAttachmentHasMoreCandidates(false)
+    setIsQuickAttachmentLoadingCandidates(false)
+    setQuickAttachmentCandidateLoadError('')
   }, [])
 
   const openQuickAttachmentDialog = () => {
@@ -152,12 +169,15 @@ export function useQuickAttachment({
         const conflict = (await response.json()) as {
           message?: string
           candidates?: QuickGigCandidate[]
+          hasMoreCandidates?: boolean
+          candidateContinuation?: string | null
         }
         promptForAttachmentGig(
           'file',
           conflict.candidates ?? [],
           conflict.message ?? 'Choose a gig before saving this attachment draft.',
-          file
+          file,
+          conflict
         )
         return
       }
@@ -173,7 +193,8 @@ export function useQuickAttachment({
       onOpenAttachmentDraft(draft.gig)
       setPendingAttachmentFile(null)
       setQuickAttachmentDraft(draft)
-      setQuickAttachmentCandidates(draft.candidates)
+        setQuickAttachmentCandidates(draft.candidates)
+        setCandidatePage({ hasMore: draft.hasMoreCandidates, continuation: draft.candidateContinuation })
       setQuickAttachmentSelectedGigId(draft.gig.id)
       syncDraftFields(draft)
       setQuickAttachmentStatus(
@@ -233,11 +254,15 @@ export function useQuickAttachment({
         const conflict = (await response.json()) as {
           message?: string
           candidates?: QuickGigCandidate[]
+          hasMoreCandidates?: boolean
+          candidateContinuation?: string | null
         }
         promptForAttachmentGig(
           'link',
           conflict.candidates ?? [],
-          conflict.message ?? 'Choose a gig before saving this attachment draft.'
+          conflict.message ?? 'Choose a gig before saving this attachment draft.',
+          undefined,
+          conflict
         )
         return
       }
@@ -252,7 +277,8 @@ export function useQuickAttachment({
       onMergeSavedGig(draft.gig)
       onOpenAttachmentDraft(draft.gig)
       setQuickAttachmentDraft(draft)
-      setQuickAttachmentCandidates(draft.candidates)
+        setQuickAttachmentCandidates(draft.candidates)
+        setCandidatePage({ hasMore: draft.hasMoreCandidates, continuation: draft.candidateContinuation })
       setQuickAttachmentSelectedGigId(draft.gig.id)
       syncDraftFields(draft)
       setQuickAttachmentStatus(
@@ -393,18 +419,67 @@ export function useQuickAttachment({
     }
   }
 
-  const startQuickAttachmentLinkMode = () => {
-    const candidates = getQuickCaptureCandidates()
+  const loadMoreQuickAttachmentCandidates = async () => {
+    if (!quickAttachmentHasMoreCandidates || !quickAttachmentContinuation || isQuickAttachmentLoadingCandidates) {
+      return
+    }
+
+    setIsQuickAttachmentLoadingCandidates(true)
+    setQuickAttachmentCandidateLoadError('')
+    try {
+      const { response, page } = await getQuickCaptureCandidatePage(quickAttachmentContinuation)
+      if (handleSessionExpired(response, onSessionExpired, 'Your session expired. Sign in again to load gigs.')) {
+        return
+      }
+      if (!response.ok || !page) {
+        throw new Error(await getResponseErrorMessage(response, 'Unable to load more gigs.'))
+      }
+
+      setQuickAttachmentCandidates((current) => {
+        const knownIds = new Set(current.map((candidate) => candidate.id))
+        return [...current, ...page.candidates.filter((candidate) => !knownIds.has(candidate.id))]
+      })
+      setCandidatePage(page)
+    } catch (error) {
+      setQuickAttachmentCandidateLoadError(
+        error instanceof Error ? error.message : 'Unable to load more gigs. Try again.'
+      )
+    } finally {
+      setIsQuickAttachmentLoadingCandidates(false)
+    }
+  }
+
+  const startQuickAttachmentLinkMode = async () => {
     setQuickAttachmentMode('link')
     setQuickAttachmentResourceType(inferResourceType(quickAttachmentUrl))
     setQuickAttachmentPurpose('Other')
-    setQuickAttachmentCandidates(candidates)
-    setQuickAttachmentSelectedGigId(candidates[0]?.id ?? '')
-    setQuickAttachmentStatus(
-      candidates.length > 0
-        ? 'Paste a link and choose the destination gig.'
-        : 'No nearby gigs are available. Create or update a gig near this attachment date, then try again.'
-    )
+    setQuickAttachmentCandidates([])
+    setQuickAttachmentSelectedGigId('')
+    setQuickAttachmentStatus('Loading nearby gigs...')
+    setIsQuickAttachmentLoadingCandidates(true)
+    setQuickAttachmentCandidateLoadError('')
+    try {
+      const { response, page } = await getQuickCaptureCandidatePage()
+      if (handleSessionExpired(response, onSessionExpired, 'Your session expired. Sign in again to load gigs.')) {
+        return
+      }
+      if (!response.ok || !page) {
+        throw new Error(await getResponseErrorMessage(response, 'Unable to load gigs.'))
+      }
+      setQuickAttachmentCandidates(page.candidates)
+      setQuickAttachmentSelectedGigId(page.candidates[0]?.id ?? '')
+      setCandidatePage(page)
+      setQuickAttachmentStatus(
+        page.candidates.length > 0
+          ? 'Paste a link and choose the destination gig.'
+          : 'No nearby gigs are available. Load more gigs to choose a destination.'
+      )
+    } catch (error) {
+      setQuickAttachmentStatus('Unable to load nearby gigs. Try again or close this dialog.')
+      setQuickAttachmentCandidateLoadError(error instanceof Error ? error.message : 'Unable to load gigs.')
+    } finally {
+      setIsQuickAttachmentLoadingCandidates(false)
+    }
   }
 
   const startQuickAttachmentFileMode = () => {
@@ -420,12 +495,16 @@ export function useQuickAttachment({
     goToQuickAttachmentGig,
     handleQuickAttachmentFile,
     isQuickAttachmentSaving,
+    isQuickAttachmentLoadingCandidates,
+    loadMoreQuickAttachmentCandidates,
     openQuickAttachmentDialog,
     pendingAttachmentFile,
     quickAttachmentCandidates,
+    quickAttachmentCandidateLoadError,
     quickAttachmentDraft,
     quickAttachmentIsPrimary,
     quickAttachmentMode,
+    quickAttachmentHasMoreCandidates,
     quickAttachmentNotes,
     quickAttachmentPurpose,
     quickAttachmentResourceType,

@@ -40,10 +40,13 @@ The attachment is added to the selected gig only, appears without refreshing, pr
 4. Confirm the attachment is saved to the nearest gig and the modal shows editable title, type, purpose, URL, notes, and primary fields.
 5. Save details, then click `Go to gig` and confirm the target Gig overview scrolls into view and shows the attachment.
 6. Click `+` again, choose `Add link`, paste a Google Doc or Google Sheet URL, and save.
+7. With several valid historical gigs outside the nearby window, use `Load more gigs` in both the receipt and attachment dialogs until the intended gig is available. Confirm the current selection and entered file, link, title, amount, and notes remain unchanged while loading and after a failed request; retry the request and confirm it recovers.
+8. Continue until `Load more gigs` is no longer available, then select an older gig and save the existing draft action.
 
 ### Expected Results
 
 The quick add journey uses the same gig matching behaviour as quick receipts, supports both uploaded files and URLs, infers Google Doc/Sheet types where possible, and preserves user-facing attachment terminology. Terminal save feedback remains visible after navigating to the target gig and does not obscure the floating mobile actions.
+Candidate expansion never saves or moves a draft by itself, keeps current options visible during loading, allows retry after an error, and eventually exposes visible non-cancelled historical gigs without duplicate options.
 
 ## File-Only Attachment Journey
 

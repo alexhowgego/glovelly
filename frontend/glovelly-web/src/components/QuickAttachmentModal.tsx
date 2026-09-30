@@ -11,6 +11,8 @@ type QuickAttachmentModalProps = {
   candidates: QuickGigCandidate[]
   clientNamesById: ReadonlyMap<string, string>
   draft: QuickExternalResourceDraftResponse | null
+  hasMoreCandidates: boolean
+  isLoadingCandidates: boolean
   isPrimary: boolean
   isSaving: boolean
   mode: QuickAttachmentMode
@@ -18,6 +20,7 @@ type QuickAttachmentModalProps = {
   onClose: () => void
   onFileChange: (file: File) => void
   onGoToGig: () => void
+  onLoadMoreCandidates: () => void
   onIsPrimaryChange: (value: boolean) => void
   onModeLink: () => void
   onNotesChange: (value: string) => void
@@ -30,6 +33,7 @@ type QuickAttachmentModalProps = {
   onTitleChange: (value: string) => void
   onUrlChange: (value: string) => void
   pendingFile: File | null
+  loadCandidatesError: string
   purpose: GigExternalResourcePurpose
   resourceType: GigExternalResourceType
   selectedGigId: string
@@ -59,6 +63,8 @@ export function QuickAttachmentModal({
   candidates,
   clientNamesById,
   draft,
+  hasMoreCandidates,
+  isLoadingCandidates,
   isPrimary,
   isSaving,
   mode,
@@ -66,6 +72,7 @@ export function QuickAttachmentModal({
   onClose,
   onFileChange,
   onGoToGig,
+  onLoadMoreCandidates,
   onIsPrimaryChange,
   onModeLink,
   onNotesChange,
@@ -78,6 +85,7 @@ export function QuickAttachmentModal({
   onTitleChange,
   onUrlChange,
   pendingFile,
+  loadCandidatesError,
   purpose,
   resourceType,
   selectedGigId,
@@ -115,7 +123,7 @@ export function QuickAttachmentModal({
       ? [draftGigCandidate]
       : []
   const hasCandidatePrompt =
-    displayedCandidates.length > 0 || status.startsWith('No gig was within')
+    displayedCandidates.length > 0 || hasMoreCandidates || status.startsWith('No gig was within')
   const selectedCandidateId = selectedGigId ||
     displayedCandidates.find((candidate) => candidate.isSelected)?.id ||
     draft?.gig.id ||
@@ -223,7 +231,11 @@ export function QuickAttachmentModal({
             candidates={displayedCandidates}
             clientNamesById={clientNamesById}
             emptyMessage="Create or update a gig near this attachment date, then try again."
+            hasMoreCandidates={hasMoreCandidates}
+            isLoadingCandidates={isLoadingCandidates}
             isSaving={isSaving && !draft}
+            loadCandidatesError={loadCandidatesError}
+            onLoadMoreCandidates={onLoadMoreCandidates}
             onSelectedGigChange={onSelectedGigChange}
             selectedGigId={selectedGigId || draft?.gig.id || ''}
           />

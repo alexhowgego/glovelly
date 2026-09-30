@@ -410,11 +410,15 @@ function App({ appMetadata }: AppProps) {
     closeQuickReceiptPrompt,
     goToQuickReceiptGig,
     handleQuickReceiptFile,
+    isQuickReceiptLoadingCandidates,
     isQuickReceiptSaving,
+    loadMoreQuickReceiptCandidates,
     pendingReceiptFile,
     quickReceiptAmount,
     quickReceiptCandidates,
+    quickReceiptCandidateLoadError,
     quickReceiptDescription,
+    quickReceiptHasMoreCandidates,
     quickReceiptDraft,
     quickReceiptSelectedGigId,
     quickReceiptStatus,
@@ -439,58 +443,22 @@ function App({ appMetadata }: AppProps) {
     onSessionExpired: expireSession,
     setGigStatus,
   })
-  const getQuickCaptureCandidates = useCallback(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const sortedCandidates = gigs
-      .filter((gig) => gig.status !== 'Cancelled')
-      .map((gig) => {
-        const gigDate = new Date(`${gig.date}T00:00:00`)
-        gigDate.setHours(0, 0, 0, 0)
-        const daysFromToday = Number.isNaN(gigDate.getTime())
-          ? 0
-          : Math.abs(Math.round((gigDate.getTime() - today.getTime()) / 86_400_000))
-
-        return {
-          id: gig.id,
-          clientId: gig.clientId,
-          title: gig.title,
-          date: gig.date,
-          venue: gig.venue,
-          type: gig.type,
-          status: gig.status,
-          daysFromToday,
-          isSelected: false,
-        }
-      })
-      .filter((candidate) => candidate.daysFromToday <= 30)
-      .sort((left, right) =>
-        left.daysFromToday - right.daysFromToday ||
-        left.date.localeCompare(right.date) ||
-        left.title.localeCompare(right.title)
-      )
-
-    const cutoff = sortedCandidates[4]?.daysFromToday
-    return sortedCandidates
-      .filter((candidate, index) => cutoff === undefined || index < 5 || candidate.daysFromToday === cutoff)
-      .map((candidate, index) => ({
-        ...candidate,
-        isSelected: index === 0,
-      }))
-  }, [gigs])
   const {
     clearQuickAttachmentDialog,
     closeQuickAttachmentPrompt,
     goToQuickAttachmentGig,
     handleQuickAttachmentFile,
+    isQuickAttachmentLoadingCandidates,
     isQuickAttachmentSaving,
+    loadMoreQuickAttachmentCandidates,
     openQuickAttachmentDialog,
     pendingAttachmentFile,
     quickAttachmentCandidates,
+    quickAttachmentCandidateLoadError,
     quickAttachmentDraft,
     quickAttachmentIsPrimary,
     quickAttachmentMode,
+    quickAttachmentHasMoreCandidates,
     quickAttachmentNotes,
     quickAttachmentPurpose,
     quickAttachmentResourceType,
@@ -511,7 +479,6 @@ function App({ appMetadata }: AppProps) {
     updateQuickAttachmentUrl,
   } = useQuickAttachment({
     getGigById: (gigId) => gigsById.get(gigId),
-    getQuickCaptureCandidates,
     onMergeSavedGig: (gig) => mergeSavedGig(gig),
     onOpenAttachmentDraft: (gig, scrollToGig) => openGigReceiptDraft(gig, scrollToGig),
     onSelectGig: selectGig,
@@ -2079,6 +2046,8 @@ function App({ appMetadata }: AppProps) {
         candidates={quickAttachmentCandidates}
         clientNamesById={clientNamesById}
         draft={quickAttachmentDraft}
+        hasMoreCandidates={quickAttachmentHasMoreCandidates}
+        isLoadingCandidates={isQuickAttachmentLoadingCandidates}
         isPrimary={quickAttachmentIsPrimary}
         isSaving={isQuickAttachmentSaving}
         mode={quickAttachmentMode}
@@ -2086,6 +2055,7 @@ function App({ appMetadata }: AppProps) {
         onClose={closeQuickAttachmentPrompt}
         onFileChange={handleQuickAttachmentFile}
         onGoToGig={goToQuickAttachmentGig}
+        onLoadMoreCandidates={loadMoreQuickAttachmentCandidates}
         onIsPrimaryChange={setQuickAttachmentIsPrimary}
         onModeLink={startQuickAttachmentLinkMode}
         onNotesChange={setQuickAttachmentNotes}
@@ -2098,6 +2068,7 @@ function App({ appMetadata }: AppProps) {
         onTitleChange={setQuickAttachmentTitle}
         onUrlChange={updateQuickAttachmentUrl}
         pendingFile={pendingAttachmentFile}
+        loadCandidatesError={quickAttachmentCandidateLoadError}
         purpose={quickAttachmentPurpose}
         resourceType={quickAttachmentResourceType}
         selectedGigId={quickAttachmentSelectedGigId}
@@ -2112,16 +2083,20 @@ function App({ appMetadata }: AppProps) {
         clientNamesById={clientNamesById}
         description={quickReceiptDescription}
         draft={quickReceiptDraft}
+        hasMoreCandidates={quickReceiptHasMoreCandidates}
+        isLoadingCandidates={isQuickReceiptLoadingCandidates}
         isSaving={isQuickReceiptSaving}
         onAmountChange={setQuickReceiptAmount}
         onClose={closeQuickReceiptPrompt}
         onDescriptionChange={setQuickReceiptDescription}
         onGoToGig={goToQuickReceiptGig}
+        onLoadMoreCandidates={loadMoreQuickReceiptCandidates}
         onSaveDetails={saveQuickReceiptDetails}
         onSaveDraft={savePendingReceiptToSelectedGig}
         onSessionExpired={expireSession}
         onSelectedGigChange={setQuickReceiptSelectedGigId}
         pendingFile={pendingReceiptFile}
+        loadCandidatesError={quickReceiptCandidateLoadError}
         selectedGigId={quickReceiptSelectedGigId}
         status={quickReceiptStatus}
       />

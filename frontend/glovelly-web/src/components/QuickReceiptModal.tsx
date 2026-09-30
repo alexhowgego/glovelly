@@ -11,15 +11,19 @@ type QuickReceiptModalProps = {
   candidates: QuickReceiptCandidate[]
   clientNamesById: ReadonlyMap<string, string>
   draft: QuickReceiptDraftResponse | null
+  hasMoreCandidates: boolean
+  isLoadingCandidates: boolean
   isSaving: boolean
   onAmountChange: (value: string) => void
   onClose: () => void
   onDescriptionChange: (value: string) => void
   onGoToGig: () => void
+  onLoadMoreCandidates: () => void
   onSaveDetails: (details?: { description: string; amount: string }) => Promise<void>
   onSaveDraft: () => void
   onSelectedGigChange: (gigId: string) => void
   pendingFile: File | null
+  loadCandidatesError: string
   selectedGigId: string
   status: string
   amount: string
@@ -33,15 +37,19 @@ export function QuickReceiptModal({
   clientNamesById,
   description,
   draft,
+  hasMoreCandidates,
+  isLoadingCandidates,
   isSaving,
   onAmountChange,
   onClose,
   onDescriptionChange,
   onGoToGig,
+  onLoadMoreCandidates,
   onSaveDetails,
   onSaveDraft,
   onSelectedGigChange,
   pendingFile,
+  loadCandidatesError,
   selectedGigId,
   status,
   onSessionExpired,
@@ -107,7 +115,11 @@ export function QuickReceiptModal({
           candidates={candidates}
           clientNamesById={clientNamesById}
           emptyMessage="Create or update a gig near this receipt date, then try again."
+          hasMoreCandidates={hasMoreCandidates}
+          isLoadingCandidates={isLoadingCandidates}
           isSaving={isSaving && !draft}
+          loadCandidatesError={loadCandidatesError}
+          onLoadMoreCandidates={onLoadMoreCandidates}
           onSelectedGigChange={onSelectedGigChange}
           selectedGigId={selectedGigId}
         />

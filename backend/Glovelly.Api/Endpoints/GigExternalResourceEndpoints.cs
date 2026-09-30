@@ -40,8 +40,9 @@ internal static class GigExternalResourceEndpoints
             var gigId = GigQuickCaptureSupport.TryReadGigId(form);
             var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
             var settings = GigQuickCaptureSupport.NormalizeSettings(quickCaptureOptions.Value);
-            var candidates = await GigQuickCaptureSupport.FindCandidatesAsync(db, userId, today, settings);
-            var gigResult = await ResolveQuickCaptureGigAsync(db, userId, gigId, candidates, settings, "attachment");
+            var candidateResult = await GigQuickCaptureSupport.QueryCandidatesAsync(db, userId, today, settings);
+            var candidates = candidateResult.Candidates;
+            var gigResult = await ResolveQuickCaptureGigAsync(db, userId, gigId, candidateResult, settings, "attachment");
             if (gigResult.Result is not null)
             {
                 return gigResult.Result;
@@ -102,6 +103,8 @@ internal static class GigExternalResourceEndpoints
                 attachmentId,
                 inferredGig = !gigId.HasValue,
                 candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, gig.Id),
+                hasMoreCandidates = candidateResult.HasMore,
+                candidateContinuation = candidateResult.Continuation,
                 autoAttachWindowDays = settings.AutoAttachWindowDays,
                 hasNearbyCandidates = GigQuickCaptureSupport.HasNearbyCandidates(candidates, gig.Id, settings),
             });
@@ -125,8 +128,9 @@ internal static class GigExternalResourceEndpoints
 
             var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
             var settings = GigQuickCaptureSupport.NormalizeSettings(quickCaptureOptions.Value);
-            var candidates = await GigQuickCaptureSupport.FindCandidatesAsync(db, userId, today, settings);
-            var gigResult = await ResolveQuickCaptureGigAsync(db, userId, request.GigId, candidates, settings, "attachment");
+            var candidateResult = await GigQuickCaptureSupport.QueryCandidatesAsync(db, userId, today, settings);
+            var candidates = candidateResult.Candidates;
+            var gigResult = await ResolveQuickCaptureGigAsync(db, userId, request.GigId, candidateResult, settings, "attachment");
             if (gigResult.Result is not null)
             {
                 return gigResult.Result;
@@ -179,6 +183,8 @@ internal static class GigExternalResourceEndpoints
                 attachmentId = (Guid?)null,
                 inferredGig = !request.GigId.HasValue,
                 candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, gig.Id),
+                hasMoreCandidates = candidateResult.HasMore,
+                candidateContinuation = candidateResult.Continuation,
                 autoAttachWindowDays = settings.AutoAttachWindowDays,
                 hasNearbyCandidates = GigQuickCaptureSupport.HasNearbyCandidates(candidates, gig.Id, settings),
             });
@@ -594,7 +600,7 @@ internal static class GigExternalResourceEndpoints
         AppDbContext db,
         Guid? userId,
         Guid? gigId,
-        List<QuickGigCandidate> candidates,
+        QuickGigCandidateResult candidateResult,
         QuickCaptureSettings settings,
         string draftName)
     {
@@ -610,13 +616,15 @@ internal static class GigExternalResourceEndpoints
                 : (explicitGig, null);
         }
 
-        var nearestCandidate = candidates.FirstOrDefault();
+        var nearestCandidate = candidateResult.Candidates.FirstOrDefault();
         if (nearestCandidate is null)
         {
             return (null, Results.Conflict(new
             {
                 message = $"No gig was within {settings.AutoAttachWindowDays} days. Choose a gig before saving this {draftName} draft.",
-                candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, nearestCandidate?.Id),
+                candidates = GigQuickCaptureSupport.ToCandidateResponses(candidateResult.Candidates, nearestCandidate?.Id),
+                hasMoreCandidates = candidateResult.HasMore,
+                candidateContinuation = candidateResult.Continuation,
                 autoAttachWindowDays = settings.AutoAttachWindowDays,
             }));
         }
