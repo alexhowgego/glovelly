@@ -899,6 +899,15 @@
   font-size: 0.86rem;
 }
 
+.quick-capture-gig-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.quick-capture-load-more {
+  justify-self: start;
+}
+
 .quick-receipt-details {
   grid-template-columns: minmax(120px, 0.5fr) minmax(0, 1fr);
 }

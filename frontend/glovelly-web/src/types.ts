@@ -612,6 +612,12 @@ export type QuickGigCandidate = Pick<
 
 export type QuickReceiptCandidate = QuickGigCandidate
 
+export type QuickCaptureCandidatePage = {
+  candidates: QuickGigCandidate[]
+  hasMore: boolean
+  continuation: string | null
+}
+
 export type QuickReceiptDraftResponse = {
   gig: Gig
   expenseId: string
@@ -620,6 +626,8 @@ export type QuickReceiptDraftResponse = {
   candidates: QuickReceiptCandidate[]
   autoAttachWindowDays: number
   hasNearbyCandidates: boolean
+  hasMoreCandidates: boolean
+  candidateContinuation: string | null
 }
 
 export type QuickReceiptDraftUpdateResponse = {
@@ -638,6 +646,8 @@ export type QuickExternalResourceDraftResponse = {
   candidates: QuickGigCandidate[]
   autoAttachWindowDays: number
   hasNearbyCandidates: boolean
+  hasMoreCandidates: boolean
+  candidateContinuation: string | null
 }
 
 export type QuickExternalResourceDraftUpdateResponse = {

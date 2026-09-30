@@ -40,11 +40,12 @@ internal static class GigReceiptEndpoints
             var gigId = GigQuickCaptureSupport.TryReadGigId(form);
             var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
             var settings = GigQuickCaptureSupport.NormalizeSettings(quickCaptureOptions.Value);
-            var candidates = await GigQuickCaptureSupport.FindCandidatesAsync(
+            var candidateResult = await GigQuickCaptureSupport.QueryCandidatesAsync(
                 db,
                 userId,
                 today,
                 settings);
+            var candidates = candidateResult.Candidates;
             Gig? gig;
             if (gigId.HasValue)
             {
@@ -67,6 +68,8 @@ internal static class GigReceiptEndpoints
                     {
                         message = $"No gig was within {settings.AutoAttachWindowDays} days. Choose a gig before saving this receipt draft.",
                         candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, nearestCandidate?.Id),
+                        hasMoreCandidates = candidateResult.HasMore,
+                        candidateContinuation = candidateResult.Continuation,
                         autoAttachWindowDays = settings.AutoAttachWindowDays,
                     });
                 }
@@ -125,6 +128,8 @@ internal static class GigReceiptEndpoints
                 attachmentId,
                 inferredGig = !gigId.HasValue,
                 candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, gig.Id),
+                hasMoreCandidates = candidateResult.HasMore,
+                candidateContinuation = candidateResult.Continuation,
                 autoAttachWindowDays = settings.AutoAttachWindowDays,
                 hasNearbyCandidates = GigQuickCaptureSupport.HasNearbyCandidates(candidates, gig.Id, settings),
             });

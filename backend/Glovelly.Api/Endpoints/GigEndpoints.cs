@@ -7,6 +7,7 @@ public static class GigEndpoints
         group
             .MapGigInvoiceEndpoints()
             .MapGigCrudEndpoints()
+            .MapGigQuickCaptureCandidateEndpoints()
             .MapGigReceiptEndpoints()
             .MapGigExpenseEndpoints()
             .MapGigExternalResourceEndpoints()

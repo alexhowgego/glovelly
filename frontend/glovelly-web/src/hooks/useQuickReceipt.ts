@@ -13,6 +13,7 @@ import type {
   QuickReceiptDraftResponse,
   QuickReceiptDraftUpdateResponse,
 } from '../types'
+import { getQuickCaptureCandidatePage } from '../quickCaptureCandidates'
 
 type UseQuickReceiptOptions = {
   getGigById: (gigId: string) => Gig | undefined
@@ -42,11 +43,22 @@ export function useQuickReceipt({
   const [quickReceiptDescription, setQuickReceiptDescription] = useState('')
   const [quickReceiptStatus, setQuickReceiptStatus] = useState('')
   const [isQuickReceiptSaving, setIsQuickReceiptSaving] = useState(false)
+  const [quickReceiptContinuation, setQuickReceiptContinuation] = useState<string | null>(null)
+  const [quickReceiptHasMoreCandidates, setQuickReceiptHasMoreCandidates] = useState(false)
+  const [isQuickReceiptLoadingCandidates, setIsQuickReceiptLoadingCandidates] = useState(false)
+  const [quickReceiptCandidateLoadError, setQuickReceiptCandidateLoadError] = useState('')
+
+  const setCandidatePage = (page: { hasMore: boolean; continuation: string | null }) => {
+    setQuickReceiptHasMoreCandidates(page.hasMore)
+    setQuickReceiptContinuation(page.continuation)
+    setQuickReceiptCandidateLoadError('')
+  }
 
   const promptForReceiptGig = (
     file: File,
     candidates: QuickReceiptCandidate[],
-    message: string
+    message: string,
+    page?: { hasMoreCandidates?: boolean; candidateContinuation?: string | null }
   ) => {
     setPendingReceiptFile(file)
     setQuickReceiptDraft(null)
@@ -55,6 +67,9 @@ export function useQuickReceipt({
     setQuickReceiptAmount('')
     setQuickReceiptDescription('Receipt draft')
     setQuickReceiptStatus(message)
+    setQuickReceiptHasMoreCandidates(page?.hasMoreCandidates ?? false)
+    setQuickReceiptContinuation(page?.candidateContinuation ?? null)
+    setQuickReceiptCandidateLoadError('')
   }
 
   const clearQuickReceiptDialog = useCallback(() => {
@@ -65,6 +80,10 @@ export function useQuickReceipt({
     setQuickReceiptAmount('')
     setQuickReceiptDescription('')
     setQuickReceiptStatus('')
+    setQuickReceiptContinuation(null)
+    setQuickReceiptHasMoreCandidates(false)
+    setIsQuickReceiptLoadingCandidates(false)
+    setQuickReceiptCandidateLoadError('')
   }, [])
 
   const uploadQuickReceiptDraft = async (file: File, gigId?: string) => {
@@ -105,11 +124,14 @@ export function useQuickReceipt({
         const conflict = (await response.json()) as {
           message?: string
           candidates?: QuickReceiptCandidate[]
+          hasMoreCandidates?: boolean
+          candidateContinuation?: string | null
         }
         promptForReceiptGig(
           file,
           conflict.candidates ?? [],
-          conflict.message ?? 'Choose a gig before saving this receipt draft.'
+          conflict.message ?? 'Choose a gig before saving this receipt draft.',
+          conflict
         )
         return
       }
@@ -124,7 +146,8 @@ export function useQuickReceipt({
       onOpenReceiptDraft(receiptDraft.gig)
       setPendingReceiptFile(null)
       setQuickReceiptDraft(receiptDraft)
-      setQuickReceiptCandidates(receiptDraft.candidates)
+        setQuickReceiptCandidates(receiptDraft.candidates)
+        setCandidatePage({ hasMore: receiptDraft.hasMoreCandidates, continuation: receiptDraft.candidateContinuation })
       setQuickReceiptSelectedGigId(receiptDraft.gig.id)
       setQuickReceiptAmount('')
       setQuickReceiptDescription('Receipt draft')
@@ -152,6 +175,36 @@ export function useQuickReceipt({
     }
 
     void uploadQuickReceiptDraft(pendingReceiptFile, quickReceiptSelectedGigId)
+  }
+
+  const loadMoreQuickReceiptCandidates = async () => {
+    if (!quickReceiptHasMoreCandidates || !quickReceiptContinuation || isQuickReceiptLoadingCandidates) {
+      return
+    }
+
+    setIsQuickReceiptLoadingCandidates(true)
+    setQuickReceiptCandidateLoadError('')
+    try {
+      const { response, page } = await getQuickCaptureCandidatePage(quickReceiptContinuation)
+      if (handleSessionExpired(response, onSessionExpired, 'Your session expired. Sign in again to load gigs.')) {
+        return
+      }
+      if (!response.ok || !page) {
+        throw new Error(await getResponseErrorMessage(response, 'Unable to load more gigs.'))
+      }
+
+      setQuickReceiptCandidates((current) => {
+        const knownIds = new Set(current.map((candidate) => candidate.id))
+        return [...current, ...page.candidates.filter((candidate) => !knownIds.has(candidate.id))]
+      })
+      setCandidatePage(page)
+    } catch (error) {
+      setQuickReceiptCandidateLoadError(
+        error instanceof Error ? error.message : 'Unable to load more gigs. Try again.'
+      )
+    } finally {
+      setIsQuickReceiptLoadingCandidates(false)
+    }
   }
 
   const saveQuickReceiptDetails = async (details?: { description: string; amount: string }) => {
@@ -272,14 +325,18 @@ export function useQuickReceipt({
     goToQuickReceiptGig,
     handleQuickReceiptFile,
     isQuickReceiptSaving,
+    isQuickReceiptLoadingCandidates,
     pendingReceiptFile,
     quickReceiptAmount,
     quickReceiptCandidates,
+    quickReceiptCandidateLoadError,
     quickReceiptDescription,
+    quickReceiptHasMoreCandidates,
     quickReceiptDraft,
     quickReceiptSelectedGigId,
     quickReceiptStatus,
     savePendingReceiptToSelectedGig,
+    loadMoreQuickReceiptCandidates,
     saveQuickReceiptDetails,
     setQuickReceiptAmount,
     setQuickReceiptDescription,

@@ -2,6 +2,8 @@ using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
+using System.Text.Json;
 
 namespace Glovelly.Api.Endpoints;
 
@@ -23,11 +25,12 @@ internal static class GigQuickCaptureSupport
         };
     }
 
-    public static async Task<List<QuickGigCandidate>> FindCandidatesAsync(
+    public static async Task<QuickGigCandidateResult> QueryCandidatesAsync(
         AppDbContext db,
         Guid? userId,
         DateOnly today,
-        QuickCaptureSettings settings)
+        QuickCaptureSettings settings,
+        string? continuation = null)
     {
         var gigs = await db.Gigs
             .WhereVisibleTo(userId)
@@ -35,7 +38,7 @@ internal static class GigQuickCaptureSupport
             .Where(value => value.Status != GigStatus.Cancelled)
             .ToListAsync();
 
-        var candidates = gigs
+        var eligibleCandidates = gigs
             .Select(gig => new QuickGigCandidate(
                 gig.Id,
                 gig.ClientId,
@@ -45,19 +48,96 @@ internal static class GigQuickCaptureSupport
                 gig.Type,
                 gig.Status,
                 Math.Abs(gig.Date.DayNumber - today.DayNumber)))
-            .Where(candidate => candidate.DaysFromToday <= settings.AutoAttachWindowDays)
             .OrderBy(candidate => candidate.DaysFromToday)
             .ThenBy(candidate => candidate.Date)
             .ThenBy(candidate => candidate.Title)
+            .ThenBy(candidate => candidate.Id)
             .ToList();
 
-        var cutoff = candidates.Count >= settings.CandidateCount
-            ? candidates[settings.CandidateCount - 1].DaysFromToday
-            : (int?)null;
+        if (string.IsNullOrWhiteSpace(continuation))
+        {
+            var nearbyCandidates = eligibleCandidates
+                .Where(candidate => candidate.DaysFromToday <= settings.AutoAttachWindowDays)
+                .ToList();
 
-        return candidates
-            .Where((candidate, index) => !cutoff.HasValue || index < settings.CandidateCount || candidate.DaysFromToday == cutoff.Value)
+            var cutoff = nearbyCandidates.Count >= settings.CandidateCount
+                ? nearbyCandidates[settings.CandidateCount - 1].DaysFromToday
+                : (int?)null;
+            var candidates = nearbyCandidates
+                .Where((candidate, index) => !cutoff.HasValue || index < settings.CandidateCount || candidate.DaysFromToday == cutoff.Value)
+                .ToList();
+            var hasMore = candidates.Count == 0
+                ? eligibleCandidates.Count > 0
+                : eligibleCandidates.Any(candidate => IsAfter(candidate, candidates[^1]));
+
+            return new QuickGigCandidateResult(candidates, hasMore, hasMore ? EncodeContinuation(candidates.LastOrDefault()) : null);
+        }
+
+        if (!TryDecodeContinuation(continuation, out var cursor))
+        {
+            throw new InvalidOperationException("The candidate continuation is invalid.");
+        }
+
+        var page = eligibleCandidates
+            .Where(candidate => cursor is null || IsAfter(candidate, cursor))
+            .Take(QuickCapturePageSize + 1)
             .ToList();
+        var hasNextPage = page.Count > QuickCapturePageSize;
+        if (hasNextPage)
+        {
+            page.RemoveAt(page.Count - 1);
+        }
+
+        return new QuickGigCandidateResult(page, hasNextPage, hasNextPage ? EncodeContinuation(page[^1]) : null);
+    }
+
+    private const int QuickCapturePageSize = 20;
+
+    private static bool IsAfter(QuickGigCandidate candidate, QuickGigCandidate cursor) =>
+        candidate.DaysFromToday > cursor.DaysFromToday ||
+        candidate.DaysFromToday == cursor.DaysFromToday && candidate.Date > cursor.Date ||
+        candidate.DaysFromToday == cursor.DaysFromToday && candidate.Date == cursor.Date && string.CompareOrdinal(candidate.Title, cursor.Title) > 0 ||
+        candidate.DaysFromToday == cursor.DaysFromToday && candidate.Date == cursor.Date && string.Equals(candidate.Title, cursor.Title, StringComparison.Ordinal) && candidate.Id.CompareTo(cursor.Id) > 0;
+
+    private static string EncodeContinuation(QuickGigCandidate? candidate)
+    {
+        if (candidate is null)
+        {
+            return Convert.ToBase64String("{}"u8);
+        }
+
+        return Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new QuickGigCandidateCursor(
+            candidate.Id, candidate.Date, candidate.Title, candidate.DaysFromToday)));
+    }
+
+    private static bool TryDecodeContinuation(string continuation, out QuickGigCandidate? cursor)
+    {
+        cursor = null;
+        try
+        {
+            var json = Convert.FromBase64String(continuation);
+            if (json.Length == 2 && Encoding.UTF8.GetString(json) == "{}")
+            {
+                return true;
+            }
+
+            var value = JsonSerializer.Deserialize<QuickGigCandidateCursor>(json);
+            if (value is null || value.Id == Guid.Empty || string.IsNullOrWhiteSpace(value.Title))
+            {
+                return false;
+            }
+
+            cursor = new QuickGigCandidate(value.Id, Guid.Empty, value.Title, value.Date, string.Empty, default, default, value.DaysFromToday);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     public static bool HasNearbyCandidates(
@@ -98,3 +178,10 @@ internal sealed record QuickGigCandidate(
     GigType Type,
     GigStatus Status,
     int DaysFromToday);
+
+internal sealed record QuickGigCandidateResult(
+    IReadOnlyList<QuickGigCandidate> Candidates,
+    bool HasMore,
+    string? Continuation);
+
+internal sealed record QuickGigCandidateCursor(Guid Id, DateOnly Date, string Title, int DaysFromToday);
