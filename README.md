@@ -10,6 +10,7 @@ Glovelly is a personal business platform for managing my self-employed music wor
 - Public site: [https://glovelly.net](https://glovelly.net)
 - Production application: [https://menu.glovelly.net](https://menu.glovelly.net)
 - Staging site: [https://staging.glovelly.net](https://staging.glovelly.net)
+- User guide: [https://docs.glovelly.net](https://docs.glovelly.net)
 - Technical handbook: [https://handbook.glovelly.net](https://handbook.glovelly.net)
 
 ## Handbook

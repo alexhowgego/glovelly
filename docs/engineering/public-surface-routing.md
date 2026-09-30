@@ -9,7 +9,7 @@ Glovelly has four public surfaces. Their roles are deliberately separate so the 
 | `docs.glovelly.net` | Public task-oriented user guide | Firebase Hosting target `user-guide` (`glovelly-docs`) | User-guide deployment |
 | `handbook.glovelly.net` | Technical and operator handbook | GitHub Pages / DocFX | Handbook workflow |
 
-The Firebase sites are in the `glovelly-dev` Google Cloud project. They are delivery targets only: Glovelly does not use Firebase Authentication, Firestore, or Firebase client SDKs. Until the landing-site and user-guide projects are implemented, their default `web.app` addresses can return `404`; do not attach their production domains to placeholder content.
+The Firebase sites are in the `glovelly-dev` Google Cloud project. They are delivery targets only: Glovelly does not use Firebase Authentication, Firestore, or Firebase client SDKs.
 
 ## Current Baseline
 
@@ -32,7 +32,7 @@ The application derives its Google sign-in redirect, Drive, Sheets, and Calendar
 - Firebase Hosting owns the apex landing site and its TLS certificate.
 - Cloud Run owns only the Menu application origin and API.
 - GitHub Pages owns the handbook hostname and its DocFX output.
-- The user-guide Firebase target owns `docs.glovelly.net` when the guide is released.
+- The user-guide Firebase target owns `docs.glovelly.net`.
 - Application URLs, OAuth callback URLs, and MCP metadata are constructed from `App:PublicBaseUrl`; deployed environments never infer a public origin from an incoming request host.
 
 ## Post-Deployment Checks

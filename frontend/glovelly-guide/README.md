@@ -1,6 +1,6 @@
 # Glovelly User Guide
 
-The public user guide is a standalone Astro/Starlight project for musicians and sole traders. It uses a practical, task-led "do this next" voice. The technical/operator [Glovelly Handbook](https://handbook.glovelly.net) remains a separate DocFX site with concise reference material.
+The public user guide is a standalone Astro/Starlight project for musicians and sole traders. It uses a practical, task-led "do this next" voice. The technical/operator [Glovelly Handbook](https://handbook.glovelly.net) remains a separate DocFX site with concise reference material. It loads the shared public-site Google Analytics module only after consent on `docs.glovelly.net`; preview and local hosts do not load analytics.
 
 ## Commands
 
