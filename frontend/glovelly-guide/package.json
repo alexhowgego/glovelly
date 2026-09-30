@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
-    "check": "astro check",
+    "build": "astro build && node ../copy-public-site-analytics.mjs dist",
+    "check": "astro check && node ../verify-public-site-analytics.mjs",
     "lint": "npm run check",
     "preview": "astro preview"
   },

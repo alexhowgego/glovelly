@@ -7,12 +7,18 @@ on:
       - ".github/workflows/guide.yml"
       - ".firebaserc"
       - "firebase.json"
+      - "frontend/copy-public-site-analytics.mjs"
+      - "frontend/verify-public-site-analytics.mjs"
+      - "frontend/public-site-analytics/**"
       - "frontend/glovelly-guide/**"
   pull_request:
     paths:
       - ".github/workflows/guide.yml"
       - ".firebaserc"
       - "firebase.json"
+      - "frontend/copy-public-site-analytics.mjs"
+      - "frontend/verify-public-site-analytics.mjs"
+      - "frontend/public-site-analytics/**"
       - "frontend/glovelly-guide/**"
 
 permissions:

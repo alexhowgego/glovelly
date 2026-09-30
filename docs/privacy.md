@@ -92,11 +92,13 @@ Glovelly and its service providers may process technical and diagnostic informat
 
 Glovelly aims to avoid logging sensitive business content unnecessarily, but diagnostic records may sometimes contain limited personal information needed to investigate issues or maintain security.
 
-### Documentation Site Data
+### Public-Site Analytics Data
 
-The documentation site is a static site published through GitHub Pages. GitHub may process limited technical information, such as IP address and request metadata, when serving the site.
+If you accept analytics cookies, Glovelly uses Google Analytics on `glovelly.net`, `docs.glovelly.net`, and `handbook.glovelly.net` to understand aggregate public-site visits and page use. Google Analytics may process technical information such as cookie identifiers, device and browser information, IP-derived location, referral information, and pages viewed.
 
-Glovelly does not intentionally collect account-level personal information from visitors to the documentation site unless a visitor contacts the controller separately.
+Glovelly does not use Google Analytics in the authenticated Menu application and does not send account information, business records, form values, or other user-entered content to Google Analytics. Google Signals and advertising personalisation are disabled. Google Analytics event data is retained for 14 months.
+
+The public documentation sites are static. GitHub or Firebase Hosting may process limited technical information, such as IP address and request metadata, when serving them. Glovelly does not intentionally collect account-level personal information from public-site visitors unless a visitor contacts the controller separately.
 
 ## How Glovelly Uses Personal Information
 
@@ -132,6 +134,7 @@ Depending on the context, Glovelly relies on the following lawful bases under UK
 | Syncing gigs to Google Calendar at the user's request | Contract or legitimate interests |
 | Administering access requests and user permissions | Legitimate interests |
 | Security, abuse prevention, diagnostics, and service maintenance | Legitimate interests |
+| Public-site analytics | Consent |
 | Responding to legal requests or regulatory obligations | Legal obligation |
 
 Where Glovelly relies on legitimate interests, those interests are the operation, administration, security, and improvement of a small business administration service, balanced against the rights and expectations of the people whose information is processed.
@@ -164,6 +167,7 @@ Current expected subprocessors include:
 - Google Cloud Platform, for hosting, infrastructure, managed secrets, and related cloud services
 - Google Cloud Vertex AI, for optional user-requested receipt analysis
 - Google, for sign-in, Google Drive integration, and Google Calendar integration
+- Google Analytics, where a visitor accepts public-site analytics cookies
 - Neon, for database hosting
 - Resend or another configured email delivery provider, for transactional email
 - GitHub, for source control, GitHub Actions, and documentation hosting
@@ -192,6 +196,7 @@ Typical retention expectations are:
 - logs and diagnostic records: normally for a limited operational period, such as up to 90 days, unless needed for security investigation, debugging, legal, accounting, or dispute purposes
 - receipt-analysis attempt metadata and validated suggestions: for as long as the associated receipt is retained for business, tax, accounting, or dispute purposes; provider responses and receipt content are not included in application logs
 - documentation site technical records: according to the retention practices of GitHub or other hosting providers used to serve the site
+- Google Analytics event data: 14 months
 
 Some information may be retained for longer where required by law, tax rules, accounting obligations, security needs, dispute resolution, or backup retention.
 
@@ -241,9 +246,9 @@ Glovelly uses cookies or similar browser storage where needed for authentication
 
 Glovelly does not currently use advertising cookies.
 
-If analytics, embedded media, advertising cookies, or additional tracking tools are added later, this policy should be updated before those tools are enabled.
+On the public landing site, user guide, and handbook, Glovelly asks before setting analytics cookies or loading Google Analytics. Your choice is stored in a secure, same-site `glovelly_analytics_consent` cookie for up to 12 months and applies across those public subdomains. You can accept, reject, or withdraw analytics consent at any time using the Cookie settings control on those sites. Withdrawing consent stops future analytics loading and removes accessible Google Analytics cookies.
 
-The documentation site is static. Any cookies or similar technologies used by GitHub Pages or related hosting infrastructure are controlled by those providers.
+Google Analytics uses its own analytics cookies, including `_ga` and a measurement-specific `_ga_*` cookie, after you accept. More information about Google's processing is available in the [Google Privacy Policy](https://policies.google.com/privacy).
 
 ## Changes To This Policy
 

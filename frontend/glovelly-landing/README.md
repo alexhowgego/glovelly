@@ -1,6 +1,6 @@
 # Glovelly Landing Site
 
-The public landing site is a standalone Astro project. It is intentionally independent from the authenticated React application and does not call the Glovelly API, initialise authentication, set application storage, use analytics, or embed third-party media.
+The public landing site is a standalone Astro project. It is intentionally independent from the authenticated React application and does not call the Glovelly API, initialise authentication, set application storage, or embed third-party media. It loads Google Analytics only after consent on `glovelly.net`; preview and local hosts do not load analytics.
 
 ## Commands
 

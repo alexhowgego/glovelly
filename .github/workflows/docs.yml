@@ -8,6 +8,7 @@ on:
       - ".github/workflows/docs.yml"
       - ".config/dotnet-tools.json"
       - "docs/**"
+      - "frontend/public-site-analytics/**"
   workflow_dispatch:
 
 permissions:

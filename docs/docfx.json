@@ -18,6 +18,13 @@
           "mcp-tools.json",
           "CNAME"
         ]
+      },
+      {
+        "src": "../frontend/public-site-analytics",
+        "files": [
+          "public-site-analytics.js"
+        ],
+        "dest": "public"
       }
     ],
     "output": "_site",
