@@ -21,5 +21,5 @@
 
 - [x] 4.1 Update the privacy policy to describe the public analytics purpose, Google Analytics provider information, consent and withdrawal controls, cookie details, and final retention period.
 - [x] 4.2 Verify the landing and user-guide builds and the DocFX handbook build succeed with the shared asset packaging.
-- [ ] 4.3 Manually verify undecided, accepted, rejected, and withdrawn consent on each production public hostname, including cross-subdomain preference behaviour, network requests, and cookie cleanup.
-- [ ] 4.4 Verify analytics is absent from local, staging, preview, automated-test, and Menu hosts, then confirm GA4 receives only production public-site page views after release.
+- [x] 4.3 Manually verify undecided, accepted, rejected, and withdrawn consent on each production public hostname, including cross-subdomain preference behaviour, network requests, and cookie cleanup.
+- [x] 4.4 Verify analytics is absent from local, staging, preview, automated-test, and Menu hosts, then confirm GA4 receives only production public-site page views after release.

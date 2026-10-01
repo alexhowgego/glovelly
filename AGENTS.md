@@ -19,6 +19,8 @@ dotnet test --solution glovelly.sln --max-parallel-test-modules 1  # backend sui
 dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --filter-class '*GigEndpointsTests'
 npm --prefix frontend/glovelly-web run lint
 npm --prefix frontend/glovelly-web run build
+npm --prefix frontend/glovelly-landing run check
+npm --prefix frontend/glovelly-landing run build
 npm --prefix frontend/glovelly-guide run check
 npm --prefix frontend/glovelly-guide run build
 ./verify.sh                                    # dotnet test, frontend lint, frontend build
@@ -45,6 +47,7 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - `src/hooks/` owns stateful workspace logic for clients, gigs, gig imports, invoices, admin, user settings, seller profile, and quick receipts.
 - `src/components/` is presentational sections/modals. Preserve the current plain React/CSS approach; there is no component library.
 - `frontend/glovelly-guide` is the public, task-led user guide. Write in a practical "do this next" voice for musicians and sole traders; keep technical/operator reference material in the DocFX handbook at `handbook.glovelly.net`.
+- `frontend/public-site-analytics/public-site-analytics.js` is the single consent-gated GA4 loader for `glovelly.net`, `docs.glovelly.net`, and `handbook.glovelly.net`. It must remain absent from Menu, previews, staging, local development, and UAT; Astro builds copy it with `frontend/copy-public-site-analytics.mjs`, while DocFX consumes it as a resource.
 - Terminal frontend feedback uses Sonner: mount `NotificationToaster` from `src/NotificationToaster.tsx` in `src/main.tsx` and call the Glovelly policy wrapper in `src/notifications.ts`, rather than importing Sonner in workspace code. Use notifications for completed actions and unexpected failures that close, navigate away from, or outlive their initiating UI; keep validation, progress, durable configuration/health warnings, and terminal feedback for still-open modals inline. The notification viewport must render below modal overlays so persistent notifications cannot block modal controls.
 - Use `buildApiUrl`, `fetchWithSession`, `parseProblemDetails`, and session-expiry helpers from `src/api.ts`; avoid raw `fetch` for authenticated API calls.
 - Update `src/types.ts` whenever backend JSON shapes change.
@@ -68,6 +71,7 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - Store local secrets such as Google OIDC, Resend, Routes API key, and PostgreSQL connection string with `dotnet user-secrets` under `backend/Glovelly.Api`, not in repo files.
 - Local admin seeding requires `DevelopmentSeeding__AdminGoogleSubject` and only applies when using the in-memory development DB.
 - When adding or changing any runtime setting/environment variable, update `backend/Glovelly.Api/appsettings.json`, both staging and production blocks in `.github/workflows/main.yml`, `README.md`, and the relevant `docs/engineering/` page in the same change. Update this guide when the setting changes agent-relevant operating constraints; never add secret values to repository files.
+- When changing `docs/privacy.md` or `docs/terms.md`, update their `Last updated` date and review the listed public URLs, cookies, providers, retention, and consent wording in the same change.
 
 ## High-Token Files
 
