@@ -11,6 +11,9 @@ public sealed class GigExpense
     public int SortOrder { get; set; }
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
+    public GigExpenseCategory? Category { get; set; }
+    [JsonIgnore]
+    public string? SourceFingerprint { get; set; }
     public GigExpenseReimbursementStatus ReimbursementStatus { get; set; } = GigExpenseReimbursementStatus.Unreimbursed;
     public DateTimeOffset? ReimbursedAt { get; set; }
     public DateTimeOffset? ReimbursementUpdatedAt { get; set; }
@@ -24,4 +27,13 @@ public sealed class GigExpense
     public User? ReimbursementUpdatedByUser { get; set; }
     [JsonIgnore]
     public Invoice? ReimbursementInvoice { get; set; }
+}
+
+public enum GigExpenseCategory
+{
+    Travel,
+    Meals,
+    Accommodation,
+    Equipment,
+    Other,
 }

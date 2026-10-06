@@ -89,6 +89,14 @@ Rollback for a failed registration before later domain schema changes is Neon re
 
 ## Ownership And Access
 
+### Unified intake consolidation (staging only)
+
+PR #294 replaces its four intermediate migrations with `20261013184923_AddUnifiedIntake`, generated from the unchanged main baseline `20260920191203_AddSetListInterpretationJobs`. Production applies this net migration normally. Never rerun an old PR migration bundle after the staging cutover.
+
+On 14 October 2026, staging inspection found the consolidated feature schema already present without its history entry. Full feature-schema equivalence passed. Execution `glovelly-staging-intake-cutover-fd8k8` registered `20261013184923_AddUnifiedIntake` without resetting any data, verified unchanged preserved-record counts, and passed a normal migration no-op rerun. Restore point: `gs://glovelly-storage-staging/maintenance/intake-cutover/20261014082907.dump`. No discarded-source cleanup is needed for this registration-only transition. Updated application deployment and Ubuntu browser checks remain the user-managed CI handoff.
+
+The one-off cutover runner, validation fixtures and build files were removed after completion. Subsequent deployments use the ordinary migration bundle. Retain the private restore point until rollback is no longer needed; do not purge saved files or rerun the old branch bundle.
+
 Use one application database at this stage. Do not introduce separate databases or schemas per user without a clear product/operational reason.
 
 Business data should relate to internal Glovelly users/domain entities, not directly to raw provider claims.

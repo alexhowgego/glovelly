@@ -244,6 +244,12 @@ internal static class EndpointSupport
             {
                 errors["expenses"] = ["Expense amounts cannot be negative."];
             }
+
+            var invalidCategory = gig.Expenses.Any(expense => expense.Category.HasValue && !Enum.IsDefined(expense.Category.Value));
+            if (invalidCategory)
+            {
+                errors["expenses"] = ["Expense category is invalid."];
+            }
         }
 
         return errors.Count > 0 ? Results.ValidationProblem(errors) : null;
@@ -275,6 +281,7 @@ internal static class EndpointSupport
                 SortOrder = expense.SortOrder == 0 ? index + 1 : expense.SortOrder,
                 Description = expense.Description.Trim(),
                 Amount = expense.Amount,
+                Category = expense.Category,
                 ReimbursementStatus = expense.ReimbursementStatus,
                 ReimbursedAt = expense.ReimbursedAt,
                 ReimbursementMethod = expense.ReimbursementMethod?.Trim(),

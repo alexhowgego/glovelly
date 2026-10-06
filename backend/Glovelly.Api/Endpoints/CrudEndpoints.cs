@@ -33,6 +33,11 @@ public static class CrudEndpoints
             .RequireAuthorization(GlovellyPolicies.GlovellyUser)
             .MapSellerProfileEndpoints();
 
+        app.MapGroup("/intake")
+            .WithTags("Intake")
+            .RequireAuthorization(GlovellyPolicies.GlovellyUser)
+            .MapIntakeEndpoints();
+
         return app;
     }
 }

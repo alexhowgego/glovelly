@@ -41,6 +41,7 @@ export const emptyUserSettingsForm = (): UserSettingsForm => ({
   invoiceEmailBodyTemplate: '',
   invoiceReplyToEmail: '',
   invoiceUploadFolderId: '',
+  automaticReceiptMatching: 'HighConfidence',
 })
 
 export const emptyClientSettingsForm = (): ClientSettingsForm => ({

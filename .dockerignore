@@ -6,3 +6,6 @@ artifacts
 **/node_modules
 frontend/glovelly-web/dist
 README.md
+.glovelly.dev.local
+gha-creds-*.json
+.opencode

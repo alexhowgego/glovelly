@@ -13,6 +13,7 @@ const API_PREFIXES = [
   '/gig-imports',
   '/health',
   '/integrations',
+  '/intake',
   '/invoices',
   '/invoice-lines',
   '/invoice-email-template',

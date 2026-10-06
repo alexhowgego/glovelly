@@ -31,8 +31,6 @@ type AppShellProps = {
   isGigLoading: boolean
   isLoading: boolean
   isProfileMenuOpen: boolean
-  isQuickAttachmentSaving: boolean
-  isQuickReceiptSaving: boolean
   isSellerProfileSaving: boolean
   isUserSettingsSaving: boolean
   navigationItems: AppNavigationItem[]
@@ -45,8 +43,7 @@ type AppShellProps = {
   onOpenConnectedServices: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
-  onQuickAttachmentOpen: () => void
-  onQuickReceiptFile: (file: File) => void
+  onUnifiedIntakeOpen: () => void
   onSectionChange: (section: AppSection) => void
   onSignOut: () => void
   onThemePreferenceChange: (preference: ThemePreference) => void
@@ -68,8 +65,6 @@ export function AppShell({
   isGigLoading,
   isLoading,
   isProfileMenuOpen,
-  isQuickAttachmentSaving,
-  isQuickReceiptSaving,
   isSellerProfileSaving,
   isUserSettingsSaving,
   navigationItems,
@@ -82,8 +77,7 @@ export function AppShell({
   onOpenConnectedServices,
   onOpenUserSettings,
   onProfileMenuToggle,
-  onQuickAttachmentOpen,
-  onQuickReceiptFile,
+  onUnifiedIntakeOpen,
   onSectionChange,
   onSignOut,
   onThemePreferenceChange,
@@ -140,44 +134,20 @@ export function AppShell({
               </div>
 
               <div className="header-actions">
-                <label
+                <button
                   className={`primary-button quick-capture-button quick-receipt-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}
-                  title="Quick add expense receipt"
+                  title="Add a photo, file, URL or text"
+                  type="button"
+                  onClick={onUnifiedIntakeOpen}
+                  disabled={isLoading || isGigLoading}
                 >
                   <span className="quick-capture-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" focusable="false">
-                      <path d="M8.4 6.5 9.7 4h4.6l1.3 2.5H19a3 3 0 0 1 3 3V17a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V9.5a3 3 0 0 1 3-3h3.4Z" />
-                      <path d="M12 16.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
-                      <path d="M18 10h.01" />
+                      <path d="M12 5v14" />
+                      <path d="M5 12h14" />
                     </svg>
                   </span>
-                  <span className="quick-capture-label">Scan receipt</span>
-                  <input
-                    type="file"
-                    accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
-                    disabled={isLoading || isGigLoading || isQuickReceiptSaving}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      event.target.value = ''
-                      if (file) {
-                        onQuickReceiptFile(file)
-                      }
-                    }}
-                  />
-                </label>
-
-                <button
-                  className={`primary-button quick-capture-button quick-attachment-button ${isReturnToTopVisible ? 'mobile-scrolled' : ''}`}
-                  data-testid="quick-attachment-button"
-                  onClick={onQuickAttachmentOpen}
-                  type="button"
-                  disabled={isLoading || isGigLoading || isQuickAttachmentSaving}
-                  title="Quick add attachment"
-                >
-                  <span className="quick-capture-icon quick-attachment-icon" aria-hidden="true">
-                    +
-                  </span>
-                  <span className="quick-capture-label">Add attachment</span>
+                  <span className="quick-capture-label">Add to Glovelly</span>
                 </button>
 
                 <div className="profile-menu" ref={profileMenuRef}>

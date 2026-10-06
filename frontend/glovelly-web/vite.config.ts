@@ -73,6 +73,10 @@ export default defineConfig({
         target: 'http://localhost:5153',
         changeOrigin: true,
       },
+      '/intake': {
+        target: 'http://localhost:5153',
+        changeOrigin: true,
+      },
       '/mcp': {
         target: 'http://localhost:5153',
         changeOrigin: true,

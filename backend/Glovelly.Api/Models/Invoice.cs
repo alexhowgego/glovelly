@@ -35,6 +35,7 @@ public sealed class Invoice
     public int DocumentRevision { get; set; } = 1;
     public int? PdfDocumentRevision { get; set; }
     public string? DocumentFailureMessage { get; set; }
+    public bool GigLinesNeedRefresh { get; set; }
 
     [JsonIgnore]
     public Client? Client { get; set; }

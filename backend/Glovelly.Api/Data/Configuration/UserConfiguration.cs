@@ -31,6 +31,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(4000);
         entity.Property(user => user.InvoiceReplyToEmail)
             .HasMaxLength(320);
+        entity.Property(user => user.AutomaticReceiptMatching)
+            .HasConversion<string>()
+            .HasMaxLength(24)
+            .HasDefaultValue(AutomaticReceiptMatching.HighConfidence);
         entity.Property(user => user.Role)
             .HasConversion<string>()
             .HasMaxLength(20);

@@ -71,6 +71,26 @@ public sealed class AuthEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task UpdateSettings_PersistsAutomaticReceiptApplicationPreference()
+    {
+        var response = await _client.PutAsJsonAsync("/auth/me/settings", new
+        {
+            displayName = "Test Admin",
+            mileageRate = 0.45m,
+            passengerMileageRate = 0.10m,
+            automaticReceiptMatching = "ManualOnly",
+        }, TestContext.Current.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("ManualOnly", payload.GetProperty("automaticReceiptMatching").GetString());
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(AutomaticReceiptMatching.ManualOnly, db.Users.Single(value => value.Id == TestAuthContext.UserId).AutomaticReceiptMatching);
+    }
+
+    [Fact]
     public async Task Me_ReturnsGoogleDriveConnected_WhenActiveConnectionExists()
     {
         using (var scope = _factory.Services.CreateScope())

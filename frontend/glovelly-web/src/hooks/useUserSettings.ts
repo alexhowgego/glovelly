@@ -8,7 +8,7 @@ import {
   jsonRequestInit,
 } from '../api'
 import { emptyUserSettingsForm } from '../forms'
-import type { AuthUser, GoogleCalendarStatus, UserSettingsForm } from '../types'
+import type { AuthUser, AutomaticReceiptMatching, GoogleCalendarStatus, UserSettingsForm } from '../types'
 
 type SavedUserSettings = {
   displayName: string
@@ -21,6 +21,7 @@ type SavedUserSettings = {
   invoiceEmailBodyTemplate: string | null
   invoiceReplyToEmail: string | null
   invoiceUploadFolderId: string | null
+  automaticReceiptMatching: AutomaticReceiptMatching
 }
 
 type UseUserSettingsOptions = {
@@ -52,6 +53,7 @@ function toUserSettingsForm(settings: SavedUserSettings): UserSettingsForm {
     invoiceEmailBodyTemplate: settings.invoiceEmailBodyTemplate ?? '',
     invoiceReplyToEmail: settings.invoiceReplyToEmail ?? '',
     invoiceUploadFolderId: settings.invoiceUploadFolderId ?? '',
+    automaticReceiptMatching: settings.automaticReceiptMatching === 'VeryHighConfidence' ? 'HighConfidence' : settings.automaticReceiptMatching ?? 'HighConfidence',
   }
 }
 
@@ -137,6 +139,7 @@ export function useUserSettings({
         invoiceEmailBodyTemplate: authUser?.invoiceEmailBodyTemplate ?? null,
         invoiceReplyToEmail: authUser?.invoiceReplyToEmail ?? null,
         invoiceUploadFolderId: authUser?.invoiceUploadFolderId ?? null,
+        automaticReceiptMatching: authUser?.automaticReceiptMatching === 'VeryHighConfidence' ? 'HighConfidence' : authUser?.automaticReceiptMatching ?? 'HighConfidence',
       })
     )
     setUserSettingsStatus(
@@ -361,6 +364,7 @@ export function useUserSettings({
           invoiceEmailBodyTemplate: invoiceEmailBodyTemplate || null,
           invoiceReplyToEmail: invoiceReplyToEmail || null,
           invoiceUploadFolderId: invoiceUploadFolderId || null,
+          automaticReceiptMatching: userSettingsForm.automaticReceiptMatching,
         })
       )
 
@@ -397,7 +401,8 @@ export function useUserSettings({
               invoiceEmailSubjectPattern: savedSettings.invoiceEmailSubjectPattern,
               invoiceEmailBodyTemplate: savedSettings.invoiceEmailBodyTemplate,
               invoiceReplyToEmail: savedSettings.invoiceReplyToEmail,
-              invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
+               invoiceUploadFolderId: savedSettings.invoiceUploadFolderId,
+               automaticReceiptMatching: savedSettings.automaticReceiptMatching,
               isGoogleDriveConnected: current.isGoogleDriveConnected,
               isGoogleSheetsConnected: current.isGoogleSheetsConnected,
             }

@@ -8,11 +8,18 @@ internal sealed class GigExpenseConfiguration : IEntityTypeConfiguration<GigExpe
 {
     public void Configure(EntityTypeBuilder<GigExpense> entity)
     {
+        entity.Property(value => value.SourceFingerprint).HasMaxLength(64);
         entity.HasKey(expense => expense.Id);
         entity.Property(expense => expense.Description)
             .HasMaxLength(500);
         entity.Property(expense => expense.Amount)
             .HasPrecision(18, 2);
+        entity.Property(expense => expense.Category)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        entity.ToTable(table => table.HasCheckConstraint(
+            "CK_GigExpenses_Category",
+            "\"Category\" IS NULL OR \"Category\" IN ('Travel', 'Meals', 'Accommodation', 'Equipment', 'Other')"));
         entity.Property(expense => expense.ReimbursementStatus)
             .HasConversion<string>()
             .HasMaxLength(50)

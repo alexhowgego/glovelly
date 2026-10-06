@@ -8,6 +8,7 @@ internal sealed class GigExternalResourceConfiguration : IEntityTypeConfiguratio
 {
     public void Configure(EntityTypeBuilder<GigExternalResource> entity)
     {
+        entity.Property(value => value.SourceFingerprint).HasMaxLength(64);
         entity.HasKey(resource => resource.Id);
         entity.Property(resource => resource.ResourceType)
             .HasConversion<string>()
