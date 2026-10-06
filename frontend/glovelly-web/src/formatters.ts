@@ -79,6 +79,7 @@ export function toGigExpenseForm(expense: GigExpense): GigExpenseForm {
     sortOrder: expense.sortOrder,
     description: expense.description,
     amount: formatEditableAmount(expense.amount),
+    category: expense.category ?? '',
     reimbursementStatus: expense.reimbursementStatus,
     reimbursedAt: expense.reimbursedAt,
     reimbursementUpdatedAt: expense.reimbursementUpdatedAt,

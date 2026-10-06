@@ -16,7 +16,7 @@ type GigExpensesPanelProps = {
   onDownloadExpenseAttachment: (expense: GigExpenseForm, attachmentId: string) => void
   onSaveExpenseDraft: (
     index: number | null,
-    draft: { description: string; amount: string }
+    draft: { description: string; amount: string; category: string }
   ) => Promise<boolean>
   onUpdateExpenseReimbursement: (
     expense: GigExpenseForm,
@@ -42,7 +42,7 @@ export function GigExpensesPanel({
   const [expandedExpenseKey, setExpandedExpenseKey] = useState<string>('')
   const [isExpenseEditorOpen, setIsExpenseEditorOpen] = useState(false)
   const [editingExpenseIndex, setEditingExpenseIndex] = useState<number | null>(null)
-  const [expenseDraft, setExpenseDraft] = useState({ description: '', amount: '' })
+  const [expenseDraft, setExpenseDraft] = useState({ description: '', amount: '', category: '' })
   const [analysisTarget, setAnalysisTarget] = useState<(ReceiptAnalysisTarget & { expenseIndex: number }) | null>(null)
   const expenseEditorTitle = editingExpenseIndex === null ? 'Add expense' : 'Edit expense'
 
@@ -52,23 +52,23 @@ export function GigExpensesPanel({
 
   const openExpenseCreate = () => {
     setEditingExpenseIndex(null)
-    setExpenseDraft({ description: '', amount: '' })
+    setExpenseDraft({ description: '', amount: '', category: '' })
     setIsExpenseEditorOpen(true)
   }
 
   const openExpenseEdit = (index: number, expense: GigExpenseForm) => {
     setEditingExpenseIndex(index)
-    setExpenseDraft({ description: expense.description, amount: expense.amount })
+    setExpenseDraft({ description: expense.description, amount: expense.amount, category: expense.category })
     setIsExpenseEditorOpen(true)
   }
 
   const closeExpenseEditor = () => {
     setIsExpenseEditorOpen(false)
     setEditingExpenseIndex(null)
-    setExpenseDraft({ description: '', amount: '' })
+    setExpenseDraft({ description: '', amount: '', category: '' })
   }
 
-  const applyReceiptSuggestions = (suggestions: { merchant: string | null; totalAmount: number | null }) => {
+  const applyReceiptSuggestions = (suggestions: { merchant: string | null; totalAmount: number | null; suggestedCategory: string | null }) => {
     if (!analysisTarget) return
     const expense = expenses[analysisTarget.expenseIndex]
     if (!expense) return
@@ -76,6 +76,7 @@ export function GigExpensesPanel({
     setExpenseDraft({
       description: suggestions.merchant || expense.description,
       amount: suggestions.totalAmount === null ? expense.amount : String(suggestions.totalAmount),
+      category: suggestions.suggestedCategory ?? expense.category,
     })
     setIsExpenseEditorOpen(true)
     setAnalysisTarget(null)
@@ -161,7 +162,7 @@ export function GigExpensesPanel({
                       )}
                       <div className="associated-item-actions expense-action-grid">
                         {expense.id && (
-                          <label>
+                          <label className="expense-reimbursement-control">
                             <span>Reimbursement</span>
                             <select
                               data-testid="gig-expense-reimbursement-select"
@@ -180,24 +181,26 @@ export function GigExpensesPanel({
                             </select>
                           </label>
                         )}
-                        <button
-                          className="ghost-button"
-                          onClick={() => openExpenseEdit(index, expense)}
-                          type="button"
-                          disabled={isGigLoading}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          aria-label={`Remove expense ${expense.description || 'Untitled expense'}`}
-                          className="icon-delete-button"
-                          onClick={() => void onDeleteExpenseDraft(index)}
-                          type="button"
-                          disabled={isGigLoading}
-                          title="Remove expense"
-                        >
-                          <TrashIcon />
-                        </button>
+                        <div className="expense-action-buttons">
+                          <button
+                            className="ghost-button"
+                            onClick={() => openExpenseEdit(index, expense)}
+                            type="button"
+                            disabled={isGigLoading}
+                          >
+                            Edit expense
+                          </button>
+                          <button
+                            aria-label={`Remove expense ${expense.description || 'Untitled expense'}`}
+                            className="icon-delete-button"
+                            onClick={() => void onDeleteExpenseDraft(index)}
+                            type="button"
+                            disabled={isGigLoading}
+                            title="Remove expense"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="expense-attachments">
@@ -226,16 +229,17 @@ export function GigExpensesPanel({
                           expense.attachments.length > 0 ? (
                             <div className="expense-attachment-list">
                               {expense.attachments.map((attachment) => (
-                                <div className="expense-attachment-item" key={attachment.id}>
-                                  <button
-                                    className="link-button"
-                                    data-testid="gig-expense-receipt-download-button"
-                                    type="button"
-                                    onClick={() => onDownloadExpenseAttachment(expense, attachment.id)}
-                                    disabled={isGigLoading}
-                                  >
-                                   {attachment.fileName}
-                                  </button>
+                              <div className="expense-attachment-item" key={attachment.id}>
+                                <button
+                                  className="link-button"
+                                  data-testid="gig-expense-receipt-download-button"
+                                  type="button"
+                                  onClick={() => onDownloadExpenseAttachment(expense, attachment.id)}
+                                  disabled={isGigLoading}
+                                >
+                                 {attachment.fileName}
+                                </button>
+                                <div className="expense-receipt-actions">
                                   <button
                                     className="ghost-button ai-button"
                                     onClick={() => selectedGig && setAnalysisTarget({
@@ -263,6 +267,7 @@ export function GigExpensesPanel({
                                     <TrashIcon />
                                   </button>
                                 </div>
+                              </div>
                               ))}
                             </div>
                           ) : null
@@ -337,6 +342,21 @@ export function GigExpensesPanel({
                       }))
                     }
                     placeholder="Parking, hotel, equipment hire..."
+                    disabled={isGigLoading}
+                  />
+                </label>
+                <label>
+                  <span>Category</span>
+                  <input
+                    data-testid="gig-expense-category-input"
+                    value={expenseDraft.category}
+                    onChange={(event) =>
+                      setExpenseDraft((current) => ({
+                        ...current,
+                        category: event.target.value,
+                      }))
+                    }
+                    placeholder="Travel, equipment, accommodation..."
                     disabled={isGigLoading}
                   />
                 </label>

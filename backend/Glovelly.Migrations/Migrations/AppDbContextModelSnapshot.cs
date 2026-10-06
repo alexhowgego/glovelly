@@ -222,6 +222,85 @@ namespace Glovelly.Migrations.Migrations
                     b.ToTable("Clients");
                 });
 
+            modelBuilder.Entity("Glovelly.Api.Models.CurrentIntake", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AnalysisState")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Confidence")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EvidenceJson")
+                        .IsRequired()
+                        .HasMaxLength(32768)
+                        .HasColumnType("character varying(32768)");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Intent")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("StorageKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(16000)
+                        .HasColumnType("character varying(16000)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("CurrentIntakes");
+                });
+
             modelBuilder.Entity("Glovelly.Api.Models.ExpenseAttachment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -517,6 +596,10 @@ namespace Glovelly.Migrations.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("Category")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -563,7 +646,10 @@ namespace Glovelly.Migrations.Migrations
 
                     b.HasIndex("ReimbursementUpdatedByUserId");
 
-                    b.ToTable("GigExpenses");
+                    b.ToTable("GigExpenses", t =>
+                        {
+                            t.HasCheckConstraint("CK_GigExpenses_Category", "\"Category\" IS NULL OR \"Category\" IN ('Travel', 'Meals', 'Accommodation', 'Equipment', 'Other')");
+                        });
                 });
 
             modelBuilder.Entity("Glovelly.Api.Models.GigExternalResource", b =>
@@ -1109,6 +1195,71 @@ namespace Glovelly.Migrations.Migrations
                         .IsUnique();
 
                     b.ToTable("GoogleDriveIntegrationSettings");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.IntakeAnalysisAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Confidence")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("CurrentIntakeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EvidenceJson")
+                        .IsRequired()
+                        .HasMaxLength(32768)
+                        .HasColumnType("character varying(32768)");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Intent")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrentIntakeId");
+
+                    b.ToTable("IntakeAnalysisAttempts");
                 });
 
             modelBuilder.Entity("Glovelly.Api.Models.Invoice", b =>
@@ -1748,6 +1899,13 @@ namespace Glovelly.Migrations.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AutomaticReceiptMatching")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("HighConfidence");
+
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1906,6 +2064,17 @@ namespace Glovelly.Migrations.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.CurrentIntake", b =>
+                {
+                    b.HasOne("Glovelly.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Glovelly.Api.Models.ExpenseAttachment", b =>
@@ -2165,6 +2334,17 @@ namespace Glovelly.Migrations.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Glovelly.Api.Models.IntakeAnalysisAttempt", b =>
+                {
+                    b.HasOne("Glovelly.Api.Models.CurrentIntake", "CurrentIntake")
+                        .WithMany("AnalysisAttempts")
+                        .HasForeignKey("CurrentIntakeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CurrentIntake");
+                });
+
             modelBuilder.Entity("Glovelly.Api.Models.Invoice", b =>
                 {
                     b.HasOne("Glovelly.Api.Models.Client", "Client")
@@ -2360,6 +2540,11 @@ namespace Glovelly.Migrations.Migrations
                     b.Navigation("Gigs");
 
                     b.Navigation("Invoices");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.CurrentIntake", b =>
+                {
+                    b.Navigation("AnalysisAttempts");
                 });
 
             modelBuilder.Entity("Glovelly.Api.Models.ExpenseAttachment", b =>

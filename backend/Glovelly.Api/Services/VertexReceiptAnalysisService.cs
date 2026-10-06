@@ -97,7 +97,7 @@ public sealed class VertexReceiptAnalysisService : IReceiptAnalysisService
         return (model, contents, config, cancellationToken) => client.Models.GenerateContentAsync(model, contents, config, cancellationToken);
     }
 
-    private static (List<Content> Contents, GenerateContentConfig Config) BuildRequest(string contentType, byte[] content) =>
+    internal static (List<Content> Contents, GenerateContentConfig Config) BuildRequest(string contentType, byte[] content) =>
         ([new Content
         {
             Role = "user",
@@ -131,7 +131,7 @@ public sealed class VertexReceiptAnalysisService : IReceiptAnalysisService
         "Receipt analysis completed for attachment {AttachmentId} using {Model}: {Status}, {FailureCode}, {ElapsedMilliseconds} ms.",
         analysis.ExpenseAttachmentId, analysis.Model, analysis.Status, analysis.FailureCode, elapsedMilliseconds);
 
-    private static bool TryParse(string? text, ReceiptAnalysis analysis, out string failureMessage)
+    internal static bool TryParse(string? text, ReceiptAnalysis analysis, out string failureMessage)
     {
         failureMessage = "Receipt analysis returned an invalid response.";
         if (string.IsNullOrWhiteSpace(text) || text.Length > 16_384) return false;

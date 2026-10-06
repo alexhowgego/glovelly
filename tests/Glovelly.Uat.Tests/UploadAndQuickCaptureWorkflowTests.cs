@@ -77,8 +77,8 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
         });
 
     [Fact]
-    public Task QuickAttachmentMobileFlowSavesDraftAndOpensTargetGig() => RunWithDiagnosticsAsync(
-        nameof(QuickAttachmentMobileFlowSavesDraftAndOpensTargetGig),
+    public Task UnifiedResourceMobileFlowKeepsUploadOpenAndOffersOptionalReview() => RunWithDiagnosticsAsync(
+        nameof(UnifiedResourceMobileFlowKeepsUploadOpenAndOffersOptionalReview),
         async () =>
         {
             var runId = CreateRunId();
@@ -91,10 +91,11 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             await CreateClientAsync(clientName);
             await CreateGigAsync(clientName, gigTitle, DateTime.UtcNow.ToString("yyyy-MM-dd"));
 
-            await Page.GetByTestId("quick-attachment-button").ClickAsync();
-            await Page.GetByTestId("quick-attachment-modal").WaitForAsync();
-            await Page.GetByTestId("quick-attachment-link-mode-button").ClickAsync();
-            await Page.GetByTestId("quick-attachment-url-input").FillAsync("https://example.com/uat-gig-plan");
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Add to Glovelly", Exact = true }).ClickAsync();
+            var upload = Page.GetByTestId("unified-intake-modal");
+            await upload.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^URL") }).ClickAsync();
+            await upload.GetByLabel("URL", new() { Exact = true }).FillAsync("https://example.com/uat-gig-plan");
+            await upload.GetByRole(AriaRole.Button, new() { Name = "Upload and analyse" }).ClickAsync();
             var gigSelect = Page.GetByTestId("quick-capture-gig-select");
             await Assertions.Expect(gigSelect).ToContainTextAsync(gigTitle);
             var optionValue = await gigSelect.Locator("option").Filter(new LocatorFilterOptions
@@ -103,23 +104,19 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             }).GetAttributeAsync("value");
             Assert.False(string.IsNullOrWhiteSpace(optionValue), $"Expected quick attachment candidates to include '{gigTitle}'.");
             await gigSelect.SelectOptionAsync(optionValue);
-            await Page.GetByTestId("quick-attachment-save-draft-button").ClickAsync();
-            await Assertions.Expect(Page.GetByTestId("quick-attachment-modal")).ToContainTextAsync("Attachment saved", new LocatorAssertionsToContainTextOptions
+            await upload.GetByLabel("Title", new() { Exact = true }).FillAsync(attachmentTitle);
+            await upload.GetByRole(AriaRole.Button, new() { Name = "Attach resource" }).ClickAsync();
+            await Assertions.Expect(upload).ToContainTextAsync($"Attached to {gigTitle}", new LocatorAssertionsToContainTextOptions
             {
                 Timeout = 30_000,
             });
-            await Page.GetByTestId("quick-attachment-title-input").FillAsync(attachmentTitle);
-            await Page.GetByTestId("quick-attachment-save-details-button").ClickAsync();
-            await Assertions.Expect(Page.GetByTestId("quick-attachment-modal")).ToContainTextAsync("details saved", new LocatorAssertionsToContainTextOptions
-            {
-                IgnoreCase = true,
-                Timeout = 30_000,
-            });
-            await Page.GetByTestId("quick-attachment-go-to-gig-button").ClickAsync();
-            await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeInViewportAsync(new LocatorAssertionsToBeInViewportOptions
-            {
-                Timeout = 30_000,
-            });
+            await Assertions.Expect(Page.GetByTestId("attachment-review-modal")).Not.ToBeVisibleAsync();
+            await upload.GetByRole(AriaRole.Button, new() { Name = "Review attachment" }).ClickAsync();
+            var review = Page.GetByTestId("attachment-review-modal");
+            await review.GetByLabel("Notes", new() { Exact = true }).FillAsync("Reviewed on mobile");
+            await review.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
+            await Assertions.Expect(review).ToContainTextAsync("Attachment updated.");
+            await review.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
             await Assertions.Expect(Page.GetByTestId("gig-attachment-item").Filter(new LocatorFilterOptions
             {
                 HasText = attachmentTitle,
@@ -127,8 +124,8 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
         });
 
     [Fact]
-    public Task QuickReceiptFlowOpensTargetGigInViewport() => RunWithDiagnosticsAsync(
-        nameof(QuickReceiptFlowOpensTargetGigInViewport),
+    public Task UnifiedReceiptMobileFlowSavesThenReviewsTheExactAttachment() => RunWithDiagnosticsAsync(
+        nameof(UnifiedReceiptMobileFlowSavesThenReviewsTheExactAttachment),
         async () =>
         {
             var runId = CreateRunId();
@@ -141,12 +138,18 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             await CreateClientAsync(clientName);
             await CreateGigAsync(clientName, gigTitle, DateTime.UtcNow.ToString("yyyy-MM-dd"));
 
-            await Page.GetByTitle("Quick add expense receipt").Locator("input[type=file]").SetInputFilesAsync(fixture);
-            await Page.GetByRole(AriaRole.Heading, new() { Name = "Receipt saved" }).WaitForAsync(new LocatorWaitForOptions
-            {
-                State = WaitForSelectorState.Visible,
-                Timeout = 30_000,
-            });
+            await Page.GetByTestId("profile-menu-button").ClickAsync();
+            await Page.GetByRole(AriaRole.Menuitem, new() { Name = "Settings", Exact = true }).ClickAsync();
+            var preference = Page.GetByTestId("user-settings-automatic-receipt-matching-select");
+            var originalPreference = await preference.InputValueAsync();
+            await preference.SelectOptionAsync("ManualOnly");
+            await Page.GetByTestId("user-settings-save-button").ClickAsync();
+            await Assertions.Expect(Page.GetByTestId("user-settings-status")).ToContainTextAsync("Settings updated.");
+            await Page.GetByRole(AriaRole.Dialog, new() { Name = "Your settings" }).GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Add to Glovelly", Exact = true }).ClickAsync();
+            var upload = Page.GetByTestId("unified-intake-modal");
+            await upload.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^Photo or file") }).ClickAsync();
+            await upload.Locator("input[type=file]").SetInputFilesAsync(fixture);
             var gigSelect = Page.GetByTestId("quick-capture-gig-select");
             var optionValue = await gigSelect.Locator("option").Filter(new LocatorFilterOptions
             {
@@ -154,18 +157,23 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             }).GetAttributeAsync("value");
             Assert.False(string.IsNullOrWhiteSpace(optionValue), $"Expected quick receipt candidates to include '{gigTitle}'.");
             await gigSelect.SelectOptionAsync(optionValue);
-            var quickReceiptModal = Page.GetByTestId("quick-receipt-modal");
-            await quickReceiptModal.GetByLabel("Description").FillAsync($"{runId} Receipt draft");
-            await Page.GetByRole(AriaRole.Button, new() { Name = "Save details" }).ClickAsync();
-            await Assertions.Expect(quickReceiptModal).ToContainTextAsync("details saved", new LocatorAssertionsToContainTextOptions
+            await upload.GetByRole(AriaRole.Button, new() { Name = "Attach receipt" }).ClickAsync();
+            await Assertions.Expect(upload).ToContainTextAsync($"Attached to {gigTitle}", new LocatorAssertionsToContainTextOptions
             {
                 Timeout = 30_000,
             });
-            await Page.GetByRole(AriaRole.Button, new() { Name = "Go to gig" }).ClickAsync();
-
-            await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeInViewportAsync(new LocatorAssertionsToBeInViewportOptions
-            {
-                Timeout = 30_000,
-            });
+            await Assertions.Expect(Page.GetByTestId("attachment-review-modal")).Not.ToBeVisibleAsync();
+            await upload.GetByRole(AriaRole.Button, new() { Name = "Review attachment" }).ClickAsync();
+            var review = Page.GetByTestId("attachment-review-modal");
+            await review.GetByLabel("Description", new() { Exact = true }).FillAsync($"{runId} Receipt draft");
+            await review.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
+            await Assertions.Expect(review).ToContainTextAsync("Attachment updated.");
+            await review.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
+            await Page.GetByTestId("profile-menu-button").ClickAsync();
+            await Page.GetByRole(AriaRole.Menuitem, new() { Name = "Settings", Exact = true }).ClickAsync();
+            await preference.SelectOptionAsync(originalPreference);
+            await Page.GetByTestId("user-settings-save-button").ClickAsync();
+            await Assertions.Expect(Page.GetByTestId("user-settings-status")).ToContainTextAsync("Settings updated.");
+            await Page.GetByRole(AriaRole.Dialog, new() { Name = "Your settings" }).GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
         });
 }

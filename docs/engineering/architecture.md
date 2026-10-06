@@ -64,6 +64,16 @@ Domain logic should not depend directly on provider APIs. Domain entities should
 
 ## Data Segregation
 
+### Unified intake lifecycle
+
+The single Add to Glovelly entry opens source selection, then unified upload. `useUnifiedIntake` owns explicit presentation/lifecycle states; `useAttachmentReview` owns optional saved-record corrections. Upload stays open after either automatic or explicit saving with one compact attached state. Review opens only on request and targets authoritative saved identifiers, without reopening the gig editor or uploading again.
+
+`IntakeWorkflowService` owns source analysis and proactive application decisions. It uses configured quick-capture ranking and local application time; additional candidates do not veto the nearest gig. `IntakeApplicationService` owns shared receipt/resource saving, independently high-confidence field initialization, owner checks, source promotion, events, and draft-only invoice refresh. `GigReceiptEndpoints` and the resource correction routes edit/reassign/delete saved records; their superseded quick-creation routes have been removed.
+
+An unapplied `CurrentIntake` is private, bounded to one per user, and retained until replacement or discard. Analysis attempts are saved explicitly after provider work. Successful application creates the normal attachment relationship and deletes the private row and transient blob. No completed-intake history or expiry job is added. URL analysis is metadata-only; Google document content retrieval is deferred.
+
+The client sends a stable intake UUID for submission/application and keeps only that recovery ID in tab-scoped session storage while unfinished. Saved receipt expense/attachment IDs or resource/attachment IDs reuse this UUID. Primary keys and the transactional destination insert/current-intake delete prevent duplicate application across replicas; bounded in-process striped command locks serialize same-user work locally. `/intake/applications/{intakeId}` resolves owner-visible normal saved records after an interrupted response, including subsequent reassignment, without retaining private source blobs. Recovery stops when the destination record is deleted. Post-commit cleanup/refresh failures are logged with safe identifiers rather than reporting the already-saved attachment as unsaved.
+
 Glovelly currently uses one application database. Internal Glovelly users are first-class entities, and business data should relate to Glovelly user IDs or future account/tenant constructs rather than directly to Google claims or email addresses.
 
 Important principles:
