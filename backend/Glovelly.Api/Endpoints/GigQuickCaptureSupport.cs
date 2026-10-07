@@ -9,12 +9,6 @@ namespace Glovelly.Api.Endpoints;
 
 internal static class GigQuickCaptureSupport
 {
-    public static Guid? TryReadGigId(IFormCollection form)
-    {
-        var rawValue = form["gigId"].FirstOrDefault();
-        return Guid.TryParse(rawValue, out var gigId) && gigId != Guid.Empty ? gigId : null;
-    }
-
     public static QuickCaptureSettings NormalizeSettings(QuickCaptureSettings settings)
     {
         return new QuickCaptureSettings
@@ -30,13 +24,14 @@ internal static class GigQuickCaptureSupport
         Guid? userId,
         DateOnly today,
         QuickCaptureSettings settings,
-        string? continuation = null)
+        string? continuation = null,
+        CancellationToken cancellationToken = default)
     {
         var gigs = await db.Gigs
             .WhereVisibleTo(userId)
             .AsNoTracking()
             .Where(value => value.Status != GigStatus.Cancelled)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         var eligibleCandidates = gigs
             .Select(gig => new QuickGigCandidate(
@@ -138,16 +133,6 @@ internal static class GigQuickCaptureSupport
         {
             return false;
         }
-    }
-
-    public static bool HasNearbyCandidates(
-        IEnumerable<QuickGigCandidate> candidates,
-        Guid selectedGigId,
-        QuickCaptureSettings settings)
-    {
-        return candidates.Any(candidate =>
-            candidate.Id != selectedGigId &&
-            candidate.DaysFromToday <= settings.AmbiguityWindowDays);
     }
 
     public static IEnumerable<object> ToCandidateResponses(

@@ -12,184 +12,6 @@ internal static class GigExternalResourceEndpoints
 {
     public static RouteGroupBuilder MapGigExternalResourceEndpoints(this RouteGroupBuilder group)
     {
-        group.MapPost("/external-resource-drafts/file", async (
-            HttpRequest request,
-            AppDbContext db,
-            ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor,
-            IExpenseAttachmentStore attachmentStore,
-            IWorkspaceEventPublisher workspaceEventPublisher,
-            IOptions<ExpenseAttachmentSettings> attachmentOptions,
-            IOptions<QuickCaptureSettings> quickCaptureOptions,
-            TimeProvider timeProvider) =>
-        {
-            if (!request.HasFormContentType)
-            {
-                return EndpointSupport.ValidationProblem("file", "Upload an attachment file.");
-            }
-
-            var userId = currentUserAccessor.TryGetUserId(user);
-            var form = await request.ReadFormAsync();
-            var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
-            var validation = GigEndpointSupport.ValidateExternalResourceAttachmentFile(file, attachmentOptions.Value);
-            if (validation is not null)
-            {
-                return validation;
-            }
-
-            var gigId = GigQuickCaptureSupport.TryReadGigId(form);
-            var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
-            var settings = GigQuickCaptureSupport.NormalizeSettings(quickCaptureOptions.Value);
-            var candidateResult = await GigQuickCaptureSupport.QueryCandidatesAsync(db, userId, today, settings);
-            var candidates = candidateResult.Candidates;
-            var gigResult = await ResolveQuickCaptureGigAsync(db, userId, gigId, candidateResult, settings, "attachment");
-            if (gigResult.Result is not null)
-            {
-                return gigResult.Result;
-            }
-
-            var gig = gigResult.Gig!;
-            var now = DateTimeOffset.UtcNow;
-            var displayFileName = Path.GetFileName(file!.FileName);
-            if (string.IsNullOrWhiteSpace(displayFileName))
-            {
-                displayFileName = "attachment";
-            }
-
-            var resourceId = Guid.NewGuid();
-            var attachmentId = Guid.NewGuid();
-            var storageKey = GigEndpointSupport.BuildExternalResourceAttachmentStorageKey(userId, gig.Id, resourceId, attachmentId);
-            await using var stream = file.OpenReadStream();
-            await attachmentStore.SaveAsync(storageKey, stream, file.ContentType);
-
-            var title = Path.GetFileNameWithoutExtension(displayFileName);
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                title = "Attachment draft";
-            }
-
-            var resource = new GigExternalResource
-            {
-                Id = resourceId,
-                GigId = gig.Id,
-                ResourceType = GigExternalResourceType.File,
-                Purpose = GigExternalResourcePurpose.Other,
-                Title = title,
-                CreatedAt = now,
-                UpdatedAt = now,
-            };
-
-            resource.Attachments.Add(new GigExternalResourceAttachment
-            {
-                Id = attachmentId,
-                GigExternalResourceId = resourceId,
-                FileName = displayFileName,
-                ContentType = file.ContentType,
-                SizeBytes = file.Length,
-                StorageKey = storageKey,
-                CreatedAt = now,
-            });
-
-            db.GigExternalResources.Add(resource);
-            EndpointSupport.StampUpdate(gig, userId);
-            await db.SaveChangesAsync();
-            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
-
-            var savedGig = await LoadVisibleGigAsync(db, userId, gig.Id);
-            return Results.Created($"/gigs/{gig.Id}/external-resources/{resourceId}", new
-            {
-                gig = savedGig,
-                resourceId,
-                attachmentId,
-                inferredGig = !gigId.HasValue,
-                candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, gig.Id),
-                hasMoreCandidates = candidateResult.HasMore,
-                candidateContinuation = candidateResult.Continuation,
-                autoAttachWindowDays = settings.AutoAttachWindowDays,
-                hasNearbyCandidates = GigQuickCaptureSupport.HasNearbyCandidates(candidates, gig.Id, settings),
-            });
-        });
-
-        group.MapPost("/external-resource-drafts/link", async (
-            QuickExternalResourceLinkDraftRequest request,
-            AppDbContext db,
-            ClaimsPrincipal user,
-            ICurrentUserAccessor currentUserAccessor,
-            IWorkspaceEventPublisher workspaceEventPublisher,
-            IOptions<QuickCaptureSettings> quickCaptureOptions,
-            TimeProvider timeProvider) =>
-        {
-            var userId = currentUserAccessor.TryGetUserId(user);
-            var url = request.Url?.Trim() ?? string.Empty;
-            if (!IsValidHttpUrl(url))
-            {
-                return EndpointSupport.ValidationProblem("url", "URL must be an absolute http or https URL.");
-            }
-
-            var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
-            var settings = GigQuickCaptureSupport.NormalizeSettings(quickCaptureOptions.Value);
-            var candidateResult = await GigQuickCaptureSupport.QueryCandidatesAsync(db, userId, today, settings);
-            var candidates = candidateResult.Candidates;
-            var gigResult = await ResolveQuickCaptureGigAsync(db, userId, request.GigId, candidateResult, settings, "attachment");
-            if (gigResult.Result is not null)
-            {
-                return gigResult.Result;
-            }
-
-            var gig = gigResult.Gig!;
-            var now = DateTimeOffset.UtcNow;
-            var resourceId = Guid.NewGuid();
-            var purpose = request.Purpose.HasValue && Enum.IsDefined(request.Purpose.Value)
-                ? request.Purpose.Value
-                : GigExternalResourcePurpose.Other;
-            var resourceType = request.ResourceType.HasValue && Enum.IsDefined(request.ResourceType.Value)
-                ? request.ResourceType.Value
-                : InferResourceType(url);
-            var title = request.Title?.Trim();
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                title = BuildTitleFromUrl(url);
-            }
-
-            var resource = new GigExternalResource
-            {
-                Id = resourceId,
-                GigId = gig.Id,
-                ResourceType = resourceType,
-                Purpose = purpose,
-                Title = title,
-                Url = url,
-                Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-                IsPrimary = request.IsPrimary,
-                CreatedAt = now,
-                UpdatedAt = now,
-            };
-
-            if (resource.IsPrimary)
-            {
-                ClearPrimaryForPurpose(gig.ExternalResources, resource.Purpose, resource.Id);
-            }
-
-            db.GigExternalResources.Add(resource);
-            EndpointSupport.StampUpdate(gig, userId);
-            await db.SaveChangesAsync();
-            await workspaceEventPublisher.PublishAsync(userId, new WorkspaceEvent("gigs", "updated", gig.Id, DateTimeOffset.UtcNow));
-
-            var savedGig = await LoadVisibleGigAsync(db, userId, gig.Id);
-            return Results.Created($"/gigs/{gig.Id}/external-resources/{resourceId}", new
-            {
-                gig = savedGig,
-                resourceId,
-                attachmentId = (Guid?)null,
-                inferredGig = !request.GigId.HasValue,
-                candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates, gig.Id),
-                hasMoreCandidates = candidateResult.HasMore,
-                candidateContinuation = candidateResult.Continuation,
-                autoAttachWindowDays = settings.AutoAttachWindowDays,
-                hasNearbyCandidates = GigQuickCaptureSupport.HasNearbyCandidates(candidates, gig.Id, settings),
-            });
-        });
-
         group.MapPatch("/external-resource-drafts/{resourceId:guid}", async (
             Guid resourceId,
             QuickExternalResourceDraftUpdateRequest request,
@@ -596,48 +418,7 @@ internal static class GigExternalResourceEndpoints
             .FirstOrDefaultAsync(gig => gig.Id == gigId);
     }
 
-    private static async Task<(Gig? Gig, IResult? Result)> ResolveQuickCaptureGigAsync(
-        AppDbContext db,
-        Guid? userId,
-        Guid? gigId,
-        QuickGigCandidateResult candidateResult,
-        QuickCaptureSettings settings,
-        string draftName)
-    {
-        if (gigId.HasValue)
-        {
-            var explicitGig = await db.Gigs
-                .WhereVisibleTo(userId)
-                .Include(gig => gig.ExternalResources)
-                .FirstOrDefaultAsync(gig => gig.Id == gigId.Value);
-
-            return explicitGig is null
-                ? (null, EndpointSupport.ValidationProblem("gigId", "Gig does not exist."))
-                : (explicitGig, null);
-        }
-
-        var nearestCandidate = candidateResult.Candidates.FirstOrDefault();
-        if (nearestCandidate is null)
-        {
-            return (null, Results.Conflict(new
-            {
-                message = $"No gig was within {settings.AutoAttachWindowDays} days. Choose a gig before saving this {draftName} draft.",
-                candidates = GigQuickCaptureSupport.ToCandidateResponses(candidateResult.Candidates, nearestCandidate?.Id),
-                hasMoreCandidates = candidateResult.HasMore,
-                candidateContinuation = candidateResult.Continuation,
-                autoAttachWindowDays = settings.AutoAttachWindowDays,
-            }));
-        }
-
-        var gig = await db.Gigs
-            .WhereVisibleTo(userId)
-            .Include(value => value.ExternalResources)
-            .FirstAsync(value => value.Id == nearestCandidate.Id);
-
-        return (gig, null);
-    }
-
-    private static GigExternalResourceType InferResourceType(string url)
+    internal static GigExternalResourceType InferResourceType(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
@@ -662,23 +443,6 @@ internal static class GigExternalResourceEndpoints
         return GigExternalResourceType.Url;
     }
 
-    private static string BuildTitleFromUrl(string url)
-    {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-        {
-            return "Attachment draft";
-        }
-
-        var title = uri.Segments.LastOrDefault()?.Trim('/');
-        return string.IsNullOrWhiteSpace(title) ? uri.Host : Uri.UnescapeDataString(title);
-    }
-
-    private static bool IsValidHttpUrl(string url)
-    {
-        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
-    }
-
     private static void ClearPrimaryForPurpose(IEnumerable<GigExternalResource> resources, GigExternalResourcePurpose purpose, Guid exceptResourceId)
     {
         foreach (var resource in resources.Where(resource => resource.Purpose == purpose && resource.Id != exceptResourceId))
@@ -689,30 +453,7 @@ internal static class GigExternalResourceEndpoints
 
     private static IResult? ValidateResourceRequest(GigExternalResourceRequest request)
     {
-        var errors = new Dictionary<string, string[]>();
-
-        if (!Enum.IsDefined(request.ResourceType))
-        {
-            errors["resourceType"] = ["Resource type is invalid."];
-        }
-
-        if (!Enum.IsDefined(request.Purpose))
-        {
-            errors["purpose"] = ["Purpose is invalid."];
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            errors["title"] = ["Title is required."];
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Url)
-            && (!Uri.TryCreate(request.Url.Trim(), UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)))
-        {
-            errors["url"] = ["URL must be an absolute http or https URL."];
-        }
-
+        var errors = GigResourceValidation.Validate(request.ResourceType, request.Purpose, request.Title, request.Url, request.Notes);
         return errors.Count == 0 ? null : Results.ValidationProblem(errors);
     }
 
@@ -721,15 +462,6 @@ internal static class GigExternalResourceEndpoints
         GigExternalResourcePurpose Purpose,
         string Title,
         string? Url,
-        string? Notes,
-        bool IsPrimary);
-
-    private sealed record QuickExternalResourceLinkDraftRequest(
-        Guid? GigId,
-        string? Url,
-        GigExternalResourceType? ResourceType,
-        GigExternalResourcePurpose? Purpose,
-        string? Title,
         string? Notes,
         bool IsPrimary);
 

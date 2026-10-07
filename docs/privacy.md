@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 30 September 2026
+Last updated: 6 October 2026
 
 This privacy policy explains how Glovelly handles personal information when you use:
 
@@ -41,7 +41,8 @@ Glovelly may collect and store the following categories of information.
 - Gig details such as dates, venues, fees, mileage, passenger counts, and status.
 - Expense details such as descriptions, categories, amounts, tax treatment, reimbursement status, and receipt attachments.
 - Receipt files or images uploaded by users. These may contain personal information visible on the receipt, such as names, partial payment card details, locations, timestamps, or purchase details.
-- When you explicitly request receipt analysis, the receipt file or image, its MIME type, upload date, optional default currency, and permitted suggestion categories are sent to Google Cloud Vertex AI. Glovelly uses the result only to show reviewable suggestions; it does not automatically change an expense record.
+- When you request receipt analysis or submit a file or pasted text through Add to Glovelly, supported receipt content and minimal extraction context are sent to Google Cloud Vertex AI where analysis is enabled. Analysis of an existing receipt presents reviewable suggestions. Unified upload can automatically save a receipt to the nearest nearby gig according to your Automatic receipt application preference, including independently high-confidence merchant, total, and category values. You can choose Manual only and can review, correct, reassign, or delete saved receipts.
+- Add to Glovelly retains one private unapplied file, URL, or text source and its analysis outcome per user for recovery. Successful application retains the original source as the ordinary receipt/resource relationship and removes the private intake and transient file. Submitted URLs are analysed from metadata/type only; unified upload does not fetch linked Google Docs or Sheets contents.
 - When you request set-list interpretation from a linked Google Sheet, the selected bounded worksheet grid, including displayed cell values and positions, is sent to Google Cloud Vertex AI. Glovelly validates the result and presents an editable draft; it does not alter the linked sheet or automatically select forScore charts.
 - Invoice details such as invoice numbers, line items, payment status, issue/reissue history, delivery details, PDF files, and Google Drive publication references.
 - Seller profile details used to generate invoices, such as trading name, address, payment details, invoice defaults, and tax or business identifiers where provided.
@@ -114,7 +115,7 @@ Glovelly uses personal information to:
 - maintain invoice, accounting, tax, and business administration records
 - secure the service and detect misuse
 - maintain, debug, test, and improve the service
-- provide user-requested receipt analysis and show its reviewable suggestions
+- provide source-submission and user-requested receipt analysis, reviewable suggestions, and receipt application according to user preferences
 - comply with legal, accounting, tax, and record-keeping obligations
 - respond to requests, questions, and rights exercises
 
@@ -165,7 +166,7 @@ Service providers are expected to process personal information only as needed to
 Current expected subprocessors include:
 
 - Google Cloud Platform, for hosting, infrastructure, managed secrets, and related cloud services
-- Google Cloud Vertex AI, for optional user-requested receipt analysis
+- Google Cloud Vertex AI, for receipt/intake analysis initiated by source submission or explicit analysis requests, and requested set-list interpretation
 - Google, for sign-in, Google Drive integration, and Google Calendar integration
 - Google Analytics, where a visitor accepts public-site analytics cookies
 - Neon, for database hosting
@@ -195,6 +196,7 @@ Typical retention expectations are:
 - email delivery records: for as long as needed to confirm delivery, investigate delivery issues, or maintain business records
 - logs and diagnostic records: normally for a limited operational period, such as up to 90 days, unless needed for security investigation, debugging, legal, accounting, or dispute purposes
 - receipt-analysis attempt metadata and validated suggestions: for as long as the associated receipt is retained for business, tax, accounting, or dispute purposes; provider responses and receipt content are not included in application logs
+- private unapplied intake source and analysis attempts: until replaced, explicitly discarded, or successfully applied; an unfinished intake has no automatic expiry, and its private analysis attempts are removed with the intake
 - documentation site technical records: according to the retention practices of GitHub or other hosting providers used to serve the site
 - Google Analytics event data: 14 months
 
@@ -243,6 +245,8 @@ https://ico.org.uk/make-a-complaint/
 ## Cookies And Local Storage
 
 Glovelly uses cookies or similar browser storage where needed for authentication, session management, security, and user preferences.
+
+The authenticated application also stores a single unfinished-upload identifier in tab-scoped session storage to recover an interrupted attachment save. It does not store receipt content or extracted facts there and clears this recovery identifier when the saved journey is finished or the authenticated session ends.
 
 Glovelly does not currently use advertising cookies.
 

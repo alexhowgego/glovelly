@@ -42,6 +42,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<VertexAiSetListChartContextualRanker>();
         services.AddScoped<VertexReceiptAnalysisService>();
         services.AddScoped<IReceiptAnalysisService, VertexReceiptAnalysisService>();
+        services.AddScoped<IntakeAnalysisService>();
+        services.AddScoped<IntakeApplicationService>();
+        services.AddScoped<IntakeWorkflowService>();
+        services.AddSingleton<IntakeCommandLocks>();
         services.AddScoped<ISetListChartContextualRanker>(provider =>
         {
             var settings = provider.GetRequiredService<IOptions<SetListChartRankingSettings>>().Value;

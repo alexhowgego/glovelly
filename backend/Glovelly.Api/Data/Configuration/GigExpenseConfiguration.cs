@@ -13,6 +13,12 @@ internal sealed class GigExpenseConfiguration : IEntityTypeConfiguration<GigExpe
             .HasMaxLength(500);
         entity.Property(expense => expense.Amount)
             .HasPrecision(18, 2);
+        entity.Property(expense => expense.Category)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        entity.ToTable(table => table.HasCheckConstraint(
+            "CK_GigExpenses_Category",
+            "\"Category\" IS NULL OR \"Category\" IN ('Travel', 'Meals', 'Accommodation', 'Equipment', 'Other')"));
         entity.Property(expense => expense.ReimbursementStatus)
             .HasConversion<string>()
             .HasMaxLength(50)

@@ -12,8 +12,8 @@ import {
   InvoiceGenerationPreviewModal,
   InvoiceEmailReviewModal,
   InvoicesSection,
-  QuickAttachmentModal,
-  QuickReceiptModal,
+  UnifiedIntakeModal,
+  AttachmentReviewModal,
   SellerProfileModal,
   SessionCheckingScreen,
   SignInScreen,
@@ -45,10 +45,9 @@ import { useGigImportsWorkspace } from './hooks/useGigImportsWorkspace'
 import { useInvoicePreview } from './hooks/useInvoicePreview'
 import { useInvoicesWorkspace } from './hooks/useInvoicesWorkspace'
 import { useProfileMenu } from './hooks/useProfileMenu'
-import { useQuickAttachment } from './hooks/useQuickAttachment'
-import { useQuickReceipt } from './hooks/useQuickReceipt'
 import { useSellerProfile } from './hooks/useSellerProfile'
 import { useThemePreference } from './hooks/useThemePreference'
+import { useUnifiedIntake } from './hooks/useUnifiedIntake'
 import { useUserSettings } from './hooks/useUserSettings'
 import { useWorkspaceEvents } from './hooks/useWorkspaceEvents'
 import { notifications } from './notifications'
@@ -117,8 +116,10 @@ function App({ appMetadata }: AppProps) {
 
   const isAdmin = authUser?.role === 'Admin'
   const accessRequestDeepLinkId = getAccessRequestDeepLinkId(window.location.pathname)
+  const resetIntakeRef = useRef<() => void>(() => {})
   const clearSession = useCallback(() => {
     notifications.resetSession()
+    resetIntakeRef.current()
     setIsAuthenticated(false)
     setAuthUser(null)
     setIsApiConnected(false)
@@ -247,7 +248,6 @@ function App({ appMetadata }: AppProps) {
     externalResourceMode,
     filteredGigs,
     gigForm,
-    gigOverviewScrollRequest,
     gigMode,
     gigQuickFilter,
     gigTypeFilter,
@@ -255,7 +255,6 @@ function App({ appMetadata }: AppProps) {
     gigSort,
     gigStatus,
     gigs,
-    gigsById,
     deleteExpenseDraft,
     estimateGigMileage,
     handleGigSubmit,
@@ -270,7 +269,6 @@ function App({ appMetadata }: AppProps) {
     isMileageEstimating,
     mergeSavedGig,
     openExpenseStatement,
-    openGigReceiptDraft,
     plannedGigCount,
     previewExpenseStatement,
     resetGigsWorkspace,
@@ -310,7 +308,6 @@ function App({ appMetadata }: AppProps) {
       setSelectedInvoiceId(invoice.id)
       notifications.info(message, { dedupeKey: `invoice:${invoice.id}:linked-gig` })
     },
-    onOpenSection: (section) => setActiveSection(section),
     onSessionExpired: expireSession,
   })
   const {
@@ -405,86 +402,13 @@ function App({ appMetadata }: AppProps) {
       )
     },
   })
-  const {
-    clearQuickReceiptDialog,
-    closeQuickReceiptPrompt,
-    goToQuickReceiptGig,
-    handleQuickReceiptFile,
-    isQuickReceiptLoadingCandidates,
-    isQuickReceiptSaving,
-    loadMoreQuickReceiptCandidates,
-    pendingReceiptFile,
-    quickReceiptAmount,
-    quickReceiptCandidates,
-    quickReceiptCandidateLoadError,
-    quickReceiptDescription,
-    quickReceiptHasMoreCandidates,
-    quickReceiptDraft,
-    quickReceiptSelectedGigId,
-    quickReceiptStatus,
-    savePendingReceiptToSelectedGig,
-    saveQuickReceiptDetails,
-    setQuickReceiptAmount,
-    setQuickReceiptDescription,
-    setQuickReceiptSelectedGigId,
-  } = useQuickReceipt({
-    getGigById: (gigId) => gigsById.get(gigId),
-    onMergeInvoices: (updatedInvoices) => {
-      if (updatedInvoices.length === 0) {
-        return
-      }
-
-      const updatesById = new Map(updatedInvoices.map((invoice) => [invoice.id, invoice]))
-      setInvoices((current) => current.map((invoice) => updatesById.get(invoice.id) ?? invoice))
+  const unifiedIntake = useUnifiedIntake({
+    onApplied: (application) => {
+      mergeSavedGig(application.gig)
     },
-    onMergeSavedGig: (gig) => mergeSavedGig(gig),
-    onOpenReceiptDraft: (gig, scrollToGig) => openGigReceiptDraft(gig, scrollToGig),
-    onSelectGig: selectGig,
     onSessionExpired: expireSession,
-    setGigStatus,
   })
-  const {
-    clearQuickAttachmentDialog,
-    closeQuickAttachmentPrompt,
-    goToQuickAttachmentGig,
-    handleQuickAttachmentFile,
-    isQuickAttachmentLoadingCandidates,
-    isQuickAttachmentSaving,
-    loadMoreQuickAttachmentCandidates,
-    openQuickAttachmentDialog,
-    pendingAttachmentFile,
-    quickAttachmentCandidates,
-    quickAttachmentCandidateLoadError,
-    quickAttachmentDraft,
-    quickAttachmentIsPrimary,
-    quickAttachmentMode,
-    quickAttachmentHasMoreCandidates,
-    quickAttachmentNotes,
-    quickAttachmentPurpose,
-    quickAttachmentResourceType,
-    quickAttachmentSelectedGigId,
-    quickAttachmentStatus,
-    quickAttachmentTitle,
-    quickAttachmentUrl,
-    savePendingAttachmentToSelectedGig,
-    saveQuickAttachmentDetails,
-    saveQuickAttachmentLinkDraft,
-    setQuickAttachmentIsPrimary,
-    setQuickAttachmentNotes,
-    setQuickAttachmentPurpose,
-    setQuickAttachmentResourceType,
-    setQuickAttachmentSelectedGigId,
-    setQuickAttachmentTitle,
-    startQuickAttachmentLinkMode,
-    updateQuickAttachmentUrl,
-  } = useQuickAttachment({
-    getGigById: (gigId) => gigsById.get(gigId),
-    onMergeSavedGig: (gig) => mergeSavedGig(gig),
-    onOpenAttachmentDraft: (gig, scrollToGig) => openGigReceiptDraft(gig, scrollToGig),
-    onSelectGig: selectGig,
-    onSessionExpired: expireSession,
-    setGigStatus,
-  })
+  useEffect(() => { resetIntakeRef.current = unifiedIntake.reset }, [unifiedIntake.reset])
   const {
     closeConnectedServices,
     closeUserSettings,
@@ -648,8 +572,6 @@ function App({ appMetadata }: AppProps) {
       setMonthlyInvoiceMonth(getCurrentMonthValue())
       setMonthlyInvoiceStatus('')
       resetInvoicesWorkspace()
-      clearQuickReceiptDialog()
-      clearQuickAttachmentDialog()
       resetUserSettings()
       resetSellerProfile()
       resetAdminWorkspace()
@@ -819,8 +741,6 @@ function App({ appMetadata }: AppProps) {
     applyGigs,
     applyInvoices,
     applySellerProfile,
-    clearQuickAttachmentDialog,
-    clearQuickReceiptDialog,
     expireSession,
     loadAdminUsers,
     loadAccessRequests,
@@ -1745,7 +1665,6 @@ function App({ appMetadata }: AppProps) {
         externalResourceForm={externalResourceForm}
         externalResourceMode={externalResourceMode}
         gigForm={gigForm}
-        scrollToGigOverviewRequest={gigOverviewScrollRequest}
         isEditorOpen={isGigEditorOpen}
         gigMode={gigMode}
         gigQuickFilter={gigQuickFilter}
@@ -1861,8 +1780,6 @@ function App({ appMetadata }: AppProps) {
       isGigLoading={isGigLoading}
       isLoading={isLoading}
       isProfileMenuOpen={isProfileMenuOpen}
-      isQuickAttachmentSaving={isQuickAttachmentSaving}
-      isQuickReceiptSaving={isQuickReceiptSaving}
       isSellerProfileSaving={isSellerProfileSaving}
       isUserSettingsSaving={isUserSettingsSaving}
       navigationItems={navigationItems}
@@ -1875,8 +1792,7 @@ function App({ appMetadata }: AppProps) {
       onOpenConnectedServices={openConnectedServices}
       onOpenUserSettings={openUserSettings}
       onProfileMenuToggle={toggleProfileMenu}
-      onQuickAttachmentOpen={openQuickAttachmentDialog}
-      onQuickReceiptFile={handleQuickReceiptFile}
+        onUnifiedIntakeOpen={unifiedIntake.open}
       onSectionChange={setActiveSection}
       onSignOut={signOut}
       onThemePreferenceChange={setThemePreference}
@@ -2042,64 +1958,16 @@ function App({ appMetadata }: AppProps) {
         status={sellerProfileStatus}
       />
 
-      <QuickAttachmentModal
-        candidates={quickAttachmentCandidates}
+      <UnifiedIntakeModal workflow={unifiedIntake} clientNamesById={clientNamesById} />
+      {unifiedIntake.state.phase === 'review' && <AttachmentReviewModal
+        application={unifiedIntake.state.application}
+        evidence={unifiedIntake.state.evidence}
         clientNamesById={clientNamesById}
-        draft={quickAttachmentDraft}
-        hasMoreCandidates={quickAttachmentHasMoreCandidates}
-        isLoadingCandidates={isQuickAttachmentLoadingCandidates}
-        isPrimary={quickAttachmentIsPrimary}
-        isSaving={isQuickAttachmentSaving}
-        mode={quickAttachmentMode}
-        notes={quickAttachmentNotes}
-        onClose={closeQuickAttachmentPrompt}
-        onFileChange={handleQuickAttachmentFile}
-        onGoToGig={goToQuickAttachmentGig}
-        onLoadMoreCandidates={loadMoreQuickAttachmentCandidates}
-        onIsPrimaryChange={setQuickAttachmentIsPrimary}
-        onModeLink={startQuickAttachmentLinkMode}
-        onNotesChange={setQuickAttachmentNotes}
-        onPurposeChange={setQuickAttachmentPurpose}
-        onResourceTypeChange={setQuickAttachmentResourceType}
-        onSaveDetails={saveQuickAttachmentDetails}
-        onSaveDraft={savePendingAttachmentToSelectedGig}
-        onSaveLink={saveQuickAttachmentLinkDraft}
-        onSelectedGigChange={setQuickAttachmentSelectedGigId}
-        onTitleChange={setQuickAttachmentTitle}
-        onUrlChange={updateQuickAttachmentUrl}
-        pendingFile={pendingAttachmentFile}
-        loadCandidatesError={quickAttachmentCandidateLoadError}
-        purpose={quickAttachmentPurpose}
-        resourceType={quickAttachmentResourceType}
-        selectedGigId={quickAttachmentSelectedGigId}
-        status={quickAttachmentStatus}
-        title={quickAttachmentTitle}
-        url={quickAttachmentUrl}
-      />
-
-      <QuickReceiptModal
-        amount={quickReceiptAmount}
-        candidates={quickReceiptCandidates}
-        clientNamesById={clientNamesById}
-        description={quickReceiptDescription}
-        draft={quickReceiptDraft}
-        hasMoreCandidates={quickReceiptHasMoreCandidates}
-        isLoadingCandidates={isQuickReceiptLoadingCandidates}
-        isSaving={isQuickReceiptSaving}
-        onAmountChange={setQuickReceiptAmount}
-        onClose={closeQuickReceiptPrompt}
-        onDescriptionChange={setQuickReceiptDescription}
-        onGoToGig={goToQuickReceiptGig}
-        onLoadMoreCandidates={loadMoreQuickReceiptCandidates}
-        onSaveDetails={saveQuickReceiptDetails}
-        onSaveDraft={savePendingReceiptToSelectedGig}
+        onClose={unifiedIntake.close}
+        onMergeGig={mergeSavedGig}
+        onMergeInvoices={updated => setInvoices(current => current.map(invoice => updated.find(value => value.id === invoice.id) ?? invoice))}
         onSessionExpired={expireSession}
-        onSelectedGigChange={setQuickReceiptSelectedGigId}
-        pendingFile={pendingReceiptFile}
-        loadCandidatesError={quickReceiptCandidateLoadError}
-        selectedGigId={quickReceiptSelectedGigId}
-        status={quickReceiptStatus}
-      />
+      />}
 
       <ClientSettingsModal
         authUser={authUser}

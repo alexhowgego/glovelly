@@ -9,7 +9,7 @@ import type { ReceiptAnalysisResult, ReceiptAnalysisTarget } from '../types'
 import { AiSparkleIcon } from './AiSparkleIcon'
 
 type ReceiptAnalysisModalProps = {
-  onApply: (suggestions: { merchant: string | null; totalAmount: number | null }) => void
+  onApply: (suggestions: { merchant: string | null; totalAmount: number | null; suggestedCategory: string | null }) => void
   onClose: () => void
   onSessionExpired: (message: string) => void
   target: ReceiptAnalysisTarget
@@ -56,7 +56,7 @@ export function ReceiptAnalysisModal({
     analyseOnOpen()
   }, [target.attachmentId])
 
-  const canApply = analysis?.status === 'Succeeded' && (analysis.merchant.value || analysis.totalAmount.value !== null)
+  const canApply = analysis?.status === 'Succeeded' && (analysis.merchant.value || analysis.totalAmount.value !== null || analysis.suggestedCategory.value)
 
   return (
     <div className="settings-overlay receipt-analysis-overlay" role="presentation">
@@ -80,8 +80,8 @@ export function ReceiptAnalysisModal({
             <Suggestion label="Total" field={analysis.totalAmount} applyable />
             <Suggestion label="Transaction date" field={analysis.transactionDate} />
             <Suggestion label="Currency" field={analysis.currency} />
-            <Suggestion label="Suggested category" field={analysis.suggestedCategory} />
-            <p className="receipt-analysis-note">Date, currency, and category are review-only suggestions. They do not change the expense record.</p>
+            <Suggestion label="Suggested category" field={analysis.suggestedCategory} applyable />
+            <p className="receipt-analysis-note">Date and currency are review-only suggestions. They do not change the expense record.</p>
             {analysis.warnings.length > 0 ? (
               <div className="quick-receipt-warning">
                 <strong>Check these details</strong>
@@ -97,8 +97,8 @@ export function ReceiptAnalysisModal({
             {isAnalysing ? 'Analysing...' : 'Analyse again'}
           </button>
           {canApply ? (
-            <button className="ghost-button" onClick={() => onApply({ merchant: analysis!.merchant.value, totalAmount: analysis!.totalAmount.value })} type="button" disabled={isAnalysing}>
-              Use merchant and total
+            <button className="ghost-button" onClick={() => onApply({ merchant: analysis!.merchant.value, totalAmount: analysis!.totalAmount.value, suggestedCategory: analysis!.suggestedCategory.value })} type="button" disabled={isAnalysing}>
+              Use suggestions
             </button>
           ) : null}
         </div>

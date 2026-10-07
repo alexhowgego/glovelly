@@ -94,6 +94,7 @@ internal static class AuthEndpoints
                 invoiceEmailSubjectPattern = localUser.InvoiceEmailSubjectPattern,
                 invoiceEmailBodyTemplate = localUser.InvoiceEmailBodyTemplate,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
+                automaticReceiptMatching = localUser.AutomaticReceiptMatching,
                 invoiceUploadFolderId = googleDriveSettings?.InvoiceUploadFolderId,
                 isGoogleDriveConnected,
                 isGoogleSheetsConnected,
@@ -133,6 +134,10 @@ internal static class AuthEndpoints
             localUser.InvoiceEmailSubjectPattern = request.InvoiceEmailSubjectPattern?.Trim();
             localUser.InvoiceEmailBodyTemplate = request.InvoiceEmailBodyTemplate?.Trim();
             localUser.InvoiceReplyToEmail = request.InvoiceReplyToEmail?.Trim();
+            if (request.AutomaticReceiptMatching.HasValue)
+            {
+                localUser.AutomaticReceiptMatching = request.AutomaticReceiptMatching.Value;
+            }
 
             var invoiceUploadFolderId = request.InvoiceUploadFolderId?.Trim();
             if (string.IsNullOrEmpty(invoiceUploadFolderId))
@@ -189,6 +194,7 @@ internal static class AuthEndpoints
                 invoiceEmailSubjectPattern = localUser.InvoiceEmailSubjectPattern,
                 invoiceEmailBodyTemplate = localUser.InvoiceEmailBodyTemplate,
                 invoiceReplyToEmail = localUser.InvoiceReplyToEmail,
+                automaticReceiptMatching = localUser.AutomaticReceiptMatching,
                 invoiceUploadFolderId = googleDriveSettings?.InvoiceUploadFolderId,
             });
         });
@@ -245,6 +251,14 @@ internal static class AuthEndpoints
             return new Dictionary<string, string[]>
             {
                 ["displayName"] = ["Display name cannot be empty or whitespace."]
+            };
+        }
+
+        if (request.AutomaticReceiptMatching.HasValue && !Enum.IsDefined(request.AutomaticReceiptMatching.Value))
+        {
+            return new Dictionary<string, string[]>
+            {
+                ["automaticReceiptMatching"] = ["Automatic receipt matching is invalid."]
             };
         }
 
@@ -331,6 +345,7 @@ internal static class AuthEndpoints
         string? InvoiceEmailBodyTemplate,
         [property: EmailAddress(ErrorMessage = "Reply-to email must be a valid email address.")]
         string? InvoiceReplyToEmail,
+        AutomaticReceiptMatching? AutomaticReceiptMatching,
         [property: StringLength(200, ErrorMessage = "Google Drive folder ID must be 200 characters or fewer.")]
         string? InvoiceUploadFolderId);
 }

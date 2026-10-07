@@ -28,24 +28,23 @@ Use these journeys when a change may affect gig attachments such as set lists, g
 
 The attachment is added to the selected gig only, appears without refreshing, preserves type and purpose, and opens external links in a separate tab.
 
-## Quick Add Attachment Journey
+## Add To Glovelly Resource Journey
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickAttachmentMobileFlowSavesDraftAndOpensTargetGig` covers the mobile-sized quick attachment link flow and confirms `Go to gig` scrolls the target Gig overview into view; backend tests cover file draft matching, no-candidate handling, type inference, moves, and primary updates.
+> **Automation:** `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.UnifiedResourceMobileFlowKeepsUploadOpenAndOffersOptionalReview` covers the mobile URL upload/application and optional saved-record review in Ubuntu CI. Backend tests cover explicit resource confirmation, source retention/cleanup, URL type inference, moves and primary updates.
 
 ### Steps
 
-1. Scroll on a phone-sized viewport and confirm the `+` quick attachment button floats beside `Scan receipt`.
-2. Click `+` and choose `Upload file`.
-3. Upload a PDF or image when a gig exists within the quick capture window.
-4. Confirm the attachment is saved to the nearest gig and the modal shows editable title, type, purpose, URL, notes, and primary fields.
-5. Save details, then click `Go to gig` and confirm the target Gig overview scrolls into view and shows the attachment.
-6. Click `+` again, choose `Add link`, paste a Google Doc or Google Sheet URL, and save.
-7. With several valid historical gigs outside the nearby window, use `Load more gigs` in both the receipt and attachment dialogs until the intended gig is available. Confirm the current selection and entered file, link, title, amount, and notes remain unchanged while loading and after a failed request; retry the request and confirm it recovers.
-8. Continue until `Load more gigs` is no longer available, then select an older gig and save the existing draft action.
+1. On a phone-sized viewport, select the single **Add to Glovelly** action.
+2. Confirm source type selection appears; choose a file, URL or pasted text and enter unified upload before acquisition. Repeat with a Google Doc or Google Sheet URL.
+3. Confirm analysis/type inference happens in upload before any resource is created. Linked Google document contents are not fetched.
+4. Confirm upload shows detected facts/confidence, suggested gigs, title, type, purpose, notes and primary controls. Choose a gig and explicitly **Attach resource**; nearby gigs must never cause automatic resource creation.
+5. Confirm upload remains open with compact **Attached to [Gig]**, **Review attachment**, and **Done**. Finish without review and verify the resource in its gig; repeat and deliberately open saved-attachment review to edit/reassign/delete that exact resource without re-uploading.
+6. With several valid historical gigs outside the nearby window, use `Load more gigs` until the intended gig is available. Confirm the current selection and submitted source remain unchanged while loading and after a failed request; retry the request and confirm it recovers.
+7. Continue until `Load more gigs` is no longer available, then select an older gig and explicitly apply the resource.
 
 ### Expected Results
 
-The quick add journey uses the same gig matching behaviour as quick receipts, supports both uploaded files and URLs, infers Google Doc/Sheet types where possible, and preserves user-facing attachment terminology. Terminal save feedback remains visible after navigating to the target gig and does not obscure the floating mobile actions.
+The unified journey supports files, URLs and text, infers Google Doc/Sheet types from URL metadata, and requires explicit resource confirmation. Automatic receipts and explicit resources share the same stable upload attached state and optional saved review. Inline save/failure feedback remains visible with notifications below modal overlays, and controls remain usable on mobile. Closing an unapplied source preserves recovery; closing after confirmed attachment preserves the saved resource.
 Candidate expansion never saves or moves a draft by itself, keeps current options visible during loading, allows retry after an error, and eventually exposes visible non-cancelled historical gigs without duplicate options.
 
 ## File-Only Attachment Journey

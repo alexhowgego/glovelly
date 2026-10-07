@@ -44,7 +44,8 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 ## Frontend Map
 
 - `src/App.tsx` coordinates session, active section, initial data loads, modals, and cross-workspace actions. Avoid adding large workflow bodies there when a hook can own them.
-- `src/hooks/` owns stateful workspace logic for clients, gigs, gig imports, invoices, admin, user settings, seller profile, and quick receipts.
+- `src/hooks/` owns stateful workspace logic for clients, gigs, gig imports, invoices, admin, user settings, seller profile, unified intake, and saved-attachment review.
+- Unified capture is source selection → upload/application → optional saved-attachment review. `IntakeWorkflowService` decides proactive receipt saving; `IntakeApplicationService` shares automatic/explicit application and stable-ID recovery. Successful private intake is deleted while the frontend retains the authoritative saved result. Never reintroduce client-triggered fast-path saving or automatically close/navigate on attachment success.
 - `src/components/` is presentational sections/modals. Preserve the current plain React/CSS approach; there is no component library.
 - `frontend/glovelly-guide` is the public, task-led user guide. Write in a practical "do this next" voice for musicians and sole traders; keep technical/operator reference material in the DocFX handbook at `handbook.glovelly.net`.
 - `frontend/public-site-analytics/public-site-analytics.js` is the single consent-gated GA4 loader for `glovelly.net`, `docs.glovelly.net`, and `handbook.glovelly.net`. It must remain absent from Menu, previews, staging, local development, and UAT; Astro builds copy it with `frontend/copy-public-site-analytics.mjs`, while DocFX consumes it as a resource.
@@ -95,6 +96,7 @@ rg "TestData\\.|TestAuthContext|factory\.Emails" backend/Glovelly.Api.Tests
 
 ## Avoid
 
+- When replacing an internal route or workflow, remove the superseded route whenever consumers can move to the shared replacement. Do not retain duplicate endpoint implementations for convenience; delegate temporarily only when a concrete external compatibility need exists.
 - Do not bypass owner visibility checks for user-owned data; null creator IDs may be intentional for shared/dev seed visibility.
 - Do not add package versions to individual `.csproj` files; use central package management in `Directory.Packages.props`.
 - Do not refactor large coordination files just to tidy them while solving a narrow task.

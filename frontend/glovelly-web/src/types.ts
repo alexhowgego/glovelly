@@ -60,8 +60,53 @@ export type AuthUser = {
   invoiceEmailBodyTemplate: string | null
   invoiceReplyToEmail: string | null
   invoiceUploadFolderId: string | null
+  automaticReceiptMatching: AutomaticReceiptMatching
   isGoogleDriveConnected: boolean
   isGoogleSheetsConnected: boolean
+}
+
+export type AutomaticReceiptMatching = 'ManualOnly' | 'VeryHighConfidence' | 'HighConfidence' | 'MediumConfidence'
+
+export type IntakeSourceType = 'File' | 'Url' | 'Text'
+export type IntakeIntent = 'Receipt' | 'Resource' | 'Unknown'
+export type IntakeAnalysisState = 'Pending' | 'Succeeded' | 'Failed'
+
+export type IntakeEvidence = {
+  label: string
+  value: string
+}
+
+export type IntakeCandidatePage = {
+  candidates: QuickGigCandidate[]
+  hasMore: boolean
+  continuation: string | null
+}
+
+export type IntakeApplication = {
+  kind: 'Receipt' | 'Resource'
+  gig: Gig
+  expenseId: string | null
+  attachmentId: string | null
+  resource: GigExternalResource | null
+}
+
+export type Intake = {
+  id: string
+  sourceType: IntakeSourceType
+  sourceName: string
+  sourceUrl: string | null
+  sourceText: string | null
+  analysisState: IntakeAnalysisState
+  failureMessage: string | null
+  proposedIntent: IntakeIntent
+  suggestedResourceType: GigExternalResourceType | null
+  confidence: 'None' | 'Low' | 'Medium' | 'High'
+  evidence: IntakeEvidence[]
+  candidates: QuickGigCandidate[]
+  hasMoreCandidates: boolean
+  candidateContinuation: string | null
+  applicationError: string | null
+  application: IntakeApplication | null
 }
 
 export type GoogleCalendarStatus = {
@@ -211,6 +256,7 @@ export type UserSettingsForm = {
   invoiceEmailBodyTemplate: string
   invoiceReplyToEmail: string
   invoiceUploadFolderId: string
+  automaticReceiptMatching: AutomaticReceiptMatching
 }
 
 export type ClientSettingsForm = {
@@ -322,6 +368,7 @@ export type GigExpense = {
   sortOrder: number
   description: string
   amount: number
+  category: string | null
   reimbursementStatus: GigExpenseReimbursementStatus
   reimbursedAt: string | null
   reimbursementUpdatedAt: string | null
@@ -535,6 +582,7 @@ export type GigExpenseForm = {
   sortOrder: number
   description: string
   amount: string
+  category: string
   reimbursementStatus: GigExpenseReimbursementStatus
   reimbursedAt: string | null
   reimbursementUpdatedAt: string | null
@@ -643,51 +691,10 @@ export type QuickGigCandidate = Pick<
   isSelected: boolean
 }
 
-export type QuickReceiptCandidate = QuickGigCandidate
-
 export type QuickCaptureCandidatePage = {
   candidates: QuickGigCandidate[]
   hasMore: boolean
   continuation: string | null
-}
-
-export type QuickReceiptDraftResponse = {
-  gig: Gig
-  expenseId: string
-  attachmentId: string
-  inferredGig: boolean
-  candidates: QuickReceiptCandidate[]
-  autoAttachWindowDays: number
-  hasNearbyCandidates: boolean
-  hasMoreCandidates: boolean
-  candidateContinuation: string | null
-}
-
-export type QuickReceiptDraftUpdateResponse = {
-  gig: Gig
-  previousGig: Gig | null
-  expenseId: string
-  moved: boolean
-  invoices: Invoice[]
-}
-
-export type QuickExternalResourceDraftResponse = {
-  gig: Gig
-  resourceId: string
-  attachmentId: string | null
-  inferredGig: boolean
-  candidates: QuickGigCandidate[]
-  autoAttachWindowDays: number
-  hasNearbyCandidates: boolean
-  hasMoreCandidates: boolean
-  candidateContinuation: string | null
-}
-
-export type QuickExternalResourceDraftUpdateResponse = {
-  gig: Gig
-  previousGig: Gig | null
-  resourceId: string
-  moved: boolean
 }
 
 export type InvoiceLine = {

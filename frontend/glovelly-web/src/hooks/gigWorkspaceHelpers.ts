@@ -14,6 +14,7 @@ export type NormalizedGigExpensePayload = {
   sortOrder: number
   description: string
   amount: number
+  category: string | null
 }
 
 export function formatEditableNumber(value: number | null) {
@@ -120,6 +121,7 @@ export function hasInvoiceRelevantGigChanges(
       sortOrder: index + 1,
       description: expense.description,
       amount: expense.amount,
+      category: expense.category,
     }))
 
   if (currentExpenses.length !== normalizedExpenses.length) {
@@ -131,7 +133,8 @@ export function hasInvoiceRelevantGigChanges(
     return (
       expense.sortOrder !== nextExpense.sortOrder ||
       expense.description !== nextExpense.description ||
-      expense.amount !== nextExpense.amount
+      expense.amount !== nextExpense.amount ||
+      expense.category !== nextExpense.category
     )
   })
 }

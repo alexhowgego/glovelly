@@ -256,6 +256,7 @@ internal static class GigCrudEndpoints
                 existingExpenses[i].SortOrder = normalizedExpenses[i].SortOrder;
                 existingExpenses[i].Description = normalizedExpenses[i].Description;
                 existingExpenses[i].Amount = normalizedExpenses[i].Amount;
+                existingExpenses[i].Category = normalizedExpenses[i].Category;
             }
 
             if (existingExpenses.Count > normalizedExpenses.Count)

@@ -47,24 +47,38 @@ Receipt metadata, storage, download, and deletion all work without changing the 
 
 Receipt analysis augments, but never blocks or silently changes, the manual expense workflow.
 
-## Quick Receipt Journey
+## Add To Glovelly Receipt Journey
 
-> **Automation:** Backend and browser automated: `Glovelly.Api.Tests.GigEndpointsTests.QuickReceiptDraft_*` and `UpdateQuickReceiptDraft_*` cover draft creation, candidate matching, draft-invoice refresh, finalized-invoice immutability, updates, and reassignment; `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.QuickReceiptFlowOpensTargetGigInViewport` covers quick-capture navigation. Receipt analysis and visual capture variants remain manual.
+> **Automation:** `IntakeEndpointsTests` cover proactive/explicit application, preferences, recovery, source cleanup, and scoping. `GigEndpointsTests` retain receipt correction and invoice-refresh regressions. Frontend journey tests cover stable upload, optional review, early finish and interrupted responses. `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.UnifiedReceiptMobileFlowSavesThenReviewsTheExactAttachment` covers mobile manual application and saved-record review in Ubuntu CI. Live-provider and visual variants remain manual.
 
 ### Steps
 
-1. Use quick receipt capture to upload a receipt.
-2. If the app suggests a nearby gig, accept it or choose a different gig.
-3. With historical non-cancelled gigs available outside the nearby window, use `Load more gigs` until the intended gig appears. Confirm the selected gig, uploaded file, description, and amount remain unchanged while loading; simulate or recover from a failed load, then confirm the action is unavailable once results are exhausted.
-4. Fill in the receipt draft description and amount.
-5. Save it and, when the selected gig has a linked draft invoice, confirm the invoice lines and PDF refresh.
-6. Repeat with an issued or other non-draft invoice and confirm its lines and PDF do not change automatically.
-7. If draft PDF regeneration fails, confirm the receipt remains saved, the invoice explains that its PDF is unavailable, and retry succeeds before delivery or download.
-8. Click `Go to gig` and confirm the target Gig overview scrolls into view and remains selected.
+1. Select **Add to Glovelly** and confirm source type selection appears before a file picker. Choose **Photo or file**, enter unified upload, and choose a receipt photo/PDF. Repeat with pasted receipt text; URLs follow the resource journey.
+2. Confirm analysis starts immediately in upload, retains the source and shows progress. Provider failure offers retry and explicit **Attach as Receipt** treatment without losing the source.
+3. With High confidence enabled and a qualifying receipt, confirm it is proactively saved to the nearest visible non-cancelled nearby gig even when other candidates exist. Upload stays open with compact **Attached to [Gig]**, **Review attachment**, and **Done**. No dialog automatically closes, no review appears automatically, and no workspace navigation occurs.
+4. Select **Done** without entering review, then confirm the receipt is saved in its gig. Reopen Add to Glovelly and confirm source selection is clean. Repeat closing after attached state; background/refresh during a save and confirm recovery never creates another receipt.
+5. Set **Automatic receipt application** to Manual only and confirm upload waits for explicit attachment. Check Settings label/select alignment, hover help, and focus explanation. Restore the original preference after testing.
+6. With no nearby gig or a historical intended destination, use **Load more gigs**. Confirm source, selection and fields survive loading/failure, retry works, and the action disappears when exhausted. Explicitly attach and confirm the same compact attached state.
+7. Select **Review attachment** and confirm it opens the exact saved receipt with original file access and editable destination, description, amount and category. Save corrections/reassignment and confirm affected draft invoices refresh. Close review without edits and confirm the existing receipt is untouched.
+8. Repeat with an issued or other non-draft invoice and confirm its lines/PDF remain unchanged. If draft PDF regeneration fails, confirm the receipt stays saved and the invoice explains its document unavailability and supports retry.
+9. Repeat on a phone-sized viewport with notifications already visible. Progress, inline failures, attached state and review controls must remain readable/clickable above the notification viewport; save feedback must not disappear in a transient notification.
+10. Close an unapplied upload and resume it from source selection. Discard it explicitly and confirm the next acquisition has empty source fields. Test deletion in saved-attachment review and confirm only that receipt/expense is removed.
 
 ### Expected Results
 
-The draft becomes a normal gig expense with its receipt attached. Candidate expansion exposes visible non-cancelled historical gigs without resetting the draft, and the action clearly reflects loading, retryable failure, and exhaustion. Linked draft invoices refresh their generated lines and PDF automatically; issued, overdue, paid, and cancelled invoices remain unchanged. A failed draft PDF regeneration preserves the receipt and lines while blocking document delivery actions until retry succeeds. Existing expenses and attachments remain intact. Completion feedback remains visible after navigating to the target gig.
+Every receipt uses source selection → stable upload/application → optional saved-attachment review. Both save modes reach the same attached presentation, and users can finish there. Candidate expansion is read-only and preserves pending fields. Linked draft invoices refresh; issued, overdue, paid and cancelled invoices remain unchanged. Failed PDF regeneration preserves the receipt while preventing stale document delivery. Unapplied sources remain recoverable; completed private intake is removed without erasing open attached state. Existing unrelated expenses and attachments remain intact.
+
+## Expense Category Journey
+
+### Steps
+
+1. Open a saved gig and add or edit an ordinary expense.
+2. Enter a category and save the expense.
+3. Reopen the expense and change or clear the category, then save again.
+
+### Expected Results
+
+The category remains editable alongside amount and description, and saving it does not affect receipts or reimbursement status.
 
 ## Expense Reimbursement Journey
 
