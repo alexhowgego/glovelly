@@ -10,6 +10,11 @@
     "lint": "npm run check",
     "preview": "astro preview"
   },
+  "overrides": {
+    "postcss-nested": {
+      "postcss-selector-parser": "^7.1.6"
+    }
+  },
   "dependencies": {
     "@astrojs/starlight": "^0.42.0",
     "astro": "^7.3.2"
