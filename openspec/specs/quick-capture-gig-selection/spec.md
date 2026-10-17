@@ -24,18 +24,22 @@ The system SHALL provide an authenticated, read-only quick-capture candidate que
 - **THEN** the system SHALL indicate that no further page is available
 
 ### Requirement: Initial quick-capture selection behavior remains unchanged
-The system SHALL retain the existing nearby-candidate range, candidate-count and cutoff-tie handling, automatic-selection behavior, and ambiguity warning for the initial quick receipt and attachment capture attempt. Explicit candidate expansion SHALL NOT change the initial selection or warning outcome.
+The system SHALL retain configured nearby range, local application clock, candidate count, cutoff ties, and existing nearest-gig ordering as the initial selection basis for unified intake. Eligible automatic receipt application SHALL use the first initial candidate; other candidates and existing informational ambiguity warnings SHALL NOT block application or trigger a separate journey. Explicit expansion SHALL NOT change the initial selection or warning outcome.
 
-#### Scenario: Initial ambiguity is preserved
-- **WHEN** a quick-capture attempt has multiple nearby candidates that trigger the existing ambiguity behavior
-- **THEN** the system SHALL retain that behavior before the user requests additional candidates
+#### Scenario: Multiple initial candidates exist
+- **WHEN** multiple nearby visible non-cancelled gigs exist and receipt confidence permits automatic application
+- **THEN** the system SHALL select the nearest ranked gig and save within the open unified upload dialog
 
-#### Scenario: Loading candidates does not mutate a draft
+#### Scenario: Another gig triggers proximity guidance
+- **WHEN** another initial candidate is within the configured AmbiguityWindowDays of today
+- **THEN** attached state SHALL show the established non-blocking check-the-gig guidance without stopping application or forcing review
+
+#### Scenario: Loading candidates does not mutate an item
 - **WHEN** a user requests another candidate page
-- **THEN** the system SHALL NOT upload, create, move, save, or otherwise modify the receipt or attachment draft
+- **THEN** the system SHALL NOT upload, create, move, save, or otherwise modify a receipt or resource
 
 ### Requirement: Quick-capture dialogs load additional gigs safely
-The quick receipt and quick attachment dialogs, including attachment link capture, SHALL present a Load more gigs action whenever eligible candidate results remain. The dialogs SHALL append loaded candidates without duplicates, preserve the selected gig when possible, and retain all pending capture fields during candidate loading or failure.
+Unified upload and saved receipt/resource correction SHALL present Load more gigs whenever eligible candidate results remain. They SHALL append candidates without duplicates, preserve selection when possible, and retain pending fields during loading and failure.
 
 #### Scenario: User loads another page
 - **WHEN** a user activates Load more gigs while another candidate page exists
@@ -50,5 +54,5 @@ The quick receipt and quick attachment dialogs, including attachment link captur
 - **THEN** the dialog SHALL hide or clearly disable Load more gigs
 
 #### Scenario: Initial nearby candidates are empty
-- **WHEN** a quick-capture dialog has no initial nearby candidate but eligible gigs remain
-- **THEN** the dialog SHALL still present Load more gigs without resetting the pending capture
+- **WHEN** no initial nearby candidate exists but eligible gigs remain
+- **THEN** upload SHALL offer Load more gigs without resetting the current intake

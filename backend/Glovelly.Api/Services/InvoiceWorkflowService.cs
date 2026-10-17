@@ -1,4 +1,5 @@
 using Glovelly.Api.Data;
+using Glovelly.Api.Endpoints;
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -202,13 +203,18 @@ public sealed class InvoiceWorkflowService(
         }
 
         var invoiceIdsToRefresh = invoices.Select(invoice => invoice.Id).ToHashSet();
-        foreach (var gig in affectedGigs.Where(gig => invoiceIdsToRefresh.Contains(gig.InvoiceId!.Value)))
+        var pendingIds = invoices.Where(invoice => invoice.GigLinesNeedRefresh).Select(invoice => invoice.Id).ToList();
+        var pendingGigs = await dbContext.Gigs.WhereVisibleTo(userId).Include(gig => gig.Expenses)
+            .Where(gig => gig.InvoiceId.HasValue && pendingIds.Contains(gig.InvoiceId.Value)).ToListAsync(cancellationToken);
+        var gigsToSync = affectedGigs.Concat(pendingGigs).DistinctBy(gig => gig.Id);
+        foreach (var gig in gigsToSync.Where(gig => invoiceIdsToRefresh.Contains(gig.InvoiceId!.Value)))
         {
             await SyncGeneratedInvoiceLinesForGigAsync(gig, userId, cancellationToken);
         }
 
         foreach (var invoice in invoices)
         {
+            invoice.GigLinesNeedRefresh = false;
             invoice.DocumentRevision++;
             invoice.DocumentState = InvoiceDocumentState.Regenerating;
             invoice.DocumentFailureMessage = null;
@@ -373,6 +379,17 @@ public sealed class InvoiceWorkflowService(
         Guid? userId,
         CancellationToken cancellationToken = default)
     {
+        if (invoice.Status == InvoiceStatus.Draft && invoice.GigLinesNeedRefresh)
+        {
+            var gigs = await dbContext.Gigs.WhereVisibleTo(userId).Include(value => value.Expenses)
+                .Where(value => value.InvoiceId == invoice.Id).ToListAsync(cancellationToken);
+            foreach (var gig in gigs) await SyncGeneratedInvoiceLinesForGigAsync(gig, userId, cancellationToken);
+            invoice.GigLinesNeedRefresh = false;
+            invoice.DocumentRevision++;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.Entry(invoice).Collection(value => value.Lines).IsLoaded = false;
+            await dbContext.Entry(invoice).Collection(value => value.Lines).LoadAsync(cancellationToken);
+        }
         invoice.DocumentState = InvoiceDocumentState.Regenerating;
         invoice.DocumentFailureMessage = null;
         var sellerProfile = await invoiceProfileDefaultsService.ResolveSellerProfileAsync(userId, cancellationToken);
@@ -401,6 +418,20 @@ public sealed class InvoiceWorkflowService(
         invoice.DocumentState = InvoiceDocumentState.Failed;
         invoice.DocumentFailureMessage = message;
         StampUpdate(invoice, userId);
+    }
+
+    public async Task MarkDraftGigChangesAsync(IReadOnlyCollection<Gig> gigs, Guid? userId, CancellationToken cancellationToken = default)
+    {
+        var ids = gigs.Where(gig => gig.InvoiceId.HasValue).Select(gig => gig.InvoiceId!.Value).Distinct().ToList();
+        var invoices = await dbContext.Invoices.WhereVisibleTo(userId)
+            .Where(invoice => ids.Contains(invoice.Id) && invoice.Status == InvoiceStatus.Draft).ToListAsync(cancellationToken);
+        foreach (var invoice in invoices)
+        {
+            invoice.GigLinesNeedRefresh = true;
+            MarkInvoicePdfRegenerationFailed(invoice, "Gig changes require an invoice refresh. Retry PDF generation from Invoices.", userId);
+        }
+        // Deliberately no SaveChanges: callers commit this obligation atomically
+        // with the receipt/expense mutation.
     }
 
     private static void StampCreate(Invoice invoice, Guid? userId)

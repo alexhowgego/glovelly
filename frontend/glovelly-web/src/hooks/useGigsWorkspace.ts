@@ -47,7 +47,6 @@ type UseGigsWorkspaceOptions = {
   clientNamesById: ReadonlyMap<string, string>
   clients: Client[]
   onLinkedInvoiceUpdated: (invoice: Invoice, message: string) => void
-  onOpenSection: (section: 'gigs') => void
   onSessionExpired: (message: string) => void
 }
 
@@ -66,7 +65,6 @@ export function useGigsWorkspace({
   clientNamesById,
   clients,
   onLinkedInvoiceUpdated,
-  onOpenSection,
   onSessionExpired,
 }: UseGigsWorkspaceOptions) {
   const [gigs, setGigs] = useState<Gig[]>([])
@@ -76,7 +74,6 @@ export function useGigsWorkspace({
   const [gigQuickFilter, setGigQuickFilter] = useState<GigQuickFilter>('work-queue')
   const [gigTypeFilter, setGigTypeFilter] = useState<GigType | 'all'>('all')
   const [gigSort, setGigSort] = useState<GigSort>({ key: 'priority', direction: 'asc' })
-  const [gigOverviewScrollRequest, setGigOverviewScrollRequest] = useState(0)
   const [isGigEditorOpen, setIsGigEditorOpen] = useState(false)
   const [gigMode, setGigMode] = useState<'create' | 'edit'>('create')
   const [gigForm, setGigForm] = useState<GigForm>(emptyGigForm)
@@ -218,11 +215,10 @@ export function useGigsWorkspace({
       savedGig,
       ...current.filter((gig) => gig.id !== savedGig.id),
     ])
-    setGigForm((current) => ({
-      ...current,
-      expenses: toEditableGigExpenses(savedGig),
-    }))
-  }, [])
+    if (savedGig.id === selectedGigId) {
+      setGigForm((current) => ({ ...current, expenses: toEditableGigExpenses(savedGig) }))
+    }
+  }, [selectedGigId])
 
   const replaceSavedGig = useCallback((savedGig: Gig) => {
     setGigs((current) => current.map((gig) => (gig.id === savedGig.id ? savedGig : gig)))
@@ -1075,18 +1071,6 @@ export function useGigsWorkspace({
     }
   }
 
-  const openGigReceiptDraft = (savedGig: Gig, scrollToGig = false) => {
-    mergeSavedGig(savedGig)
-    revealGig(savedGig, [savedGig, ...gigs.filter((gig) => gig.id !== savedGig.id)])
-    onOpenSection('gigs')
-    setGigMode('edit')
-    setGigForm(toEditableGigForm(savedGig))
-    setIsGigEditorOpen(true)
-    if (scrollToGig) {
-      setGigOverviewScrollRequest((current) => current + 1)
-    }
-  }
-
   const handleLinkedInvoiceAfterGigSave = async (
     previousGig: Gig,
     savedGig: Gig,
@@ -1250,6 +1234,7 @@ export function useGigsWorkspace({
         sortOrder: index + 1,
         description,
         amount,
+        category: expense.category.trim() || null,
       })
     }
 
@@ -1335,7 +1320,7 @@ export function useGigsWorkspace({
 
   const saveExpenseDraft = async (
     expenseIndex: number | null,
-    draft: { description: string; amount: string }
+    draft: { description: string; amount: string; category: string }
   ) => {
     if (!selectedGig) {
       setGigStatus('Select a gig before saving expenses.')
@@ -1363,6 +1348,7 @@ export function useGigsWorkspace({
         sortOrder: nextExpenses.length + 1,
         description,
         amount,
+        category: draft.category.trim(),
         reimbursementStatus: 'Unreimbursed',
         reimbursedAt: null,
         reimbursementUpdatedAt: null,
@@ -1381,11 +1367,12 @@ export function useGigsWorkspace({
         ...existing,
         description,
         amount,
+        category: draft.category.trim(),
       }
     }
 
     return await saveGigForm(
-      false,
+      !isGigEditorOpen,
       nextExpenses,
       expenseIndex === null ? 'Expense added.' : 'Expense updated.'
     )
@@ -1414,8 +1401,7 @@ export function useGigsWorkspace({
         sortOrder: index + 1,
       }))
 
-    await saveGigForm(false, nextExpenses, 'Expense removed.')
-    return true
+    return await saveGigForm(!isGigEditorOpen, nextExpenses, 'Expense removed.')
   }
 
   const handleToggleGigSelection = (gigId: string) => {
@@ -1468,7 +1454,6 @@ export function useGigsWorkspace({
     externalResourceMode,
     gigForm,
     gigMode,
-    gigOverviewScrollRequest,
     gigQuickFilter,
     gigTypeFilter,
     gigSearchQuery,
@@ -1486,7 +1471,6 @@ export function useGigsWorkspace({
     isGigLoading,
     isMileageEstimating,
     mergeSavedGig,
-    openGigReceiptDraft,
     openExpenseStatement,
     plannedGigCount: gigs.filter((gig) => gig.status === 'Confirmed').length,
     previewExpenseStatement,

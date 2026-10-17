@@ -64,6 +64,18 @@ Domain logic should not depend directly on provider APIs. Domain entities should
 
 ## Data Segregation
 
+### Unified intake lifecycle
+
+The single Add to Glovelly entry opens source selection, then unified upload. `useUnifiedIntake` owns explicit presentation/lifecycle states; `useAttachmentReview` owns optional saved-record corrections. Upload stays open after either automatic or explicit saving with one compact attached state. Review opens only on request and targets authoritative saved identifiers, without reopening the gig editor or uploading again.
+
+`IntakeWorkflowService` owns source analysis and proactive application decisions. `ReceiptExtractionEngine` shares provider execution/validation/budget between intake and saved-attachment adapters. Configured quick-capture ranking and local time select the nearest gig; additional candidates do not veto it. `AmbiguityWindowDays` retains the original informational warning only. `IntakeApplicationService` shares receipt/resource saving and promotes structured receipt analysis into existing attachment-linked provenance. One candidate endpoint and neutral resource/expense/analysis presenters serve capture and editing.
+
+An unapplied `CurrentIntake` is private, bounded to one per user, and retained until replacement or discard. Analysis attempts are saved explicitly after provider work. Successful application creates the normal attachment relationship and deletes the private row and transient blob. No completed-intake history or expiry job is added. URL analysis is metadata-only; Google document content retrieval is deferred.
+
+The client freezes an intake UUID/payload for replay and assigns a new UUID to replacement sources. Server fingerprints reject conflicting payload reuse; retry/discard name the expected current intake. Stable destination IDs and transactional insert/delete prevent duplicate application. Bounded local locks plus PostgreSQL advisory locks on a dedicated session serialize acquisition/application across replicas. Neon session locks and operator schema validation use its direct endpoint, not transaction pooling. `/intake/applications/{intakeId}` resolves normal saved records with analysis, candidates and invoice health after interrupted responses.
+
+`ReceiptSaveEffects` separates required invoice synchronization from cleanup/publication. `Invoice.GigLinesNeedRefresh` and document health are marked in the same save as receipt mutation; PDF retry synchronizes pending gig lines before rendering. Failed cleanup/publication cannot prevent financial refresh or turn a committed attachment into an unsaved result. GBP amount population requires independently High confidence total and GBP currency; other totals remain evidence.
+
 Glovelly currently uses one application database. Internal Glovelly users are first-class entities, and business data should relate to Glovelly user IDs or future account/tenant constructs rather than directly to Google claims or email addresses.
 
 Important principles:

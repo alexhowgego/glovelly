@@ -22,15 +22,16 @@ internal static class GigReceiptAnalysisEndpoints
                 .Where(analysis => analysis.ExpenseAttachmentId == attachmentId)
                 .OrderByDescending(analysis => analysis.RequestedAt)
                 .FirstOrDefaultAsync();
-            return latest is null ? Results.NoContent() : Results.Ok(VertexReceiptAnalysisService.ToResult(latest));
+            return latest is null ? Results.NoContent() : Results.Ok(ReceiptAnalysisResult.FromAnalysis(latest));
         });
 
         group.MapPost(route, async (Guid gigId, Guid expenseId, Guid attachmentId, AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor, IReceiptAnalysisService receiptAnalysisService, CancellationToken cancellationToken) =>
         {
             var attachment = await GigEndpointSupport.FindVisibleAttachmentAsync(db, currentUserAccessor.TryGetUserId(user), gigId, expenseId, attachmentId, asNoTracking: false);
             if (attachment is null) return Results.NotFound();
-            return Results.Ok(await receiptAnalysisService.AnalyzeAsync(attachment, cancellationToken));
-        }).RequireRateLimiting("ReceiptAnalysis");
+            var result = await receiptAnalysisService.AnalyzeAsync(attachment, cancellationToken, currentUserAccessor.TryGetUserId(user));
+            return result.FailureCode == "rate_limited" ? Results.Json(result, statusCode: StatusCodes.Status429TooManyRequests) : Results.Ok(result);
+        });
 
         return group;
     }

@@ -141,14 +141,21 @@ export function InvoicesSection({
       return
     }
 
-    window.setTimeout(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' })
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
       editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
+    return () => window.clearTimeout(timeout)
   }, [isEditorOpen])
 
   useEffect(() => {
     if (scrollToListRequest > 0) {
-      listControlsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      listControlsRef.current?.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' })
     }
   }, [scrollToListRequest])
 

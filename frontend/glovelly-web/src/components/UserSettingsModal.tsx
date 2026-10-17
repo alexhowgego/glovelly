@@ -56,6 +56,8 @@ export function UserSettingsModal({
                     ? 'Leave blank if replies should not be directed to a personal mailbox.'
                     : focusedField === 'invoiceUploadFolderId'
                       ? "Leave blank to use Google Drive's default upload destination."
+                      : focusedField === 'automaticReceiptMatching'
+                        ? 'Choose when Glovelly may attach an analysed receipt to the nearest nearby gig without asking first. You can always review or reassign it later.'
                       : 'Choose a setting to see a short note here.'
   const handleFocus = (field: keyof UserSettingsForm) => {
     setFocusedField(field)
@@ -87,7 +89,7 @@ export function UserSettingsModal({
         </div>
 
         <p className="hero-text settings-intro">
-          Set your personal defaults for rates, payment timing, invoice files, and email templates.
+          Set your personal defaults for rates, receipt matching, payment timing, invoice files, and email templates.
         </p>
 
         <form className="settings-form" onSubmit={onSubmit}>
@@ -168,6 +170,19 @@ export function UserSettingsModal({
                     onUpdateField('travelOriginPostcode', event.target.value)
                   }
                 />
+              </label>
+              <label>
+                <span title="Choose when Glovelly may attach an analysed receipt to the nearest nearby gig without asking first. You can always review or reassign it later.">Automatic receipt application</span>
+                <select
+                  data-testid="user-settings-automatic-receipt-matching-select"
+                  value={form.automaticReceiptMatching}
+                  onFocus={() => handleFocus('automaticReceiptMatching')}
+                  onChange={(event) => onUpdateField('automaticReceiptMatching', event.target.value)}
+                >
+                  <option value="ManualOnly">Manual only</option>
+                  <option value="HighConfidence">High confidence</option>
+                  <option value="MediumConfidence">Medium confidence</option>
+                </select>
               </label>
             </div>
           </section>

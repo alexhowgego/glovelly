@@ -81,6 +81,8 @@ public abstract class UatTestBase : IAsyncLifetime
     protected virtual BrowserNewContextOptions CreateContextOptions() => new()
     {
         BaseURL = BaseUrl(),
+        // Workflow assertions should not race decorative transitions or smooth scrolling.
+        ReducedMotion = ReducedMotion.Reduce,
     };
 
     protected virtual Task ConfigureContextAsync(IBrowserContext browserContext) => Task.CompletedTask;

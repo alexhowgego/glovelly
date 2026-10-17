@@ -17,6 +17,7 @@ public sealed class User
     public string? InvoiceEmailSubjectPattern { get; set; }
     public string? InvoiceEmailBodyTemplate { get; set; }
     public string? InvoiceReplyToEmail { get; set; }
+    public AutomaticReceiptMatching AutomaticReceiptMatching { get; set; } = AutomaticReceiptMatching.HighConfidence;
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public UserRole Role { get; set; } = UserRole.User;
     public bool IsActive { get; set; } = true;

@@ -7,9 +7,10 @@ import {
 } from '../api'
 import type { ReceiptAnalysisResult, ReceiptAnalysisTarget } from '../types'
 import { AiSparkleIcon } from './AiSparkleIcon'
+import { ReceiptAnalysisResults } from './ReceiptAnalysisResults'
 
 type ReceiptAnalysisModalProps = {
-  onApply: (suggestions: { merchant: string | null; totalAmount: number | null }) => void
+  onApply: (suggestions: { merchant: string | null; totalAmount: number | null; suggestedCategory: string | null }) => void
   onClose: () => void
   onSessionExpired: (message: string) => void
   target: ReceiptAnalysisTarget
@@ -56,8 +57,6 @@ export function ReceiptAnalysisModal({
     analyseOnOpen()
   }, [target.attachmentId])
 
-  const canApply = analysis?.status === 'Succeeded' && (analysis.merchant.value || analysis.totalAmount.value !== null)
-
   return (
     <div className="settings-overlay receipt-analysis-overlay" role="presentation">
       <section aria-labelledby="receipt-analysis-title" className="settings-modal receipt-analysis-modal panel" role="dialog" aria-modal="true">
@@ -74,46 +73,15 @@ export function ReceiptAnalysisModal({
           <span>{status || 'Analysing receipt...'}</span>
         </div>
 
-        {analysis?.status === 'Succeeded' ? (
-          <div className="receipt-analysis-results">
-            <Suggestion label="Merchant" field={analysis.merchant} applyable />
-            <Suggestion label="Total" field={analysis.totalAmount} applyable />
-            <Suggestion label="Transaction date" field={analysis.transactionDate} />
-            <Suggestion label="Currency" field={analysis.currency} />
-            <Suggestion label="Suggested category" field={analysis.suggestedCategory} />
-            <p className="receipt-analysis-note">Date, currency, and category are review-only suggestions. They do not change the expense record.</p>
-            {analysis.warnings.length > 0 ? (
-              <div className="quick-receipt-warning">
-                <strong>Check these details</strong>
-                <span>{analysis.warnings.join(' ')}</span>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        {analysis && <ReceiptAnalysisResults analysis={analysis} onApply={onApply} disabled={isAnalysing} />}
 
         <div className="form-actions">
           <button className="ghost-button ai-button" onClick={() => void analyse()} type="button" disabled={isAnalysing}>
             <AiSparkleIcon />
             {isAnalysing ? 'Analysing...' : 'Analyse again'}
           </button>
-          {canApply ? (
-            <button className="ghost-button" onClick={() => onApply({ merchant: analysis!.merchant.value, totalAmount: analysis!.totalAmount.value })} type="button" disabled={isAnalysing}>
-              Use merchant and total
-            </button>
-          ) : null}
         </div>
       </section>
-    </div>
-  )
-}
-
-function Suggestion<T>({ label, field, applyable = false }: { label: string; field: { value: T | null; confidence: string }; applyable?: boolean }) {
-  if (field.value === null || field.value === '') return null
-  return (
-    <div className="receipt-analysis-suggestion">
-      <span>{label}{applyable ? ' (can use)' : ' (review only)'}</span>
-      <strong>{String(field.value)}</strong>
-      <small>{field.confidence.toLowerCase()} confidence</small>
     </div>
   )
 }

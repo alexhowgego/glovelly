@@ -10,6 +10,8 @@ import type {
 } from '../types'
 import { SetListImportModal } from './SetListImportModal'
 import { TrashIcon } from './TrashIcon'
+import { GigResourceFields } from './GigResourceFields'
+import { resourceTypeOptions, resourcePurposeOptions } from '../gigEditing'
 
 type GigAttachmentsPanelProps = {
   selectedGig: Gig | null
@@ -37,23 +39,6 @@ type GigAttachmentsPanelProps = {
   ) => void
   onUploadExternalResourceAttachment: (resource: GigExternalResource, file: File) => void
 }
-
-const resourceTypeOptions: { value: GigExternalResourceType; label: string }[] = [
-  { value: 'GoogleSheet', label: 'Google Sheet' },
-  { value: 'GoogleDoc', label: 'Google Doc' },
-  { value: 'Url', label: 'URL' },
-  { value: 'Email', label: 'Email' },
-  { value: 'File', label: 'File' },
-  { value: 'Other', label: 'Other' },
-]
-
-const resourcePurposeOptions: { value: GigExternalResourcePurpose; label: string }[] = [
-  { value: 'SetList', label: 'Set list' },
-  { value: 'GigPlan', label: 'Gig plan' },
-  { value: 'Contract', label: 'Contract' },
-  { value: 'Travel', label: 'Travel' },
-  { value: 'Other', label: 'Other' },
-]
 
 export function GigAttachmentsPanel({
   selectedGig,
@@ -292,88 +277,7 @@ export function GigAttachmentsPanel({
             </div>
 
             <form className="external-resource-form" onSubmit={onSubmitExternalResource}>
-              <div className="compact-form-grid">
-                <label>
-                  <span>Type</span>
-                  <select
-                    data-testid="gig-attachment-type-select"
-                    value={externalResourceForm.resourceType}
-                    onChange={(event) =>
-                      onUpdateExternalResourceField(
-                        'resourceType',
-                        event.target.value as GigExternalResourceType
-                      )
-                    }
-                  >
-                    {resourceTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Purpose</span>
-                  <select
-                    value={externalResourceForm.purpose}
-                    onChange={(event) =>
-                      onUpdateExternalResourceField(
-                        'purpose',
-                        event.target.value as GigExternalResourcePurpose
-                      )
-                    }
-                  >
-                    {resourcePurposeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Title</span>
-                  <input
-                    data-testid="gig-attachment-title-input"
-                    required
-                    value={externalResourceForm.title}
-                    onChange={(event) =>
-                      onUpdateExternalResourceField('title', event.target.value)
-                    }
-                  />
-                </label>
-                <label>
-                  <span>URL</span>
-                  <input
-                    data-testid="gig-attachment-url-input"
-                    type="url"
-                    placeholder="Optional link"
-                    value={externalResourceForm.url}
-                    onChange={(event) =>
-                      onUpdateExternalResourceField('url', event.target.value)
-                    }
-                  />
-                </label>
-              </div>
-              <label>
-                <span>Notes</span>
-                <textarea
-                  rows={3}
-                  value={externalResourceForm.notes}
-                  onChange={(event) =>
-                    onUpdateExternalResourceField('notes', event.target.value)
-                  }
-                />
-              </label>
-              <label className="checkbox-field resource-primary-toggle">
-                  <input
-                  type="checkbox"
-                  checked={externalResourceForm.isPrimary}
-                  onChange={(event) =>
-                    onUpdateExternalResourceField('isPrimary', event.target.checked)
-                  }
-                />
-                <span>Make this the primary attachment for its purpose</span>
-              </label>
+              <GigResourceFields form={externalResourceForm} disabled={isGigLoading} onChange={onUpdateExternalResourceField} testIdPrefix="gig-attachment" />
               <div className="form-actions">
                 <button className="primary-button" type="submit" disabled={isGigLoading}>
                   <span data-testid="gig-attachment-submit-label">

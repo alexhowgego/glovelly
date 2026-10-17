@@ -11,7 +11,7 @@ using GenAiType = Google.GenAI.Types.Type;
 
 namespace Glovelly.Api.Tests;
 
-public sealed class VertexReceiptAnalysisServiceTests
+public sealed class AttachmentReceiptAnalysisServiceTests
 {
     [Fact]
     public async Task AnalyzeAsync_PersistsValidatedSuggestionsAndSendsInlineMedia()
@@ -29,7 +29,8 @@ public sealed class VertexReceiptAnalysisServiceTests
             return """{"merchant":"Station Cafe","merchantConfidence":"high","transactionDate":"2026-01-02","totalAmount":"12.50","totalAmountConfidence":"medium","currency":"GBP","suggestedCategory":"meals","warnings":[]}""";
         });
 
-        var result = await service.AnalyzeAsync(CreateAttachment(), TestContext.Current.CancellationToken);
+        var attachment = CreateAttachment();
+        var result = await service.AnalyzeAsync(attachment, TestContext.Current.CancellationToken);
 
         Assert.Equal(ReceiptAnalysisStatus.Succeeded, result.Status);
         Assert.Equal("Station Cafe", result.Merchant.Value);
@@ -46,6 +47,8 @@ public sealed class VertexReceiptAnalysisServiceTests
         var attempt = Assert.Single(db.ReceiptAnalyses);
         Assert.Equal("VertexAi", attempt.Provider);
         Assert.Equal("receipt-v1", attempt.PromptVersion);
+        Assert.Equal(attachment.Id, attempt.ExpenseAttachmentId);
+        Assert.Equal(attempt.Id, result.Id);
     }
 
     [Fact]
@@ -80,6 +83,25 @@ public sealed class VertexReceiptAnalysisServiceTests
         Assert.Equal("unsupported_media", result.FailureCode);
         Assert.False(called);
         Assert.Null(result.Merchant.Value);
+        var attempt = Assert.Single(db.ReceiptAnalyses);
+        Assert.Equal(attachment.Id, attempt.ExpenseAttachmentId);
+        Assert.Equal(result.FailureCode, attempt.FailureCode);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReanalysisPersistsIndependentAttachmentAttempts()
+    {
+        await using var db = CreateDb();
+        var service = CreateService(db, await CreateStoreAsync(), (_, _, _) =>
+            """{"merchant":"Cafe","merchantConfidence":"high","warnings":[]}""");
+        var attachment = CreateAttachment();
+
+        var first = await service.AnalyzeAsync(attachment, TestContext.Current.CancellationToken);
+        var second = await service.AnalyzeAsync(attachment, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.Equal(2, db.ReceiptAnalyses.Count());
+        Assert.All(db.ReceiptAnalyses, attempt => Assert.Equal(attachment.Id, attempt.ExpenseAttachmentId));
     }
 
     private static AppDbContext CreateDb() => new(new DbContextOptionsBuilder<AppDbContext>()
@@ -97,17 +119,17 @@ public sealed class VertexReceiptAnalysisServiceTests
         Id = Guid.NewGuid(), GigExpenseId = Guid.NewGuid(), StorageKey = "receipt", ContentType = "image/jpeg", SizeBytes = 7,
     };
 
-    private static VertexReceiptAnalysisService CreateService(AppDbContext db, IExpenseAttachmentStore store, Func<string, List<Content>, GenerateContentConfig, string> response)
+    private static AttachmentReceiptAnalysisService CreateService(AppDbContext db, IExpenseAttachmentStore store, Func<string, List<Content>, GenerateContentConfig, string> response)
     {
-        return new VertexReceiptAnalysisService(
+        var engine = new ReceiptExtractionEngine(
             (model, contents, config, _) => Task.FromResult(new GenerateContentResponse
             {
                 Candidates = [new Candidate { Content = new Content { Parts = [new Part { Text = response(model, contents, config) }] } }],
             }),
-            db,
             store,
             Options.Create(new ReceiptAnalysisSettings { Enabled = true, VertexAiProjectId = "test-project", VertexAiLocation = "eu", VertexAiModel = "test-model" }),
             TimeProvider.System,
-            NullLogger<VertexReceiptAnalysisService>.Instance);
+            NullLogger<ReceiptExtractionEngine>.Instance);
+        return new AttachmentReceiptAnalysisService(db, engine);
     }
 }

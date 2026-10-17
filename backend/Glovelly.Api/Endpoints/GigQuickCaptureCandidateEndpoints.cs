@@ -16,7 +16,7 @@ internal static class GigQuickCaptureCandidateEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IOptions<QuickCaptureSettings> quickCaptureOptions,
-            TimeProvider timeProvider) =>
+            TimeProvider timeProvider, CancellationToken cancellationToken) =>
         {
             try
             {
@@ -25,7 +25,7 @@ internal static class GigQuickCaptureCandidateEndpoints
                     currentUserAccessor.TryGetUserId(user),
                     DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime),
                     GigQuickCaptureSupport.NormalizeSettings(quickCaptureOptions.Value),
-                    continuation);
+                    continuation, cancellationToken);
 
                 return Results.Ok(new
                 {

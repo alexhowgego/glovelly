@@ -200,7 +200,9 @@ public abstract class InvoiceUatTestBase : UatTestBase
     protected async Task OpenGigFromInvoiceLineAsync(string lineText)
     {
         await InvoiceLine(lineText).GetByTestId("invoice-line-link").ClickAsync();
-        await Page.GetByTestId("generate-invoice-button").WaitForAsync(new LocatorWaitForOptions
+        await Assertions.Expect(Page.GetByTestId("nav-gigs")).ToHaveClassAsync(
+            new System.Text.RegularExpressions.Regex(@"\bselected\b"));
+        await Page.Locator("#gig-overview").GetByRole(AriaRole.Heading, new() { Name = lineText, Exact = true }).WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
         });
@@ -265,6 +267,9 @@ public abstract class InvoiceUatTestBase : UatTestBase
             });
 
         Assert.True(response.Ok, $"Expected gig save to succeed, got HTTP {response.Status} for {response.Url}.");
+        // A response can arrive before React consumes its body and closes the editor.
+        await Assertions.Expect(Page.GetByTestId("gig-form")).ToHaveAttributeAsync("aria-hidden", "true");
+        await Assertions.Expect(Page.GetByTestId("gig-edit-button")).ToBeEnabledAsync();
     }
 
     protected async Task RunAndAcceptConfirmAsync(Func<Task> action)

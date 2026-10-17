@@ -36,7 +36,9 @@ public sealed class GigListVisibilityTests : InvoiceUatTestBase
             await CreateGigAsync(clientName, gigTitle, DateTime.UtcNow.AddDays(14).ToString("yyyy-MM-dd"));
 
             var gigFilters = Page.GetByLabel("Gig filters");
-            await gigFilters.GetByRole(AriaRole.Button, new() { Name = "Drafts", Exact = true }).ClickAsync();
+            var draftsFilter = gigFilters.GetByRole(AriaRole.Button, new() { Name = "Drafts", Exact = true });
+            await draftsFilter.ClickAsync();
+            await Assertions.Expect(draftsFilter).ToHaveAttributeAsync("aria-pressed", "true");
             await Assertions.Expect(GigCard(gigTitle)).ToHaveCountAsync(0);
 
             var allGigsFilter = gigFilters.GetByRole(AriaRole.Button, new() { Name = "All", Exact = true });

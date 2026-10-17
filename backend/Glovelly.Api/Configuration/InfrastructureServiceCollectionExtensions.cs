@@ -20,8 +20,6 @@ internal static class InfrastructureServiceCollectionExtensions
     {
         var accessRequestSettings = configuration.GetSection(AccessRequestProtectionSettings.SectionName)
             .Get<AccessRequestProtectionSettings>() ?? new AccessRequestProtectionSettings();
-        var receiptAnalysisSettings = configuration.GetSection(ReceiptAnalysisSettings.SectionName)
-            .Get<ReceiptAnalysisSettings>() ?? new ReceiptAnalysisSettings();
 
         services.AddSingleton(settings);
         services.AddEndpointsApiExplorer();
@@ -106,16 +104,6 @@ internal static class InfrastructureServiceCollectionExtensions
         {
             options.OnRejected = async (context, cancellationToken) =>
             {
-                if (context.HttpContext.Request.Path.StartsWithSegments("/gigs"))
-                {
-                    context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-                    context.HttpContext.Response.ContentType = "application/json";
-                    await context.HttpContext.Response.WriteAsync(
-                        "{\"message\":\"Receipt analysis rate limit reached. Please try again later.\"}",
-                        cancellationToken);
-                    return;
-                }
-
                 var logger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>()
                     .CreateLogger("Glovelly.AccessRequests");
@@ -139,19 +127,6 @@ internal static class InfrastructureServiceCollectionExtensions
                         Window = accessRequestSettings.PerIpShortWindow,
                         QueueLimit = 0,
                         AutoReplenishment = true
-                    });
-            });
-            options.AddPolicy<string>("ReceiptAnalysis", httpContext =>
-            {
-                var userId = httpContext.User.FindFirst(GlovellyClaimTypes.UserId)?.Value ?? "anonymous";
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    userId,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = receiptAnalysisSettings.PerUserPermitLimit,
-                        Window = receiptAnalysisSettings.PerUserWindow,
-                        QueueLimit = 0,
-                        AutoReplenishment = true,
                     });
             });
         });

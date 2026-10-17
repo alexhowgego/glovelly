@@ -11,6 +11,8 @@ public sealed class GigExternalResource
     public string Title { get; set; } = string.Empty;
     public string? Url { get; set; }
     public string? Notes { get; set; }
+    [JsonIgnore]
+    public string? SourceFingerprint { get; set; }
     public bool IsPrimary { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

@@ -28,7 +28,6 @@ type GigsSectionProps = {
   externalResourceForm: GigExternalResourceForm
   externalResourceMode: 'create' | 'edit'
   gigForm: GigForm
-  scrollToGigOverviewRequest: number
   isEditorOpen: boolean
   gigMode: 'create' | 'edit'
   gigQuickFilter: GigQuickFilter
@@ -77,7 +76,7 @@ type GigsSectionProps = {
   onStartExternalResourceEdit: (resource: GigExternalResource) => void
   onSaveExpenseDraft: (
     index: number | null,
-    draft: { description: string; amount: string }
+    draft: { description: string; amount: string; category: string }
   ) => Promise<boolean>
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onSubmitExternalResource: (event: FormEvent<HTMLFormElement>) => void
@@ -107,7 +106,6 @@ export function GigsSection({
   externalResourceForm,
   externalResourceMode,
   gigForm,
-  scrollToGigOverviewRequest,
   isEditorOpen,
   gigMode,
   gigQuickFilter,
@@ -188,22 +186,16 @@ export function GigsSection({
       return
     }
 
-    window.setTimeout(() => {
-      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 80)
-  }, [isEditorOpen])
-
-  useEffect(() => {
-    if (!scrollToGigOverviewRequest || !selectedGig) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' })
       return
     }
 
-    const timer = window.setTimeout(() => {
-      detailPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const timeout = window.setTimeout(() => {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
-
-    return () => window.clearTimeout(timer)
-  }, [detailPanelRef, scrollToGigOverviewRequest, selectedGig])
+    return () => window.clearTimeout(timeout)
+  }, [isEditorOpen])
 
   return (
     <section className="section-layout">
@@ -379,7 +371,7 @@ export function GigsSection({
           </div>
         </div>
 
-        <div ref={detailPanelRef} className="panel">
+        <div id="gig-overview" ref={detailPanelRef} className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Gig Overview</p>

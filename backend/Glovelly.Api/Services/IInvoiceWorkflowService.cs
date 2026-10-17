@@ -22,6 +22,7 @@ public interface IInvoiceWorkflowService
     void RemoveManualAdjustment(Invoice invoice, InvoiceLine adjustmentLine, Guid? userId);
     Task RegenerateInvoicePdfAsync(Invoice invoice, Client client, Guid? userId, CancellationToken cancellationToken = default);
     void MarkInvoicePdfRegenerationFailed(Invoice invoice, string message, Guid? userId);
+    Task MarkDraftGigChangesAsync(IReadOnlyCollection<Gig> gigs, Guid? userId, CancellationToken cancellationToken = default);
 }
 
 public sealed record GenerateInvoiceFromGigSelectionResult(
