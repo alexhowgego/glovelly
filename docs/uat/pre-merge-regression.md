@@ -114,6 +114,10 @@ When changes touch Google Calendar, run the focused [Google Calendar](calendar.m
 
 Cross-workspace shortcuts preserve the intended target record, clear stale search filters that would hide the target, hydrate an open gig editor from the target record, and leave unrelated records unchanged.
 
+Workflow automation uses the browser's reduced-motion preference so decorative transitions and smooth scrolling cannot compete with pointer actions. Gig-save helpers wait for the editor to close after the response, and invoice-line shortcuts assert the Gigs workspace and exact destination heading rather than an unrelated action button. These checks must pass without forced clicks, sleeps or click retries.
+
+Also check with normal motion on a narrow viewport: open/close client, gig and invoice editors promptly, and follow a gig link after opening invoice lines. Pending editor-scroll timers must be cancelled when the editor closes/unmounts. With reduced motion enabled, editor navigation should scroll immediately and expanding panes should not animate.
+
 ## Editor Navigation Regression Checks
 
 > **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.EditorNavigationGuardTests` covers client and gig editor discard accept/decline paths; admin editor guard checks remain manual.

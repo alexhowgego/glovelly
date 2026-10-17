@@ -186,9 +186,15 @@ export function GigsSection({
       return
     }
 
-    window.setTimeout(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      editorSlotRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' })
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
       editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
+    return () => window.clearTimeout(timeout)
   }, [isEditorOpen])
 
   return (
