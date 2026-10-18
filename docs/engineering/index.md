@@ -13,6 +13,7 @@ The goal is durable context rather than exhaustive implementation notes. Keep th
 - [Database](database.md): PostgreSQL, EF Core, data ownership, and migration posture.
 - [Email](email.md): outbound email abstraction, Resend integration, and delivery assumptions.
 - [Mileage and routes](mileage-routes.md): Google Routes mileage estimation and fallback behavior.
+- [Dependency maintenance](dependency-maintenance.md): October 2026 upgrades, storage checksum behavior, and deployment verification.
 - [Architecture decisions](decisions/index.md): ADR index for decisions that should outlive individual pull requests.
 
 ## Principles

@@ -28,6 +28,17 @@ Use these journeys when a change may affect gig expenses, receipt attachments, q
 
 Receipt metadata, storage, download, and deletion all work without changing the expense reimbursement state. Each completed file action shows a terminal notification; a missing receipt file shows a persistent error notification with a clear unavailable-file message.
 
+## Staging GCS Storage Verification
+
+Use this check after a storage SDK upgrade is deployed. Run against the staging application with GCS-backed storage, not the local/in-memory store, using non-sensitive test data.
+
+1. Record the staging revision/build identifier and confirm GCS is the active storage backend.
+2. Calculate a SHA-256 hash of a small test PDF/image, then upload it to an expense through the normal application UI.
+3. Confirm the attachment appears only after successful upload, download it, and compare its byte length and SHA-256 hash with the original.
+4. Confirm upload/download completion notifications still appear. Repeat at a phone-sized viewport with an existing notification visible; modal controls must remain usable above notifications. Any failed action must not show success or leave a phantom receipt, and its normal error feedback must remain visible.
+5. Delete only the test attachment and confirm it disappears and can no longer be downloaded.
+6. Record pass/fail, revision, file size and hash comparison in the PR. Do not include private receipt data or credentials. An ordinary successful round trip does not itself simulate a checksum mismatch; controlled HTTP-transport backend tests cover rejection propagation.
+
 ## Receipt Analysis Journey
 
 > **Automation:** Backend automated; browser review remains manual until a consented Vertex test environment and fixture set are available.

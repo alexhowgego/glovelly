@@ -48,6 +48,8 @@
       href: engineering/email.md
     - name: Mileage and routes
       href: engineering/mileage-routes.md
+    - name: Dependency maintenance
+      href: engineering/dependency-maintenance.md
     - name: Architecture decisions
       href: engineering/decisions/index.md
       items:
