@@ -94,6 +94,21 @@ public sealed class PaidIncomeSummaryEndpointsTests : IClassFixture<GlovellyApiF
     }
 
     [Fact]
+    public async Task GetPaidIncomeSummary_SumsIndividuallyRoundedLines()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            AddInvoice(db, Guid.NewGuid(), InvoiceStatus.Paid, new DateOnly(2026, 1, 1), 53.505m, TestAuthContext.UserId);
+            AddInvoice(db, Guid.NewGuid(), InvoiceStatus.Paid, new DateOnly(2026, 1, 1), 53.505m, TestAuthContext.UserId);
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var summary = await _client.GetFromJsonAsync<JsonElement>("/invoices/paid-income-summary", TestContext.Current.CancellationToken);
+        Assert.Equal(107.02m, summary.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
     public async Task GetPaidIncomeSummary_IncludesPaidInvoicesWithoutLinesAsZeroIncome()
     {
         var zeroLineInvoiceId = Guid.NewGuid();

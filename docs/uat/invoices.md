@@ -143,6 +143,18 @@ Preconditions:
 
 Expected result: the estimate fills the editable travel miles field but does not save until the gig is saved. Mileage estimation uses the travel origin postcode when set, otherwise the seller profile postcode. The generated invoice includes a mileage line using the saved travel miles and the applicable mileage rate.
 
+### Fractional Mileage And Zero-Balance Adjustment (#300)
+
+1. Set the client's mileage rate to £0.45 per mile. Create a gig with a £0 fee, driving enabled, no passengers, and no chargeable expenses.
+2. Use `Estimate mileage` (the mileage calculation feature). Use an odd-tenth mileage value such as 118.9 miles; adjust the editable result if necessary, then save.
+3. Generate an invoice and open its lines and PDF. For 118.9 miles, confirm the mileage line and total both show £53.51.
+4. Add a negative adjustment equal to the displayed invoice total (for example, -£53.51).
+5. Confirm the saved invoice total and regenerated PDF show £0.00, never -£0.01.
+6. Repeat with multiple fractional-mileage lines and confirm the displayed total equals the sum of the displayed line amounts before cancelling it with an adjustment.
+7. Repeat the adjustment on a mobile viewport. Confirm the completion notification reports £0.00, does not obscure modal controls, and persistent failure feedback remains available if PDF regeneration fails.
+
+Expected result: each line is rounded to pennies before summing; cancelling the displayed total leaves an exact zero balance. Mileage quantities and rates remain unchanged.
+
 ### Estimated Mileage Manual Fallback
 
 1. Use an environment where Google Routes mileage estimation is not configured, or temporarily use a gig location that cannot be routed (i.e. 'The Moon').
