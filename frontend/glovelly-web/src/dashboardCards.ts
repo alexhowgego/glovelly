@@ -1,11 +1,9 @@
 import { formatCurrency, formatDate } from './formatters'
 import type { AppSection, Client, Gig, Invoice, PaidIncomeSummary } from './types'
 
-export type DashboardCardAction = 'invoices-outstanding' | 'invoices-overdue' | 'invoices-income'
 export type DashboardCardState = 'loading' | 'ready' | 'error'
 
 export type DashboardCard = {
-  action?: DashboardCardAction
   detail: string
   label: string
   state: DashboardCardState
@@ -25,6 +23,12 @@ type DashboardCardOptions = {
   isWorkspaceLoading: boolean
   paidIncomeSummary: PaidIncomeSummaryState
   today: string
+  adminSummary?: {
+    status: DashboardCardState
+    totalUsers: number
+    activeUsers: number
+    administrators: number
+  }
 }
 
 const loadingCard = (label: string): DashboardCard => ({
@@ -42,7 +46,23 @@ export function getDashboardCards({
   isWorkspaceLoading,
   paidIncomeSummary,
   today,
+  adminSummary,
 }: DashboardCardOptions): DashboardCard[] {
+  if (activeSection === 'admin') {
+    const metrics = [
+      { label: 'Users with access', value: adminSummary?.totalUsers, detail: 'Registered users' },
+      { label: 'Active accounts', value: adminSummary?.activeUsers, detail: 'Accounts enabled to sign in' },
+      { label: 'Administrators', value: adminSummary?.administrators, detail: 'Users with administrator access' },
+    ]
+    return metrics.map(({ label, value, detail }) => {
+      if (!adminSummary || adminSummary.status === 'loading') return loadingCard(label)
+      if (adminSummary.status === 'error') return {
+        label, value: 'Unavailable', detail: 'Unable to load user access summary.', state: 'error',
+      }
+      return { label, value: String(value), detail, state: 'ready' }
+    })
+  }
+
   if (isWorkspaceLoading) {
     const labels = activeSection === 'clients'
       ? ['Active clients', 'Clients with outstanding invoices', 'Recently added clients']
@@ -110,7 +130,6 @@ export function getDashboardCards({
             state: 'error',
           }
         : {
-            action: 'invoices-income',
             label: 'Income this financial year',
             value: formatCurrency(paidIncomeSummary.summary.total),
             detail: `${formatDate(paidIncomeSummary.summary.financialYearStart)} to ${formatDate(paidIncomeSummary.summary.financialYearEnd)}`,
@@ -119,14 +138,12 @@ export function getDashboardCards({
 
     return [
       {
-        action: 'invoices-outstanding',
         label: 'Outstanding balance',
         value: formatCurrency(outstandingInvoices.reduce((total, invoice) => total + invoice.total, 0)),
         detail: outstandingInvoices.length === 1 ? '1 invoice needs attention' : `${outstandingInvoices.length} invoices need attention`,
         state: 'ready',
       },
       {
-        action: 'invoices-overdue',
         label: 'Overdue invoices',
         value: String(overdueInvoices.length),
         detail: overdueInvoices.length === 1 ? '1 invoice is overdue' : `${overdueInvoices.length} invoices are overdue`,

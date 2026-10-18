@@ -76,9 +76,11 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             await Assertions.Expect(attachmentRow).ToBeVisibleAsync();
         });
 
-    [Fact]
-    public Task UnifiedResourceMobileFlowKeepsUploadOpenAndOffersOptionalReview() => RunWithDiagnosticsAsync(
-        nameof(UnifiedResourceMobileFlowKeepsUploadOpenAndOffersOptionalReview),
+    [Theory]
+    [InlineData(390, 844)]
+    [InlineData(1280, 800)]
+    public Task UnifiedResourceFlowKeepsUploadOpenAndOffersOptionalReview(int width, int height) => RunWithDiagnosticsAsync(
+        $"{nameof(UnifiedResourceFlowKeepsUploadOpenAndOffersOptionalReview)}_{width}",
         async () =>
         {
             var runId = CreateRunId();
@@ -87,7 +89,7 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             var attachmentTitle = $"{runId} Quick gig plan";
 
             await AuthenticateWithUatSecretAsync();
-            await Page.SetViewportSizeAsync(390, 844);
+            await Page.SetViewportSizeAsync(width, height);
             await CreateClientAsync(clientName);
             await CreateGigAsync(clientName, gigTitle, DateTime.UtcNow.ToString("yyyy-MM-dd"));
 
@@ -116,7 +118,12 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             await review.GetByLabel("Notes", new() { Exact = true }).FillAsync("Reviewed on mobile");
             await review.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
             await Assertions.Expect(review).ToContainTextAsync("Attachment updated.");
-            await review.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
+            await review.GetByRole(AriaRole.Button, new() { Name = "Go to gig" }).ClickAsync();
+            await Assertions.Expect(Page.Locator("#gig-overview")).ToBeInViewportAsync();
+            if (width > 1180)
+            {
+                Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollHeight <= innerHeight + 1"));
+            }
             await Assertions.Expect(Page.GetByTestId("gig-attachment-item").Filter(new LocatorFilterOptions
             {
                 HasText = attachmentTitle,

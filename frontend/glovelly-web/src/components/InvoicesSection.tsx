@@ -58,7 +58,6 @@ type InvoicesSectionProps = {
   onSelectInvoice: (invoiceId: string) => void
   onSortChange: (sort: InvoiceSort) => void
   onStartEditing: () => void
-  scrollToListRequest: number
   sellerProfileNotice: string
   selectedInvoice: Invoice | null
   sendButtonRef: RefObject<HTMLButtonElement | null>
@@ -105,13 +104,11 @@ export function InvoicesSection({
   onSelectInvoice,
   onSortChange,
   onStartEditing,
-  scrollToListRequest,
   sellerProfileNotice,
   selectedInvoice,
   sendButtonRef,
 }: InvoicesSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
-  const listControlsRef = useRef<HTMLDivElement | null>(null)
   const selectedInvoiceClientName =
     (selectedInvoice ? clientNamesById.get(selectedInvoice.clientId) : null) ??
     'Unknown client'
@@ -151,13 +148,6 @@ export function InvoicesSection({
     }, 80)
     return () => window.clearTimeout(timeout)
   }, [isEditorOpen])
-
-  useEffect(() => {
-    if (scrollToListRequest > 0) {
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      listControlsRef.current?.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' })
-    }
-  }, [scrollToListRequest])
 
   return (
     <section className="section-layout">
@@ -204,7 +194,7 @@ export function InvoicesSection({
             </article>
           </div>
 
-          <div className="compact-list-controls" aria-label="Invoice list controls" ref={listControlsRef}>
+          <div className="compact-list-controls" aria-label="Invoice list controls">
             <div className="compact-list-main-controls">
               <label className="search-field compact-search-field">
                 <span>Search</span>

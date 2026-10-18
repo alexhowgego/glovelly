@@ -11,8 +11,6 @@ type AdminSectionProps = {
   adminSearchQuery: string
   adminSort: AdminSort
   adminStatus: string
-  adminUsers: AdminUser[]
-  activeUsersCount: number
   filteredAdminUsers: AdminUser[]
   isAdminLoading: boolean
   onCloseEditor: () => void
@@ -25,7 +23,6 @@ type AdminSectionProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onUpdateField: (field: keyof AdminUserForm, value: string | boolean) => void
   selectedAdminUser: AdminUser | null
-  totalAdmins: number
 }
 
 export function AdminSection({
@@ -35,8 +32,6 @@ export function AdminSection({
   adminSearchQuery,
   adminSort,
   adminStatus,
-  adminUsers,
-  activeUsersCount,
   filteredAdminUsers,
   isAdminLoading,
   onCloseEditor,
@@ -49,7 +44,6 @@ export function AdminSection({
   onSubmit,
   onUpdateField,
   selectedAdminUser,
-  totalAdmins,
 }: AdminSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
   const adminSortOptions: { value: AdminSortKey; label: string }[] = [
@@ -73,31 +67,6 @@ export function AdminSection({
 
   return (
     <section className="section-layout admin-zone">
-      <div className="admin-banner panel">
-        <div>
-          <p className="section-label">Administrator Area</p>
-          <h2>User access</h2>
-          <p className="hero-text">
-            Manage who can sign in, which role they have, and whether their account is active.
-          </p>
-        </div>
-
-        <div className="hero-metrics admin-metrics">
-          <article>
-            <span>{adminUsers.length}</span>
-            <p>users with access</p>
-          </article>
-          <article>
-            <span>{activeUsersCount}</span>
-            <p>active accounts</p>
-          </article>
-          <article>
-            <span>{totalAdmins}</span>
-            <p>administrators</p>
-          </article>
-        </div>
-      </div>
-
       <div className="admin-workspace">
         <div className="panel">
           <div className="panel-heading">

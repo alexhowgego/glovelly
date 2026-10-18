@@ -1,3 +1,234 @@
+.app-shell.workspace-shell {
+  padding: 16px;
+  gap: 12px;
+  align-content: start;
+}
+
+.workspace-shell .app-frame {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workspace-shell .content-shell {
+  gap: 16px;
+}
+
+.workspace-shell .content-header {
+  padding: 12px 16px;
+  gap: 10px;
+  /* Account menus must escape the header without clipping. */
+  overflow: visible;
+}
+
+.workspace-shell .content-header-top {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.workspace-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: var(--heading);
+}
+
+.workspace-brand img {
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.workspace-shell .charm-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.workspace-shell .charm-item {
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  align-items: center;
+}
+
+.workspace-shell .dashboard-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.workspace-shell .dashboard-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  padding: 8px 12px;
+  border-radius: 12px;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.workspace-shell .dashboard-card > .section-label {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.workspace-shell .dashboard-card strong {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.workspace-shell .dashboard-card > span {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+}
+
+.workspace-shell .build-meta {
+  padding: 4px 10px;
+  font-size: 0.72rem;
+}
+
+.workspace-shell .profile-dropdown {
+  left: auto;
+  right: 0;
+  max-height: calc(100dvh - 110px);
+  max-width: calc(100vw - 48px);
+  overflow: auto;
+}
+
+/* Only record workspaces opt into viewport containment. Height in em also
+   releases containment when the user's default text size needs more room. */
+@media (min-width: 1181px) and (min-height: 45em) {
+  .workspace-shell[data-section='clients'],
+  .workspace-shell[data-section='gigs'],
+  .workspace-shell[data-section='invoices'],
+  .workspace-shell[data-section='admin'] {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .workspace-shell .app-frame {
+    min-height: 0;
+    align-items: stretch;
+  }
+
+  .workspace-shell .content-shell {
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .workspace-shell .content-shell > .section-layout {
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .workspace-shell .gig-summary-grid article {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 10px;
+  }
+
+  .workspace-shell .gig-summary-grid span {
+    font-size: 1rem;
+  }
+
+  .workspace-shell .gig-summary-grid p {
+    margin: 0;
+    font-size: 0.78rem;
+  }
+
+  .workspace-shell .compact-list-main-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.6fr) 40px;
+  }
+
+  .workspace-shell .gig-list-main-controls {
+    grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 0.7fr)) 40px;
+  }
+
+  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) {
+    min-height: 0;
+    gap: 16px;
+  }
+
+  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) > .panel,
+  .workspace-shell .editor-slot.open > .panel {
+    min-height: 0;
+    overflow: auto;
+    padding: 16px;
+    gap: 12px;
+    scroll-padding: 16px;
+  }
+
+  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) > .panel > *,
+  .workspace-shell .editor-slot.open > .panel > * {
+    flex-shrink: 0;
+  }
+
+  .workspace-shell .panel:has(> .compact-record-list) {
+    overflow: visible;
+  }
+
+  .workspace-shell .panel > .compact-record-list {
+    flex: 1 1 0;
+    /* Preserve a reachable records region if unusually large controls wrap;
+       allow document overflow instead of collapsing the list to zero. */
+    min-height: 100px;
+    max-height: none;
+    scroll-padding-block: 44px 8px;
+  }
+
+  .workspace-shell .compact-record-list > * {
+    flex-shrink: 0;
+  }
+
+  .workspace-shell .compact-record-row:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .workspace-shell .editor-slot.open {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .workspace-shell .editor-slot.open > .panel {
+    height: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace-shell .workspace-brand {
+    padding-left: 36px;
+  }
+
+  .workspace-shell .content-header-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .workspace-shell .charm-bar {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+
+  .workspace-shell .header-actions {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .workspace-shell .dashboard-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
 .app-shell {
   min-height: 100svh;
   padding: 32px;
@@ -1317,13 +1548,6 @@
   font-size: 1.1rem;
 }
 
-.compact-action {
-  justify-self: start;
-  margin-top: 6px;
-  padding: 9px 14px;
-  min-height: 40px;
-}
-
 .hero-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1359,11 +1583,6 @@
 .admin-zone {
   display: grid;
   gap: 24px;
-}
-
-.admin-banner {
-  display: grid;
-  gap: 20px;
 }
 
 .admin-workspace {
@@ -1483,10 +1702,6 @@
   padding: 18px;
   background: var(--surface-subtle);
   border: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
-}
-
-.admin-metrics {
-  align-self: stretch;
 }
 
 .panel {
@@ -1698,11 +1913,6 @@
     box-sizing: border-box;
   }
 
-  .compact-record-list {
-    flex-basis: auto;
-    min-height: 0;
-    max-height: none;
-  }
 }
 
 .compact-list-controls {

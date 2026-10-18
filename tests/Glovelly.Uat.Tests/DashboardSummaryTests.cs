@@ -5,9 +5,11 @@ namespace Glovelly.Uat.Tests;
 
 public sealed class DashboardSummaryTests : InvoiceUatTestBase
 {
-    [Fact]
-    public Task DashboardShowsContextSpecificCardsAndInvoiceDrillDown() => RunWithDiagnosticsAsync(
-        nameof(DashboardShowsContextSpecificCardsAndInvoiceDrillDown),
+    [Theory]
+    [InlineData(1280, 800)]
+    [InlineData(390, 844)]
+    public Task DashboardShowsContextSpecificCardsAndInvoiceDrillDown(int width, int height) => RunWithDiagnosticsAsync(
+        $"{nameof(DashboardShowsContextSpecificCardsAndInvoiceDrillDown)}_{width}",
         async () =>
         {
             var runId = CreateRunId();
@@ -15,6 +17,7 @@ public sealed class DashboardSummaryTests : InvoiceUatTestBase
             var completedGigTitle = $"000 {runId} Completed Dashboard Gig";
             var upcomingGigTitle = $"000 {runId} Upcoming Dashboard Gig";
 
+            await Page.SetViewportSizeAsync(width, height);
             await AuthenticateWithUatSecretAsync();
             await CreateClientAsync(clientName);
             await CreateGigAsync(
@@ -45,9 +48,16 @@ public sealed class DashboardSummaryTests : InvoiceUatTestBase
             await Assertions.Expect(Page.GetByTestId("dashboard-income-this-financial-year")).ToBeVisibleAsync(
                 new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
 
-            await Page.GetByTestId("dashboard-outstanding-balance").GetByRole(AriaRole.Button, new() { Name = "View invoices" }).ClickAsync();
+            await Assertions.Expect(Page.GetByLabel("Dashboard summary").GetByRole(AriaRole.Button)).ToHaveCountAsync(0);
+            await Assertions.Expect(Page.Locator(".workspace-title")).ToHaveCountAsync(0);
+            await Page.GetByLabel("Invoice filters").GetByRole(AriaRole.Button, new() { Name = "Outstanding", Exact = true }).ClickAsync();
             await Assertions.Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Outstanding", Exact = true })).ToHaveClassAsync(
                 "compact-filter-chip selected",
                 new LocatorAssertionsToHaveClassOptions { Timeout = 30_000 });
+            if (width > 1180)
+            {
+                await Assertions.Expect(Page.GetByLabel("Dashboard summary")).ToBeInViewportAsync();
+                Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollHeight <= innerHeight + 1"));
+            }
         });
 }

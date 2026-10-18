@@ -65,10 +65,10 @@ describe('getDashboardCards', () => {
       } },
     })
 
-    expect(result.map((card) => [card.label, card.value, card.action])).toEqual([
-      ['Outstanding balance', '£100.00', 'invoices-outstanding'],
-      ['Overdue invoices', '1', 'invoices-overdue'],
-      ['Income this financial year', '£125.00', 'invoices-income'],
+    expect(result.map((card) => [card.label, card.value])).toEqual([
+      ['Outstanding balance', '£100.00'],
+      ['Overdue invoices', '1'],
+      ['Income this financial year', '£125.00'],
     ])
   })
 
@@ -99,5 +99,27 @@ describe('getDashboardCards', () => {
     expect(cards({ activeSection: 'invoices', paidIncomeSummary: { status: 'error' } })[2]).toMatchObject({
       state: 'error', value: 'Unavailable',
     })
+  })
+
+  it('uses user-access metrics for Admin regardless of gig data', () => {
+    const result = cards({
+      activeSection: 'admin', gigs: [gig('unrelated')],
+      adminSummary: { status: 'ready', totalUsers: 5, activeUsers: 3, administrators: 2 },
+    })
+    expect(result.map(card => [card.label, card.value])).toEqual([
+      ['Users with access', '5'], ['Active accounts', '3'], ['Administrators', '2'],
+    ])
+  })
+
+  it('keeps Admin loading, unavailable, and zero counts distinct', () => {
+    expect(cards({ activeSection: 'admin' }).every(card => card.state === 'loading')).toBe(true)
+    for (const status of ['loading', 'error', 'ready'] as const) {
+      const result = cards({ activeSection: 'admin', adminSummary: {
+        status, totalUsers: 0, activeUsers: 0, administrators: 0,
+      } })
+      expect(result.map(card => card.value)).toEqual(Array(3).fill(
+        status === 'ready' ? '0' : status === 'error' ? 'Unavailable' : 'Loading...',
+      ))
+    }
   })
 })

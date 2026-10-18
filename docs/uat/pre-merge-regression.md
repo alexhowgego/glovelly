@@ -52,6 +52,31 @@ Navigation, session state, and core reads are healthy.
 
 The left list pane remains usable when no record is selected. Filter controls remain visible and can restore a filtered-out list.
 
+## Compact Desktop Workspace
+
+> **Automation:** `Glovelly.Uat.Tests.WorkspaceLayoutTests` covers desktop pane geometry, large and empty lists, filter recovery, editor toggles, keyboard focus, and constrained viewports. Admin layout uses an isolated browser response fixture: the staging UAT identity is not granted administrator permissions. Run browser tests in Ubuntu CI, not locally on macOS.
+
+### Steps
+
+1. At 1280×800 and 1440×900 CSS pixels, open Clients, Gigs, Invoices, and (as an administrator) Users.
+2. Confirm compact branding, navigation, capture, profile access, and the informational summary strip are visible. The large slogan, mascot introduction, duplicate shell workspace title, summary action buttons, and separate Admin banner should be absent.
+   Gordon's small brand icon should have rounded corners matching the controls. The outer enclosing frame should have no border, background, shadow, or extra padding; individual panels remain distinct, with a page gutter and quiet legal/build information beneath them.
+3. With enough records to overflow, scroll each list to its final record. Search, filters, actions, and column headings should stay reachable without moving the document.
+4. Select a record with long details, scroll its overview, open its editor, and scroll to the editor's final action. Neither pane should enlarge the page or make the list's records unreachable.
+5. Search for an impossible term, then clear it. Repeat with no records and no selection. Controls and empty states must not collapse or truncate.
+6. Tab through records and editor actions; confirm focused controls are revealed within the appropriate pane and focus rings remain visible.
+7. Repeat at 390×844, 1280×600, and 200% browser zoom. Page scrolling must reach all content without horizontal document overflow. Open Settings and Seller profile and reach their final actions.
+8. Check profile menus, capture dialogs, persistent error notifications, and mobile capture/return-to-top placement. Notifications must remain below modal overlays and must not block modal controls.
+9. Apply an invoice filter chip, follow an invoice-line gig link, and use capture review's **Go to gig**. Confirm the intended result or target is revealed; desktop remains bounded and mobile scrolls naturally.
+
+### Expected Results
+
+Normal desktop record work fits the viewport with independent pane scrolling. Informational summary values and loading/error states remain available across views without action buttons. Small windows and enlarged text favor reachable content over forced containment. Settings remain naturally scrollable within their existing dialogs.
+
+### Documentation Capture Review
+
+The shared chrome and workspace geometry changed. Request the Ubuntu CI documentation-capture job for this change and review its `TestResults/documentation-captures/` candidates for client workspace, gig workspace, expenses/mileage, and invoice status. Check both light and dark product themes, including whether the bounded detail pane exposes the intended subject. Replace checked-in screenshots only after reviewing those real staging captures; never create substitutes locally. Record CI run and capture-review results before completing the OpenSpec validation tasks.
+
 ## Notification Feedback
 
 > **Automation:** Partially automated UAT: invoice, gig, receipt, and attachment browser journeys assert terminal Sonner notifications. Manual checks cover dismissal, modal stacking, and visual placement.
@@ -71,17 +96,17 @@ Terminal success and information notifications auto-dismiss. Errors persist unti
 
 ## Dashboard Summary
 
-> **Automation:** Automated UAT: `Glovelly.Uat.Tests.DashboardSummaryTests.DashboardHighlightsNextGigOutstandingBalanceAndInvoicePrompt`; manual balance edge-case spot checks remain useful when paid, cancelled, issued, and overdue invoices already exist together.
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.DashboardSummaryTests.DashboardShowsContextSpecificCardsAndInvoiceDrillDown`; manual balance edge-case spot checks remain useful when paid, cancelled, issued, and overdue invoices already exist together.
 
 ### Steps
 
 1. Sign in with at least one draft, issued, or overdue invoice available.
-2. Confirm the dashboard shows an outstanding balance that includes draft, issued, and overdue invoice totals, but excludes paid and cancelled invoices.
-3. Confirm the `Next gig` card shows the earliest non-cancelled upcoming gig.
-4. Click `Open gig` and confirm the app opens Gigs with that gig selected.
-5. Identify a recent past or current uninvoiced gig with status `Planned` or `Completed`.
-6. Confirm the invoice prompt shows that gig and click `Generate invoice`.
-7. Confirm the invoice preview opens, the gig becomes linked to the generated invoice, and returning to the dashboard no longer offers that gig as the invoice prompt.
+2. Open Invoices and confirm the compact strip shows outstanding balance, overdue invoices, and income this financial year. Outstanding balance includes draft, issued, and overdue totals, but excludes paid and cancelled invoices.
+3. Confirm no **View invoices** buttons remain in the summary strip. Use the invoice filter chips to select Outstanding, Overdue, and Income this financial year and confirm the matching records appear.
+4. Open Gigs and confirm the strip shows upcoming gigs, awaiting confirmation, and completed uninvoiced work.
+5. Open Clients and confirm active clients, clients with outstanding invoices, and most frequent client are shown.
+6. Confirm three summary slots remain present during loading and errors, with unavailable values distinct from zero.
+7. As an administrator, open Users and confirm the strip shows Users with access, Active accounts, and Administrators, with no separate Admin banner. Search the directory and confirm these totals do not change. Open Settings and close it without losing the shared header or summary state.
 
 ### Expected Results
 

@@ -25,4 +25,10 @@ Use **Planned** for confirmed future work, **Completed** once it is finished, **
 
 You can add notes, driving mileage, passengers, expenses, receipts, and linked resources to a saved gig. Keep the detail with the work so it is ready when you invoice it.
 
+## Work through your list
+
+On a desktop, scroll the gig list to find more work while keeping search and filters in place. Scroll the selected gig's details or its editor separately when there is more to read. The compact summary above the workspace stays available as you switch between Gigs, Clients, and Invoices.
+
+On a phone or in a short window, scroll the page to reach the next panel. If a search or filter shows no results, clear it using the controls above the list.
+
 <div class="help-panel"><p>Need help? <a href="mailto:support@glovelly.net">Contact help</a> or <a href="https://github.com/alexhowgego/glovelly/issues/new">report a problem</a>.</p></div>

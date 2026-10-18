@@ -227,7 +227,7 @@ export function GigsSection({
           </div>
 
           <div className="compact-list-controls" aria-label="Gig list controls">
-            <div className="compact-list-main-controls">
+            <div className="compact-list-main-controls gig-list-main-controls">
               <label className="search-field compact-search-field">
                 <span>Search</span>
                 <input

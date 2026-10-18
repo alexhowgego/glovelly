@@ -41,6 +41,7 @@ export function useAdminWorkspace({
   onSessionExpired,
 }: UseAdminWorkspaceOptions) {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+  const [adminSummaryState, setAdminSummaryState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>('')
   const [adminSearchQuery, setAdminSearchQuery] = useState('')
   const [adminSort, setAdminSort] = useState<AdminSort>({
@@ -55,6 +56,7 @@ export function useAdminWorkspace({
   const deferredAdminSearchQuery = useDeferredValue(adminSearchQuery)
 
   const resetAdminWorkspace = useCallback(() => {
+    setAdminSummaryState('loading')
     setAdminUsers([])
     setSelectedAdminUserId('')
     setAdminSearchQuery('')
@@ -67,10 +69,12 @@ export function useAdminWorkspace({
   }, [])
 
   const loadAdminUsers = useCallback(async () => {
+    setAdminSummaryState('loading')
     const response = await fetchWithSession(buildApiUrl('/admin/users'))
     throwIfSessionExpired(response)
 
     if (response.status === 403) {
+      setAdminSummaryState('error')
       return
     }
 
@@ -80,6 +84,7 @@ export function useAdminWorkspace({
 
     const users = (await response.json()) as AdminUser[]
     setAdminUsers(users)
+    setAdminSummaryState('ready')
     setSelectedAdminUserId((current) => current || users[0]?.id || '')
     setAdminStatus(
       users.length > 0
@@ -256,6 +261,7 @@ export function useAdminWorkspace({
   }
 
   const markAdminLoadFailed = useCallback(() => {
+    setAdminSummaryState('error')
     setAdminUsers([])
     setSelectedAdminUserId('')
     setAdminStatus('The admin area could not be loaded right now.')
@@ -443,6 +449,7 @@ export function useAdminWorkspace({
 
   return {
     activeUsersCount,
+    adminSummaryState,
     adminForm,
     adminMode,
     adminSearchQuery,

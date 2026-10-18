@@ -30,7 +30,7 @@ The attachment is added to the selected gig only, appears without refreshing, pr
 
 ## Add To Glovelly Resource Journey
 
-> **Automation:** `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.UnifiedResourceMobileFlowKeepsUploadOpenAndOffersOptionalReview` covers the mobile URL upload/application and optional saved-record review in Ubuntu CI. Backend tests cover explicit resource confirmation, source retention/cleanup, URL type inference, moves and primary updates.
+> **Automation:** `Glovelly.Uat.Tests.UploadAndQuickCaptureWorkflowTests.UnifiedResourceFlowKeepsUploadOpenAndOffersOptionalReview` covers mobile and desktop URL upload/application, optional saved-record review, and `Go to gig` navigation in Ubuntu CI. Desktop navigation reveals the overview without enlarging the document; mobile retains natural page scrolling. Backend tests cover explicit resource confirmation, source retention/cleanup, URL type inference, moves and primary updates.
 
 ### Steps
 

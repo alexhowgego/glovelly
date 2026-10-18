@@ -56,6 +56,7 @@ public sealed class GigListVisibilityTests : InvoiceUatTestBase
             var clientName = $"{runId} Historical Link Client";
             var gigTitle = $"{runId} Historical Link Gig";
 
+            await Page.SetViewportSizeAsync(1280, 800);
             await AuthenticateWithUatSecretAsync();
             await CreateClientAsync(clientName);
             await CreateGigAsync(
@@ -77,6 +78,8 @@ public sealed class GigListVisibilityTests : InvoiceUatTestBase
                 .ToHaveAttributeAsync("aria-pressed", "true");
             await Assertions.Expect(GigCard(gigTitle)).ToBeVisibleAsync();
             await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = gigTitle })).ToBeVisibleAsync();
+            await Assertions.Expect(Page.Locator("#gig-overview")).ToBeInViewportAsync();
+            Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollHeight <= innerHeight + 1"));
         });
 
     [Fact]
