@@ -62,7 +62,7 @@ The left list pane remains usable when no record is selected. Filter controls re
 2. Confirm compact branding, navigation, capture, profile access, and the informational summary strip are visible. The large slogan, mascot introduction, duplicate shell workspace title, summary action buttons, and separate Admin banner should be absent.
    Gordon's small brand icon should have rounded corners matching the controls. The outer enclosing frame should have no border, background, shadow, or extra padding; individual panels remain distinct, with a page gutter and quiet legal/build information beneath them.
 3. With enough records to overflow, scroll each list to its final record. Search, filters, actions, and column headings should stay reachable without moving the document.
-4. Select a record with long details, scroll its overview, open its editor, and scroll to the editor's final action. Neither pane should enlarge the page or make the list's records unreachable.
+4. Select normal and unusually long records with the editor closed and open. The header stays at the top; full standard details use a left-aligned facts layout in the middle, centered as a group when space allows. Long notes, descriptions, addresses, or metadata scroll in that region instead of being hidden or opening read-only dialogs. Applicable collection/task controls stay docked at the bottom. The document and list must not grow; switching records resets the detail region to the top.
 5. Search for an impossible term, then clear it. Repeat with no records and no selection. Controls and empty states must not collapse or truncate.
 6. Tab through records and editor actions; confirm focused controls are revealed within the appropriate pane and focus rings remain visible.
 7. Repeat at 390×844, 1280×600, and 200% browser zoom. Page scrolling must reach all content without horizontal document overflow. Open Settings and Seller profile and reach their final actions.
@@ -71,7 +71,18 @@ The left list pane remains usable when no record is selected. Filter controls re
 
 ### Expected Results
 
-Normal desktop record work fits the viewport with independent pane scrolling. Informational summary values and loading/error states remain available across views without action buttons. Small windows and enlarged text favor reachable content over forced containment. Settings remain naturally scrollable within their existing dialogs.
+The desktop layout allocates usable space for normal records without forcing a no-scroll rule. Standard details are visible inline; anomalous content scrolls in the middle region, independently of the record list and editor. Informational summary values and loading/error states remain available across views without action buttons. Small windows and enlarged text favor reachable content over forced containment. Settings remain naturally scrollable within their existing dialogs.
+
+### Focused Detail Dialogs
+
+1. In Gigs, read full notes inline and open **Resources** and **Expenses**, including records with no resources or expenses. Create/manage items using the existing controls.
+2. In Clients, read the full contact/billing information; in Invoices, read the description and issue/delivery metadata; in Admin, read all user/account details directly. Confirm there are no redundant read-only details dialogs or buttons. Long values must remain fully readable through scrolling, not tooltip-only ellipses.
+3. Close each dialog with its button and Escape. Focus returns to the initiating control and the list retains its position. Background workspace controls must not be interactive while a dialog is open.
+4. From Expenses, open an expense editor or receipt analysis; from Resources, open attachment editing or set-list management. Only the top layer accepts interaction, Escape closes only that layer, and returning preserves parent context. Dirty editor dismissal requires confirmation; busy operations cannot be dismissed manually.
+5. Refresh/update/delete the originating record through a separate context while management is open. A changed/deleted selection closes stale management immediately with an explicit possible-discard notice, as agreed. An in-flight save remains tied to its original record and must not overwrite or reopen another selection's editor.
+6. On mobile, short windows, and enlarged text, reach all dialog contents and final actions by scrolling. Check persistent errors, modal layering, and notification placement. Save/upload success must leave management open and update its contents and overview summaries.
+
+> Browser UAT and real light/dark documentation captures run in Ubuntu CI only. The preceding change's browser/capture checks were waived, so verify the geometry and workflows in this change rather than assuming the old layout was proven. Expense documentation captures now target the Expenses dialog, not the entire workspace; review candidates before replacing assets.
 
 ### Documentation Capture Review
 

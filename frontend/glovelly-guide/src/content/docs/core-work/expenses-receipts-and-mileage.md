@@ -8,9 +8,11 @@ description: Keep claimable costs with the gig they belong to.
 <a class="menu-link" href="https://menu.glovelly.net">Open Glovelly Menu to record an expense</a>
 
 1. Open the saved gig.
-2. Add an expense with a clear description and amount.
-3. Attach a receipt if you have one.
-4. Save the expense.
+2. Choose **Expenses**, then **Add expense**.
+3. Enter a clear description and amount, then save the expense.
+4. Expand the saved expense to add a receipt, change its reimbursement state, or review an existing receipt.
+
+The expenses dialog stays open after saving. Close it to return to the gig overview. If you have unsaved changes in the expense editor, confirm whether to discard them before closing.
 
 A saved receipt stays with that expense. You can download or remove the attachment later without changing the expense's reimbursement state.
 

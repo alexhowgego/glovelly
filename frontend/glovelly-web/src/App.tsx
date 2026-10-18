@@ -67,6 +67,7 @@ import type {
   SellerProfile,
 } from './types'
 import './App.css'
+import './recordOverviews.css'
 
 function getCurrentMonthValue() {
   return new Date().toISOString().slice(0, 7)
@@ -284,6 +285,7 @@ function App({ appMetadata }: AppProps) {
     setGigSearchQuery,
     setGigSort,
     setGigStatus,
+    setDetailContext,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
     setSelectedGigIds,
@@ -1665,6 +1667,7 @@ function App({ appMetadata }: AppProps) {
         gigStatus={gigStatus}
         gigs={gigs}
         isGigLoading={isGigLoading}
+        onDetailContextChange={setDetailContext}
         isInvoiceLoading={isInvoiceLoading}
         isMileageEstimating={isMileageEstimating}
         isExternalResourceEditorOpen={isExternalResourceEditorOpen}

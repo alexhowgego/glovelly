@@ -194,11 +194,11 @@ export function ClientsSection({
           </div>
         </div>
 
-        <div className="detail-panel panel">
+        <div className="detail-panel panel record-overview">
           <div className="panel-heading">
             <div>
               <p className="section-label">Overview</p>
-              <h2>{selectedClient?.name ?? 'No client selected'}</h2>
+              <h2 tabIndex={-1}>{selectedClient?.name ?? 'No client selected'}</h2>
             </div>
             <div className="actions">
               <button
@@ -234,6 +234,19 @@ export function ClientsSection({
 
           {selectedClient ? (
             <>
+              <div className="overview-body" key={selectedClient.id}>
+              <dl className="overview-facts">
+                <div><dt>Email</dt><dd>{selectedClient.email || 'Not set'}</dd></div>
+                <div><dt>City</dt><dd>{selectedClient.billingAddress.city || 'Not set'}</dd></div>
+                <div><dt>Country</dt><dd>{selectedClient.billingAddress.country || 'Not set'}</dd></div>
+                <div className="full-width overview-address"><dt>Billing address</dt><dd>{[
+                  selectedClient.billingAddress.line1, selectedClient.billingAddress.line2,
+                  [selectedClient.billingAddress.city, selectedClient.billingAddress.stateOrCounty].filter(Boolean).join(', '),
+                  selectedClient.billingAddress.postalCode, selectedClient.billingAddress.country,
+                ].filter(Boolean).join('\n') || 'Not set'}</dd></div>
+              </dl>
+              </div>
+              <div className="overview-dock">
               <div className="gig-timeline-note">
                 <p className="detail-label">Monthly invoice run</p>
                 <div className="invoice-adjustment-form">
@@ -261,34 +274,8 @@ export function ClientsSection({
                 </div>
                 <span data-testid="monthly-invoice-helper">{monthlyInvoiceHelperText}</span>
               </div>
-
-              <div className="detail-grid">
-                <article>
-                  <p className="detail-label">Primary email</p>
-                  <strong>{selectedClient.email}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Billing city</p>
-                  <strong>{selectedClient.billingAddress.city}</strong>
-                </article>
-                <article className="full-width">
-                  <p className="detail-label">Billing address</p>
-                  <strong>{selectedClient.billingAddress.line1}</strong>
-                  {selectedClient.billingAddress.line2 && (
-                    <span>{selectedClient.billingAddress.line2}</span>
-                  )}
-                  <span>
-                    {selectedClient.billingAddress.city}
-                    {selectedClient.billingAddress.stateOrCounty
-                      ? `, ${selectedClient.billingAddress.stateOrCounty}`
-                      : ''}
-                  </span>
-                  <span>
-                    {selectedClient.billingAddress.postalCode},{' '}
-                    {selectedClient.billingAddress.country}
-                  </span>
-                </article>
               </div>
+
             </>
           ) : (
             <div className="empty-state roomy">

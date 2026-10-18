@@ -24,6 +24,8 @@ The client is now available when you create a gig. Their email and billing detai
 
 Open a client to update their details when they change. Client settings can also hold invoice filename, email-subject, payment-window, and mileage defaults for that client.
 
+Contact and billing details appear directly in the pane, including the full address. Scroll the details region if an unusually long record needs more room. Monthly invoicing and editing remain available without opening a separate read-only details dialog.
+
 :::tip
 Add the billing email you actually expect to use before sending an invoice. It is easier to check once here than to correct a delivery later.
 :::

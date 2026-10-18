@@ -113,9 +113,11 @@ public sealed class CrossWorkspaceNavigationTests : InvoiceUatTestBase
             await Assertions.Expect(Page.GetByRole(AriaRole.Heading, new() { Name = secondGigTitle })).ToBeVisibleAsync();
             await Assertions.Expect(Page.GetByTestId("gig-title-input")).ToHaveValueAsync(secondGigTitle);
             await Assertions.Expect(Page.GetByTestId("gig-venue-input")).ToHaveValueAsync(secondGigVenue);
+            await OpenGigExpensesAsync();
             await Assertions.Expect(ExpenseRow(secondGigExpense)).ToBeVisibleAsync();
             await Assertions.Expect(ExpenseRow(firstGigUpdatedExpense)).ToHaveCountAsync(0);
 
+            await CloseRecordDetailsAsync();
             await Page.GetByTestId("gig-venue-input").FillAsync(secondGigUpdatedVenue);
             await SaveGigAndAcceptLinkedRedraftAsync();
 
@@ -124,6 +126,7 @@ public sealed class CrossWorkspaceNavigationTests : InvoiceUatTestBase
             await OpenGigFromInvoiceLineAsync(firstGigTitle);
             await EnsureGigEditorOpenAsync();
             await Assertions.Expect(Page.GetByTestId("gig-venue-input")).ToHaveValueAsync(firstGigVenue);
+            await OpenGigExpensesAsync();
             await Assertions.Expect(ExpenseRow(firstGigUpdatedExpense)).ToBeVisibleAsync();
             await Assertions.Expect(ExpenseRow(secondGigExpense)).ToHaveCountAsync(0);
 
@@ -132,6 +135,7 @@ public sealed class CrossWorkspaceNavigationTests : InvoiceUatTestBase
             await OpenGigFromInvoiceLineAsync(secondGigTitle);
             await EnsureGigEditorOpenAsync();
             await Assertions.Expect(Page.GetByTestId("gig-venue-input")).ToHaveValueAsync(secondGigUpdatedVenue);
+            await OpenGigExpensesAsync();
             await Assertions.Expect(ExpenseRow(secondGigExpense)).ToBeVisibleAsync();
         });
 
@@ -150,6 +154,7 @@ public sealed class CrossWorkspaceNavigationTests : InvoiceUatTestBase
 
     private async Task UpdateExpenseAndAcceptLinkedRedraftAsync(string currentDescription, string nextDescription)
     {
+        await OpenGigExpensesAsync();
         var expense = ExpenseRow(currentDescription);
         await expense.Locator(".associated-item-summary").ClickAsync();
         await expense.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();

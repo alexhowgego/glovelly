@@ -63,10 +63,13 @@ public sealed class DocumentationCaptureTests : UatTestBase
         await gigCard.ClickAsync();
         await Page.Locator(".section-layout").ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("gig-workspace", theme) });
 
+        await Page.GetByTestId("gig-expenses-button").ClickAsync();
+        var expenseDialog = Page.GetByRole(AriaRole.Dialog, new() { Name = "Gig expenses", Exact = true });
         var expense = Page.GetByTestId("gig-expense-item");
         await expense.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await expense.Locator(".associated-item-summary").ClickAsync();
-        await Page.Locator(".section-layout").ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("gig-expenses-mileage", theme) });
+        await expenseDialog.ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("gig-expenses-mileage", theme) });
+        await expenseDialog.Locator(":scope > .panel-heading").GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
 
         await Page.GetByTestId("nav-invoices").ClickAsync();
         var invoiceCard = Page.GetByTestId("invoice-card").Filter(new LocatorFilterOptions { HasText = "GLV-202604-001" });

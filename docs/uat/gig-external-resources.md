@@ -18,9 +18,9 @@ Use these journeys when a change may affect gig attachments such as set lists, g
 ### Steps
 
 1. Open Gigs and select a saved gig.
-2. In `Attachments`, click `Add attachment`.
+2. Choose **Resources** in the overview, then click `Add attachment` in the dialog.
 3. Create a `Set list` attachment with a title and valid URL, and mark it primary.
-4. Confirm the modal closes and the attachment appears on the gig detail panel with a primary badge.
+4. Confirm the attachment editor closes and the resource appears in the still-open Resources dialog with a primary badge; the overview count refreshes.
 5. Click `Open` and confirm the link opens in a new tab.
 6. Edit the attachment, change its title or notes, and save.
 
@@ -56,15 +56,15 @@ Candidate expansion never saves or moves a draft by itself, keeps current option
 ### Steps
 
 1. Select a saved gig.
-2. Click `Add attachment`.
+2. Open **Resources**, then click `Add attachment`.
 3. Create a `Contract` or `Other` attachment with a title and no URL.
-4. Upload a PDF or image file to the attachment from the detail panel.
+4. Upload a PDF or image file to the attachment from the Resources dialog.
 5. Download the uploaded file.
 6. Delete the uploaded file.
 
 ### Expected Results
 
-The app allows an attachment without a URL, stores uploaded file metadata, downloads the same file, and removes the file without deleting the attachment itself. Completed file actions show terminal notifications; unavailable stored files show a persistent, user-safe error notification.
+The app allows an attachment without a URL, stores uploaded file metadata, downloads the same file, and removes the file without deleting the attachment itself. Feedback for operations in the still-open Resources dialog remains inline. Terminal feedback that outlives the dialog uses notifications; notifications stay below modal controls. No successful attachment action automatically closes or navigates away from management.
 
 ## Primary Resource Behaviour
 

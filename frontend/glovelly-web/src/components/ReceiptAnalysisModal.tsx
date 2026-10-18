@@ -65,7 +65,7 @@ export function ReceiptAnalysisModal({
             <p className="section-label">Receipt analysis</p>
             <h2 id="receipt-analysis-title">Review suggestions</h2>
           </div>
-          <button className="ghost-button" onClick={onClose} type="button" disabled={isAnalysing}>Close</button>
+          <button data-dialog-close className="ghost-button" onClick={onClose} type="button" disabled={isAnalysing}>Close</button>
         </div>
 
         <div className="quick-receipt-summary">

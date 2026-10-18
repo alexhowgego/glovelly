@@ -70,6 +70,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
         foreach (var expense in expenses)
         {
+            await OpenGigExpensesAsync();
             var expenseIndex = await Page.GetByTestId("gig-expense-item").CountAsync();
             await Page.GetByTestId("open-gig-expense-dialog-button").ClickAsync();
             await Page.GetByTestId("gig-expense-amount-input").WaitForAsync(new LocatorWaitForOptions
@@ -85,10 +86,34 @@ public abstract class InvoiceUatTestBase : UatTestBase
                 Timeout = 30_000,
             });
         }
+        await CloseRecordDetailsAsync();
+    }
+
+    protected async Task OpenGigExpensesAsync()
+    {
+        if (await Page.GetByRole(AriaRole.Dialog, new() { Name = "Gig expenses", Exact = true }).CountAsync() == 0)
+            await Page.GetByTestId("gig-expenses-button").ClickAsync();
+    }
+
+    protected async Task OpenGigResourcesAsync()
+    {
+        if (await Page.GetByRole(AriaRole.Dialog, new() { Name = "Gig resources", Exact = true }).CountAsync() == 0)
+            await Page.GetByTestId("gig-resources-button").ClickAsync();
+    }
+
+    protected async Task CloseRecordDetailsAsync()
+    {
+        var dialog = Page.Locator("dialog.record-detail-dialog[open]");
+        if (await dialog.CountAsync() > 0)
+        {
+            await dialog.Locator(":scope > .panel-heading").GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+            await Assertions.Expect(dialog).ToHaveCountAsync(0);
+        }
     }
 
     protected async Task GenerateInvoiceAndWaitForPreviewAsync()
     {
+        await CloseRecordDetailsAsync();
         await Page.GetByTestId("generate-invoice-button").ClickAsync();
         await WaitForInvoicePreviewAsync();
     }
@@ -217,6 +242,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected async Task EnsureGigEditorOpenAsync()
     {
+        await CloseRecordDetailsAsync();
         var editButton = Page.GetByTestId("gig-edit-button");
         if (await editButton.GetAttributeAsync("aria-expanded") != "true")
         {
@@ -232,6 +258,7 @@ public abstract class InvoiceUatTestBase : UatTestBase
 
     protected async Task OpenLinkedInvoiceFromGigAsync()
     {
+        await CloseRecordDetailsAsync();
         await Page.GetByTestId("gig-open-linked-invoice-button").ClickAsync();
         await Page.GetByTestId("invoice-line-items-button").WaitForAsync(new LocatorWaitForOptions
         {

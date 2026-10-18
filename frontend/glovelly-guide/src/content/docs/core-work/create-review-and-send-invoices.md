@@ -14,6 +14,8 @@ description: Turn saved work into a checked invoice without sending it by accide
 
 Glovelly links the gig to the invoice and creates lines from the fee, claimable expenses, and applicable mileage. You can also create one invoice from selected gigs for the same client, or generate a monthly invoice from a client.
 
+The invoice pane shows dates, total, status, PDF readiness, full description, and issue/delivery information directly. Scroll the details region if a long description needs more room. Choose **Line items** to use the existing editor for invoice lines, adjustments, and description changes.
+
 ## Review before you send
 
 1. Open the invoice and choose **Send to client**.

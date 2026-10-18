@@ -298,11 +298,11 @@ export function InvoicesSection({
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel record-overview">
           <div className="panel-heading">
             <div>
               <p className="section-label">Invoice Overview</p>
-              <h2>{selectedInvoice?.invoiceNumber ?? 'No invoice selected'}</h2>
+              <h2 tabIndex={-1}>{selectedInvoice?.invoiceNumber ?? 'No invoice selected'}</h2>
             </div>
             <div className="actions">
               <button
@@ -394,8 +394,30 @@ export function InvoicesSection({
 
           {selectedInvoice ? (
             <>
+              <div className="overview-body" key={selectedInvoice.id}>
+              <dl className="overview-facts">
+                <div><dt>Client</dt><dd><button className="link-button" data-testid="invoice-client-link" onClick={() => onOpenClient(selectedInvoice.clientId)} type="button">{selectedInvoiceClientName}</button></dd></div>
+                <div><dt>Status</dt><dd><select aria-label="Invoice status" data-testid="invoice-status-select" value={selectedInvoice.status} disabled={isInvoiceLoading} onChange={event => void onInvoiceStatusChange(selectedInvoice, event.target.value as InvoiceStatus)}>
+                  <option value={selectedInvoice.status}>{selectedInvoice.status}</option>
+                  {getAllowedInvoiceStatusTransitions(selectedInvoice.status).map(status => <option key={status} value={status}>{status}</option>)}
+                </select></dd></div>
+                <div><dt>Invoice date</dt><dd>{formatDate(selectedInvoice.invoiceDate)}</dd></div>
+                <div><dt>Due date</dt><dd>{formatDate(selectedInvoice.dueDate)}</dd></div>
+                <div><dt>Total</dt><dd>{formatCurrency(selectedInvoice.total)}</dd></div>
+                <div><dt>Deliveries</dt><dd>{selectedInvoice.deliveryCount}</dd></div>
+                <div><dt>First issued</dt><dd>{selectedInvoice.firstIssuedUtc ? formatDateTime(selectedInvoice.firstIssuedUtc) : 'Not issued'}</dd></div>
+                <div><dt>Re-issued</dt><dd>{selectedInvoice.reissueCount} {selectedInvoice.reissueCount === 1 ? 'time' : 'times'}</dd></div>
+                <div><dt>Line items</dt><dd>{selectedInvoice.lines.length}</dd></div>
+                <div><dt>Last delivery</dt><dd>{formatDateTime(selectedInvoice.lastDeliveredUtc)}</dd></div>
+                {selectedInvoice.lastDeliveryRecipient && <div className="full-width"><dt>Last recipient</dt><dd>{selectedInvoice.lastDeliveryRecipient}</dd></div>}
+                <div className="full-width"><dt>In respect of</dt><dd className="overview-long-text">{selectedInvoice.description?.trim() || 'No description set.'}</dd></div>
+                <div className="full-width"><dt>Invoice PDF</dt><dd className="overview-long-text">{documentStatus}
+                  {documentAvailability.canRetry && <button className="link-button" data-testid="invoice-regenerate-pdf-button" disabled={isInvoiceLoading} onClick={() => void onRegeneratePdf(selectedInvoice)} type="button">Try again</button>}
+                </dd></div>
+              </dl>
+              </div>
               {!isSellerProfileConfigured && (
-                <div className="settings-note">
+                <div className="overview-dock"><div className="settings-note">
                   {sellerProfileNotice}
                   {' '}
                   <button
@@ -405,115 +427,8 @@ export function InvoicesSection({
                   >
                     Set up seller profile
                   </button>
-                </div>
+                </div></div>
               )}
-
-              <div className="detail-grid">
-                <article>
-                  <p className="detail-label">Client</p>
-                  <button
-                    className="link-button detail-link"
-                    data-testid="invoice-client-link"
-                    onClick={() => onOpenClient(selectedInvoice.clientId)}
-                    type="button"
-                  >
-                    {selectedInvoiceClientName}
-                  </button>
-                </article>
-                <article>
-                  <p className="detail-label">Status</p>
-                  <div className="field-with-inline-help">
-                    <select
-                      data-testid="invoice-status-select"
-                      value={selectedInvoice.status}
-                      onChange={(event) =>
-                        void onInvoiceStatusChange(
-                          selectedInvoice,
-                          event.target.value as InvoiceStatus
-                        )
-                      }
-                      disabled={isInvoiceLoading}
-                    >
-                      <option value={selectedInvoice.status}>{selectedInvoice.status}</option>
-                      {getAllowedInvoiceStatusTransitions(selectedInvoice.status).map(
-                        (statusOption) => (
-                          <option key={statusOption} value={statusOption}>
-                            {statusOption}
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </div>
-                </article>
-                <article>
-                  <p className="detail-label">Invoice date</p>
-                  <strong>{formatDate(selectedInvoice.invoiceDate)}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Due date</p>
-                  <strong>{formatDate(selectedInvoice.dueDate)}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">First issued on</p>
-                  <strong>
-                    {selectedInvoice.firstIssuedUtc
-                      ? formatDateTime(selectedInvoice.firstIssuedUtc)
-                      : 'Not issued'}
-                  </strong>
-                </article>
-                <article>
-                  <p className="detail-label">Re-issued</p>
-                  <strong>
-                    {selectedInvoice.reissueCount}{' '}
-                    {selectedInvoice.reissueCount === 1 ? 'time' : 'times'}
-                  </strong>
-                </article>
-                <article className="full-width">
-                  <p className="detail-label">In respect of</p>
-                  <span>{selectedInvoice.description?.trim() || 'No description set.'}</span>
-                </article>
-                <article>
-                  <p className="detail-label">Total</p>
-                  <strong>{formatCurrency(selectedInvoice.total)}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Line items</p>
-                  <strong>{selectedInvoice.lines.length}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Invoice PDF</p>
-                  <strong>{documentStatus}</strong>
-                  {documentAvailability.canRetry ? (
-                    <button
-                      className="link-button"
-                      data-testid="invoice-regenerate-pdf-button"
-                      disabled={isInvoiceLoading}
-                      onClick={() => void onRegeneratePdf(selectedInvoice)}
-                      type="button"
-                    >
-                      Try again
-                    </button>
-                  ) : null}
-                </article>
-                <article>
-                  <p className="detail-label">Deliveries</p>
-                  <strong>{selectedInvoice.deliveryCount}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Last delivery</p>
-                  <strong>{formatDateTime(selectedInvoice.lastDeliveredUtc)}</strong>
-                  {selectedInvoice.lastDeliveryRecipient ? (
-                    <span>{selectedInvoice.lastDeliveryRecipient}</span>
-                  ) : null}
-                </article>
-              </div>
-
-              <div className="gig-timeline-note">
-                <p className="detail-label">Invoice workflow</p>
-                <span>
-                  Review invoice details here, then open line items when you need to make changes.
-                </span>
-              </div>
             </>
           ) : (
             <div className="empty-state roomy">

@@ -959,7 +959,9 @@ export function SetListImportModal({ gig, resource, onClose }: SetListImportModa
             <p className="section-label">Set list</p>
             <h2 id="setlist-import-title">Manage set list</h2>
           </div>
-          <button className="ghost-button" onClick={onClose} type="button" disabled={isLoading}>
+          <button data-dialog-close className="ghost-button" onClick={() => {
+            if (!isLoading && (!hasUnsavedChanges || window.confirm('Discard unsaved set list changes?'))) onClose()
+          }} type="button" disabled={isLoading}>
             Close
           </button>
         </div>

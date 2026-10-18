@@ -23,11 +23,11 @@ Use **Planned** for confirmed future work, **Completed** once it is finished, **
 
 ## Add useful context
 
-You can add notes, driving mileage, passengers, expenses, receipts, and linked resources to a saved gig. Keep the detail with the work so it is ready when you invoice it.
+You can add notes, driving mileage, passengers, expenses, receipts, and linked resources to a saved gig. Booking details and full notes appear directly in the details pane. Choose **Resources** to manage links and files, or **Expenses** to manage costs and receipts. These collections open separately so you can finish the task and return to the same gig.
 
 ## Work through your list
 
-On a desktop, scroll the gig list to find more work while keeping search and filters in place. Scroll the selected gig's details or its editor separately when there is more to read. The compact summary above the workspace stays available as you switch between Gigs, Clients, and Invoices.
+On a desktop, scroll the gig list to find more work while keeping search and filters in place. The selected gig uses the available pane space for its details; if its notes are unusually long, scroll that middle region to read them in full. Editors and collection dialogs scroll separately when needed. The compact summary above the workspace stays available as you switch between Gigs, Clients, and Invoices.
 
 On a phone or in a short window, scroll the page to reach the next panel. If a search or filter shows no results, clear it using the controls above the list.
 

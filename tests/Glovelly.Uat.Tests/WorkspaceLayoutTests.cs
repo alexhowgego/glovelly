@@ -32,6 +32,10 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
                 var list = Page.Locator(".compact-record-list");
                 await Assertions.Expect(list.Locator("button.compact-record-row")).ToHaveCountAsync(section == "clients" ? 33 : 32);
                 await AssertBoundedDocumentAsync();
+                Assert.True(await Page.Locator(".record-overview").EvaluateAsync<bool>("el => el.scrollHeight <= el.clientHeight + 1"), $"{section} overview must fit without scrolling");
+                Assert.True(await Page.Locator(".record-overview").EvaluateAsync<bool>(
+                    "el => !el.querySelector('.overview-dock') || Math.abs(el.querySelector('.overview-dock').getBoundingClientRect().bottom - (el.getBoundingClientRect().bottom - parseFloat(getComputedStyle(el).paddingBottom) - parseFloat(getComputedStyle(el).borderBottomWidth))) <= 2"),
+                    $"{section} controls should be docked at the bottom of the pane");
                 Assert.True(await list.EvaluateAsync<bool>("el => el.scrollHeight > el.clientHeight && el.clientHeight >= 100"), $"{section} needs a usable internal list viewport");
                 await list.EvaluateAsync("el => el.scrollTop = el.scrollHeight");
                 await Assertions.Expect(list.Locator("button.compact-record-row").Last).ToBeInViewportAsync();
@@ -45,6 +49,7 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
                 await Page.Locator(".editor-toggle").ClickAsync();
                 await Assertions.Expect(Page.Locator(".editor-slot.open")).ToBeVisibleAsync();
                 await AssertBoundedDocumentAsync();
+                Assert.True(await Page.Locator(".record-overview").EvaluateAsync<bool>("el => el.scrollHeight <= el.clientHeight + 1"), $"{section} overview must also fit beside its editor");
                 var editor = Page.Locator(".editor-slot.open > .panel");
                 await editor.EvaluateAsync("el => el.scrollTop = el.scrollHeight");
                 Assert.True(await editor.EvaluateAsync<bool>("el => el.scrollHeight <= el.clientHeight + el.scrollTop + 1"));
@@ -64,7 +69,29 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
             await Page.GetByTestId("nav-gigs").ClickAsync();
             var detail = Page.Locator("#gig-overview");
             await detail.EvaluateAsync("el => el.scrollTop = el.scrollHeight");
-            Assert.True(await detail.EvaluateAsync<bool>("el => el.scrollHeight > el.clientHeight && el.scrollTop > 0"));
+            Assert.True(await detail.EvaluateAsync<bool>("el => el.scrollHeight <= el.clientHeight + 1 && el.scrollTop === 0"));
+            var body = detail.Locator(".overview-body");
+            await Assertions.Expect(body).ToContainTextAsync("Long detail content for independent pane scrolling.");
+            Assert.True(await body.EvaluateAsync<bool>("el => el.scrollHeight > el.clientHeight"));
+            Assert.Equal("left", await body.EvaluateAsync<string>("el => getComputedStyle(el).textAlign"));
+            await body.EvaluateAsync("el => el.scrollTop = el.scrollHeight");
+            Assert.True(await body.EvaluateAsync<bool>("el => el.scrollTop > 0 && el.scrollTop + el.clientHeight >= el.scrollHeight - 1"));
+            await Page.Locator(".compact-record-list button.compact-record-row").Nth(1).ClickAsync();
+            await Page.WaitForFunctionAsync("() => document.querySelector('#gig-overview .overview-body').scrollTop === 0");
+            await Assertions.Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Notes and details", Exact = true })).ToHaveCountAsync(0);
+            await OpenGigExpensesAsync();
+            await Page.GetByTestId("open-gig-expense-dialog-button").ClickAsync();
+            var expenseEditor = Page.GetByRole(AriaRole.Dialog, new() { Name = "Add expense", Exact = true });
+            await Assertions.Expect(expenseEditor).ToBeFocusedAsync();
+            for (var index = 0; index < 10; index++)
+            {
+                await Page.Keyboard.PressAsync("Tab");
+                Assert.True(await expenseEditor.EvaluateAsync<bool>("el => el.contains(document.activeElement)"));
+            }
+            await Page.Keyboard.PressAsync("Escape");
+            await Assertions.Expect(expenseEditor).ToHaveCountAsync(0);
+            await Assertions.Expect(Page.GetByRole(AriaRole.Dialog, new() { Name = "Gig expenses", Exact = true })).ToBeVisibleAsync();
+            await CloseRecordDetailsAsync();
             await AssertBoundedDocumentAsync();
             await Page.GetByRole(AriaRole.Button, new() { Name = "Open profile menu" }).ClickAsync();
             await Assertions.Expect(Page.GetByRole(AriaRole.Menuitem, new() { Name = "Sign out" })).ToBeVisibleAsync();
@@ -99,13 +126,23 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
         {
             await Page.SetViewportSizeAsync(width, height);
             await AuthenticateWithUatSecretAsync();
-            await CreateClientAsync($"{CreateRunId()} Responsive Client");
+            var clientName = $"{CreateRunId()} Responsive Client";
+            await CreateClientAsync(clientName);
             await Page.GetByTestId("client-edit-button").ClickAsync();
             await Assertions.Expect(Page.GetByTestId("client-save-close-button")).ToBeVisibleAsync();
             await Page.GetByTestId("client-save-close-button").FocusAsync();
             await Assertions.Expect(Page.GetByTestId("client-save-close-button")).ToBeInViewportAsync();
             Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"));
             Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollHeight > innerHeight"));
+
+            await Page.GetByTestId("client-edit-button").ClickAsync();
+            await Assertions.Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Contact and billing details", Exact = true })).ToHaveCountAsync(0);
+            await CreateGigAsync(clientName, $"{CreateRunId()} Responsive Gig", DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-dd"));
+            await OpenGigResourcesAsync();
+            var resources = Page.GetByRole(AriaRole.Dialog, new() { Name = "Gig resources", Exact = true });
+            Assert.True(await resources.EvaluateAsync<bool>("el => el.getBoundingClientRect().height <= innerHeight && el.getBoundingClientRect().width <= innerWidth"));
+            await Page.Keyboard.PressAsync("Escape");
+            await Assertions.Expect(Page.GetByTestId("gig-resources-button")).ToBeFocusedAsync();
 
             await Page.GetByTestId("profile-menu-button").ClickAsync();
             await Page.GetByRole(AriaRole.Menuitem, new() { Name = "Settings", Exact = true }).ClickAsync();

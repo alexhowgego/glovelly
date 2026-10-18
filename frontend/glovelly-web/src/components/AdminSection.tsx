@@ -163,11 +163,11 @@ export function AdminSection({
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel record-overview">
           <div className="panel-heading">
             <div>
               <p className="section-label">Access Overview</p>
-              <h2>
+              <h2 tabIndex={-1}>
                 {selectedAdminUser?.displayName ||
                   selectedAdminUser?.email ||
                   'No user selected'}
@@ -205,36 +205,19 @@ export function AdminSection({
           </div>
 
           {selectedAdminUser ? (
-            <div className="detail-grid">
-              <article>
-                <p className="detail-label">Role</p>
-                <strong>{selectedAdminUser.role}</strong>
-              </article>
-              <article>
-                <p className="detail-label">Access</p>
-                <strong>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</strong>
-              </article>
-              <article>
-                <p className="detail-label">Sign-in status</p>
-                <strong>
-                  {selectedAdminUser.isEnrolled ? 'Ready to sign in' : 'Waiting for first sign-in'}
-                </strong>
-              </article>
-              <article className="full-width">
-                <p className="detail-label">Account reference</p>
-                <strong>
-                  {selectedAdminUser.googleSubject ?? 'Added by email only so far'}
-                </strong>
-              </article>
-              <article>
-                <p className="detail-label">Created</p>
-                <strong>{formatDateTime(selectedAdminUser.createdUtc)}</strong>
-              </article>
-              <article>
-                <p className="detail-label">Last login</p>
-                <strong>{formatDateTime(selectedAdminUser.lastLoginUtc)}</strong>
-              </article>
+            <>
+            <div className="overview-body" key={selectedAdminUser.id}>
+            <dl className="overview-facts">
+              <div className="full-width"><dt>Email</dt><dd>{selectedAdminUser.email}</dd></div>
+              <div><dt>Role</dt><dd>{selectedAdminUser.role}</dd></div>
+              <div><dt>Access</dt><dd>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</dd></div>
+              <div><dt>Sign-in</dt><dd>{selectedAdminUser.isEnrolled ? 'Ready to sign in' : 'Waiting for first sign-in'}</dd></div>
+              <div><dt>Last login</dt><dd>{formatDateTime(selectedAdminUser.lastLoginUtc)}</dd></div>
+              <div><dt>Created</dt><dd>{formatDateTime(selectedAdminUser.createdUtc)}</dd></div>
+              <div className="full-width"><dt>Account reference</dt><dd>{selectedAdminUser.googleSubject ?? 'Added by email only so far'}</dd></div>
+            </dl>
             </div>
+            </>
           ) : (
             <div className="empty-state roomy">
               <strong>Select a user to review their access.</strong>
