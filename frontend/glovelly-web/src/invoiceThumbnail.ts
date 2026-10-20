@@ -4,9 +4,20 @@ import type { Invoice } from './types'
 
 export const MAX_THUMBNAIL_PDF_BYTES = 15 * 1024 * 1024
 
+// PostgreSQL stores microseconds, whereas an immediate .NET mutation response
+// can still contain a seventh fractional digit. Compare instants at storage
+// precision, retaining microseconds so real replacements are not hidden.
+function persistedPdfTimestamp(value: string | null | undefined) {
+  if (!value) return value
+  const milliseconds = Date.parse(value)
+  if (!Number.isFinite(milliseconds)) return value
+  const fraction = value.match(/\.(\d+)(?:Z|[+-]\d{2}:\d{2})$/i)?.[1] ?? ''
+  return milliseconds * 1000 + Number(fraction.slice(3, 6).padEnd(3, '0'))
+}
+
 export function invoiceThumbnailIdentity(invoice: Invoice): string {
   return JSON.stringify([invoice.id, invoice.documentState, invoice.documentRevision,
-    invoice.pdfDocumentRevision, invoice.pdfGeneratedAt, invoice.pdfSizeBytes, invoice.gigLinesNeedRefresh ?? false])
+    invoice.pdfDocumentRevision, persistedPdfTimestamp(invoice.pdfGeneratedAt), invoice.pdfSizeBytes, invoice.gigLinesNeedRefresh ?? false])
 }
 
 export async function readLimitedThumbnailPdf(response: Response, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {

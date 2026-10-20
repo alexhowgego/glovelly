@@ -11,6 +11,21 @@ const invoice = (overrides: Partial<Invoice> = {}) => ({ id: 'one', documentStat
 const pdf = () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'application/pdf' } })
 
 describe('uncached thumbnail PDF reads', () => {
+  it.each([
+    ['2026-10-19T09:00:00.1234567Z', '2026-10-19T09:00:00.123456Z'],
+    ['2026-10-19T10:00:00.123456+01:00', '2026-10-19T09:00:00.123456Z'],
+  ])('accepts a timestamp storage/serialization round trip without discarding the PDF (%s)', async (initial, persisted) => {
+    vi.mocked(fetchWithSession).mockResolvedValueOnce(pdf())
+      .mockResolvedValueOnce(new Response(JSON.stringify(invoice({ pdfGeneratedAt: persisted }))))
+    await expect(loadInvoiceThumbnailBytes(invoice({ pdfGeneratedAt: initial }), new AbortController().signal, vi.fn())).resolves.toEqual(new Uint8Array([1, 2, 3]))
+  })
+
+  it('still rejects replacement timestamps that differ by one stored microsecond', async () => {
+    vi.mocked(fetchWithSession).mockResolvedValueOnce(pdf())
+      .mockResolvedValueOnce(new Response(JSON.stringify(invoice({ pdfGeneratedAt: '2026-10-19T09:00:00.123457Z' }))))
+    await expect(loadInvoiceThumbnailBytes(invoice({ pdfGeneratedAt: '2026-10-19T09:00:00.1234567Z' }), new AbortController().signal, vi.fn())).rejects.toThrow('changed')
+  })
+
   it('reads only the stored PDF and metadata and retains no reusable bytes between calls', async () => {
     const selected = invoice()
     vi.mocked(fetchWithSession).mockImplementation(async path => path.endsWith('/pdf') ? pdf() : new Response(JSON.stringify(selected)))

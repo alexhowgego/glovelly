@@ -280,6 +280,8 @@ Marking an invoice Paid records its payment date using the current UK date. The 
 - Delivery checks depend on test environment configuration. If email or Google Drive is not configured, record that the delivery step was skipped.
 # Supplementary thumbnail sizing
 
+After generating an invoice against PostgreSQL, verify the initial first-page thumbnail loads without a spurious “PDF changed” warning. Persisted timestamp precision/offset formatting alone must not invalidate it; genuine PDF replacement/revision changes must still invalidate stale thumbnails.
+
 When the invoice thumbnail is eligible, verify its dedicated layout distributes width evenly across two facts columns and the PDF column rather than crowding the facts beside an oversized preview rail. The page remains centred and proportional, with no stretch, cropping, new PDF reads or loading changes. Check short/wide panes and long fact values, and confirm Clients/Gigs retain their distinct map layouts.
 
 On a wide, tall invoice pane with a current PDF, confirm page one is centred beside the facts and uses the available column width/height without stretching. Resize within eligible dimensions: the whole page stays visible, no permanent caption adds scrolling, and resizing alone does not fetch the PDF again. Hover and keyboard focus show page-one/action help; Enter still opens full preview. Existing Preview controls remain available when the thumbnail is omitted. Repeat with a short pane and on mobile, where insufficient space omits the visual rather than stacking it.

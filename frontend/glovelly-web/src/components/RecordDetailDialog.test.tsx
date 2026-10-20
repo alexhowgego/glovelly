@@ -35,6 +35,57 @@ function Harness({ recordId = 'a', text = 'Complete notes', busy = false, warn =
 }
 
 describe('record detail dialogs', () => {
+  it('wraps forward/reverse Tab inside the active child, excluding hidden, disabled and inert controls', async () => {
+    // jsdom has no layout; make the visible test controls measurable.
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([new DOMRect(0, 0, 100, 20)] as unknown as DOMRectList)
+    render(<RecordDetailDialog title="Parent" onClose={vi.fn()}>
+      <button>Parent action</button>
+      <section role="dialog" aria-label="Child">
+        <input aria-label="First field" />
+        <button disabled>Disabled action</button>
+        <fieldset disabled><button>Disabled fieldset action</button></fieldset>
+        <div hidden><button>Hidden action</button></div>
+        <div inert><button>Inert action</button></div>
+        <button style={{ visibility: 'hidden' }}>Invisible action</button>
+        <button tabIndex={-1}>Non-tabbable action</button>
+        <button>Last action</button>
+      </section>
+    </RecordDetailDialog>)
+    const child = screen.getByRole('dialog', { name: 'Child' })
+    const first = screen.getByLabelText('First field')
+    const last = screen.getByText('Last action')
+    await waitFor(() => expect(document.activeElement).toBe(child))
+    expect(fireEvent.keyDown(child, { key: 'Tab' })).toBe(false)
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(first, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
+    fireEvent.keyDown(last, { key: 'Tab' })
+    expect(document.activeElement).toBe(first)
+    // Normal interior traversal is left to the browser.
+    expect(fireEvent.keyDown(first, { key: 'Tab' })).toBe(true)
+  })
+
+  it('keeps Tab on an empty child layer and recovers focus from outside it', async () => {
+    render(<RecordDetailDialog title="Parent" onClose={vi.fn()}>
+      <section role="dialog" aria-label="Empty child"><button disabled>Unavailable</button></section>
+    </RecordDetailDialog>)
+    const child = screen.getByRole('dialog', { name: 'Empty child' })
+    await waitFor(() => expect(document.activeElement).toBe(child))
+    fireEvent.keyDown(child, { key: 'Tab' })
+    expect(document.activeElement).toBe(child)
+    document.body.tabIndex = -1
+    document.body.focus()
+    fireEvent.keyDown(document.body, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(child)
+    document.body.removeAttribute('tabindex')
+  })
+
+  it('removes Tab handling when closed', () => {
+    const { unmount } = render(<RecordDetailDialog title="Parent" onClose={vi.fn()}>Content</RecordDetailDialog>)
+    unmount()
+    expect(fireEvent.keyDown(document.body, { key: 'Tab' })).toBe(true)
+  })
+
   it('focuses a named modal, locks scrolling, and restores the trigger without scrolling', () => {
     document.body.style.overflow = 'auto'
     render(<Harness />)

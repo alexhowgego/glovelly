@@ -85,7 +85,7 @@ public sealed class RecordMapPreviewTests : InvoiceUatTestBase
         Assert.Equal("0% 50%", await image.EvaluateAsync<string>("el => getComputedStyle(el).objectPosition"));
         Assert.True(await Page.Locator(".record-visual-layout").EvaluateAsync<bool>(
             "el => { const facts = el.querySelector('.overview-facts'); const columns = getComputedStyle(facts).gridTemplateColumns; return getComputedStyle(el).columnGap === '28px' && getComputedStyle(facts).columnGap === '24px' && (el.classList.contains('single-column-facts') ? columns.split(' ').length === 1 : columns.startsWith('subgrid')) && [...el.querySelectorAll('.overview-facts > .full-width:not(.overview-address)')].every(field => getComputedStyle(field).contain.includes('inline-size')); }"));
-        Assert.True(await image.EvaluateAsync<bool>("el => { const frame = el.closest('.map-preview-frame').getBoundingClientRect(); return Math.abs(el.naturalWidth / el.naturalHeight - frame.width / frame.height) < .01 && getComputedStyle(el.closest('a')).borderRadius === '12px'; }"));
+        await AssertSettledMapFrameAsync(image);
         Assert.StartsWith("https://maps.googleapis.com/maps/api/staticmap?", await image.GetAttributeAsync("src"));
         await Page.Locator(".map-preview-link").FocusAsync();
         await Assertions.Expect(Page.GetByRole(AriaRole.Tooltip)).ToBeVisibleAsync();
@@ -93,6 +93,41 @@ public sealed class RecordMapPreviewTests : InvoiceUatTestBase
         Assert.True(await image.EvaluateAsync<bool>("el => { const image = el.getBoundingClientRect(); const body = el.closest('.overview-body').getBoundingClientRect(); return image.height <= body.height && getComputedStyle(el).objectFit === 'contain'; }"));
         Assert.True(await Page.Locator(".record-visual-layout").EvaluateAsync<bool>(
             "el => el.querySelector('.record-visual-facts').getBoundingClientRect().right <= el.querySelector('.record-visual-rail').getBoundingClientRect().left"));
+    }
+
+    private async Task AssertSettledMapFrameAsync(ILocator image)
+    {
+        // Saving a client closes its editor and resizes the reserved frame.
+        // The image stays visible while its debounced shape request completes.
+        try
+        {
+            await Page.WaitForFunctionAsync(
+                """
+                () => {
+                  const image = document.querySelector('.map-preview-frame img');
+                  const frame = image?.closest('.map-preview-frame').getBoundingClientRect();
+                  return image?.complete && image.naturalHeight > 0 && frame?.height > 0
+                    && Math.abs(image.naturalWidth / image.naturalHeight - frame.width / frame.height) < .01
+                    && getComputedStyle(image.closest('a')).borderRadius === '12px';
+                }
+                """, null, new() { Timeout = 5000 });
+        }
+        catch (TimeoutException error)
+        {
+            var geometry = await image.EvaluateAsync<string>(
+                """
+                image => {
+                  const frame = image.closest('.map-preview-frame').getBoundingClientRect();
+                  return JSON.stringify({ complete: image.complete,
+                    imageWidth: image.naturalWidth, imageHeight: image.naturalHeight,
+                    frameWidth: frame.width, frameHeight: frame.height,
+                    requestedSize: new URL(image.currentSrc).searchParams.get('size'),
+                    borderRadius: getComputedStyle(image.closest('a')).borderRadius });
+                }
+                """);
+            // Never include the credential-bearing signed image URL in diagnostics.
+            throw new InvalidOperationException($"Map geometry did not settle within the existing aspect-ratio tolerance: {geometry}", error);
+        }
     }
 
     private async Task AssertReadableClientAddressAsync()

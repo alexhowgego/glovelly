@@ -71,6 +71,35 @@ export function RecordDetailDialog({ title, children, onClose, canClose, returnF
     observer.observe(dialog, { childList: true, subtree: true })
     updateLayer()
 
+    const trapTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+      updateLayer()
+      // The native outer dialog does not wrap focus inside a nested role=dialog.
+      // Recompute each time: controls can become hidden, disabled or inert.
+      const controls = [...activeLayer.querySelectorAll<HTMLElement>(
+        'a[href], area[href], button, input, select, textarea, iframe, [tabindex], [contenteditable="true"], audio[controls], video[controls], summary',
+      )].filter(element => {
+        if (element.tabIndex < 0 || element.matches(':disabled') || element.closest('[hidden], [inert]') || !element.getClientRects().length) return false
+        for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
+          if (ancestor.inert) return false
+        }
+        const style = getComputedStyle(element)
+        return style.visibility !== 'hidden' && style.visibility !== 'collapse'
+      }).sort((left, right) => (left.tabIndex || Number.MAX_SAFE_INTEGER) - (right.tabIndex || Number.MAX_SAFE_INTEGER))
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      if (!first) {
+        event.preventDefault()
+        activeLayer.focus()
+      } else if (!controls.includes(document.activeElement as HTMLElement)
+        || (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
+        event.preventDefault()
+        const target = event.shiftKey ? last : first
+        target.focus()
+      }
+    }
+    document.addEventListener('keydown', trapTab, true)
+
     const cancel = (event: Event) => {
       event.preventDefault()
       if (activeLayer !== dialog) {
@@ -82,6 +111,7 @@ export function RecordDetailDialog({ title, children, onClose, canClose, returnF
     dialog.addEventListener('cancel', cancel)
     return () => {
       observer.disconnect()
+      document.removeEventListener('keydown', trapTab, true)
       resetInert()
       dialog.removeEventListener('cancel', cancel)
       dialog.close()

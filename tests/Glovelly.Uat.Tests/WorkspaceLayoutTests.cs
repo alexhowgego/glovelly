@@ -14,8 +14,9 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
         {
             await Page.SetViewportSizeAsync(width, height);
             await AuthenticateWithUatSecretAsync();
-            await SeedLayoutRecordsAsync();
-            await ConfigureAdminLayoutFixtureAsync();
+            var prefix = $"L{Guid.NewGuid().ToString("N")[..6]}";
+            await SeedLayoutRecordsAsync(prefix);
+            await ConfigureAdminLayoutFixtureAsync(prefix);
             await Page.ReloadAsync();
 
             foreach (var section in new[] { "clients", "gigs", "invoices", "admin" })
@@ -30,7 +31,10 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
                     await Assertions.Expect(Page.GetByTestId("dashboard-upcoming-gigs")).ToHaveCountAsync(0);
                 }
                 var list = Page.Locator(".compact-record-list");
-                await Assertions.Expect(list.Locator("button.compact-record-row")).ToHaveCountAsync(section == "clients" ? 33 : 32);
+                var search = Page.Locator(".compact-list-controls input[type=search]");
+                await search.FillAsync(prefix);
+                await Assertions.Expect(list.Locator("button.compact-record-row")).ToHaveCountAsync(32);
+                await list.Locator("button.compact-record-row").First.ClickAsync();
                 await AssertBoundedDocumentAsync();
                 Assert.True(await Page.Locator(".record-overview").EvaluateAsync<bool>("el => el.scrollHeight <= el.clientHeight + 1"), $"{section} overview must fit without scrolling");
                 Assert.True(await Page.Locator(".record-overview").EvaluateAsync<bool>(
@@ -42,9 +46,15 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
                 await Assertions.Expect(Page.Locator(".compact-list-controls")).ToBeInViewportAsync();
                 await Assertions.Expect(list.Locator(".compact-record-header")).ToBeInViewportAsync();
 
-                // Keyboard focus must reveal a record without moving the document.
+                // The first row was clicked earlier, so blur it before testing
+                // a genuine focus transition from outside the scrolled list.
+                await search.FocusAsync();
+                await Assertions.Expect(search).ToBeFocusedAsync();
+                await Assertions.Expect(list.Locator("button.compact-record-row").First).Not.ToBeInViewportAsync();
                 await list.Locator("button.compact-record-row").First.FocusAsync();
+                await Assertions.Expect(list.Locator("button.compact-record-row").First).ToBeFocusedAsync();
                 await Assertions.Expect(list.Locator("button.compact-record-row").First).ToBeInViewportAsync();
+                await AssertBoundedDocumentAsync();
                 await list.Locator("button.compact-record-row").First.ClickAsync();
                 await Page.Locator(".editor-toggle").ClickAsync();
                 await Assertions.Expect(Page.Locator(".editor-slot.open")).ToBeVisibleAsync();
@@ -56,17 +66,19 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
                 await Page.Locator(".editor-toggle").ClickAsync();
                 await AssertBoundedDocumentAsync();
 
-                var search = Page.Locator(".compact-list-controls input[type=search]");
                 await search.FillAsync("no-layout-record-matches-this");
                 await Assertions.Expect(list.Locator("button.compact-record-row")).ToHaveCountAsync(0);
                 await Assertions.Expect(search).ToBeInViewportAsync();
                 await AssertBoundedDocumentAsync();
-                await search.FillAsync("");
+                await search.FillAsync(prefix);
+                await Assertions.Expect(list.Locator("button.compact-record-row")).ToHaveCountAsync(32);
                 await Assertions.Expect(list.Locator("button.compact-record-row").First).ToBeVisibleAsync();
                 await Assertions.Expect(Page.GetByLabel("Dashboard summary")).ToBeInViewportAsync();
             }
 
             await Page.GetByTestId("nav-gigs").ClickAsync();
+            await Page.Locator(".compact-list-controls input[type=search]").FillAsync(prefix);
+            await Page.Locator(".compact-record-list button.compact-record-row").First.ClickAsync();
             var detail = Page.Locator("#gig-overview");
             await detail.EvaluateAsync("el => el.scrollTop = el.scrollHeight");
             Assert.True(await detail.EvaluateAsync<bool>("el => el.scrollHeight <= el.clientHeight + 1 && el.scrollTop === 0"));
@@ -86,6 +98,11 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
             for (var index = 0; index < 10; index++)
             {
                 await Page.Keyboard.PressAsync("Tab");
+                Assert.True(await expenseEditor.EvaluateAsync<bool>("el => el.contains(document.activeElement)"));
+            }
+            for (var index = 0; index < 10; index++)
+            {
+                await Page.Keyboard.PressAsync("Shift+Tab");
                 Assert.True(await expenseEditor.EvaluateAsync<bool>("el => el.contains(document.activeElement)"));
             }
             await Page.Keyboard.PressAsync("Escape");
@@ -148,8 +165,10 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
             await Page.GetByRole(AriaRole.Menuitem, new() { Name = "Settings", Exact = true }).ClickAsync();
             await Assertions.Expect(Page.Locator(".settings-overlay").First).ToBeVisibleAsync();
             await Assertions.Expect(Page.Locator(".settings-overlay").First.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true })).ToBeVisibleAsync();
-            Assert.True(await Page.EvaluateAsync<bool>(
-                "() => Number(getComputedStyle(document.querySelector('.settings-overlay')).zIndex) > Number(getComputedStyle(document.querySelector('[data-sonner-toaster]')).zIndex)"));
+            var notificationViewport = Page.GetByTestId("notification-layer");
+            await Assertions.Expect(notificationViewport).ToHaveCountAsync(1);
+            Assert.True(await Page.Locator(".settings-overlay").First.EvaluateAsync<bool>(
+                "el => { const notification = document.querySelector('[data-testid=\"notification-layer\"]'); return !!notification && Number(getComputedStyle(el).zIndex) > Number(getComputedStyle(notification).zIndex); }"));
         });
 
     private Task AssertBoundedDocumentAsync() => Page.WaitForFunctionAsync(
@@ -159,9 +178,9 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
           && scrollY === 0
         """);
 
-    private Task SeedLayoutRecordsAsync() => Page.EvaluateAsync(
+    private Task SeedLayoutRecordsAsync(string prefix) => Page.EvaluateAsync(
         """
-        async () => {
+        async (prefix) => {
           const post = async (path, data) => {
             const response = await fetch(path, { method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
@@ -170,21 +189,22 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
           };
           const date = new Date(Date.now() + 86400000 * 14).toISOString().slice(0, 10);
           for (let index = 0; index < 32; index++) {
-            const name = `Layout ${String(index).padStart(2, '0')}`;
+            const name = `${prefix} Layout ${String(index).padStart(2, '0')}`;
             const client = await post('/clients', { name, email: 'layout@example.com',
               billingAddress: { line1: 'Layout test address', city: 'Bristol', country: 'United Kingdom' } });
+            // Exercise scrolling while staying within PostgreSQL's 4,000-character notes limit.
             await post('/gigs', { clientId: client.id, title: name, date, venue: 'Layout Hall',
               fee: 100, status: 'Confirmed', travelMiles: 0, passengerCount: 0, wasDriving: false,
-              notes: 'Long detail content for independent pane scrolling. '.repeat(200) });
-            await post('/invoices', { clientId: client.id, invoiceNumber: `LAYOUT-${index}`,
+              notes: 'Long detail content for independent pane scrolling. '.repeat(70) });
+            await post('/invoices', { clientId: client.id, invoiceNumber: `${prefix}-${index}`,
               invoiceDate: date, dueDate: date, status: 'Draft', description: 'Layout invoice detail. '.repeat(100) });
           }
         }
-        """);
+        """, prefix);
 
     // Layout-only admin projection: the staging UAT identity deliberately has
     // no administrator permissions. Never grant it backend access for CSS tests.
-    private async Task ConfigureAdminLayoutFixtureAsync()
+    private async Task ConfigureAdminLayoutFixtureAsync(string prefix)
     {
         await Page.RouteAsync("**/auth/me", async route =>
         {
@@ -198,7 +218,7 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
             ContentType = "application/json",
             Body = System.Text.Json.JsonSerializer.Serialize(Enumerable.Range(0, 32).Select(index => new
             {
-                id = $"layout-user-{index}", email = $"layout-{index}@example.com", displayName = $"Layout User {index:00}",
+                id = $"layout-user-{index}", email = $"layout-{index}@example.com", displayName = $"{prefix} Layout User {index:00}",
                 googleSubject = (string?)null, isEnrolled = false, role = "User", isActive = true,
                 createdUtc = "2026-01-01T00:00:00Z", lastLoginUtc = (string?)null,
             })),

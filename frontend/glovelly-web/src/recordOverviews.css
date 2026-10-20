@@ -255,7 +255,7 @@
   pointer-events: none;
   visibility: hidden;
 }
-.map-search-preview:has(.map-preview-link:hover, .map-preview-link:focus-visible) > .visual-preview-tooltip,
+.map-search-preview:has(.map-preview-link:hover, .map-preview-link:focus) > .visual-preview-tooltip,
 .invoice-thumbnail-preview:has(.invoice-thumbnail:hover, .invoice-thumbnail:focus-visible) > .visual-preview-tooltip {
   visibility: visible;
 }

@@ -340,6 +340,12 @@
   overflow-x: clip;
 }
 
+/* An open profile menu must stay usable above persistent notifications,
+   while remaining below modal overlays (80). */
+.content-header:has(.profile-trigger.open) {
+  z-index: 76;
+}
+
 .content-header-top {
   display: flex;
   align-items: flex-start;

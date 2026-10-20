@@ -51,14 +51,15 @@ function MapFrame(props: RecordMapPreviewProps) {
   }, [canMeasure])
   const requestedSize = size ?? (!canMeasure ? props.bucket : null)
   return <div className="map-preview-frame" ref={frame}>
-    {requestedSize ? <MapImage key={requestedSize} {...props} size={requestedSize} /> : <p role="status">Loading map preview…</p>}
+    {requestedSize ? <MapImage {...props} size={requestedSize} /> : <p role="status">Loading map preview…</p>}
   </div>
 }
 
 function MapImage({ kind, id, source, query, size, onUnavailable, onSessionExpired }: RecordMapPreviewProps & { size: string }) {
   const tooltipId = useId()
   const mapsUrl = googleMapsSearchUrl(query)
-  const [url, setUrl] = useState<string | null>(null)
+  const [image, setImage] = useState<{ url: string, key: string } | null>(null)
+  const url = image?.url
   const [loaded, setLoaded] = useState(false)
   const alive = useRef(false)
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -90,7 +91,7 @@ function MapImage({ kind, id, source, query, size, onUnavailable, onSessionExpir
         if (descriptor.sourceFingerprint !== source || descriptor.size !== size || descriptor.url.length > 16384 ||
           imageUrl.origin !== 'https://maps.googleapis.com' || imageUrl.pathname !== '/maps/api/staticmap' ||
           imageUrl.username || imageUrl.password || imageUrl.hash || !imageUrl.searchParams.get('signature')) throw new Error('unavailable')
-        setUrl(descriptor.url)
+        setImage({ url: descriptor.url, key })
       } catch {
         if (!controller.signal.aborted) {
           controller.abort()
@@ -112,12 +113,12 @@ function MapImage({ kind, id, source, query, size, onUnavailable, onSessionExpir
       aria-label={`Open location in Google Maps: ${query}`} aria-describedby={tooltipId} hidden={!loaded}>
       <img src={url} alt="Unverified map search preview" referrerPolicy="origin" hidden={!loaded}
       onLoad={() => {
-        if (!alive.current) return
+        if (!alive.current || image?.key !== key) return
         if (watchdog.current) clearTimeout(watchdog.current)
         setLoaded(true)
       }}
       onError={() => {
-        if (!alive.current) return
+        if (!alive.current || image?.key !== key) return
         alive.current = false
         if (watchdog.current) clearTimeout(watchdog.current)
         onUnavailable()

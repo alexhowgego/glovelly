@@ -517,6 +517,20 @@ body::before {
   font-size: 0.9rem;
 }
 
+/* Desktop notification text must not block the application beneath it. Keep
+   explicit actions interactive; mobile retains Sonner's touch/swipe behavior. */
+@media (min-width: 601px) and (hover: hover) and (pointer: fine) {
+  .notification-layer [data-sonner-toaster],
+  .notification-layer [data-sonner-toast],
+  .notification-layer [data-sonner-toast][data-styled] {
+    pointer-events: none;
+  }
+
+  .notification-layer [data-sonner-toast] :is(button, a, input, select, textarea, [role='button']) {
+    pointer-events: auto;
+  }
+}
+
 [data-sonner-toast][data-styled='true'] [data-close-button] {
   color: inherit;
 }
