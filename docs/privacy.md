@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 13 October 2026
+Last updated: 19 October 2026
 
 This privacy policy explains how Glovelly handles personal information when you use:
 
@@ -80,6 +80,18 @@ When Google Calendar integration is enabled, Glovelly may store:
 - Calendar sync status, retry, queue, and diagnostic metadata.
 
 Google Calendar access can be revoked through your Google Account permissions. If access is revoked, expires, or otherwise stops working, Calendar sync will stop until the connection is restored.
+
+### Optional Location Map Previews
+
+Where Maps Static previews are configured, Glovelly automatically displays a map search preview of a selected client's saved billing address or a gig's saved venue when the pane has enough visible space. There is no per-record approval setting or public/private address classification. Unsaved editor text is not used for previews. Images are unverified location searches, not confirmation of an exact venue match.
+
+Glovelly generates a signed image URL containing only the location query and necessary rendering/authentication parameters; it does not append separate client names, contact details or internal record identifiers. Location text itself can still contain personal information. Your browser loads the image directly from Google, which receives the query and browser network/request information, such as your IP address and the application's origin. Requests may interact with Google's browser state according to browser settings and Google's practices; they are not described as anonymous or cookie-free. See the [Google Privacy Policy](https://policies.google.com/privacy).
+
+Changing the selected saved location or hiding the preview removes obsolete imagery from Glovelly's display. It cannot recall requests already sent to Google or delete data Google has already received. Deployment-level disabling of map imagery does not change your saved business addresses or venues.
+
+Glovelly does not durably store, rehost, shared-cache or save map images, signed URLs or derived geocoding data for offline use. It holds the active signed URL in component memory; Google's image delivery and browser caching follow Google's response headers and browser behavior. This feature adds no Glovelly analytics loader. Invoice thumbnails are rendered locally from existing PDFs, not sent to a third-party renderer.
+
+The separate **Open in Google Maps** link is available without enabling imagery. Merely showing the link does not contact Google; choosing it opens Google's site with the location query and is subject to Google's own terms and privacy practices.
 
 ### Technical and Security Data
 
@@ -167,7 +179,7 @@ Current expected subprocessors include:
 
 - Google Cloud Platform, for hosting, infrastructure, managed secrets, and related cloud services
 - Google Cloud Vertex AI, for receipt/intake analysis initiated by source submission or explicit analysis requests, and requested set-list interpretation
-- Google, for sign-in, Google Drive integration, and Google Calendar integration
+- Google, for sign-in, Google Drive integration, Google Calendar integration, and automatic location map previews where configured
 - Google Analytics, where a visitor accepts public-site analytics cookies
 - Neon, for database hosting
 - Resend or another configured email delivery provider, for transactional email
@@ -199,6 +211,7 @@ Typical retention expectations are:
 - private unapplied intake source and analysis attempts: until replaced, explicitly discarded, or successfully applied; an unfinished intake has no automatic expiry. Receipt application promotes validated attempts to attachment analysis records, then removes the private intake attempts
 - documentation site technical records: according to the retention practices of GitHub or other hosting providers used to serve the site
 - Google Analytics event data: 14 months
+- map-preview signed URLs: active display memory only, not durable Glovelly storage; Google/browser handling is subject to provider headers and browser behavior
 
 Some information may be retained for longer where required by law, tax rules, accounting obligations, security needs, dispute resolution, or backup retention.
 

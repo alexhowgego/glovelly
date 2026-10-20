@@ -10,6 +10,7 @@ public static class ClientEndpoints
 {
     public static RouteGroupBuilder MapClientEndpoints(this RouteGroupBuilder group)
     {
+        group.MapRecordMapPreview(isClient: true);
         group.MapGet("/", async (AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);

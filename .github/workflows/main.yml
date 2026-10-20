@@ -264,6 +264,7 @@ jobs:
             Email__Invoices__FromDisplayName=Glovelly
             Email__UserInvitations__FromDisplayName=Glovelly
             ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
+            Maps__GoogleStatic__Enabled=${{ vars.MAPS_STATIC_ENABLED || 'false' }}
             Mcp__OAuth__Issuer=${{ vars.DEPLOYMENT_URL }}
             Mcp__OAuth__Resource=${{ vars.DEPLOYMENT_URL }}/mcp
             Mcp__OAuth__Clients__0__DisplayName=ChatGPT
@@ -288,6 +289,8 @@ jobs:
             Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
             Email__UserInvitations__FromAddress=glovelly-access-requests-from-address:latest
             Mileage__GoogleRoutes__ApiKey=glovelly-routes-api-key:latest
+            Maps__GoogleStatic__ApiKey=glovelly-maps-static-api-key:latest
+            Maps__GoogleStatic__SigningSecret=glovelly-maps-static-url-signing-secret:latest
             Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
             Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest
             Mcp__OAuth__Clients__0__RedirectUris__0=${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}:latest
@@ -539,6 +542,7 @@ jobs:
             Email__Invoices__FromDisplayName=Glovelly
             Email__UserInvitations__FromDisplayName=Glovelly
             ExpenseAttachments__BucketName=${{ vars.GCP_BUCKET_NAME }}
+            Maps__GoogleStatic__Enabled=${{ vars.MAPS_STATIC_ENABLED || 'false' }}
             Mcp__OAuth__Issuer=${{ vars.DEPLOYMENT_URL }}
             Mcp__OAuth__Resource=${{ vars.DEPLOYMENT_URL }}/mcp
             Mcp__OAuth__Clients__0__DisplayName=ChatGPT
@@ -563,6 +567,8 @@ jobs:
             Email__Invoices__FromAddress=glovelly-invoices-from-address:latest
             Email__UserInvitations__FromAddress=glovelly-access-requests-from-address:latest
             Mileage__GoogleRoutes__ApiKey=glovelly-routes-api-key:latest
+            Maps__GoogleStatic__ApiKey=glovelly-maps-static-api-key:latest
+            Maps__GoogleStatic__SigningSecret=glovelly-maps-static-url-signing-secret:latest
             Mcp__OAuth__Clients__0__ClientId=chatgpt-oauth-client-id:latest
             Mcp__OAuth__Clients__0__ClientSecret=chatgpt-oauth-client-secret:latest
             Mcp__OAuth__Clients__0__RedirectUris__0=${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}:latest

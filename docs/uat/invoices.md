@@ -180,6 +180,16 @@ Expected result: the app explains that a travel origin postcode, seller profile 
 
 ## Invoice Preview
 
+### Supplementary first-page thumbnail
+
+1. Select an invoice with a current PDF at a sufficiently wide/tall pane size. Confirm page one appears beside the standard facts, preserves its proportions/white paper background in both themes, and contains no embedded PDF viewer controls.
+2. Inspect passive requests: only the existing authenticated PDF GET and a post-download invoice metadata GET are required. No generation, repair, issue/reissue or delivery mutation is allowed. Ordinary UI renders do not repeat the download; revisiting an unmounted invoice may download/render again.
+3. Change selection, revision or document readiness during a pending fetch/render. Obsolete work must not fill the new record's canvas. A detected metadata change gives a quiet refresh/reselect explanation without retry loops. A residual concurrent-replacement race is accepted; no immutable storage or reusable PDF-byte cache is assumed.
+4. Activate the thumbnail by keyboard to open the existing full preview, which obtains its own PDF bytes. Keep explicit Preview, download, readiness warnings and repair controls working if the thumbnail is missing, oversized, unrenderable or unavailable.
+5. Open an editor, shrink/shorten the pane and switch workspaces or end the session. The rail is omitted when ineligible, hidden-only work stops, and bytes/render tasks/canvas resources are released. Facts, headers and docks remain usable without a stacked landscape strip or document overflow.
+
+Run browser rendering checks only in Ubuntu CI. Documentation captures use actual product rendering and wait for supplementary previews to settle in both light/dark modes; do not fabricate thumbnail screenshots.
+
 > **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoicePreviewWorkflowTests.InvoicePreviewDownloadRedraftAndReissueShowLatestPdf`, with generation preview also covered by the core and aggregation invoice tests.
 
 ### Steps
@@ -268,3 +278,14 @@ Marking an invoice Paid records its payment date using the current UK date. The 
 - Issued invoices should not be silently changed by later gig edits.
 - Draft invoice regeneration should happen only after an explicit user choice.
 - Delivery checks depend on test environment configuration. If email or Google Drive is not configured, record that the delivery step was skipped.
+# Supplementary thumbnail sizing
+
+When the invoice thumbnail is eligible, verify its dedicated layout distributes width evenly across two facts columns and the PDF column rather than crowding the facts beside an oversized preview rail. The page remains centred and proportional, with no stretch, cropping, new PDF reads or loading changes. Check short/wide panes and long fact values, and confirm Clients/Gigs retain their distinct map layouts.
+
+On a wide, tall invoice pane with a current PDF, confirm page one is centred beside the facts and uses the available column width/height without stretching. Resize within eligible dimensions: the whole page stays visible, no permanent caption adds scrolling, and resizing alone does not fetch the PDF again. Hover and keyboard focus show page-one/action help; Enter still opens full preview. Existing Preview controls remain available when the thumbnail is omitted. Repeat with a short pane and on mobile, where insufficient space omits the visual rather than stacking it.
+
+## Invoice delivery action area
+
+Confirm the delivery count appears in the bottom delivery area, not the facts grid. **Invoice PDF** status occupies its former compact facts slot (with retry still available when applicable), rather than a trailing full-width row.
+
+Confirm **Send to client** and **Publish to Drive** appear only in the labelled bottom **Invoice delivery** area, with delivery status/recipient context. The header retains Preview, download, line items and record actions. Existing readiness/Drive restrictions and seller-profile guidance remain intact. Sending still opens the review workflow, supports cancellation, and restores focus to the bottom Send button when closed. Verify completion notifications, persistent errors in still-open dialogs, and mobile placement without controls overflowing.

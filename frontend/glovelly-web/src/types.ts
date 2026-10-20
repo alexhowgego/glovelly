@@ -7,11 +7,18 @@ export type Address = {
   country: string
 }
 
+export type StaticMapDescriptor = {
+  url: string
+  sourceFingerprint: string
+  size: 'small' | 'medium'
+}
+
 export type Client = {
   id: string
   name: string
   email: string
   billingAddress: Address
+  mapPreviewSourceFingerprint?: string
   mileageRate: number | null
   passengerMileageRate: number | null
   defaultPaymentWindowDays: number | null
@@ -593,6 +600,7 @@ export type GigExpenseForm = {
 }
 
 export type Gig = {
+  mapPreviewSourceFingerprint?: string
   id: string
   clientId: string
   invoiceId: string | null

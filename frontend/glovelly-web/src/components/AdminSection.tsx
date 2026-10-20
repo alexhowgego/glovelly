@@ -3,8 +3,12 @@ import type { FormEvent } from 'react'
 import { formatDateTime } from '../formatters'
 import type { AdminSort, AdminSortKey, AdminUser, AdminUserForm } from '../types'
 import { TrashIcon } from './TrashIcon'
+import { RecordActionDock } from './RecordActionDock'
+import { adminAccessRestriction } from '../adminAccess'
 
 type AdminSectionProps = {
+  currentUserId?: string
+  onChangeAccess: (role: AdminUserForm['role'], isActive: boolean) => Promise<void>
   adminForm: AdminUserForm
   isEditorOpen: boolean
   adminMode: 'create' | 'edit'
@@ -26,6 +30,8 @@ type AdminSectionProps = {
 }
 
 export function AdminSection({
+  currentUserId,
+  onChangeAccess,
   adminForm,
   isEditorOpen,
   adminMode,
@@ -46,6 +52,8 @@ export function AdminSection({
   selectedAdminUser,
 }: AdminSectionProps) {
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
+  const selfRestriction = selectedAdminUser ? adminAccessRestriction(selectedAdminUser, currentUserId) : undefined
+  const accessRestriction = selfRestriction ?? (isEditorOpen ? 'Save or discard editor changes before changing access here.' : undefined)
   const adminSortOptions: { value: AdminSortKey; label: string }[] = [
     { value: 'displayName', label: 'User' },
     { value: 'email', label: 'Email' },
@@ -217,6 +225,32 @@ export function AdminSection({
               <div className="full-width"><dt>Account reference</dt><dd>{selectedAdminUser.googleSubject ?? 'Added by email only so far'}</dd></div>
             </dl>
             </div>
+            <RecordActionDock title="Access and role">
+              <div className="actions access-control-group" tabIndex={accessRestriction ? 0 : undefined}
+                aria-label={accessRestriction ? 'Access controls unavailable' : undefined}
+                aria-describedby={accessRestriction ? 'admin-access-restriction' : undefined} title={accessRestriction}>
+                {accessRestriction && <span className="access-control-tooltip" role="tooltip">{accessRestriction}</span>}
+                <label>
+                  <select aria-label="User access role" value={selectedAdminUser.role}
+                    disabled={isAdminLoading || !!accessRestriction} title={accessRestriction}
+                    aria-describedby={accessRestriction ? 'admin-access-restriction' : undefined}
+                    onChange={event => void onChangeAccess(event.target.value as AdminUserForm['role'], selectedAdminUser.isActive)}>
+                    <option value="User">User</option>
+                    <option value="Admin">Admin</option>
+                  </select>
+                </label>
+                <button type="button" className={selectedAdminUser.isActive ? 'danger-button' : 'primary-button'}
+                  disabled={isAdminLoading || !!accessRestriction} title={accessRestriction}
+                  aria-describedby={accessRestriction ? 'admin-access-restriction' : undefined}
+                  onClick={() => void onChangeAccess(selectedAdminUser.role === 'Admin' ? 'Admin' : 'User', !selectedAdminUser.isActive)}>
+                  {selectedAdminUser.isActive ? 'Deactivate access' : 'Enable access'}
+                </button>
+              </div>
+              {accessRestriction && <details className="access-restriction-help">
+                <summary title={accessRestriction}>Why are these controls unavailable?</summary>
+                <p id="admin-access-restriction">{accessRestriction}</p>
+              </details>}
+            </RecordActionDock>
             </>
           ) : (
             <div className="empty-state roomy">
@@ -275,6 +309,8 @@ export function AdminSection({
                 <span>Role</span>
                 <select
                   value={adminForm.role}
+                  disabled={adminMode === 'edit' && !!selfRestriction}
+                  title={adminMode === 'edit' ? selfRestriction : undefined}
                   onChange={(event) =>
                     onUpdateField('role', event.target.value as AdminUserForm['role'])
                   }
@@ -288,6 +324,8 @@ export function AdminSection({
                 <input
                   type="checkbox"
                   checked={adminForm.isActive}
+                  disabled={adminMode === 'edit' && !!selfRestriction}
+                  title={adminMode === 'edit' ? selfRestriction : undefined}
                   onChange={(event) => onUpdateField('isActive', event.target.checked)}
                 />
                 <span>Account is active and allowed to sign in</span>

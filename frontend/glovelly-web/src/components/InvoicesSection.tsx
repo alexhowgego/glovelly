@@ -8,6 +8,10 @@ import {
 } from '../formatters'
 import { TrashIcon } from './TrashIcon'
 import { getInvoiceDocumentAvailability } from '../invoiceDocumentState'
+import { invoiceThumbnailIdentity } from '../invoiceThumbnail'
+import { InvoiceThumbnail } from './InvoiceThumbnail'
+import { RecordVisualOverview } from './RecordVisualOverview'
+import { RecordActionDock } from './RecordActionDock'
 import type {
   Invoice,
   InvoiceLine,
@@ -18,6 +22,7 @@ import type {
 } from '../types'
 
 type InvoicesSectionProps = {
+  onSessionExpired?: (message: string) => void
   adjustmentAmount: string
   adjustmentReason: string
   invoiceDescription: string
@@ -64,6 +69,7 @@ type InvoicesSectionProps = {
 }
 
 export function InvoicesSection({
+  onSessionExpired,
   adjustmentAmount,
   adjustmentReason,
   invoiceDescription,
@@ -340,32 +346,6 @@ export function InvoicesSection({
                 Preview
               </button>
               <button
-                className="ghost-button"
-                onClick={() => selectedInvoice && void onPublishGoogleDrive(selectedInvoice)}
-                type="button"
-                disabled={!selectedInvoice || isInvoiceLoading || !isGoogleDriveConnected || !isDocumentCurrent}
-                title={
-                  !isGoogleDriveConnected
-                    ? 'Connect Google Drive from your profile menu first.'
-                    : !isDocumentCurrent
-                      ? documentStatus
-                      : undefined
-                }
-              >
-                Publish to Drive
-              </button>
-              <button
-                className="ghost-button"
-                data-testid="invoice-send-button"
-                ref={sendButtonRef}
-                onClick={() => selectedInvoice && void onSendEmail(selectedInvoice)}
-                type="button"
-                disabled={!selectedInvoice || isInvoiceLoading || !isDocumentCurrent}
-                title={!isDocumentCurrent ? documentStatus : undefined}
-              >
-                Send to client
-              </button>
-              <button
                 className="danger-button"
                 onClick={() => selectedInvoice && void onDeleteInvoice(selectedInvoice)}
                 type="button"
@@ -394,7 +374,9 @@ export function InvoicesSection({
 
           {selectedInvoice ? (
             <>
-              <div className="overview-body" key={selectedInvoice.id}>
+              <RecordVisualOverview key={invoiceThumbnailIdentity(selectedInvoice)} layout="invoice"
+                visual={isDocumentCurrent && !selectedInvoice.gigLinesNeedRefresh ? () => <InvoiceThumbnail invoice={selectedInvoice}
+                  maxHeight={1200} onPreview={onPreviewPdf} onSessionExpired={onSessionExpired} /> : undefined}>
               <dl className="overview-facts">
                 <div><dt>Client</dt><dd><button className="link-button" data-testid="invoice-client-link" onClick={() => onOpenClient(selectedInvoice.clientId)} type="button">{selectedInvoiceClientName}</button></dd></div>
                 <div><dt>Status</dt><dd><select aria-label="Invoice status" data-testid="invoice-status-select" value={selectedInvoice.status} disabled={isInvoiceLoading} onChange={event => void onInvoiceStatusChange(selectedInvoice, event.target.value as InvoiceStatus)}>
@@ -404,20 +386,30 @@ export function InvoicesSection({
                 <div><dt>Invoice date</dt><dd>{formatDate(selectedInvoice.invoiceDate)}</dd></div>
                 <div><dt>Due date</dt><dd>{formatDate(selectedInvoice.dueDate)}</dd></div>
                 <div><dt>Total</dt><dd>{formatCurrency(selectedInvoice.total)}</dd></div>
-                <div><dt>Deliveries</dt><dd>{selectedInvoice.deliveryCount}</dd></div>
+                <div><dt>Invoice PDF</dt><dd className="overview-long-text">{documentStatus}
+                  {documentAvailability.canRetry && <button className="link-button" data-testid="invoice-regenerate-pdf-button" disabled={isInvoiceLoading} onClick={() => void onRegeneratePdf(selectedInvoice)} type="button">Try again</button>}
+                </dd></div>
                 <div><dt>First issued</dt><dd>{selectedInvoice.firstIssuedUtc ? formatDateTime(selectedInvoice.firstIssuedUtc) : 'Not issued'}</dd></div>
                 <div><dt>Re-issued</dt><dd>{selectedInvoice.reissueCount} {selectedInvoice.reissueCount === 1 ? 'time' : 'times'}</dd></div>
                 <div><dt>Line items</dt><dd>{selectedInvoice.lines.length}</dd></div>
                 <div><dt>Last delivery</dt><dd>{formatDateTime(selectedInvoice.lastDeliveredUtc)}</dd></div>
                 {selectedInvoice.lastDeliveryRecipient && <div className="full-width"><dt>Last recipient</dt><dd>{selectedInvoice.lastDeliveryRecipient}</dd></div>}
                 <div className="full-width"><dt>In respect of</dt><dd className="overview-long-text">{selectedInvoice.description?.trim() || 'No description set.'}</dd></div>
-                <div className="full-width"><dt>Invoice PDF</dt><dd className="overview-long-text">{documentStatus}
-                  {documentAvailability.canRetry && <button className="link-button" data-testid="invoice-regenerate-pdf-button" disabled={isInvoiceLoading} onClick={() => void onRegeneratePdf(selectedInvoice)} type="button">Try again</button>}
-                </dd></div>
               </dl>
-              </div>
+              </RecordVisualOverview>
+              <RecordActionDock title="Invoice delivery">
+                <p className="helper-text">{selectedInvoice.deliveryCount === 0 ? '0 deliveries · Not yet delivered.' : `${selectedInvoice.deliveryCount} ${selectedInvoice.deliveryCount === 1 ? 'delivery' : 'deliveries'} · Last delivery ${formatDateTime(selectedInvoice.lastDeliveredUtc)}`}
+                  {selectedInvoice.lastDeliveryRecipient && ` · ${selectedInvoice.lastDeliveryRecipient}`}</p>
+                <div className="actions">
+                  <button className="primary-button" data-testid="invoice-send-button" ref={sendButtonRef}
+                    onClick={() => void onSendEmail(selectedInvoice)} type="button"
+                    disabled={isInvoiceLoading || !isDocumentCurrent} title={!isDocumentCurrent ? documentStatus : undefined}>Send to client</button>
+                  <button className="ghost-button" onClick={() => void onPublishGoogleDrive(selectedInvoice)} type="button"
+                    disabled={isInvoiceLoading || !isGoogleDriveConnected || !isDocumentCurrent}
+                    title={!isGoogleDriveConnected ? 'Connect Google Drive from your profile menu first.' : !isDocumentCurrent ? documentStatus : undefined}>Publish to Drive</button>
+                </div>
               {!isSellerProfileConfigured && (
-                <div className="overview-dock"><div className="settings-note">
+                <div className="settings-note">
                   {sellerProfileNotice}
                   {' '}
                   <button
@@ -427,8 +419,9 @@ export function InvoicesSection({
                   >
                     Set up seller profile
                   </button>
-                </div></div>
+                </div>
               )}
+              </RecordActionDock>
             </>
           ) : (
             <div className="empty-state roomy">

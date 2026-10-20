@@ -2,8 +2,13 @@ import { useEffect, useRef } from 'react'
 import type { FormEvent } from 'react'
 import type { Client, ClientForm, ClientSort, ClientSortKey } from '../types'
 import { TrashIcon } from './TrashIcon'
+import { clientLocationQuery } from '../recordLocationSource'
+import { RecordVisualOverview } from './RecordVisualOverview'
+import { GoogleMapsLocationLink, RecordMapPreview } from './RecordMapPreview'
+import { RecordActionDock } from './RecordActionDock'
 
 type ClientsSectionProps = {
+  onSessionExpired?: (message: string) => void
   filteredClients: Client[]
   form: ClientForm
   clientSort: ClientSort
@@ -36,6 +41,7 @@ type ClientsSectionProps = {
 }
 
 export function ClientsSection({
+  onSessionExpired,
   filteredClients,
   form,
   clientSort,
@@ -234,21 +240,23 @@ export function ClientsSection({
 
           {selectedClient ? (
             <>
-              <div className="overview-body" key={selectedClient.id}>
+              <RecordVisualOverview key={`${selectedClient.id}:${selectedClient.mapPreviewSourceFingerprint}`} factsColumns={1}
+                visual={clientLocationQuery(selectedClient.billingAddress) && selectedClient.mapPreviewSourceFingerprint ? (bucket, unavailable) =>
+                  <RecordMapPreview kind="clients" id={selectedClient.id} source={selectedClient.mapPreviewSourceFingerprint!}
+                    query={clientLocationQuery(selectedClient.billingAddress)}
+                    bucket={bucket} onUnavailable={unavailable} onSessionExpired={onSessionExpired} /> : undefined}>
               <dl className="overview-facts">
                 <div><dt>Email</dt><dd>{selectedClient.email || 'Not set'}</dd></div>
                 <div><dt>City</dt><dd>{selectedClient.billingAddress.city || 'Not set'}</dd></div>
                 <div><dt>Country</dt><dd>{selectedClient.billingAddress.country || 'Not set'}</dd></div>
-                <div className="full-width overview-address"><dt>Billing address</dt><dd>{[
+                <div className="full-width overview-address"><dt>Billing address</dt><dd><GoogleMapsLocationLink query={clientLocationQuery(selectedClient.billingAddress)}>{[
                   selectedClient.billingAddress.line1, selectedClient.billingAddress.line2,
                   [selectedClient.billingAddress.city, selectedClient.billingAddress.stateOrCounty].filter(Boolean).join(', '),
                   selectedClient.billingAddress.postalCode, selectedClient.billingAddress.country,
-                ].filter(Boolean).join('\n') || 'Not set'}</dd></div>
+                ].filter(Boolean).join('\n') || 'Not set'}</GoogleMapsLocationLink></dd></div>
               </dl>
-              </div>
-              <div className="overview-dock">
-              <div className="gig-timeline-note">
-                <p className="detail-label">Monthly invoice run</p>
+              </RecordVisualOverview>
+              <RecordActionDock title="Monthly invoice run">
                 <div className="invoice-adjustment-form">
                   <label>
                     Month
@@ -273,8 +281,7 @@ export function ClientsSection({
                   </button>
                 </div>
                 <span data-testid="monthly-invoice-helper">{monthlyInvoiceHelperText}</span>
-              </div>
-              </div>
+              </RecordActionDock>
 
             </>
           ) : (

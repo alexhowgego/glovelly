@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
+using Glovelly.Api.Services;
 
 namespace Glovelly.Api.Models;
 
@@ -8,6 +10,8 @@ public sealed class Client
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public Address BillingAddress { get; set; } = new();
+    [NotMapped]
+    public string MapPreviewSourceFingerprint => RecordLocationSource.Fingerprint(RecordLocationSource.ClientQuery(BillingAddress));
     public decimal? MileageRate { get; set; }
     public decimal? PassengerMileageRate { get; set; }
     public string? InvoiceFilenamePattern { get; set; }

@@ -147,6 +147,7 @@ function App({ appMetadata }: AppProps) {
 
   const {
     activeUsersCount,
+    changeAdminAccess,
     adminSummaryState,
     adminForm,
     adminMode,
@@ -173,6 +174,7 @@ function App({ appMetadata }: AppProps) {
     updateAdminUserDisplayName,
     updateAdminField,
   } = useAdminWorkspace({
+    currentUserId: authUser?.userId,
     onAdminUserSaved: syncCurrentUserFromAdmin,
     onSessionExpired: expireSession,
   })
@@ -1598,6 +1600,7 @@ function App({ appMetadata }: AppProps) {
   const currentSectionContent =
     activeSection === 'clients' ? (
       <ClientsSection
+        onSessionExpired={expireSession}
         filteredClients={filteredClients}
         form={form}
         clientSort={clientSort}
@@ -1630,6 +1633,8 @@ function App({ appMetadata }: AppProps) {
       />
     ) : activeSection === 'admin' && isAdmin ? (
       <AdminSection
+        currentUserId={authUser?.userId}
+        onChangeAccess={changeAdminAccess}
         adminForm={adminForm}
         isEditorOpen={isAdminEditorOpen}
         adminMode={adminMode}
@@ -1712,6 +1717,8 @@ function App({ appMetadata }: AppProps) {
       />
     ) : (
       <InvoicesSection
+        key={authUser?.userId}
+        onSessionExpired={expireSession}
         adjustmentAmount={adjustmentAmount}
         adjustmentReason={adjustmentReason}
         clientNamesById={clientNamesById}

@@ -32,6 +32,14 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
+  // Remove only legacy Static Maps entries; provider images are not app-shell data.
+  event.waitUntil(caches.open(CACHE_NAME).then(async (cache) => {
+    const requests = await cache.keys()
+    await Promise.all(requests.filter((request) => {
+      const url = new URL(request.url)
+      return url.origin === 'https://maps.googleapis.com' && url.pathname === '/maps/api/staticmap'
+    }).map((request) => cache.delete(request)))
+  }))
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
@@ -50,6 +58,9 @@ self.addEventListener('fetch', (event) => {
   }
 
   const requestUrl = new URL(event.request.url)
+  if (requestUrl.origin !== self.location.origin) {
+    return
+  }
   if (API_PREFIXES.some((prefix) => requestUrl.pathname.startsWith(prefix))) {
     return
   }

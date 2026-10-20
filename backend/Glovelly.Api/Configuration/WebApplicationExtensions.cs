@@ -55,7 +55,7 @@ internal static class WebApplicationExtensions
             {
                 context.Response.OnStarting(() =>
                 {
-                    context.Response.Headers["Cache-Control"] = "no-store, no-cache, max-age=0";
+                    context.Response.Headers["Cache-Control"] = "private, no-store, no-cache, max-age=0";
                     context.Response.Headers["Pragma"] = "no-cache";
                     context.Response.Headers["Expires"] = "Thu, 01 Jan 1970 00:00:00 GMT";
                     return Task.CompletedTask;

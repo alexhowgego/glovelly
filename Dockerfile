@@ -5,6 +5,7 @@ COPY frontend/glovelly-web/package.json frontend/glovelly-web/package-lock.json 
 RUN npm ci
 
 COPY frontend/glovelly-web/ ./
+COPY tests/fixtures/record-location-sources.json /src/tests/fixtures/record-location-sources.json
 RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.402 AS backend-build

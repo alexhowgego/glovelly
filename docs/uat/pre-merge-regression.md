@@ -38,6 +38,17 @@ For local development, engineers usually run:
 
 Navigation, session state, and core reads are healthy.
 
+## Automatic Location Previews
+
+Run automated map checks with mocked signed-URL descriptors and Google image responses, not live billable calls. Actual API/website restrictions and required signatures need a separate deliberate staging smoke check. Do not record live signed URLs or credentials in screenshots/logs.
+
+1. Select a client with a saved billing address and a gig with a different saved venue in a sufficiently wide/tall details pane. Confirm a supplementary map appears automatically beside the full facts, without an approval checkbox or record mutation. Hover and keyboard focus expose unverified-search help, without a permanent caption. Both the image and written location open the same Google Maps search in a new tab. Resize the pane: the whole map, including attribution, remains contained and centred without adding scrolling when facts otherwise fit.
+2. Inspect requests: authenticated `/clients/{id}/map-preview` or `/gigs/{id}/map-preview` returns private/no-store JSON; the image loads directly from `https://maps.googleapis.com/maps/api/staticmap` with an origin-only referrer. No Glovelly image-byte request, blob/data image URL or persistent image cache is used. Attribution stays visible, including in portrait rails.
+3. Change selection/source while a descriptor or image is pending. Only the current saved record/location may populate the rail; unsaved editor typing must not issue a location preview. Save a changed location and confirm the new source is used without extra approval.
+4. Open an editor, shrink the actual pane, use a short/mobile window, or hide the workspace. Confirm images are omitted rather than stacked below facts, pending local work is cancelled/ignored, and no invisible requests start. Preserve headers, docks, long-detail scrolling and document bounds. Admin is unchanged.
+5. Simulate disabled/missing/invalid signing configuration, issuance limits, a broken image, and a load that exceeds ten seconds. The image falls back quietly without retry loops or global error notifications; records and actions remain usable. Restore eligible space after failure and confirm resizing does not repeatedly retry.
+6. With imagery unavailable or hidden, use the keyboard to activate the saved address/location text. It uses the encoded saved query and safe external navigation; merely rendering that link does not contact Google. No separate Maps navigation line is shown. Authentication expiry from descriptor reads follows the normal session-expiry path.
+
 ## Empty List Views
 
 > **Automation:** Automated UAT: `Glovelly.Uat.Tests.GigListVisibilityTests.EmptyListViewsRemainUsableAndGigFiltersCanBeCleared`; retain a desktop spot check when changing workspace layout.
@@ -434,3 +445,12 @@ Pay special attention to workflows that cross boundaries:
 When a manual journey reveals a bug, record the exact steps and tell the engineer or release owner. The fix should usually include an automated backend test for the server-side rule, and the frontend flow may later become an automated browser test.
 
 Keep these manual journeys aligned with automated coverage by updating the nearest **Automation** line whenever a Playwright UAT test is added, removed, or meaningfully changes scope.
+# Consistent record action areas
+
+On Clients, verify Email, City, Country and Billing address stack in one content-sized facts column, with the map using the remaining horizontal space after the normal gap. Test a desktop pane with map delivery, unavailable imagery, mobile, long email/address values and switching clients. The billing address must not collapse character-by-character; saved line breaks and the Google Maps address link remain intact. No changes to Gigs/Invoices column sizing are expected.
+
+In Gigs, confirm Notes spans both content-sized facts columns, wrapping within the combined width established by ordinary facts rather than widening them. Maps align on the left of their visual area with a consistent gap after the right-hand facts column, not a centring gutter. Check short and long notes, long ordinary fact values, mobile/full-width fallback and record switching. All text and map attribution remain visible; map requests and preview loading behavior are unchanged.
+
+Check the roomier spacing (24px between facts columns, 28px between the facts area and visual) and 12px rounded map corners. The map shape should fill its reserved width and height without stretching or cover-cropping; inspect real provider attribution near the rounded corners. Switch records and invoice line items: the shared overview and facts must not flicker/remount due to map measurement. Initial map measurement requests immediately; dragging coalesces later map-only shape requests after 300ms, with no uncontrolled retries.
+
+Check Clients (**Monthly invoice run**), Gigs (**Receipts and invoicing**), Invoices (**Invoice delivery**) and Users (**Access and role**) use the same labelled enclosing chrome at the bottom of the selected-record pane. Gigs retains Resources, Expenses and linked-invoice navigation; no controls are duplicated in its header. Check editor-open, short-height and mobile layouts retain readable details and wrap bottom actions without horizontal overflow. Run the invoice delivery and enrolment safeguards scenarios for confirmations, focus return, terminal notifications and persistent errors.

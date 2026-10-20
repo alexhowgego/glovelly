@@ -126,6 +126,141 @@
   flex-shrink: 0;
 }
 
+.record-visual-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  min-width: 0;
+}
+
+.record-visual-layout.has-visual {
+  grid-template-columns: minmax(0, max-content) minmax(0, max-content) minmax(180px, 1fr);
+  column-gap: 28px;
+  align-items: center;
+}
+
+.record-visual-layout.has-visual > .record-visual-facts {
+  grid-column: 1 / span 2;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.record-visual-layout.has-visual .overview-facts {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: 24px;
+}
+
+/* Spanning prose wraps to the width established by the two ordinary fact
+   columns; it must not widen those columns through its max-content size. */
+.record-visual-layout.has-visual .overview-facts > .full-width {
+  contain: inline-size;
+  min-width: 0;
+}
+
+/* Clients places its address in the second desktop facts column. Unlike
+   spanning notes, that address must contribute to the column's width. */
+.record-visual-layout.has-visual .overview-facts > .overview-address {
+  contain: none;
+}
+
+/* Clients keeps its contact/address facts in one content-sized column and
+   gives the remaining width to its independently measured map frame. */
+.record-visual-layout.has-visual.single-column-facts {
+  grid-template-columns: minmax(0, max-content) minmax(180px, 1fr);
+}
+
+.record-visual-layout.single-column-facts > .record-visual-facts {
+  grid-column: 1;
+}
+
+.record-visual-layout.single-column-facts .overview-facts {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.record-visual-layout.single-column-facts .overview-facts > div {
+  grid-column: 1;
+  grid-row: auto;
+}
+
+/* Portrait PDF pages cannot expand like maps. Share spare width across both
+   facts tracks and the preview instead of packing facts against one edge. */
+.record-visual-layout.has-visual.invoice-visual-layout {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.record-visual-facts, .record-visual-rail { min-width: 0; }
+.record-action-dock { width: 100%; min-width: 0; }
+.record-action-dock .actions { flex-wrap: wrap; align-items: end; }
+.record-action-dock .helper-text { overflow-wrap: anywhere; }
+.access-restriction-help { font-size: 0.85rem; margin-top: 8px; }
+.access-restriction-help summary { cursor: pointer; }
+.access-control-group { position: relative; }
+.access-control-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 0;
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  color: var(--text);
+  z-index: 2;
+  font-size: 0.85rem;
+}
+.access-control-group:hover > .access-control-tooltip,
+.access-control-group:focus > .access-control-tooltip { display: block; }
+.record-visual-rail {
+  height: var(--record-visual-max-height);
+  max-height: var(--record-visual-max-height);
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+.map-search-preview, .invoice-thumbnail-preview {
+  position: relative;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+.map-preview-frame { width: 100%; height: 100%; min-height: 0; min-width: 0; display: grid; place-items: center; }
+.map-preview-link { display: grid; place-items: center; width: 100%; height: 100%; min-height: 0; border-radius: 12px; overflow: hidden; }
+.map-preview-link[hidden] { display: none; }
+.map-search-preview img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; object-position: left center; }
+.map-search-preview img[hidden] { display: none; }
+.invoice-thumbnail { display: block; max-width: 100%; padding: 0; background: white; border: 1px solid var(--surface-border); }
+.invoice-thumbnail[hidden] { display: none; }
+.invoice-thumbnail canvas { display: block; width: 100%; height: auto; }
+.invoice-thumbnail-preview > p { font-size: 0.85rem; overflow-wrap: anywhere; }
+.visual-preview-tooltip {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline: 8px;
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin-inline: auto;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--surface-panel);
+  color: var(--text);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow-strong);
+  font-size: 0.8rem;
+  pointer-events: none;
+  visibility: hidden;
+}
+.map-search-preview:has(.map-preview-link:hover, .map-preview-link:focus-visible) > .visual-preview-tooltip,
+.invoice-thumbnail-preview:has(.invoice-thumbnail:hover, .invoice-thumbnail:focus-visible) > .visual-preview-tooltip {
+  visibility: visible;
+}
+.map-preview-link:focus-visible, .invoice-thumbnail:focus-visible { outline-offset: -3px; }
+
 .overview-dock {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -131,3 +131,12 @@ Only inactive users can be deleted. Active users, including the current administ
 ## Notes
 
 Access changes can lock testers out of an environment. Confirm the target user before changing active state or administrator role.
+# Access and role action area
+
+Confirm the bottom role selector has no extra visible **Role** label, stays aligned with its adjacent access action, and retains the accessible name **User access role**. The editor's Role label and all access restrictions/confirmations remain unchanged.
+
+- Select an existing user. Confirm the labelled **Access and role** bottom area uses the same enclosing style as Clients' **Monthly invoice run**, without hiding identity facts or header actions.
+- Select yourself: role and deactivation controls are disabled, including in the editor. Hover or focus the bottom control group for an explanation; on keyboard or touch, expand **Why are these controls unavailable?**. No update request should be made.
+- Select another user: cancel role/access confirmation and confirm nothing changes; accept it and confirm the server-authoritative role/access appears, with a completion notification. Server validation and session-expiry handling still apply. Failed requests must not show a successful change.
+- Open the editor and change a field. Bottom access controls must be unavailable until changes are saved/discarded, preventing those changes from being overwritten. Editing role/access also requires confirmation on save. Delete remains restricted to inactive users and retains its confirmation.
+- Repeat at mobile width: controls wrap within the bottom area, explanations remain accessible, notifications do not block modal controls, and persistent validation remains available in the editor.

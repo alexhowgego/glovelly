@@ -25,6 +25,14 @@ Use **Planned** for confirmed future work, **Completed** once it is finished, **
 
 You can add notes, driving mileage, passengers, expenses, receipts, and linked resources to a saved gig. Booking details and full notes appear directly in the details pane. Choose **Resources** to manage links and files, or **Expenses** to manage costs and receipts. These collections open separately so you can finish the task and return to the same gig.
 
+## Check where to go
+
+Choose the saved location to search for the venue in Google Maps in a new tab. Where available and space permits, an unverified map search image appears beside the details and opens the same search. Hover over or focus the image for help. It uses the gig's saved location, not the client's billing address, and needs no per-gig approval checkbox.
+
+Check the venue text before relying on the result, especially for names shared by several places. Edit and save the location to correct it; unsaved typing does not change the preview. If an editor, narrow pane or loading problem hides the image, use the written location and Maps link instead.
+
+Automatic previews load directly from Google, sending the location query and browser network/request information. See [privacy and terms](/help/privacy-terms-and-technical-help/) for details.
+
 ## Work through your list
 
 On a desktop, scroll the gig list to find more work while keeping search and filters in place. The selected gig uses the available pane space for its details; if its notes are unusually long, scroll that middle region to read them in full. Editors and collection dialogs scroll separately when needed. The compact summary above the workspace stays available as you switch between Gigs, Clients, and Invoices.

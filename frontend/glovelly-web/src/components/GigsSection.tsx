@@ -1,4 +1,8 @@
 import { useEffect, useRef } from 'react'
+import { RecordVisualOverview } from './RecordVisualOverview'
+import { GoogleMapsLocationLink, RecordMapPreview } from './RecordMapPreview'
+import { RecordActionDock } from './RecordActionDock'
+import { gigLocationQuery } from '../recordLocationSource'
 import type { FormEvent } from 'react'
 import { GigAttachmentsPanel } from './GigAttachmentsPanel'
 import { GigEditorPanel } from './GigEditorPanel'
@@ -468,7 +472,11 @@ export function GigsSection({
 
           {selectedGig ? (
             <>
-              <div className="overview-body" key={selectedGig.id}>
+              <RecordVisualOverview key={`${selectedGig.id}:${selectedGig.mapPreviewSourceFingerprint}`}
+                visual={gigLocationQuery(selectedGig.venue) && selectedGig.mapPreviewSourceFingerprint ? (bucket, unavailable) =>
+                  <RecordMapPreview kind="gigs" id={selectedGig.id} source={selectedGig.mapPreviewSourceFingerprint!}
+                    query={gigLocationQuery(selectedGig.venue)}
+                    bucket={bucket} onUnavailable={unavailable} onSessionExpired={onSessionExpired} /> : undefined}>
               <dl className="overview-facts">
                 <div><dt>Client</dt><dd><button className="link-button" data-testid="gig-client-link" onClick={() => onOpenClient(selectedGig.clientId)} type="button">{selectedGigClientName}</button></dd></div>
                 <div><dt>Type</dt><dd>{formatGigType(selectedGig.type)}</dd></div>
@@ -477,15 +485,17 @@ export function GigsSection({
                 <div><dt>Status</dt><dd data-testid="selected-gig-status">{formatGigStatus(selectedGig.status)}</dd></div>
                 <div><dt>Driving</dt><dd>{selectedGig.wasDriving ? `${selectedGig.travelMiles || 0} miles` : 'No'}</dd></div>
                 <div><dt>Invoice</dt><dd>{selectedGig.isInvoiced ? 'Invoiced' : 'Not invoiced yet'}</dd></div>
-                <div className="full-width"><dt>Location</dt><dd>{selectedGig.venue || 'Not set'}</dd></div>
+                <div className="full-width"><dt>Location</dt><dd><GoogleMapsLocationLink query={gigLocationQuery(selectedGig.venue)}>{selectedGig.venue || 'Not set'}</GoogleMapsLocationLink></dd></div>
                 <div className="full-width"><dt>Notes</dt><dd className="overview-long-text">{selectedGig.notes?.trim() || 'No notes yet.'}</dd></div>
               </dl>
-              </div>
-              <div className="overview-dock">
+              </RecordVisualOverview>
+              <RecordActionDock title="Receipts and invoicing">
+                <div className="actions">
                 <button type="button" className="ghost-button" data-testid="gig-resources-button" onClick={event => detail.open('resources', event)}>Resources ({selectedGig.externalResources.length})</button>
                 <button type="button" className="ghost-button" data-testid="gig-expenses-button" onClick={event => detail.open('expenses', event)}>Expenses ({selectedGig.expenses.length}) · {formatCurrency(selectedGig.expenses.reduce((total, expense) => total + expense.amount, 0))}</button>
                 {selectedGig.isInvoiced && <button type="button" className="ghost-button overview-dock-wide" data-testid="gig-open-linked-invoice-button" onClick={onOpenLinkedInvoice}>Open invoice</button>}
-              </div>
+                </div>
+              </RecordActionDock>
 
               {detail.kind === 'resources' && <RecordDetailDialog title="Gig resources" onClose={detail.close} returnFocus={detail.trigger} canClose={() => !isGigLoading && !isExternalResourceEditorOpen}>
               <GigAttachmentsPanel

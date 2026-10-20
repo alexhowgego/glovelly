@@ -91,6 +91,8 @@ describe('compact record overviews', () => {
     expect(screen.queryByTestId('open-gig-expense-dialog-button')).toBeNull()
     expect(screen.queryByText('Notes and details')).toBeNull()
     expect(within(document.querySelector('.record-overview') as HTMLElement).getByText(overviewGig.notes!.trim())).toBeDefined()
+    const notesField = within(document.querySelector('.record-overview .overview-facts') as HTMLElement).getByText('Notes').parentElement!
+    expect(notesField.classList.contains('full-width')).toBe(true)
     fireEvent.click(screen.getByTestId('gig-resources-button'))
     fireEvent.click(screen.getByTestId('add-gig-attachment-button'))
     expect(props.onStartExternalResourceCreate).toHaveBeenCalledOnce()
@@ -144,6 +146,7 @@ describe('compact record overviews', () => {
     }
     render(<ClientsSection {...props} />)
     expectFullPaneComposition()
+    expect(document.querySelector('.record-overview .record-visual-layout.single-column-facts')).not.toBeNull()
     fireEvent.click(screen.getByTestId('generate-monthly-invoice-button'))
     expect(props.onGenerateMonthlyInvoice).toHaveBeenCalledOnce()
     expect(screen.queryByText('Contact and billing details')).toBeNull()
@@ -167,6 +170,7 @@ describe('compact record overviews', () => {
     }
     render(<InvoicesSection {...props} />)
     expectFullPaneComposition()
+    expect(document.querySelector('.record-overview .record-visual-layout.invoice-visual-layout')).not.toBeNull()
     expect(screen.getByTestId<HTMLButtonElement>('invoice-download-pdf-button').disabled).toBe(true)
     expect(screen.getByText('Configure your seller profile')).toBeDefined()
     fireEvent.click(screen.getByTestId('invoice-line-items-button'))
@@ -174,10 +178,18 @@ describe('compact record overviews', () => {
     expect(screen.queryByText('Description and workflow details')).toBeNull()
     expect(within(document.querySelector('.record-overview') as HTMLElement).getByText(invoice.description!.trim())).toBeDefined()
     expect(screen.getByTestId('invoice-status-select')).toBeDefined()
+    const delivery = screen.getByRole('region', { name: 'Invoice delivery' })
+    expect(delivery.textContent).toContain(`${invoice.deliveryCount} deliveries`)
+    const facts = document.querySelector('.record-overview .overview-facts') as HTMLElement
+    expect(within(facts).queryByText('Deliveries')).toBeNull()
+    expect(within(facts).getByText('Invoice PDF').parentElement?.classList.contains('full-width')).toBe(false)
+    expect(within(delivery).getByTestId('invoice-send-button')).toBeDefined()
+    expect(within(delivery).getByRole('button', { name: 'Publish to Drive' })).toBeDefined()
   })
 
   it('shows Admin access facts and complete identity metadata without weakening deletion rules', () => {
     const props: ComponentProps<typeof AdminSection> = {
+      currentUserId: user.id, onChangeAccess: vi.fn(async () => {}),
       adminForm: emptyAdminForm(), isEditorOpen: false, adminMode: 'edit', adminSearchQuery: '', adminSort: { key: 'displayName', direction: 'asc' },
       adminStatus: '', filteredAdminUsers: [user], isAdminLoading: false, onCloseEditor: vi.fn(), onDeleteUser: vi.fn(), onResetForm: vi.fn(),
       onSearchQueryChange: vi.fn(), onSelectUser: vi.fn(), onSortChange: vi.fn(), onStartEditing: vi.fn(), onSubmit: vi.fn(), onUpdateField: vi.fn(), selectedAdminUser: user,
@@ -188,5 +200,10 @@ describe('compact record overviews', () => {
     expect(screen.queryByText('Account details')).toBeNull()
     expect(within(document.querySelector('.record-overview') as HTMLElement).getByText(user.googleSubject!.trim())).toBeDefined()
     expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole<HTMLSelectElement>('combobox', { name: 'User access role' }).disabled).toBe(true)
+    expect(within(screen.getByRole('region', { name: 'Access and role' })).queryByText('Role')).toBeNull()
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Deactivate access' }).disabled).toBe(true)
+    fireEvent.click(screen.getByText('Why are these controls unavailable?'))
+    expect(screen.getAllByText('You cannot deactivate your own administrator account or remove your own administrator role.')).toHaveLength(2)
   })
 })

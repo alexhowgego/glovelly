@@ -10,9 +10,11 @@ import {
 } from '../api'
 import { defaultAdminStatus, emptyAdminForm } from '../forms'
 import { notifications } from '../notifications'
+import { adminAccessRestriction } from '../adminAccess'
 import type { AdminSort, AdminUser, AdminUserForm } from '../types'
 
 type UseAdminWorkspaceOptions = {
+  currentUserId?: string
   onAdminUserSaved: (user: AdminUser) => void
   onSessionExpired: (message: string) => void
 }
@@ -37,6 +39,7 @@ function toEditableAdminForm(user: AdminUser): AdminUserForm {
 }
 
 export function useAdminWorkspace({
+  currentUserId,
   onAdminUserSaved,
   onSessionExpired,
 }: UseAdminWorkspaceOptions) {
@@ -285,6 +288,16 @@ export function useAdminWorkspace({
       return
     }
 
+    if (adminMode === 'edit' && selectedAdminUser) {
+      const restriction = adminAccessRestriction(selectedAdminUser, currentUserId)
+      if (restriction && (!payload.isActive || payload.role !== 'Admin')) {
+        setAdminStatus(restriction)
+        return
+      }
+      if ((payload.isActive !== selectedAdminUser.isActive || payload.role !== selectedAdminUser.role) &&
+        !window.confirm(`Change access and role for ${selectedAdminUser.displayName || selectedAdminUser.email}?`)) return
+    }
+
     setIsAdminLoading(true)
 
     try {
@@ -384,6 +397,29 @@ export function useAdminWorkspace({
     }
   }
 
+  const changeAdminAccess = async (role: AdminUserForm['role'], isActive: boolean) => {
+    if (!selectedAdminUser || isAdminLoading || isAdminEditorOpen) return
+    const restriction = adminAccessRestriction(selectedAdminUser, currentUserId)
+    if (restriction && (!isActive || role !== 'Admin')) return
+    if (role === selectedAdminUser.role && isActive === selectedAdminUser.isActive) return
+    if (!window.confirm(`Change ${selectedAdminUser.displayName || selectedAdminUser.email} to ${isActive ? 'active' : 'inactive'} access with the ${role} role?`)) return
+    setIsAdminLoading(true)
+    try {
+      const response = await fetchWithSession(buildApiUrl(`/admin/users/${selectedAdminUser.id}`),
+        jsonRequestInit('PUT', { ...selectedAdminUser, ...toEditableAdminForm(selectedAdminUser), role, isActive }))
+      if (handleSessionExpired(response, onSessionExpired, 'Your session expired. Sign in again to keep managing access.')) return
+      if (!response.ok) throw new Error(await getResponseErrorMessage(response, 'Unable to update access.'))
+      const savedUser = await response.json() as AdminUser
+      setAdminUsers(current => current.map(user => user.id === savedUser.id ? savedUser : user))
+      onAdminUserSaved(savedUser)
+      notifications.success('User access updated.')
+    } catch (error) {
+      notifications.error(error instanceof Error ? error.message : 'Unable to update access.')
+    } finally {
+      setIsAdminLoading(false)
+    }
+  }
+
   const deleteAdminUser = async () => {
     if (!selectedAdminUser) {
       return
@@ -448,6 +484,7 @@ export function useAdminWorkspace({
   }
 
   return {
+    changeAdminAccess,
     activeUsersCount,
     adminSummaryState,
     adminForm,

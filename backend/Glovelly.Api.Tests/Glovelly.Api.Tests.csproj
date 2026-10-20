@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <Content Include="Fixtures\SetLists\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../tests/fixtures/record-location-sources.json" Link="Fixtures/record-location-sources.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

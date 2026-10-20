@@ -45,6 +45,7 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 
 - `src/App.tsx` coordinates session, active section, initial data loads, modals, and cross-workspace actions. Avoid adding large workflow bodies there when a hook can own them.
 - `src/hooks/` owns stateful workspace logic for clients, gigs, gig imports, invoices, admin, user settings, seller profile, unified intake, and saved-attachment review.
+- Invoice thumbnails use lazy local PDF.js/worker assets, uncached per-mounted-render bytes from the existing PDF GET, and a post-download metadata check. Preserve existing PDF storage/generation and accept the documented residual concurrent-replacement race; do not reintroduce shared byte caching or passive generation. Full preview performs its own read.
 - Unified capture is source selection → upload/application → optional saved-attachment review. `IntakeWorkflowService` decides proactive receipt saving; `IntakeApplicationService` shares automatic/explicit application and stable-ID recovery. Successful private intake is deleted while the frontend retains the authoritative saved result. Never reintroduce client-triggered fast-path saving or automatically close/navigate on attachment success.
 - Receipt extraction/budget is shared by intake and saved analysis; metadata URLs do not consume provider permits. Analysis is promoted to attachment provenance. Source fingerprints and expected IDs guard replay/replacement, and PostgreSQL session locks use Neon's direct endpoint. Proximity warnings never block attachment. GBP amounts require confirmed High-confidence GBP; pending invoice gig-line refresh is durable and PDF retry repairs it.
 - `src/components/` is presentational sections/modals. Preserve the current plain React/CSS approach; there is no component library.
@@ -68,6 +69,8 @@ dotnet tool run docfx docs/docfx.json --serve  # local handbook
 - Guide screenshots are paired `*-light.png` and `*-dark.png` assets. Select pairs with the active Starlight `[data-theme]` attribute, not `<picture>` `prefers-color-scheme`, which does not follow the guide's theme toggle. The dark asset is Glovelly's actual `dark` product preference, not another product theme.
 
 ## Local And Secrets
+
+- Maps Static is separate from Routes: `Maps:GoogleStatic:Enabled` defaults false and both API key/signing secret are required (no unsigned fallback). Cloud Run binds `glovelly-maps-static-api-key` and `glovelly-maps-static-url-signing-secret`; local Development uses API-project .NET user-secrets. Authenticated source-scoped endpoints issue signed URLs; images load directly from Google with origin-only referrers, no byte proxy or per-record approval. The restricted API key/signature are visible by design; never expose/log the signing secret or signed URLs. Issuance limits do not prevent replay; validate website restrictions/signature enforcement/Google quotas on staging and resolve provider privacy requirements before production. Merge-based deployment does not retire old bindings automatically; see `docs/engineering/maps-static.md`.
 
 - `.glovelly.dev.local` is git-ignored and sourced by `run-dev.sh`; do not read or edit it unless explicitly asked.
 - Store local secrets such as Google OIDC, Resend, Routes API key, and PostgreSQL connection string with `dotnet user-secrets` under `backend/Glovelly.Api`, not in repo files.

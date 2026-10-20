@@ -56,11 +56,13 @@ public sealed class DocumentationCaptureTests : UatTestBase
 
         await Page.GetByTestId("nav-clients").ClickAsync();
         await Page.GetByTestId("client-card").Filter(new LocatorFilterOptions { HasText = "The Lantern Quartet" }).ClickAsync();
+        await WaitForSupplementaryPreviewAsync();
         await Page.Locator(".section-layout").ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("client-workspace", theme) });
 
         await Page.GetByTestId("nav-gigs").ClickAsync();
         var gigCard = Page.GetByTestId("gig-card").Filter(new LocatorFilterOptions { HasText = "Spring concert" });
         await gigCard.ClickAsync();
+        await WaitForSupplementaryPreviewAsync();
         await Page.Locator(".section-layout").ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("gig-workspace", theme) });
 
         await Page.GetByTestId("gig-expenses-button").ClickAsync();
@@ -74,6 +76,7 @@ public sealed class DocumentationCaptureTests : UatTestBase
         await Page.GetByTestId("nav-invoices").ClickAsync();
         var invoiceCard = Page.GetByTestId("invoice-card").Filter(new LocatorFilterOptions { HasText = "GLV-202604-001" });
         await invoiceCard.ClickAsync();
+        await WaitForSupplementaryPreviewAsync();
         await Page.Locator(".section-layout").ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("invoice-status", theme) });
 
         await Page.GetByTestId("invoice-send-button").ClickAsync();
@@ -96,6 +99,16 @@ public sealed class DocumentationCaptureTests : UatTestBase
         var userSettings = Page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Your settings" });
         await userSettings.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await userSettings.ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("user-settings", theme) });
+    }
+
+    private async Task WaitForSupplementaryPreviewAsync()
+    {
+        // Let actual pane observers settle, then capture ready/unavailable product UI,
+        // never an in-progress preview or a synthetic replacement image.
+        await Page.EvaluateAsync("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+        await Page.WaitForFunctionAsync(
+            "() => !Array.from(document.querySelectorAll('.record-visual-rail [role=status]')).some(el => el.textContent.startsWith('Loading'))",
+            null, new() { Timeout = 30_000 });
     }
 
     private static string CandidatePath(string name, string theme)
