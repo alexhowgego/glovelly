@@ -434,6 +434,9 @@ jobs:
       - name: Install screenshot comparison tools
         run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes imagemagick
 
+      - name: Test screenshot comparison reporting
+        run: python3 .github/scripts/tests/test_compare_documentation_screenshots.py
+
       - name: Compare candidates with approved screenshots
         id: comparison
         run: |
