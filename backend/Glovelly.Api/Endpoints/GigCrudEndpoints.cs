@@ -11,6 +11,7 @@ internal static class GigCrudEndpoints
 {
     public static RouteGroupBuilder MapGigCrudEndpoints(this RouteGroupBuilder group)
     {
+        group.MapRecordMapPreview(isClient: false);
         group.MapGet("/", async (AppDbContext db, ClaimsPrincipal user, ICurrentUserAccessor currentUserAccessor) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);

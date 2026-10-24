@@ -17,6 +17,8 @@ public sealed class GcsBlobStore(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // Storage SDK 5 defaults to server-side CRC32C validation (RejectAndThrow).
+        // Keep SDK failures observable so callers cannot persist a successful attachment after a rejected upload.
         await storageClient.UploadObjectAsync(
             _bucketName,
             request.Key,

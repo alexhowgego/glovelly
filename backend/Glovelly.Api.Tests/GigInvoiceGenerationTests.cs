@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Glovelly.Api.Tests.Infrastructure;
+using Glovelly.Api.Data;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Glovelly.Api.Tests;
@@ -12,10 +14,118 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _client;
+    private readonly GlovellyApiFactory _factory;
 
     public GigInvoiceGenerationTests(GlovellyApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task GenerateInvoice_FractionalMileage_RoundsLinesAndAdjustmentCancelsExactly(int lineCount)
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var client = await db.Clients.FindAsync([TestData.FoxAndFinchId], TestContext.Current.CancellationToken);
+            client!.MileageRate = 0.45m;
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        _factory.MileageEstimation.Result = Glovelly.Api.Services.MileageEstimateResult.Success(
+            distanceMeters: 118.9m * 1609.344m,
+            durationSeconds: 3600,
+            originLabel: "BS1 1AA",
+            destinationLabel: "Town Hall",
+            provider: "test-routes",
+            calculatedAtUtc: DateTimeOffset.UtcNow);
+
+        var createResponse = await _client.PostAsJsonAsync("/gigs", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Fractional mileage rounding",
+            date = "2026-06-20",
+            venue = "Town Hall",
+            fee = 0m,
+            travelMiles = 0m,
+            wasDriving = true,
+            status = 1,
+        }, TestContext.Current.CancellationToken);
+        createResponse.EnsureSuccessStatusCode();
+        var gig = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var gigId = gig.GetProperty("id").GetGuid();
+        var estimateResponse = await _client.PostAsJsonAsync($"/gigs/{gigId}/mileage-estimate", new
+        {
+            originPostcode = "BS1 1AA",
+            destination = "Town Hall",
+            roundTrip = true,
+        }, TestContext.Current.CancellationToken);
+        estimateResponse.EnsureSuccessStatusCode();
+        var estimate = await estimateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var miles = estimate.GetProperty("distanceMiles").GetDecimal();
+        Assert.Equal(118.9m, miles);
+
+        var saveResponse = await _client.PutAsJsonAsync($"/gigs/{gigId}", new
+        {
+            clientId = TestData.FoxAndFinchId,
+            title = "Fractional mileage rounding",
+            date = "2026-06-20",
+            venue = "Town Hall",
+            fee = 0m,
+            travelMiles = miles,
+            wasDriving = true,
+            status = 1,
+        }, TestContext.Current.CancellationToken);
+        saveResponse.EnsureSuccessStatusCode();
+        var generateResponse = await _client.PostAsync($"/gigs/{gigId}/generate-invoice", null, TestContext.Current.CancellationToken);
+        generateResponse.EnsureSuccessStatusCode();
+        var invoice = await generateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        var invoiceId = invoice.GetProperty("id").GetGuid();
+        var mileage = Assert.Single(invoice.GetProperty("lines").EnumerateArray());
+        Assert.Equal(miles, mileage.GetProperty("quantity").GetDecimal());
+        Assert.Equal(0.45m, mileage.GetProperty("unitPrice").GetDecimal());
+        Assert.Equal(53.51m, mileage.GetProperty("lineTotal").GetDecimal());
+
+        if (lineCount == 2)
+        {
+            var lineResponse = await _client.PostAsJsonAsync("/invoice-lines", new
+            {
+                invoiceId,
+                sortOrder = 10,
+                type = "Mileage",
+                description = "Additional fractional mileage",
+                quantity = miles,
+                unitPrice = 0.45m,
+            }, TestContext.Current.CancellationToken);
+            lineResponse.EnsureSuccessStatusCode();
+            var regenerateResponse = await _client.PostAsync($"/invoices/{invoiceId}/regenerate-pdf", null, TestContext.Current.CancellationToken);
+            regenerateResponse.EnsureSuccessStatusCode();
+            invoice = await regenerateResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(53.51m * lineCount, invoice.GetProperty("total").GetDecimal());
+        var pdfBytes = await _client.GetByteArrayAsync($"/invoices/{invoiceId}/pdf", TestContext.Current.CancellationToken);
+        var pdfText = Encoding.ASCII.GetString(pdfBytes);
+        Assert.Contains("GBP 53.51", pdfText);
+        Assert.Contains($"GBP {(53.51m * lineCount).ToString("0.00", CultureInfo.InvariantCulture)}", pdfText);
+
+        var adjustmentResponse = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/adjustments", new
+        {
+            amount = -invoice.GetProperty("total").GetDecimal(),
+            reason = "Cancel displayed total",
+        }, TestContext.Current.CancellationToken);
+        adjustmentResponse.EnsureSuccessStatusCode();
+        var adjusted = await adjustmentResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal(0m, adjusted.GetProperty("total").GetDecimal());
+        Assert.Equal(0m, adjusted.GetProperty("lines").EnumerateArray().Sum(line => line.GetProperty("lineTotal").GetDecimal()));
+        var adjustedPdf = Encoding.ASCII.GetString(await _client.GetByteArrayAsync($"/invoices/{invoiceId}/pdf", TestContext.Current.CancellationToken));
+        Assert.Contains("GBP 0.00", adjustedPdf);
+        Assert.DoesNotContain("GBP -0.01", adjustedPdf);
+        var refreshedGig = await _client.GetFromJsonAsync<JsonElement>($"/gigs/{gigId}", TestContext.Current.CancellationToken);
+        Assert.Equal(miles, refreshedGig.GetProperty("travelMiles").GetDecimal());
     }
 
     [Fact]
@@ -94,7 +204,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal(15.5m, lines[1].GetProperty("quantity").GetDecimal());
         Assert.Equal("PassengerMileage", lines[2].GetProperty("type").GetString());
         Assert.Equal(15.5m, lines[2].GetProperty("quantity").GetDecimal());
-        Assert.Equal(510.385m, invoice.GetProperty("total").GetDecimal());
+        Assert.Equal(510.39m, invoice.GetProperty("total").GetDecimal());
 
         var refreshedGigResponse = await _client.GetAsync($"/gigs/{gigId}", TestContext.Current.CancellationToken);
         refreshedGigResponse.EnsureSuccessStatusCode();

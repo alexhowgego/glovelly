@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
+using Glovelly.Api.Services;
 
 namespace Glovelly.Api.Models;
 
@@ -14,6 +16,8 @@ public sealed class Gig
     public string Title { get; set; } = string.Empty;
     public DateOnly Date { get; set; }
     public string Venue { get; set; } = string.Empty;
+    [NotMapped]
+    public string MapPreviewSourceFingerprint => RecordLocationSource.Fingerprint(RecordLocationSource.GigQuery(Venue));
     public decimal Fee { get; set; }
     public decimal TravelMiles { get; set; }
     public int? PassengerCount { get; set; }

@@ -38,6 +38,17 @@ For local development, engineers usually run:
 
 Navigation, session state, and core reads are healthy.
 
+## Automatic Location Previews
+
+Run automated map checks with mocked signed-URL descriptors and Google image responses, not live billable calls. Actual API/website restrictions and required signatures need a separate deliberate staging smoke check. Do not record live signed URLs or credentials in screenshots/logs.
+
+1. Select a client with a saved billing address and a gig with a different saved venue in a sufficiently wide/tall details pane. Confirm a supplementary map appears automatically beside the full facts, without an approval checkbox or record mutation. Hover and keyboard focus expose unverified-search help, without a permanent caption. Both the image and written location open the same Google Maps search in a new tab. Resize the pane: the whole map, including attribution, remains contained and centred without adding scrolling when facts otherwise fit.
+2. Inspect requests: authenticated `/clients/{id}/map-preview` or `/gigs/{id}/map-preview` returns private/no-store JSON; the image loads directly from `https://maps.googleapis.com/maps/api/staticmap` with an origin-only referrer. No Glovelly image-byte request, blob/data image URL or persistent image cache is used. Attribution stays visible, including in portrait rails.
+3. Change selection/source while a descriptor or image is pending. Only the current saved record/location may populate the rail; unsaved editor typing must not issue a location preview. Save a changed location and confirm the new source is used without extra approval.
+4. Open an editor, shrink the actual pane, use a short/mobile window, or hide the workspace. Confirm images are omitted rather than stacked below facts, pending local work is cancelled/ignored, and no invisible requests start. Preserve headers, docks, long-detail scrolling and document bounds. Admin is unchanged.
+5. Simulate disabled/missing/invalid signing configuration, issuance limits, a broken image, and a load that exceeds ten seconds. The image falls back quietly without retry loops or global error notifications; records and actions remain usable. Restore eligible space after failure and confirm resizing does not repeatedly retry.
+6. With imagery unavailable or hidden, use the keyboard to activate the saved address/location text. It uses the encoded saved query and safe external navigation; merely rendering that link does not contact Google. No separate Maps navigation line is shown. Authentication expiry from descriptor reads follows the normal session-expiry path.
+
 ## Empty List Views
 
 > **Automation:** Automated UAT: `Glovelly.Uat.Tests.GigListVisibilityTests.EmptyListViewsRemainUsableAndGigFiltersCanBeCleared`; retain a desktop spot check when changing workspace layout.
@@ -51,6 +62,42 @@ Navigation, session state, and core reads are healthy.
 ### Expected Results
 
 The left list pane remains usable when no record is selected. Filter controls remain visible and can restore a filtered-out list.
+
+## Compact Desktop Workspace
+
+> **Automation:** `Glovelly.Uat.Tests.WorkspaceLayoutTests` covers desktop pane geometry, large and empty lists, filter recovery, editor toggles, keyboard focus, and constrained viewports. Admin layout uses an isolated browser response fixture: the staging UAT identity is not granted administrator permissions. Run browser tests in Ubuntu CI, not locally on macOS.
+
+### Steps
+
+1. At 1280×800 and 1440×900 CSS pixels, open Clients, Gigs, Invoices, and (as an administrator) Users.
+2. Confirm compact branding, navigation, capture, profile access, and the informational summary strip are visible. The large slogan, mascot introduction, duplicate shell workspace title, summary action buttons, and separate Admin banner should be absent.
+   Gordon's small brand icon should have rounded corners matching the controls. The outer enclosing frame should have no border, background, shadow, or extra padding; individual panels remain distinct, with a page gutter and quiet legal/build information beneath them.
+3. With enough records to overflow, scroll each list to its final record. Search, filters, actions, and column headings should stay reachable without moving the document.
+4. Select normal and unusually long records with the editor closed and open. The header stays at the top; full standard details use a left-aligned facts layout in the middle, centered as a group when space allows. Long notes, descriptions, addresses, or metadata scroll in that region instead of being hidden or opening read-only dialogs. Applicable collection/task controls stay docked at the bottom. The document and list must not grow; switching records resets the detail region to the top.
+5. Search for an impossible term, then clear it. Repeat with no records and no selection. Controls and empty states must not collapse or truncate.
+6. Tab through records and editor actions; confirm focused controls are revealed within the appropriate pane and focus rings remain visible.
+7. Repeat at 390×844, 1280×600, and 200% browser zoom. Page scrolling must reach all content without horizontal document overflow. Open Settings and Seller profile and reach their final actions.
+8. Check profile menus, capture dialogs, persistent error notifications, and mobile capture/return-to-top placement. Notifications must remain below modal overlays and must not block modal controls.
+9. Apply an invoice filter chip, follow an invoice-line gig link, and use capture review's **Go to gig**. Confirm the intended result or target is revealed; desktop remains bounded and mobile scrolls naturally.
+
+### Expected Results
+
+The desktop layout allocates usable space for normal records without forcing a no-scroll rule. Standard details are visible inline; anomalous content scrolls in the middle region, independently of the record list and editor. Informational summary values and loading/error states remain available across views without action buttons. Small windows and enlarged text favor reachable content over forced containment. Settings remain naturally scrollable within their existing dialogs.
+
+### Focused Detail Dialogs
+
+1. In Gigs, read full notes inline and open **Resources** and **Expenses**, including records with no resources or expenses. Create/manage items using the existing controls.
+2. In Clients, read the full contact/billing information; in Invoices, read the description and issue/delivery metadata; in Admin, read all user/account details directly. Confirm there are no redundant read-only details dialogs or buttons. Long values must remain fully readable through scrolling, not tooltip-only ellipses.
+3. Close each dialog with its button and Escape. Focus returns to the initiating control and the list retains its position. Background workspace controls must not be interactive while a dialog is open.
+4. From Expenses, open an expense editor or receipt analysis; from Resources, open attachment editing or set-list management. Only the top layer accepts interaction, Escape closes only that layer, and returning preserves parent context. Dirty editor dismissal requires confirmation; busy operations cannot be dismissed manually.
+5. Refresh/update/delete the originating record through a separate context while management is open. A changed/deleted selection closes stale management immediately with an explicit possible-discard notice, as agreed. An in-flight save remains tied to its original record and must not overwrite or reopen another selection's editor.
+6. On mobile, short windows, and enlarged text, reach all dialog contents and final actions by scrolling. Check persistent errors, modal layering, and notification placement. Save/upload success must leave management open and update its contents and overview summaries.
+
+> Browser UAT and real light/dark documentation captures run in Ubuntu CI only. The preceding change's browser/capture checks were waived, so verify the geometry and workflows in this change rather than assuming the old layout was proven. Expense documentation captures now target the Expenses dialog, not the entire workspace; review candidates before replacing assets.
+
+### Documentation Capture Review
+
+The shared chrome and workspace geometry changed. Request the Ubuntu CI documentation-capture job for this change and review its `TestResults/documentation-captures/` candidates for client workspace, gig workspace, expenses/mileage, and invoice status. Check both light and dark product themes, including whether the bounded detail pane exposes the intended subject. Replace checked-in screenshots only after reviewing those real staging captures; never create substitutes locally. Record CI run and capture-review results before completing the OpenSpec validation tasks.
 
 ## Notification Feedback
 
@@ -71,17 +118,17 @@ Terminal success and information notifications auto-dismiss. Errors persist unti
 
 ## Dashboard Summary
 
-> **Automation:** Automated UAT: `Glovelly.Uat.Tests.DashboardSummaryTests.DashboardHighlightsNextGigOutstandingBalanceAndInvoicePrompt`; manual balance edge-case spot checks remain useful when paid, cancelled, issued, and overdue invoices already exist together.
+> **Automation:** Automated UAT: `Glovelly.Uat.Tests.DashboardSummaryTests.DashboardShowsContextSpecificCardsAndInvoiceDrillDown`; manual balance edge-case spot checks remain useful when paid, cancelled, issued, and overdue invoices already exist together.
 
 ### Steps
 
 1. Sign in with at least one draft, issued, or overdue invoice available.
-2. Confirm the dashboard shows an outstanding balance that includes draft, issued, and overdue invoice totals, but excludes paid and cancelled invoices.
-3. Confirm the `Next gig` card shows the earliest non-cancelled upcoming gig.
-4. Click `Open gig` and confirm the app opens Gigs with that gig selected.
-5. Identify a recent past or current uninvoiced gig with status `Planned` or `Completed`.
-6. Confirm the invoice prompt shows that gig and click `Generate invoice`.
-7. Confirm the invoice preview opens, the gig becomes linked to the generated invoice, and returning to the dashboard no longer offers that gig as the invoice prompt.
+2. Open Invoices and confirm the compact strip shows outstanding balance, overdue invoices, and income this financial year. Outstanding balance includes draft, issued, and overdue totals, but excludes paid and cancelled invoices.
+3. Confirm no **View invoices** buttons remain in the summary strip. Use the invoice filter chips to select Outstanding, Overdue, and Income this financial year and confirm the matching records appear.
+4. Open Gigs and confirm the strip shows upcoming gigs, awaiting confirmation, and completed uninvoiced work.
+5. Open Clients and confirm active clients, clients with outstanding invoices, and most frequent client are shown.
+6. Confirm three summary slots remain present during loading and errors, with unavailable values distinct from zero.
+7. As an administrator, open Users and confirm the strip shows Users with access, Active accounts, and Administrators, with no separate Admin banner. Search the directory and confirm these totals do not change. Open Settings and close it without losing the shared header or summary state.
 
 ### Expected Results
 
@@ -398,3 +445,22 @@ Pay special attention to workflows that cross boundaries:
 When a manual journey reveals a bug, record the exact steps and tell the engineer or release owner. The fix should usually include an automated backend test for the server-side rule, and the frontend flow may later become an automated browser test.
 
 Keep these manual journeys aligned with automated coverage by updating the nearest **Automation** line whenever a Playwright UAT test is added, removed, or meaningfully changes scope.
+# Consistent record action areas
+
+Notification regressions: leave a persistent error visible and open the profile menu by pointer and keyboard on desktop/mobile. The trigger and Settings item must remain usable without dismissing the error or forcing clicks. Desktop notifications retain the 24px top/right corner position; notification bodies pass pointer input through while Dismiss and explicit action controls remain interactive and keyboard-accessible. Desktop body hover/swipe is not an interaction target; mobile retains its existing top offset and touch/swipe behavior. The open menu remains below modal overlays. Verify the stable notification layer exists even with no active toasts and remains below Settings dialogs.
+
+Desktop layout UAT seeds and filters by a unique per-run prefix, asserting exactly 32 matching rows in each workspace. Keep the filter when restoring search results and selecting long-note gigs; unrelated staging seed records must not affect row counts or scrolling coverage.
+
+Regression-test setup must exercise the intended action: accept the client-delete confirmation and verify the mocked DELETE response before asserting its persistent error notification. For keyboard scrolling, move focus outside the list before focusing an offscreen row that was previously selected; verify it becomes focused/visible while the document stays bounded. After client saves/editor closure, poll map geometry for the settled image/frame ratio using the existing tolerance, with dimensions-only diagnostics (never signed image URLs).
+
+Nested record dialogs: open Gig expenses → Add expense, then cycle Tab and Shift+Tab past both ends of the form. Focus must remain in the topmost editor, excluding disabled, hidden, inert and negative-tabindex controls. If that layer has no tabbable controls, focus stays on the layer itself. Escape closes only the child and restores the parent trigger/scroll position; closing the parent restores its workspace trigger. Repeat with busy/disabled form states and at both desktop test sizes.
+
+Preview regressions: immediately after invoice generation, the thumbnail must survive PostgreSQL timestamp precision/offset normalization without treating it as a replacement. Real revision, stored-microsecond timestamp, size and readiness changes still discard stale work. Focus a map link and resize its frame: keep the same link focused and show its help on focus, without invoice mutation or map retry loops.
+
+On Clients, verify Email, City, Country and Billing address stack in one content-sized facts column, with the map using the remaining horizontal space after the normal gap. Test a desktop pane with map delivery, unavailable imagery, mobile, long email/address values and switching clients. The billing address must not collapse character-by-character; saved line breaks and the Google Maps address link remain intact. No changes to Gigs/Invoices column sizing are expected.
+
+In Gigs, confirm Notes spans both content-sized facts columns, wrapping within the combined width established by ordinary facts rather than widening them. Maps align on the left of their visual area with a consistent gap after the right-hand facts column, not a centring gutter. Check short and long notes, long ordinary fact values, mobile/full-width fallback and record switching. All text and map attribution remain visible; map requests and preview loading behavior are unchanged.
+
+Check the roomier spacing (24px between facts columns, 28px between the facts area and visual) and 12px rounded map corners. The map shape should fill its reserved width and height without stretching or cover-cropping; inspect real provider attribution near the rounded corners. Switch records and invoice line items: the shared overview and facts must not flicker/remount due to map measurement. Initial map measurement requests immediately; dragging coalesces later map-only shape requests after 300ms, with no uncontrolled retries.
+
+Check Clients (**Monthly invoice run**), Gigs (**Receipts and invoicing**), Invoices (**Invoice delivery**) and Users (**Access and role**) use the same labelled enclosing chrome at the bottom of the selected-record pane. Gigs retains Resources, Expenses and linked-invoice navigation; no controls are duplicated in its header. Check editor-open, short-height and mobile layouts retain readable details and wrap bottom actions without horizontal overflow. Run the invoice delivery and enrolment safeguards scenarios for confirmations, focus return, terminal notifications and persistent errors.

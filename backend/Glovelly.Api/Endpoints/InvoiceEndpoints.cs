@@ -40,15 +40,22 @@ public static class InvoiceEndpoints
                 .WhereVisibleTo(userId)
                 .WhereContributingToPaidIncome(period)
                 .AsNoTracking()
-                .Select(invoice => new PaidIncomeContribution(
+                .Select(invoice => new
+                {
                     invoice.Id,
-                    invoice.Lines.Sum(line => (decimal?)(line.Quantity * line.UnitPrice)) ?? 0m))
+                    Lines = invoice.Lines.Select(line => new InvoiceLine
+                    {
+                        Quantity = line.Quantity,
+                        UnitPrice = line.UnitPrice,
+                    }).ToList(),
+                })
                 .ToListAsync(cancellationToken);
 
+            // Use the shared decimal rounding policy after materialization, not provider-specific SQL rounding.
             return Results.Ok(new InvoicePaidIncomeSummary(
                 period.Start,
                 period.End,
-                contributions.Sum(contribution => contribution.Total),
+                contributions.Sum(contribution => contribution.Lines.Sum(line => line.LineTotal)),
                 contributions.Select(contribution => contribution.Id).ToList()));
         });
 
@@ -651,7 +658,6 @@ public static class InvoiceEndpoints
         return group;
     }
 
-    private sealed record PaidIncomeContribution(Guid Id, decimal Total);
     private sealed record InvoicePaidIncomeSummary(
         DateOnly FinancialYearStart,
         DateOnly FinancialYearEnd,

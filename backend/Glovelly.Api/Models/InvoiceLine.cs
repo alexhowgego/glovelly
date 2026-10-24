@@ -24,5 +24,5 @@ public sealed class InvoiceLine
     public Gig? Gig { get; set; }
 
     [NotMapped]
-    public decimal LineTotal => Quantity * UnitPrice;
+    public decimal LineTotal => decimal.Round(Quantity * UnitPrice, 2, MidpointRounding.AwayFromZero);
 }

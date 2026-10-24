@@ -210,10 +210,11 @@ public sealed class IntakeEndpointsTests : IDisposable
     [Fact]
     public async Task AutomaticApplication_StorageFailureKeepsTheSourceAndCreatesNoExpense()
     {
+        var destinationStore = new FailingDestinationStore();
         await using var configured = _factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IExpenseAttachmentStore>();
-            services.AddSingleton<IExpenseAttachmentStore, FailingDestinationStore>();
+            services.AddSingleton<IExpenseAttachmentStore>(destinationStore);
         }));
         using var client = configured.CreateClient();
         var intakeId = Guid.NewGuid();
@@ -234,14 +235,25 @@ public sealed class IntakeEndpointsTests : IDisposable
         var dbCheck = verification.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Single(dbCheck.CurrentIntakes);
         Assert.Empty(dbCheck.GigExpenses);
+        Assert.Empty(dbCheck.ExpenseAttachments);
         var source = await verification.ServiceProvider.GetRequiredService<IExpenseAttachmentStore>().OpenReadAsync("intakes/test/failure", TestContext.Current.CancellationToken);
         await source.Content.DisposeAsync();
+
+        destinationStore.FailDestinationWrites = false;
+        var retry = await ReplayReceiptAsync(client, intakeId);
+        retry.EnsureSuccessStatusCode();
+        using var retryVerification = configured.Services.CreateScope();
+        var recovered = retryVerification.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(recovered.CurrentIntakes);
+        Assert.Single(recovered.GigExpenses);
+        Assert.Single(recovered.ExpenseAttachments);
     }
 
     private sealed class FailingDestinationStore : IExpenseAttachmentStore
     {
         private readonly InMemoryExpenseAttachmentStore _inner = new();
-        public Task SaveAsync(string key, Stream content, string contentType, CancellationToken token = default) => key.StartsWith("intakes/", StringComparison.Ordinal)
+        public bool FailDestinationWrites { get; set; } = true;
+        public Task SaveAsync(string key, Stream content, string contentType, CancellationToken token = default) => !FailDestinationWrites || key.StartsWith("intakes/", StringComparison.Ordinal)
             ? _inner.SaveAsync(key, content, contentType, token) : throw new IOException("Simulated destination write failure.");
         public Task<ExpenseAttachmentContent> OpenReadAsync(string key, CancellationToken token = default) => _inner.OpenReadAsync(key, token);
         public Task DeleteAsync(string key, CancellationToken token = default) => _inner.DeleteAsync(key, token);

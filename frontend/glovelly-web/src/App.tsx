@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { revealWorkspaceTarget } from './workspaceScrolling'
 import {
   AdminSection,
   AccessRequestsModal,
@@ -66,6 +67,7 @@ import type {
   SellerProfile,
 } from './types'
 import './App.css'
+import './recordOverviews.css'
 
 function getCurrentMonthValue() {
   return new Date().toISOString().slice(0, 7)
@@ -107,7 +109,6 @@ function App({ appMetadata }: AppProps) {
   const { setThemePreference, themePreference } = useThemePreference()
   const [monthlyInvoiceMonth, setMonthlyInvoiceMonth] = useState(getCurrentMonthValue)
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
-  const [invoiceListScrollRequest, setInvoiceListScrollRequest] = useState(0)
   const [isGigImportsOpen, setIsGigImportsOpen] = useState(false)
   const [isAccessRequestsOpen, setIsAccessRequestsOpen] = useState(false)
   const [forScoreSnapshot, setForScoreSnapshot] = useState<ForScoreLibrarySnapshot | null>(null)
@@ -146,6 +147,8 @@ function App({ appMetadata }: AppProps) {
 
   const {
     activeUsersCount,
+    changeAdminAccess,
+    adminSummaryState,
     adminForm,
     adminMode,
     adminSearchQuery,
@@ -171,6 +174,7 @@ function App({ appMetadata }: AppProps) {
     updateAdminUserDisplayName,
     updateAdminField,
   } = useAdminWorkspace({
+    currentUserId: authUser?.userId,
     onAdminUserSaved: syncCurrentUserFromAdmin,
     onSessionExpired: expireSession,
   })
@@ -283,6 +287,7 @@ function App({ appMetadata }: AppProps) {
     setGigSearchQuery,
     setGigSort,
     setGigStatus,
+    setDetailContext,
     setIncludeStatementReceiptAppendix,
     setIncludeStatementReceiptAttachments,
     setSelectedGigIds,
@@ -1021,7 +1026,6 @@ function App({ appMetadata }: AppProps) {
       : []),
   ]
 
-  const currentSection = navigationItems.find((item) => item.id === activeSection)
   const pendingGigImportCount = gigImportBatches.reduce(
     (count, batch) => count + batch.pendingCount + batch.acceptedCount,
     0
@@ -1036,9 +1040,15 @@ function App({ appMetadata }: AppProps) {
         invoices,
         isWorkspaceLoading: isLoading,
         paidIncomeSummary,
+        adminSummary: {
+          status: adminSummaryState,
+          totalUsers: adminUsers.length,
+          activeUsers: activeUsersCount,
+          administrators: totalAdmins,
+        },
         today: new Date().toISOString().slice(0, 10),
       }),
-    [activeSection, clients, gigs, invoices, isLoading, paidIncomeSummary]
+    [activeSection, clients, gigs, invoices, isLoading, paidIncomeSummary, adminSummaryState, adminUsers.length, activeUsersCount, totalAdmins]
   )
 
   const signIn = () => {
@@ -1433,19 +1443,6 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
-  const handleDashboardCardAction = (action: 'invoices-outstanding' | 'invoices-overdue' | 'invoices-income') => {
-    setActiveSection('invoices')
-    setInvoiceSearchQuery('')
-    setInvoiceQuickFilter(
-      action === 'invoices-income'
-        ? 'income-this-financial-year'
-        : action === 'invoices-overdue'
-          ? 'overdue'
-          : 'outstanding'
-    )
-    setInvoiceListScrollRequest((request) => request + 1)
-  }
-
   const handleGenerateMonthlyInvoice = async () => {
     if (!selectedClient) {
       setMonthlyInvoiceStatus('Choose a client before running a monthly invoice.')
@@ -1603,6 +1600,7 @@ function App({ appMetadata }: AppProps) {
   const currentSectionContent =
     activeSection === 'clients' ? (
       <ClientsSection
+        onSessionExpired={expireSession}
         filteredClients={filteredClients}
         form={form}
         clientSort={clientSort}
@@ -1635,14 +1633,14 @@ function App({ appMetadata }: AppProps) {
       />
     ) : activeSection === 'admin' && isAdmin ? (
       <AdminSection
+        currentUserId={authUser?.userId}
+        onChangeAccess={changeAdminAccess}
         adminForm={adminForm}
         isEditorOpen={isAdminEditorOpen}
         adminMode={adminMode}
         adminSearchQuery={adminSearchQuery}
         adminSort={adminSort}
         adminStatus={adminStatus}
-        adminUsers={adminUsers}
-        activeUsersCount={activeUsersCount}
         filteredAdminUsers={filteredAdminUsers}
         isAdminLoading={isAdminLoading}
         onCloseEditor={closeAdminEditor}
@@ -1655,7 +1653,6 @@ function App({ appMetadata }: AppProps) {
         onSubmit={handleAdminSubmit}
         onUpdateField={updateAdminField}
         selectedAdminUser={selectedAdminUser}
-        totalAdmins={totalAdmins}
       />
     ) : activeSection === 'gigs' ? (
       <GigsSection
@@ -1675,6 +1672,7 @@ function App({ appMetadata }: AppProps) {
         gigStatus={gigStatus}
         gigs={gigs}
         isGigLoading={isGigLoading}
+        onDetailContextChange={setDetailContext}
         isInvoiceLoading={isInvoiceLoading}
         isMileageEstimating={isMileageEstimating}
         isExternalResourceEditorOpen={isExternalResourceEditorOpen}
@@ -1719,6 +1717,8 @@ function App({ appMetadata }: AppProps) {
       />
     ) : (
       <InvoicesSection
+        key={authUser?.userId}
+        onSessionExpired={expireSession}
         adjustmentAmount={adjustmentAmount}
         adjustmentReason={adjustmentReason}
         clientNamesById={clientNamesById}
@@ -1762,7 +1762,6 @@ function App({ appMetadata }: AppProps) {
         onSelectInvoice={setSelectedInvoiceId}
         onSortChange={setInvoiceSort}
         onStartEditing={startInvoiceEdit}
-        scrollToListRequest={invoiceListScrollRequest}
         sellerProfileNotice={sellerProfileNotice}
         selectedInvoice={selectedInvoice}
       />
@@ -1773,7 +1772,6 @@ function App({ appMetadata }: AppProps) {
       activeSection={activeSection}
       appMetadata={appMetadata}
       authUser={authUser}
-      currentSection={currentSection}
       currentSectionContent={currentSectionContent}
       dashboardCards={dashboardCards}
       isAdmin={isAdmin}
@@ -1786,7 +1784,6 @@ function App({ appMetadata }: AppProps) {
       navigationItems={navigationItems}
       pendingGigImportCount={pendingGigImportCount}
       pendingAccessRequestCount={pendingAccessRequestCount}
-      onDashboardCardAction={handleDashboardCardAction}
       onOpenGigImports={openGigImports}
       onOpenAccessRequests={openAccessRequests}
       onOpenSellerProfile={openSellerProfile}
@@ -1972,7 +1969,7 @@ function App({ appMetadata }: AppProps) {
           if (!selectGig(gig.id)) return
           setActiveSection('gigs')
           unifiedIntake.close()
-          window.requestAnimationFrame(() => document.getElementById('gig-overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+          window.requestAnimationFrame(() => revealWorkspaceTarget(document.getElementById('gig-overview')))
         }}
       />}
 

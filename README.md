@@ -228,6 +228,14 @@ dotnet user-secrets set "Mileage:GoogleRoutes:ApiKey" "your-google-routes-api-ke
 
 Non-secret local defaults are shown in `appsettings.Development.json`. In deployed environments, provide the key through Secret Manager or an equivalent secret-backed environment variable named `Mileage__GoogleRoutes__ApiKey`.
 
+### Optional location map previews
+
+Maps Static is separate from Routes mileage estimation. `Maps:GoogleStatic:Enabled` defaults to `false`; both `Maps:GoogleStatic:ApiKey` and `Maps:GoogleStatic:SigningSecret` must be valid for signed-URL issuance. Store them with `dotnet user-secrets` locally, not in repository files. The signing secret stays server-side; the restricted API key/signature appear in directly loaded Google image URLs by design. Missing/invalid/disabled configuration leaves core workflows and external Maps links usable, without unsigned fallback.
+
+Both deployment environments use `MAPS_STATIC_ENABLED` (default false) and bind `glovelly-maps-static-api-key:latest` to `Maps__GoogleStatic__ApiKey` and `glovelly-maps-static-url-signing-secret:latest` to `Maps__GoogleStatic__SigningSecret`. Provision those secrets and runtime service-account access in each deployment project before deployment. Local development uses the same configuration keys in the API project's .NET user-secrets; no startup-time Secret Manager fetch is required. Secret bindings are merged, so explicitly remove obsolete Cloud Run bindings during credential retirement.
+
+Eligible saved locations display automatically without per-record approval. Validate signed direct Google delivery and API/website restrictions on staging; require signatures and disable unsigned-request quota after verification. Google-side request caps bound actual usage; URL-issuance limits do not prevent replay and budget alerts are not spending caps. Production enablement requires resolving the pending provider privacy inquiry and applicable browser-storage requirements. See [Maps Static operations](docs/engineering/maps-static.md).
+
 ### Google Drive, Sheets and Calendar services
 
 Authenticated users can connect optional Google services from the profile menu under `Services`:

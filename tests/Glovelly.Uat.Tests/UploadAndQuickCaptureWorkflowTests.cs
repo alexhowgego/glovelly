@@ -25,6 +25,7 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
                 DateTime.UtcNow.AddDays(20).ToString("yyyy-MM-dd"),
                 expenses: [new GigExpense(expenseDescription, "12.34")]);
 
+            await OpenGigExpensesAsync();
             var expenseRow = Page.GetByTestId("gig-expense-item").Filter(new LocatorFilterOptions
             {
                 HasText = expenseDescription,
@@ -44,6 +45,8 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             });
             await Assertions.Expect(expenseRow.GetByTestId("gig-expense-reimbursement-select")).ToHaveValueAsync("Unreimbursed");
 
+            await CloseRecordDetailsAsync();
+            await OpenGigResourcesAsync();
             await Page.GetByTestId("add-gig-attachment-button").ClickAsync();
             await Page.GetByTestId("gig-attachment-type-select").SelectOptionAsync("Url");
             await Page.GetByTestId("gig-attachment-title-input").FillAsync(attachmentTitle);
@@ -52,7 +55,7 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             await Assertions.Expect(Page.GetByTestId("gig-attachment-status")).ToContainTextAsync(
                 "URL must be an absolute http or https URL.",
                 new LocatorAssertionsToContainTextOptions { Timeout = 30_000 });
-            await Assertions.Expect(Page.GetByRole(AriaRole.Dialog)).ToBeVisibleAsync();
+            await Assertions.Expect(Page.GetByRole(AriaRole.Dialog, new() { Name = "Add attachment", Exact = true })).ToBeVisibleAsync();
             await Page.GetByTestId("gig-attachment-url-input").FillAsync("https://example.com/contract");
             await Page.GetByText("Add attachment", new PageGetByTextOptions { Exact = true }).Last.ClickAsync();
 
@@ -76,9 +79,11 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             await Assertions.Expect(attachmentRow).ToBeVisibleAsync();
         });
 
-    [Fact]
-    public Task UnifiedResourceMobileFlowKeepsUploadOpenAndOffersOptionalReview() => RunWithDiagnosticsAsync(
-        nameof(UnifiedResourceMobileFlowKeepsUploadOpenAndOffersOptionalReview),
+    [Theory]
+    [InlineData(390, 844)]
+    [InlineData(1280, 800)]
+    public Task UnifiedResourceFlowKeepsUploadOpenAndOffersOptionalReview(int width, int height) => RunWithDiagnosticsAsync(
+        $"{nameof(UnifiedResourceFlowKeepsUploadOpenAndOffersOptionalReview)}_{width}",
         async () =>
         {
             var runId = CreateRunId();
@@ -87,7 +92,7 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             var attachmentTitle = $"{runId} Quick gig plan";
 
             await AuthenticateWithUatSecretAsync();
-            await Page.SetViewportSizeAsync(390, 844);
+            await Page.SetViewportSizeAsync(width, height);
             await CreateClientAsync(clientName);
             await CreateGigAsync(clientName, gigTitle, DateTime.UtcNow.ToString("yyyy-MM-dd"));
 
@@ -116,7 +121,13 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             await review.GetByLabel("Notes", new() { Exact = true }).FillAsync("Reviewed on mobile");
             await review.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
             await Assertions.Expect(review).ToContainTextAsync("Attachment updated.");
-            await review.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
+            await review.GetByRole(AriaRole.Button, new() { Name = "Go to gig" }).ClickAsync();
+            await Assertions.Expect(Page.Locator("#gig-overview")).ToBeInViewportAsync();
+            if (width > 1180)
+            {
+                Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollHeight <= innerHeight + 1"));
+            }
+            await OpenGigResourcesAsync();
             await Assertions.Expect(Page.GetByTestId("gig-attachment-item").Filter(new LocatorFilterOptions
             {
                 HasText = attachmentTitle,

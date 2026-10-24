@@ -282,6 +282,7 @@ public sealed class InvoiceLineRefreshWorkflowTests : InvoiceUatTestBase
 
     private async Task<ILocator> ExpenseRowForDescriptionAsync(string expenseDescription)
     {
+        await OpenGigExpensesAsync();
         var rows = Page.GetByTestId("gig-expense-item");
         await Assertions.Expect(rows.First).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
         {

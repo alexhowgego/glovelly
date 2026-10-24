@@ -14,6 +14,12 @@ description: Turn saved work into a checked invoice without sending it by accide
 
 Glovelly links the gig to the invoice and creates lines from the fee, claimable expenses, and applicable mileage. You can also create one invoice from selected gigs for the same client, or generate a monthly invoice from a client.
 
+The invoice pane shows dates, total, status, PDF readiness, full description, and issue/delivery information directly. Scroll the details region if a long description needs more room. Choose **Line items** to use the existing editor for invoice lines, adjustments, and description changes.
+
+When the pane has enough room and the PDF is current, a first-page thumbnail fits beside the details, centred within the available space. Click it, or focus it and press Enter, to open the full PDF preview. Hover or focus shows page-one help without a permanent caption. The existing **Preview** action is still available if the thumbnail is hidden or cannot load.
+
+The thumbnail reads the saved PDF; viewing an invoice does not generate, repair, issue or send it. If the PDF changes while the thumbnail loads, refresh or reselect the invoice. A concurrent update can briefly leave the supplementary image behind the latest document, so use the full preview to review before sending. Large or unusual PDFs may need the explicit **Preview** action instead.
+
 ## Review before you send
 
 1. Open the invoice and choose **Send to client**.

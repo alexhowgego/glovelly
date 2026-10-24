@@ -8,7 +8,7 @@ import type {
   ThemePreference,
 } from '../types'
 import { formatBuildMetadata } from '../formatters'
-import type { DashboardCard, DashboardCardAction } from '../dashboardCards'
+import type { DashboardCard } from '../dashboardCards'
 
 export type AppNavigationItem = {
   id: AppSection
@@ -23,7 +23,6 @@ type AppShellProps = {
   appMetadata: AppMetadata
   authUser: AuthUser | null
   children: ReactNode
-  currentSection: AppNavigationItem | undefined
   currentSectionContent: ReactNode
   dashboardCards: DashboardCard[]
   isAdmin: boolean
@@ -39,7 +38,6 @@ type AppShellProps = {
   onOpenAccessRequests: () => void
   onOpenGigImports: () => void
   onOpenSellerProfile: () => void
-  onDashboardCardAction: (action: DashboardCardAction) => void
   onOpenConnectedServices: () => void
   onOpenUserSettings: () => void
   onProfileMenuToggle: () => void
@@ -57,7 +55,6 @@ export function AppShell({
   appMetadata,
   authUser,
   children,
-  currentSection,
   currentSectionContent,
   dashboardCards,
   isAdmin,
@@ -73,7 +70,6 @@ export function AppShell({
   onOpenAccessRequests,
   onOpenGigImports,
   onOpenSellerProfile,
-  onDashboardCardAction,
   onOpenConnectedServices,
   onOpenUserSettings,
   onProfileMenuToggle,
@@ -120,18 +116,31 @@ export function AppShell({
   }, [])
 
   return (
-    <main className="app-shell">
+    <main className="app-shell workspace-shell" data-section={activeSection}>
       <section className="hero-panel app-frame">
         <div className="content-shell">
           <div className="content-header panel">
             <div className="content-header-top">
-              <div className="content-header-copy">
-                <p className="eyebrow">Workspace</p>
-                <h1>Your work, all in one place.</h1>
-                <p className="hero-text">
-                  Move between clients, gigs, invoices and admin tools with everything easy to find.
-                </p>
+              <div className="workspace-brand">
+                <img src="/gordon-192.png" alt="" width="36" height="36" />
+                <span>Glovelly</span>
               </div>
+
+              <nav className="charm-bar" aria-label="Primary">
+                {navigationItems.map((item) => (
+                  <button
+                    key={item.id}
+                    className={`charm-item ${activeSection === item.id ? 'selected' : ''}`}
+                    data-testid={`nav-${item.id}`}
+                    aria-current={activeSection === item.id ? 'page' : undefined}
+                    onClick={() => onSectionChange(item.id)}
+                    type="button"
+                    disabled={item.disabled}
+                  >
+                    <strong>{item.label}</strong>
+                  </button>
+                ))}
+              </nav>
 
               <div className="header-actions">
                 <button
@@ -296,43 +305,6 @@ export function AppShell({
               </div>
             </div>
 
-            <div className="content-header-body">
-              <div className="content-header-copy">
-                <p className="eyebrow">{currentSection?.eyebrow ?? 'Workspace'}</p>
-                <h2>{currentSection?.label ?? 'Glovelly'}</h2>
-                <p className="hero-text">{currentSection?.description}</p>
-              </div>
-
-              <div className="hero-mascot header-mascot">
-                <img
-                  src="/gordon-192.png"
-                  alt="Gordon the Glovelly mascot"
-                  decoding="async"
-                  loading="lazy"
-                />
-                <div>
-                  <p className="section-label">Meet Gordon</p>
-                  <strong>Mozart wig. Rubber chicken. Unreasonably good taste in admin.</strong>
-                </div>
-              </div>
-            </div>
-
-            <nav className="charm-bar" aria-label="Primary">
-              {navigationItems.map((item) => (
-                <button
-                  key={item.id}
-                  className={`charm-item ${activeSection === item.id ? 'selected' : ''}`}
-                  data-testid={`nav-${item.id}`}
-                  onClick={() => onSectionChange(item.id)}
-                  type="button"
-                  disabled={item.disabled}
-                >
-                  <span className="charm-meta">{item.eyebrow}</span>
-                  <strong>{item.label}</strong>
-                  <span>{item.description}</span>
-                </button>
-              ))}
-            </nav>
 
             <div className="content-header-aside">
               <div className="dashboard-summary" aria-label="Dashboard summary">
@@ -345,16 +317,6 @@ export function AppShell({
                     <p className="section-label">{card.label}</p>
                     <strong>{card.value}</strong>
                     <span>{card.detail}</span>
-                    {card.action ? (
-                      <button
-                        className="ghost-button compact-action"
-                        disabled={card.state !== 'ready'}
-                        onClick={() => onDashboardCardAction(card.action!)}
-                        type="button"
-                      >
-                        View invoices
-                      </button>
-                    ) : null}
                   </article>
                 ))}
               </div>

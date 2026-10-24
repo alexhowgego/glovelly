@@ -13,17 +13,19 @@ export function NotificationToaster() {
   }, [])
 
   return (
-    <Toaster
-      closeButton
-      containerAriaLabel="Notifications"
-      hotkey={[]}
-      mobileOffset={{ left: 'max(10px, env(safe-area-inset-left))', right: 'max(10px, env(safe-area-inset-right))', top: 'max(74px, calc(env(safe-area-inset-top) + 64px))' }}
-      offset={{ right: '24px', top: '24px' }}
-      position={isDesktop ? 'top-right' : 'top-center'}
-      richColors
-      style={{ zIndex: 75 }}
-      toastOptions={{ closeButtonAriaLabel: 'Dismiss notification' }}
-      visibleToasts={3}
-    />
+    <div className="notification-layer" data-testid="notification-layer" style={{ position: 'relative', zIndex: 75 }}>
+      <Toaster
+        closeButton
+        containerAriaLabel="Notifications"
+        hotkey={[]}
+        mobileOffset={{ left: 'max(10px, env(safe-area-inset-left))', right: 'max(10px, env(safe-area-inset-right))', top: 'max(74px, calc(env(safe-area-inset-top) + 64px))' }}
+        offset={{ right: '24px', top: '24px' }}
+        position={isDesktop ? 'top-right' : 'top-center'}
+        richColors
+        style={{ zIndex: 75 }}
+        toastOptions={{ closeButtonAriaLabel: 'Dismiss notification' }}
+        visibleToasts={3}
+      />
+    </div>
   )
 }

@@ -44,7 +44,10 @@ export function GigExpensesPanel({
   const [expandedExpenseKey, setExpandedExpenseKey] = useState<string>('')
   const [isExpenseEditorOpen, setIsExpenseEditorOpen] = useState(false)
   const [editingExpenseIndex, setEditingExpenseIndex] = useState<number | null>(null)
+  const [editingExpenseId, setEditingExpenseId] = useState('')
+  const [editorError, setEditorError] = useState('')
   const [expenseDraft, setExpenseDraft] = useState({ description: '', amount: '', category: '' })
+  const [expenseBaseline, setExpenseBaseline] = useState(expenseDraft)
   const [analysisTarget, setAnalysisTarget] = useState<(ReceiptAnalysisTarget & { expenseIndex: number }) | null>(null)
   const expenseEditorTitle = editingExpenseIndex === null ? 'Add expense' : 'Edit expense'
 
@@ -53,18 +56,30 @@ export function GigExpensesPanel({
   }, [selectedGig?.id])
 
   const openExpenseCreate = () => {
+    setEditingExpenseId('')
+    setEditorError('')
     setEditingExpenseIndex(null)
     setExpenseDraft({ description: '', amount: '', category: '' })
+    setExpenseBaseline({ description: '', amount: '', category: '' })
     setIsExpenseEditorOpen(true)
   }
 
   const openExpenseEdit = (index: number, expense: GigExpenseForm) => {
+    setEditingExpenseId(expense.id)
+    setEditorError('')
     setEditingExpenseIndex(index)
     setExpenseDraft({ description: expense.description, amount: expense.amount, category: expense.category })
+    setExpenseBaseline({ description: expense.description, amount: expense.amount, category: expense.category })
     setIsExpenseEditorOpen(true)
   }
 
   const closeExpenseEditor = () => {
+    if (isGigLoading) return
+    if (JSON.stringify(expenseDraft) !== JSON.stringify(expenseBaseline) && !window.confirm('Discard unsaved expense changes?')) return
+    resetExpenseEditor()
+  }
+
+  const resetExpenseEditor = () => {
     setIsExpenseEditorOpen(false)
     setEditingExpenseIndex(null)
     setExpenseDraft({ description: '', amount: '', category: '' })
@@ -72,23 +87,32 @@ export function GigExpensesPanel({
 
   const applyReceiptSuggestions = (suggestions: { merchant: string | null; totalAmount: number | null; suggestedCategory: string | null }) => {
     if (!analysisTarget) return
-    const expense = expenses[analysisTarget.expenseIndex]
+    const index = expenses.findIndex(expense => expense.id === analysisTarget.expenseId)
+    const expense = expenses[index]
     if (!expense) return
-    setEditingExpenseIndex(analysisTarget.expenseIndex)
+    setEditingExpenseIndex(index)
+    setEditingExpenseId(expense.id)
+    setEditorError('')
     setExpenseDraft({
       description: suggestions.merchant || expense.description,
       amount: suggestions.totalAmount === null ? expense.amount : String(suggestions.totalAmount),
       category: suggestions.suggestedCategory === null ? expense.category : normalizeExpenseCategory(suggestions.suggestedCategory),
     })
+    setExpenseBaseline({ description: expense.description, amount: expense.amount, category: expense.category })
     setIsExpenseEditorOpen(true)
     setAnalysisTarget(null)
   }
 
   const submitExpenseDraft = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const saved = await onSaveExpenseDraft(editingExpenseIndex, expenseDraft)
+    const index = editingExpenseId ? expenses.findIndex(expense => expense.id === editingExpenseId) : editingExpenseIndex
+    if (index !== null && index < 0) {
+      setEditorError('This expense no longer exists. Close and reopen expense management.')
+      return
+    }
+    const saved = await onSaveExpenseDraft(index, expenseDraft)
     if (saved) {
-      closeExpenseEditor()
+      resetExpenseEditor()
     }
   }
 
@@ -110,13 +134,14 @@ export function GigExpensesPanel({
             Add expense
           </button>
         </div>
+        <p role="status">{gigStatus}</p>
 
         {expenses.length > 0 ? (
           <div className="associated-item-list expense-associated-list">
             {expenses.map((expense, index) => {
               const isReimbursed = expense.reimbursementStatus === 'Reimbursed'
               const statusLabel = formatExpenseReimbursementStatus(expense.reimbursementStatus)
-              const expenseKey = `${expense.id || 'new'}-${index}`
+              const expenseKey = expense.id || `new-${index}`
               const isExpanded = expandedExpenseKey === expenseKey
               const amount = Number(expense.amount)
               const amountLabel = Number.isFinite(amount) ? formatCurrency(amount) : expense.amount
@@ -306,6 +331,7 @@ export function GigExpensesPanel({
               </div>
               <button
                 className="ghost-button"
+                data-dialog-close
                 onClick={closeExpenseEditor}
                 type="button"
                 disabled={isGigLoading}
@@ -315,6 +341,7 @@ export function GigExpensesPanel({
             </div>
 
             <form className="external-resource-form" onSubmit={submitExpenseDraft}>
+              {editorError && <p role="alert">{editorError}</p>}
               <ExpenseFields amount={expenseDraft.amount} description={expenseDraft.description} category={expenseDraft.category} disabled={isGigLoading} testIdPrefix="gig-expense"
                 onAmount={amount => setExpenseDraft(current => ({ ...current, amount }))}
                 onDescription={description => setExpenseDraft(current => ({ ...current, description }))}

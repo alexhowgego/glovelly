@@ -1,9 +1,15 @@
 import { useEffect, useRef } from 'react'
+import { RecordVisualOverview } from './RecordVisualOverview'
+import { GoogleMapsLocationLink, RecordMapPreview } from './RecordMapPreview'
+import { RecordActionDock } from './RecordActionDock'
+import { gigLocationQuery } from '../recordLocationSource'
 import type { FormEvent } from 'react'
 import { GigAttachmentsPanel } from './GigAttachmentsPanel'
 import { GigEditorPanel } from './GigEditorPanel'
 import { GigExpensesPanel } from './GigExpensesPanel'
 import { TrashIcon } from './TrashIcon'
+import { RecordDetailDialog } from './RecordDetailDialog'
+import { useRecordDetail } from '../hooks/useRecordDetail'
 import { formatCurrency, formatDate, formatGigStatus, formatGigType } from '../formatters'
 import type {
   Client,
@@ -37,6 +43,7 @@ type GigsSectionProps = {
   gigStatus: string
   gigs: Gig[]
   isGigLoading: boolean
+  onDetailContextChange: (id: string | null) => void
   isInvoiceLoading: boolean
   isMileageEstimating: boolean
   isExternalResourceEditorOpen: boolean
@@ -115,6 +122,7 @@ export function GigsSection({
   gigStatus,
   gigs,
   isGigLoading,
+  onDetailContextChange,
   isInvoiceLoading,
   isMileageEstimating,
   isExternalResourceEditorOpen,
@@ -157,6 +165,11 @@ export function GigsSection({
   selectedGigIds,
   selectedGigs,
 }: GigsSectionProps) {
+  const detail = useRecordDetail<'resources' | 'expenses'>(selectedGig?.id, true)
+  useEffect(() => {
+    onDetailContextChange(detail.kind && selectedGig ? selectedGig.id : null)
+    return () => onDetailContextChange(null)
+  }, [detail.kind, selectedGig, onDetailContextChange])
   const editorSlotRef = useRef<HTMLDivElement | null>(null)
   const detailPanelRef = useRef<HTMLDivElement | null>(null)
   const selectedGigClientName =
@@ -227,7 +240,7 @@ export function GigsSection({
           </div>
 
           <div className="compact-list-controls" aria-label="Gig list controls">
-            <div className="compact-list-main-controls">
+            <div className="compact-list-main-controls gig-list-main-controls">
               <label className="search-field compact-search-field">
                 <span>Search</span>
                 <input
@@ -371,11 +384,11 @@ export function GigsSection({
           </div>
         </div>
 
-        <div id="gig-overview" ref={detailPanelRef} className="panel">
+        <div id="gig-overview" ref={detailPanelRef} className="panel record-overview">
           <div className="panel-heading">
             <div>
               <p className="section-label">Gig Overview</p>
-              <h2>{selectedGig?.title ?? 'No gig selected'}</h2>
+              <h2 tabIndex={-1}>{selectedGig?.title ?? 'No gig selected'}</h2>
             </div>
             <div className="actions">
               <button
@@ -459,65 +472,34 @@ export function GigsSection({
 
           {selectedGig ? (
             <>
-              <div className="detail-grid">
-                <article>
-                  <p className="detail-label">Client</p>
-                  <button
-                    className="link-button detail-link"
-                    data-testid="gig-client-link"
-                    onClick={() => onOpenClient(selectedGig.clientId)}
-                    type="button"
-                  >
-                    {selectedGigClientName}
-                  </button>
-                </article>
-                <article>
-                  <p className="detail-label">Type</p>
-                  <strong>{formatGigType(selectedGig.type)}</strong>
-                </article>
-                <div className="gig-detail-metrics full-width">
-                  <article>
-                    <p className="detail-label">Date</p>
-                    <strong>{formatDate(selectedGig.date)}</strong>
-                  </article>
-                  <article>
-                    <p className="detail-label">Fee</p>
-                    <strong>{formatCurrency(selectedGig.fee)}</strong>
-                  </article>
-                  <article>
-                    <p className="detail-label">Status</p>
-                    <strong data-testid="selected-gig-status">{formatGigStatus(selectedGig.status)}</strong>
-                  </article>
+              <RecordVisualOverview key={`${selectedGig.id}:${selectedGig.mapPreviewSourceFingerprint}`}
+                visual={gigLocationQuery(selectedGig.venue) && selectedGig.mapPreviewSourceFingerprint ? (bucket, unavailable) =>
+                  <RecordMapPreview kind="gigs" id={selectedGig.id} source={selectedGig.mapPreviewSourceFingerprint!}
+                    query={gigLocationQuery(selectedGig.venue)}
+                    bucket={bucket} onUnavailable={unavailable} onSessionExpired={onSessionExpired} /> : undefined}>
+              <dl className="overview-facts">
+                <div><dt>Client</dt><dd><button className="link-button" data-testid="gig-client-link" onClick={() => onOpenClient(selectedGig.clientId)} type="button">{selectedGigClientName}</button></dd></div>
+                <div><dt>Type</dt><dd>{formatGigType(selectedGig.type)}</dd></div>
+                <div><dt>Date</dt><dd>{formatDate(selectedGig.date)}</dd></div>
+                <div><dt>Fee</dt><dd>{formatCurrency(selectedGig.fee)}</dd></div>
+                <div><dt>Status</dt><dd data-testid="selected-gig-status">{formatGigStatus(selectedGig.status)}</dd></div>
+                <div><dt>Driving</dt><dd>{selectedGig.wasDriving ? `${selectedGig.travelMiles || 0} miles` : 'No'}</dd></div>
+                <div><dt>Invoice</dt><dd>{selectedGig.isInvoiced ? 'Invoiced' : 'Not invoiced yet'}</dd></div>
+                <div className="full-width"><dt>Location</dt><dd><GoogleMapsLocationLink query={gigLocationQuery(selectedGig.venue)}>{selectedGig.venue || 'Not set'}</GoogleMapsLocationLink></dd></div>
+                <div className="full-width"><dt>Notes</dt><dd className="overview-long-text">{selectedGig.notes?.trim() || 'No notes yet.'}</dd></div>
+              </dl>
+              </RecordVisualOverview>
+              <RecordActionDock title="Receipts and invoicing">
+                <div className="actions">
+                <button type="button" className="ghost-button" data-testid="gig-resources-button" onClick={event => detail.open('resources', event)}>Resources ({selectedGig.externalResources.length})</button>
+                <button type="button" className="ghost-button" data-testid="gig-expenses-button" onClick={event => detail.open('expenses', event)}>Expenses ({selectedGig.expenses.length}) · {formatCurrency(selectedGig.expenses.reduce((total, expense) => total + expense.amount, 0))}</button>
+                {selectedGig.isInvoiced && <button type="button" className="ghost-button overview-dock-wide" data-testid="gig-open-linked-invoice-button" onClick={onOpenLinkedInvoice}>Open invoice</button>}
                 </div>
-                <article className="full-width">
-                  <p className="detail-label">Location</p>
-                  <strong>{selectedGig.venue}</strong>
-                </article>
-                <article>
-                  <p className="detail-label">Driving</p>
-                  <strong>
-                    {selectedGig.wasDriving
-                      ? `${selectedGig.travelMiles || 0} miles`
-                      : 'No'}
-                  </strong>
-                </article>
-                <article>
-                  <p className="detail-label">Invoice link</p>
-                  {selectedGig.isInvoiced ? (
-                    <button className="ghost-button" data-testid="gig-open-linked-invoice-button" onClick={onOpenLinkedInvoice} type="button">
-                      Open invoice
-                    </button>
-                  ) : (
-                    <strong>Not invoiced yet</strong>
-                  )}
-                </article>
-                <article className="full-width">
-                  <p className="detail-label">Notes</p>
-                  <span>{selectedGig.notes?.trim() || 'No notes yet.'}</span>
-                </article>
-              </div>
+              </RecordActionDock>
 
+              {detail.kind === 'resources' && <RecordDetailDialog title="Gig resources" onClose={detail.close} returnFocus={detail.trigger} canClose={() => !isGigLoading && !isExternalResourceEditorOpen}>
               <GigAttachmentsPanel
+                key={selectedGig.id}
                 selectedGig={selectedGig}
                 externalResourceForm={externalResourceForm}
                 externalResourceMode={externalResourceMode}
@@ -534,8 +516,11 @@ export function GigsSection({
                 onUpdateExternalResourceField={onUpdateExternalResourceField}
                 onUploadExternalResourceAttachment={onUploadExternalResourceAttachment}
               />
+              </RecordDetailDialog>}
 
+              {detail.kind === 'expenses' && <RecordDetailDialog title="Gig expenses" onClose={detail.close} returnFocus={detail.trigger} canClose={() => !isGigLoading}>
               <GigExpensesPanel
+                key={selectedGig.id}
                 expenses={gigForm.expenses}
                 gigStatus={gigStatus}
                 isGigLoading={isGigLoading}
@@ -548,6 +533,7 @@ export function GigsSection({
                 onUploadExpenseAttachment={onUploadExpenseAttachment}
                 onSessionExpired={onSessionExpired}
               />
+              </RecordDetailDialog>}
             </>
           ) : (
             <div className="empty-state roomy">

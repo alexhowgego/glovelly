@@ -22,6 +22,9 @@ internal static class InfrastructureServiceCollectionExtensions
             .Get<AccessRequestProtectionSettings>() ?? new AccessRequestProtectionSettings();
 
         services.AddSingleton(settings);
+        services.AddOptions<GoogleStaticMapsSettings>()
+            .Bind(configuration.GetSection(GoogleStaticMapsSettings.SectionName));
+        services.AddSingleton<GoogleStaticMapsService>();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddSignalR();

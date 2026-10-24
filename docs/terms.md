@@ -1,6 +1,6 @@
 # Application Terms of Service
 
-Last updated: 30 September 2026
+Last updated: 19 October 2026
 
 These terms apply to use of the Glovelly application at `https://menu.glovelly.net`.
 
@@ -83,6 +83,14 @@ If you connect Google Calendar, you authorise Glovelly to create and manage a de
 Calendar sync is one-way from Glovelly to Google Calendar. Glovelly remains the source of truth for gig records. Changes made directly in Google Calendar may be overwritten, ignored, or removed by later Glovelly sync activity.
 
 You are responsible for checking that synced calendar entries are suitable for your own planning and operational use. Calendar sync depends on Google's services, permissions, scopes, and availability. If Google Calendar access expires, is revoked, or otherwise stops working, sync may fail until the connection is restored.
+
+## Google Maps Features
+
+Where configured, Glovelly includes Google Maps content as optional, non-interactive location search previews. Use of Google Maps features and content is subject to the [Google Maps End User Additional Terms of Service](https://maps.google.com/help/terms_maps/) and [Google Privacy Policy](https://policies.google.com/privacy).
+
+When configured and visible pane space permits, maps load automatically for saved client addresses and gig venues. No per-record approval or public/private classification is required. Your browser requests the image directly from Google with the saved location query and browser network/request information. Images are unverified search previews and must not be relied on as an exact venue match. Do not include information in location fields that you are not entitled to process for this purpose.
+
+Removing a preview from display cannot recall requests already sent. The independent **Open in Google Maps** link opens Google's site with the saved query only when you choose it and remains usable when image previews are disabled or unavailable. See our [Privacy Policy](privacy.md) for data-handling details.
 
 ## Third-Party Services
 

@@ -142,6 +142,7 @@ public sealed class ExpenseStatementTests : InvoiceUatTestBase
             State = WaitForSelectorState.Visible,
         });
 
+        await OpenGigExpensesAsync();
         await Page.GetByTestId("open-gig-expense-dialog-button").ClickAsync();
         await Page.GetByTestId("gig-expense-amount-input").WaitForAsync(new LocatorWaitForOptions
         {
@@ -169,6 +170,7 @@ public sealed class ExpenseStatementTests : InvoiceUatTestBase
 
     private async Task GeneratePreviewAndDownloadAsync(string gigTitle, string expenseDescription)
     {
+        await CloseRecordDetailsAsync();
         await GigCard(gigTitle).ClickAsync();
         await Page.GetByTestId("expense-statement-button").ClickAsync();
         await Page.GetByTestId("expense-statement-modal").WaitForAsync(new LocatorWaitForOptions
@@ -201,6 +203,7 @@ public sealed class ExpenseStatementTests : InvoiceUatTestBase
 
     private async Task MarkExpenseReimbursedAsync(string expenseDescription)
     {
+        await OpenGigExpensesAsync();
         Page.Dialog += AcceptReimbursementDialog;
         try
         {

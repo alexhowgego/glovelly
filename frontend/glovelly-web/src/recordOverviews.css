@@ -1,0 +1,340 @@
+.record-detail-dialog {
+  width: min(960px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  color: var(--text);
+  background: var(--surface-panel);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.record-detail-dialog:not([open]) {
+  display: none;
+}
+
+.record-detail-dialog[open] {
+  display: flex;
+}
+
+.record-detail-dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+.record-detail-dialog > .panel-heading {
+  flex: 0 0 auto;
+}
+
+.record-detail-dialog-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 3px;
+  overflow-wrap: anywhere;
+}
+
+.record-detail-dialog-body > .gig-timeline-note {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.record-detail-dialog .associated-item-list {
+  max-height: none;
+  overflow: visible;
+}
+
+.record-overview > .panel-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.record-overview > .panel-heading .actions {
+  justify-content: flex-start;
+}
+
+.record-overview h2,
+.overview-facts dd {
+  overflow-wrap: anywhere;
+}
+
+.record-overview h2 {
+  outline-offset: -2px;
+}
+
+.overview-facts dd:has(select) {
+  display: block;
+  overflow: visible;
+}
+
+.overview-dock > .gig-timeline-note {
+  padding: 10px;
+  gap: 6px;
+  border-radius: 12px;
+}
+
+.overview-dock > .gig-timeline-note .invoice-adjustment-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0;
+  gap: 8px;
+}
+
+.overview-dock > .gig-timeline-note .invoice-adjustment-form > button {
+  grid-column: auto;
+  max-width: 160px;
+  white-space: normal;
+  padding: 8px 12px;
+}
+
+.overview-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.overview-facts dt {
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.overview-facts dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  color: var(--heading);
+}
+
+.overview-facts .overview-long-text {
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.overview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.overview-body > * {
+  flex-shrink: 0;
+}
+
+.record-visual-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  min-width: 0;
+}
+
+.record-visual-layout.has-visual {
+  grid-template-columns: minmax(0, max-content) minmax(0, max-content) minmax(180px, 1fr);
+  column-gap: 28px;
+  align-items: center;
+}
+
+.record-visual-layout.has-visual > .record-visual-facts {
+  grid-column: 1 / span 2;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.record-visual-layout.has-visual .overview-facts {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: 24px;
+}
+
+/* Spanning prose wraps to the width established by the two ordinary fact
+   columns; it must not widen those columns through its max-content size. */
+.record-visual-layout.has-visual .overview-facts > .full-width {
+  contain: inline-size;
+  min-width: 0;
+}
+
+/* Clients places its address in the second desktop facts column. Unlike
+   spanning notes, that address must contribute to the column's width. */
+.record-visual-layout.has-visual .overview-facts > .overview-address {
+  contain: none;
+}
+
+/* Clients keeps its contact/address facts in one content-sized column and
+   gives the remaining width to its independently measured map frame. */
+.record-visual-layout.has-visual.single-column-facts {
+  grid-template-columns: minmax(0, max-content) minmax(180px, 1fr);
+}
+
+.record-visual-layout.single-column-facts > .record-visual-facts {
+  grid-column: 1;
+}
+
+.record-visual-layout.single-column-facts .overview-facts {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.record-visual-layout.single-column-facts .overview-facts > div {
+  grid-column: 1;
+  grid-row: auto;
+}
+
+/* Portrait PDF pages cannot expand like maps. Share spare width across both
+   facts tracks and the preview instead of packing facts against one edge. */
+.record-visual-layout.has-visual.invoice-visual-layout {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.record-visual-facts, .record-visual-rail { min-width: 0; }
+.record-action-dock { width: 100%; min-width: 0; }
+.record-action-dock .actions { flex-wrap: wrap; align-items: end; }
+.record-action-dock .helper-text { overflow-wrap: anywhere; }
+.access-restriction-help { font-size: 0.85rem; margin-top: 8px; }
+.access-restriction-help summary { cursor: pointer; }
+.access-control-group { position: relative; }
+.access-control-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 0;
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  color: var(--text);
+  z-index: 2;
+  font-size: 0.85rem;
+}
+.access-control-group:hover > .access-control-tooltip,
+.access-control-group:focus > .access-control-tooltip { display: block; }
+.record-visual-rail {
+  height: var(--record-visual-max-height);
+  max-height: var(--record-visual-max-height);
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+.map-search-preview, .invoice-thumbnail-preview {
+  position: relative;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+.map-preview-frame { width: 100%; height: 100%; min-height: 0; min-width: 0; display: grid; place-items: center; }
+.map-preview-link { display: grid; place-items: center; width: 100%; height: 100%; min-height: 0; border-radius: 12px; overflow: hidden; }
+.map-preview-link[hidden] { display: none; }
+.map-search-preview img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; object-position: left center; }
+.map-search-preview img[hidden] { display: none; }
+.invoice-thumbnail { display: block; max-width: 100%; padding: 0; background: white; border: 1px solid var(--surface-border); }
+.invoice-thumbnail[hidden] { display: none; }
+.invoice-thumbnail canvas { display: block; width: 100%; height: auto; }
+.invoice-thumbnail-preview > p { font-size: 0.85rem; overflow-wrap: anywhere; }
+.visual-preview-tooltip {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline: 8px;
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin-inline: auto;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--surface-panel);
+  color: var(--text);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow-strong);
+  font-size: 0.8rem;
+  pointer-events: none;
+  visibility: hidden;
+}
+.map-search-preview:has(.map-preview-link:hover, .map-preview-link:focus) > .visual-preview-tooltip,
+.invoice-thumbnail-preview:has(.invoice-thumbnail:hover, .invoice-thumbnail:focus-visible) > .visual-preview-tooltip {
+  visibility: visible;
+}
+.map-preview-link:focus-visible, .invoice-thumbnail:focus-visible { outline-offset: -3px; }
+
+.overview-dock {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--surface-border);
+}
+
+.overview-dock > :only-child,
+.overview-dock > :not(button),
+.overview-dock > .overview-dock-wide {
+  grid-column: 1 / -1;
+}
+
+.overview-dock > button {
+  width: 100%;
+  white-space: normal;
+}
+
+@media (min-width: 1181px) and (min-height: 45em) {
+  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) > .record-overview > .overview-body {
+    /* Normal records fill the pane; unusually long content scrolls here. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scroll-padding: 4px;
+    gap: clamp(12px, 1.5vh, 20px);
+    padding-block: 4px;
+    text-align: left;
+  }
+
+  .workspace-shell .record-overview > .overview-body > :first-child {
+    margin-block-start: auto;
+  }
+
+  .workspace-shell .record-overview > .overview-body > :last-child {
+    margin-block-end: auto;
+  }
+
+  .record-overview .overview-facts {
+    gap: clamp(10px, 1.2vh, 16px) 20px;
+    align-items: start;
+  }
+
+  .record-overview .overview-facts .overview-address {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
+
+  .record-overview > .panel-heading .actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .workspace-shell .record-overview > .empty-state {
+    flex: 1 0 auto;
+    text-align: center;
+  }
+}
+
+.overview-facts .full-width {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 760px) {
+  .overview-dock {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .record-detail-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    padding: 14px;
+    gap: 12px;
+  }
+}

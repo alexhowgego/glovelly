@@ -19,6 +19,17 @@ encoding_only=()
 within_tolerance=()
 diff_dir="$(dirname "$report_path")/diffs"
 
+normalise_pixel_count() {
+  # ImageMagick may emit AE counts using scientific notation. Request full
+  # double precision below, then validate and format an integral count in C locale.
+  LC_ALL=C awk -v metric="$1" 'BEGIN {
+    if (metric !~ /^[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/) exit 1
+    count = metric + 0
+    if (count < 0 || count > 9007199254740991 || count != int(count)) exit 1
+    printf "%.0f", count
+  }'
+}
+
 create_review_artifacts() {
   local baseline="$1"
   local candidate="$2"
@@ -27,11 +38,11 @@ create_review_artifacts() {
   local mask_path="$diff_dir/.${name%.png}-overlay-mask.png"
   local overlay_path="$diff_dir/${name%.png}-overlay.png"
   local crop_path="$diff_dir/${name%.png}-overlay-crop.png"
-  local bounds width height crop_width crop_height left top right bottom
+  local bounds width height crop_width crop_height left top right bottom compare_status=0
 
   mkdir -p "$diff_dir"
-  compare "$baseline" "$candidate" "$raw_diff_path" 2>/dev/null || true
-  if [ ! -f "$raw_diff_path" ]; then
+  compare "$baseline" "$candidate" "$raw_diff_path" 2>/dev/null || compare_status=$?
+  if (( compare_status > 1 )) || [ ! -f "$raw_diff_path" ]; then
     printf 'Could not create visual diff for %s\n' "$name" >&2
     exit 1
   fi
@@ -70,9 +81,16 @@ create_review_artifacts() {
     if [ ! -f "$baseline" ]; then
       changed+=("$name (new candidate)")
     elif ! cmp -s "$candidate" "$baseline"; then
-      differing_pixels="$(compare -metric AE "$baseline" "$candidate" null: 2>&1 || true)"
-      if [[ ! "$differing_pixels" =~ ^[0-9]+$ ]]; then
-        printf 'Could not compare decoded pixels for %s: %s\n' "$name" "$differing_pixels" >&2
+      compare_status=0
+      metric="$(LC_ALL=C compare -precision 17 -metric AE "$baseline" "$candidate" null: 2>&1)" || compare_status=$?
+      # ImageMagick returns 0 for identical images, 1 for differences, and >1
+      # for errors. Never turn a genuine tool failure into a freshness result.
+      if (( compare_status > 1 )); then
+        printf 'Could not compare decoded pixels for %s (exit %s): %s\n' "$name" "$compare_status" "$metric" >&2
+        exit 1
+      fi
+      if ! differing_pixels="$(normalise_pixel_count "$metric")"; then
+        printf 'Invalid decoded-pixel count for %s: %s\n' "$name" "$metric" >&2
         exit 1
       fi
 
@@ -115,4 +133,8 @@ create_review_artifacts() {
   fi
 } > "$report_path"
 
-printf '%s\n' "${changed[@]}" > "${report_path%.md}.txt"
+if [ "${#changed[@]}" -gt 0 ]; then
+  printf '%s\n' "${changed[@]}" > "${report_path%.md}.txt"
+else
+  : > "${report_path%.md}.txt"
+fi

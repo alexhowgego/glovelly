@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type {
   Gig,
@@ -59,6 +59,17 @@ export function GigAttachmentsPanel({
 }: GigAttachmentsPanelProps) {
   const [expandedResourceId, setExpandedResourceId] = useState<string>('')
   const [setListImportResource, setSetListImportResource] = useState<GigExternalResource | null>(null)
+  const resourceBaseline = useRef('')
+  useEffect(() => {
+    if (isExternalResourceEditorOpen) resourceBaseline.current = JSON.stringify(externalResourceForm)
+    // Capture only on opening, not while the draft changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExternalResourceEditorOpen])
+  const cancelResourceEdit = () => {
+    if (isGigLoading) return
+    if (JSON.stringify(externalResourceForm) !== resourceBaseline.current && !window.confirm('Discard unsaved attachment changes?')) return
+    onCancelExternalResourceEdit()
+  }
   const externalResourceEditorTitle =
     externalResourceMode === 'edit' ? 'Edit attachment' : 'Add attachment'
   const formatResourceType = (value: GigExternalResourceType) =>
@@ -97,6 +108,7 @@ export function GigAttachmentsPanel({
             Add attachment
           </button>
         </div>
+        <p role="status">{gigStatus}</p>
 
         {sortedExternalResources.length > 0 ? (
           <div className="associated-item-list external-resource-list">
@@ -268,7 +280,8 @@ export function GigAttachmentsPanel({
               </div>
               <button
                 className="ghost-button"
-                onClick={onCancelExternalResourceEdit}
+                data-dialog-close
+                onClick={cancelResourceEdit}
                 type="button"
                 disabled={isGigLoading}
               >
@@ -286,7 +299,7 @@ export function GigAttachmentsPanel({
                 </button>
                 <button
                   className="ghost-button"
-                  onClick={onCancelExternalResourceEdit}
+                  onClick={cancelResourceEdit}
                   type="button"
                   disabled={isGigLoading}
                 >

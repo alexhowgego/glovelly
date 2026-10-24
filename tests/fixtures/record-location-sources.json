@@ -1,0 +1,32 @@
+[
+  {
+    "name": "empty venue",
+    "venue": " \t\r\n",
+    "query": "",
+    "fingerprint": "v1:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "venue ASCII whitespace",
+    "venue": "  Royal\t Hall,\r\nLondon ",
+    "query": "Royal Hall, London",
+    "fingerprint": "v1:44a009d8260fb7605c77a594b3cdf72204c7280fa6410d47e752efef9e174381"
+  },
+  {
+    "name": "UTF-8 venue",
+    "venue": "Café 🎵",
+    "query": "Café 🎵",
+    "fingerprint": "v1:de2dd878dafd9319d0c79bd062f1ca4a8c703fa32b126c7a7f7568ca0171b611"
+  },
+  {
+    "name": "billing fields in deterministic order",
+    "address": { "line1": " 1 High\tStreet ", "line2": "", "city": "London", "stateOrCounty": "  ", "postalCode": " SW1A 1AA ", "country": "UK" },
+    "query": "1 High Street, London, SW1A 1AA, UK",
+    "fingerprint": "v1:f161a05f924e19e50208e3049538b20bba6a32cff7534bbf24111af10bca03cd"
+  },
+  {
+    "name": "non-ASCII whitespace is preserved identically",
+    "venue": " Hall ",
+    "query": " Hall ",
+    "fingerprint": "v1:3845391d7bdba2474b74d4e4f23a465099b51828b36c4bb56c1348437691e0fc"
+  }
+]
