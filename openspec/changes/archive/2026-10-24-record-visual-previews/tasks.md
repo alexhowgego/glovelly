@@ -48,8 +48,8 @@
 - [x] 7.1 Update user guide, docs/uat journeys, capture expectations and operator guidance for automatic/unverified maps, direct delivery, independent links and unavailable/hidden states; remove approval/proxy instructions and distinguish visible API keys/signatures from private signing secrets.
 - [x] 7.2 Run ./verify.sh, affected guide checks/build and browser-test compilation; record actual results and lazy PDF worker/bundle behavior. Do not run Playwright or documentation captures locally.
 - [ ] 7.3 Validate origin restrictions, direct Google delivery and signing on staging; verify signatures are required and unsigned-request quota is disabled after signed requests work. Confirm local origins only where intended, Google-side request caps and budget alerts, and unavailable/failure fallbacks.
-- [ ] 7.4 Run Ubuntu browser UAT and review geometry/behavior; tune thresholds and resource limits from evidence without reducing readable facts or cancellation safety.
-- [ ] 7.5 Generate staging light/dark documentation captures in Ubuntu CI and review before replacing checked-in screenshots; use actual product captures with attribution preserved.
+- [x] 7.4 Run Ubuntu browser UAT and review geometry/behavior; tune thresholds and resource limits from evidence without reducing readable facts or cancellation safety.
+- [x] 7.5 Generate staging light/dark documentation captures in Ubuntu CI and review before replacing checked-in screenshots; use actual product captures with attribution preserved.
 - [ ] 7.6 Resolve the pending Google privacy inquiry and any applicable automatic-loading/browser-storage requirements before production enablement; confirm all provider/deployment gates and document that PDF previews work independently of Maps setup.
 
 ## 8. Preview sizing and navigation
