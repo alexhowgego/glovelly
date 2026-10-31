@@ -71,10 +71,33 @@ static RootCommand BuildRootCommand(IServiceProvider services)
     var businessLifecycleCommand = new Command("business-lifecycle", "Manage automatic business lifecycle transitions.");
     businessLifecycleCommand.Subcommands.Add(advanceCommand);
 
+    var intakeDrain = new Command("drain", "Recover pending unified intake work.");
+    intakeDrain.SetAction(async (_, cancellationToken) => await RunIntakeDrainAsync(services, cancellationToken));
+    var intakeCommand = new Command("intake", "Manage unified intake background work.");
+    intakeCommand.Subcommands.Add(intakeDrain);
+
     var rootCommand = new RootCommand("Glovelly background worker commands.");
     rootCommand.Subcommands.Add(calendarSyncCommand);
     rootCommand.Subcommands.Add(businessLifecycleCommand);
+    rootCommand.Subcommands.Add(intakeCommand);
     return rootCommand;
+}
+
+static async Task<int> RunIntakeDrainAsync(IServiceProvider services, CancellationToken cancellationToken)
+{
+    var stateStore = services.GetRequiredService<IScheduledTaskStateStore>();
+    var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
+    var state = await stateStore.ReadAsync<IntakePreparationTaskState>(ScheduledTaskNames.IntakePreparation, cancellationToken)
+        ?? new ScheduledTaskStateEnvelope<IntakePreparationTaskState> { TaskName = ScheduledTaskNames.IntakePreparation };
+    if (!state.State.HasPendingWork && state.LastSuccessfulRunUtc is { } last && now - last < TimeSpan.FromHours(6)) return 0;
+    var marked = state.State.LastMarkedStaleUtc;
+    var worker = ActivatorUtilities.CreateInstance<IntakePreparationWorker>(services);
+    var remaining = await worker.DrainOnceAsync(cancellationToken);
+    var latest = await stateStore.ReadAsync<IntakePreparationTaskState>(ScheduledTaskNames.IntakePreparation, cancellationToken) ?? state;
+    latest.LastSuccessfulRunUtc = now;
+    if (latest.State.LastMarkedStaleUtc == marked) latest.State.HasPendingWork = remaining;
+    await stateStore.WriteAsync(latest, cancellationToken);
+    return 0;
 }
 
 static async Task<int> RunCalendarSyncDrainAsync(

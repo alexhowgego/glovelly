@@ -1,5 +1,9 @@
 import type { ForScoreLibrarySnapshot, GoogleCalendarStatus } from '../types'
 
+function ServiceStatus({ connected, children }: { connected: boolean; children: string }) {
+  return <strong className="connected-service-status"><span aria-hidden="true" className={`service-connection-indicator ${connected ? 'connected' : 'disconnected'}`} />{children}</strong>
+}
+
 type ConnectedServicesModalProps = {
   forScoreLibrarySnapshot: ForScoreLibrarySnapshot | null
   forScoreLibraryStatus: string
@@ -11,15 +15,19 @@ type ConnectedServicesModalProps = {
   isGoogleDriveConnected: boolean
   isGoogleSheetsBusy: boolean
   isGoogleSheetsConnected: boolean
+  isGoogleDocsBusy: boolean
+  isGoogleDocsConnected: boolean
   isOpen: boolean
   isSaving: boolean
   onClose: () => void
   onConnectGoogleCalendar: () => void
   onConnectGoogleDrive: () => void
   onConnectGoogleSheets: () => void
+  onConnectGoogleDocs: () => void
   onDisconnectGoogleCalendar: () => void
   onDisconnectGoogleDrive: () => void
   onDisconnectGoogleSheets: () => void
+  onDisconnectGoogleDocs: () => void
   onForScoreLibraryFile: (file: File) => void
   onOpenSettings: () => void
   status: string
@@ -36,15 +44,19 @@ export function ConnectedServicesModal({
   isGoogleDriveConnected,
   isGoogleSheetsBusy,
   isGoogleSheetsConnected,
+  isGoogleDocsBusy,
+  isGoogleDocsConnected,
   isOpen,
   isSaving,
   onClose,
   onConnectGoogleCalendar,
   onConnectGoogleDrive,
   onConnectGoogleSheets,
+  onConnectGoogleDocs,
   onDisconnectGoogleCalendar,
   onDisconnectGoogleDrive,
   onDisconnectGoogleSheets,
+  onDisconnectGoogleDocs,
   onForScoreLibraryFile,
   onOpenSettings,
   status,
@@ -52,13 +64,13 @@ export function ConnectedServicesModal({
   const calendarConnected = googleCalendarStatus?.isConnected ?? false
   const calendarStatusText = googleCalendarStatus
     ? googleCalendarStatus.requiresReconnection
-      ? 'Calendar reconnect required'
+      ? 'Reconnect required'
       : calendarConnected
-      ? `Calendar connected${googleCalendarStatus.pendingWorkCount > 0 ? `, ${googleCalendarStatus.pendingWorkCount} pending` : ''}`
+      ? `Connected${googleCalendarStatus.pendingWorkCount > 0 ? `, ${googleCalendarStatus.pendingWorkCount} pending` : ''}`
       : googleCalendarStatus.hasRequiredScope
-        ? 'Calendar not enabled'
-        : 'Calendar not connected'
-    : 'Calendar status loading'
+        ? 'Not enabled'
+        : 'Not connected'
+    : 'Status loading'
 
   if (!isOpen) {
     return null
@@ -83,32 +95,23 @@ export function ConnectedServicesModal({
           </button>
         </div>
 
-        <p className="hero-text settings-intro">
-          Manage Google integrations used for publishing invoices, importing set lists and syncing gigs.
-        </p>
-        <p className="detail-label">{status}</p>
+        {status && <p className="detail-label">{status}</p>}
 
         <div className="connected-services-grid services-modal-grid">
           <article className="connected-service-card">
             <div className="connected-service-summary">
+              <img className="connected-service-icon" src="/service-icons/google-drive.svg" alt="" />
               <div>
                 <p className="detail-label">Google Drive</p>
-                <strong>{isGoogleDriveConnected ? 'Drive connected' : 'Drive not connected'}</strong>
-                <span>Publish invoice PDFs to Google Drive.</span>
+                <ServiceStatus connected={isGoogleDriveConnected}>{isGoogleDriveConnected ? 'Connected' : 'Not connected'}</ServiceStatus>
               </div>
-              <span
-                aria-hidden="true"
-                className={`service-connection-indicator ${
-                  isGoogleDriveConnected ? 'connected' : 'disconnected'
-                }`}
-              />
             </div>
 
-            <span className="connected-service-note">
+            <details className="connected-service-details"><summary>Details</summary><span className="connected-service-note">Publish invoice PDFs to Google Drive.{' '}
               {invoiceUploadFolderId.trim()
                 ? `Invoice folder: ${invoiceUploadFolderId.trim()}`
                 : "No invoice folder set. Configure it in Settings if you don't want Google's default destination."}
-            </span>
+            </span></details>
 
             <div className="form-actions compact-actions">
               <button
@@ -134,23 +137,21 @@ export function ConnectedServicesModal({
           </article>
 
           <article className="connected-service-card">
+            <div className="connected-service-summary"><img className="connected-service-icon" src="/service-icons/google-docs.svg" alt="" /><div><p className="detail-label">Google Docs</p><ServiceStatus connected={isGoogleDocsConnected}>{isGoogleDocsConnected ? 'Connected' : 'Not connected'}</ServiceStatus></div></div>
+            <details className="connected-service-details"><summary>Read-only access to your Google Docs · Details</summary><span className="connected-service-note">Read submitted Google Docs to prepare gig imports. This requests access to your Google Docs, not just a single document. Attaching a link does not require this connection. Disconnecting here removes Glovelly's local access; revoke the app in your Google Account to withdraw Google's grant.</span></details>
+            <div className="form-actions compact-actions"><button className="ghost-button" disabled={isGoogleDocsBusy} onClick={onConnectGoogleDocs} type="button">{isGoogleDocsConnected ? 'Reconnect Docs' : 'Connect Docs'}</button><button className="ghost-button" disabled={!isGoogleDocsConnected || isGoogleDocsBusy} onClick={onDisconnectGoogleDocs} type="button">Disconnect</button></div>
+          </article>
+
+          <article className="connected-service-card">
             <div className="connected-service-summary">
+              <img className="connected-service-icon" src="/service-icons/google-sheets.svg" alt="" />
               <div>
                 <p className="detail-label">Google Sheets</p>
-                <strong>{isGoogleSheetsConnected ? 'Sheets connected' : 'Sheets not connected'}</strong>
-                <span>Read linked set list spreadsheets for gig setlist imports.</span>
+                <ServiceStatus connected={isGoogleSheetsConnected}>{isGoogleSheetsConnected ? 'Connected' : 'Not connected'}</ServiceStatus>
               </div>
-              <span
-                aria-hidden="true"
-                className={`service-connection-indicator ${
-                  isGoogleSheetsConnected ? 'connected' : 'disconnected'
-                }`}
-              />
             </div>
 
-            <span className="connected-service-note">
-              This asks for read-only access to Google Sheets and is separate from Drive publishing.
-            </span>
+            <details className="connected-service-details"><summary>Details</summary><span className="connected-service-note">Read linked set list spreadsheets for gig setlist imports. This asks for read-only access to Google Sheets and is separate from Drive publishing.</span></details>
 
             <div className="form-actions compact-actions">
               <button
@@ -174,21 +175,11 @@ export function ConnectedServicesModal({
 
           <article className="connected-service-card">
             <div className="connected-service-summary">
+              <img className="connected-service-icon" src="/service-icons/google-calendar.svg" alt="" />
               <div>
                 <p className="detail-label">Google Calendar</p>
-                <strong>{calendarStatusText}</strong>
-                <span>
-                  {googleCalendarStatus?.lastSuccessfulSyncAtUtc
-                    ? `Last synced ${new Date(googleCalendarStatus.lastSuccessfulSyncAtUtc).toLocaleString()}`
-                    : 'Confirmed and completed gigs sync to a dedicated Glovelly Gigs calendar.'}
-                </span>
+                <ServiceStatus connected={calendarConnected && !googleCalendarStatus?.requiresReconnection}>{calendarStatusText}</ServiceStatus>
               </div>
-              <span
-                aria-hidden="true"
-                className={`service-connection-indicator ${
-                  calendarConnected ? 'connected' : 'disconnected'
-                }`}
-              />
             </div>
 
             {googleCalendarStatus?.requiresReconnection ? (
@@ -199,9 +190,7 @@ export function ConnectedServicesModal({
               <span className="connected-service-error">{googleCalendarStatus.lastError}</span>
             ) : null}
 
-            <span className="connected-service-note">
-              Draft and cancelled gigs are skipped. Changes may take a few minutes to appear.
-            </span>
+            <details className="connected-service-details"><summary>Details</summary><span className="connected-service-note">{googleCalendarStatus?.lastSuccessfulSyncAtUtc ? `Last synced ${new Date(googleCalendarStatus.lastSuccessfulSyncAtUtc).toLocaleString()}. ` : ''}Confirmed and completed gigs sync to a dedicated Glovelly Gigs calendar. Draft and cancelled gigs are skipped. Changes may take a few minutes to appear.</span></details>
 
             <div className="form-actions compact-actions">
               <button
@@ -227,28 +216,22 @@ export function ConnectedServicesModal({
 
           <article className="connected-service-card">
             <div className="connected-service-summary">
+              <img className="connected-service-icon" src="/service-icons/forscore.png" alt="" />
               <div>
                 <p className="detail-label">forScore library</p>
-                <strong>
+                <ServiceStatus connected={!!forScoreLibrarySnapshot}>
                   {forScoreLibrarySnapshot
                     ? `${forScoreLibrarySnapshot.chartCount} chart(s) imported`
                     : 'No library snapshot'}
-                </strong>
-                <span>Upload a forScore .4sb library export for set list chart matching.</span>
+                </ServiceStatus>
               </div>
-              <span
-                aria-hidden="true"
-                className={`service-connection-indicator ${
-                  forScoreLibrarySnapshot ? 'connected' : 'disconnected'
-                }`}
-              />
             </div>
 
-            <span className="connected-service-note">
+            <details className="connected-service-details"><summary>Details</summary><span className="connected-service-note">Upload a forScore .4sb library export for set list chart matching.{' '}
               {forScoreLibrarySnapshot
                 ? `Active snapshot: ${forScoreLibrarySnapshot.originalFileName}, imported ${new Date(forScoreLibrarySnapshot.importedAtUtc).toLocaleString()}. Existing forScore set lists are ignored.`
                 : 'Glovelly only stores chart metadata from the backup. Existing forScore set lists, annotations and settings are ignored.'}
-            </span>
+            </span></details>
             <span className="connected-service-note">{forScoreLibraryStatus}</span>
             {forScoreLibraryStatus.includes('need review') && (
               <span className="connected-service-note">

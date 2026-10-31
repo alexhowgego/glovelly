@@ -52,8 +52,36 @@ public sealed class GoogleSheetsIntegrationEndpointsTests : IClassFixture<Glovel
         Assert.Equal(
             "openid email profile https://www.googleapis.com/auth/spreadsheets.readonly",
             query["scope"]);
-        Assert.Equal("http://localhost/integrations/google-sheets/callback", query["redirect_uri"]);
+        Assert.Equal("http://localhost/integrations/google/callback", query["redirect_uri"]);
         Assert.False(string.IsNullOrWhiteSpace(query["state"]));
+    }
+
+    [Fact]
+    public async Task ConnectDocs_RequestsDocumentScopeWithoutSheetsScope()
+    {
+        using var factory = CreateConfiguredFactory(new FakeGoogleSheetsOAuthTokenExchanger());
+        using var client = factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync("/integrations/google-docs/connect", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var scopes = QueryHelpers.ParseQuery(response.Headers.Location!.Query)["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains(GoogleScopes.DocumentsReadonly, scopes);
+        Assert.DoesNotContain(GoogleScopes.SpreadsheetsReadonly, scopes);
+    }
+
+    [Fact]
+    public async Task CallbackDocs_UsesProtectedStateAndSavesDocumentScope()
+    {
+        var exchanger = new FakeGoogleSheetsOAuthTokenExchanger { Response = new GoogleOAuthTokenResponse { AccessToken = "test", RefreshToken = "refresh", ExpiresIn = 3600, Scope = GoogleScopes.DocumentsReadonly, TokenType = "Bearer" } };
+        using var factory = CreateConfiguredFactory(exchanger);
+        using var client = factory.CreateClient(new() { AllowAutoRedirect = false });
+        var connect = await client.GetAsync("/integrations/google-docs/connect", TestContext.Current.CancellationToken);
+        var state = QueryHelpers.ParseQuery(connect.Headers.Location!.Query)["state"].ToString();
+        var callback = await client.GetAsync($"/integrations/google/callback?code=test&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Redirect, callback.StatusCode);
+        Assert.Equal("/?integration=google-docs&status=callback-received", callback.Headers.Location?.OriginalString);
+        using var scope = factory.Services.CreateScope();
+        var connection = await scope.ServiceProvider.GetRequiredService<AppDbContext>().GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Contains(GoogleScopes.DocumentsReadonly, connection.GrantedScopes);
     }
 
     [Fact]
@@ -116,14 +144,14 @@ public sealed class GoogleSheetsIntegrationEndpointsTests : IClassFixture<Glovel
         });
 
         var response = await client.GetAsync(
-            $"/integrations/google-sheets/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+            $"/integrations/google/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(
             "/?integration=google-sheets&status=callback-received",
             response.Headers.Location?.OriginalString);
         Assert.Equal("auth-code", tokenExchanger.Code);
-        Assert.Equal("http://localhost/integrations/google-sheets/callback", tokenExchanger.RedirectUri);
+        Assert.Equal("http://localhost/integrations/google/callback", tokenExchanger.RedirectUri);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -165,7 +193,7 @@ public sealed class GoogleSheetsIntegrationEndpointsTests : IClassFixture<Glovel
         });
 
         var response = await client.GetAsync(
-            $"/integrations/google-sheets/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+            $"/integrations/google/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         using var assertionScope = factory.Services.CreateScope();
@@ -199,7 +227,7 @@ public sealed class GoogleSheetsIntegrationEndpointsTests : IClassFixture<Glovel
         });
 
         var response = await client.GetAsync(
-            $"/integrations/google-sheets/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+            $"/integrations/google/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
@@ -242,32 +270,114 @@ public sealed class GoogleSheetsIntegrationEndpointsTests : IClassFixture<Glovel
     }
 
     [Fact]
+    public async Task DocsStatusAndDisconnect_PreserveOtherScopes()
+    {
+        await SeedGoogleConnectionAsync(_factory, $"{GoogleScopes.DocumentsReadonly} {GoogleScopes.SpreadsheetsReadonly}");
+        var before = await _client.GetFromJsonAsync<JsonElement>("/auth/me", TestContext.Current.CancellationToken);
+        Assert.True(before.GetProperty("isGoogleDocsConnected").GetBoolean());
+        Assert.Equal(HttpStatusCode.NoContent, (await _client.PostAsync("/integrations/google-docs/disconnect", null, TestContext.Current.CancellationToken)).StatusCode);
+        var after = await _client.GetFromJsonAsync<JsonElement>("/auth/me", TestContext.Current.CancellationToken);
+        Assert.False(after.GetProperty("isGoogleDocsConnected").GetBoolean());
+        Assert.True(after.GetProperty("isGoogleSheetsConnected").GetBoolean());
+    }
+
+    [Fact]
+    public async Task SheetsDisconnect_PreservesDocsScope()
+    {
+        await SeedGoogleConnectionAsync(_factory, $"{GoogleScopes.DocumentsReadonly} {GoogleScopes.SpreadsheetsReadonly}");
+        Assert.Equal(HttpStatusCode.NoContent, (await _client.PostAsync("/integrations/google-sheets/disconnect", null, TestContext.Current.CancellationToken)).StatusCode);
+        var after = await _client.GetFromJsonAsync<JsonElement>("/auth/me", TestContext.Current.CancellationToken);
+        Assert.True(after.GetProperty("isGoogleDocsConnected").GetBoolean());
+        Assert.False(after.GetProperty("isGoogleSheetsConnected").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData("/integrations/google-docs/disconnect", GoogleScopes.DocumentsReadonly)]
+    [InlineData("/integrations/google-sheets/disconnect", GoogleScopes.SpreadsheetsReadonly)]
+    public async Task Disconnect_LastScope_ClearsTokens(string path, string scopeValue)
+    {
+        await SeedGoogleConnectionAsync(_factory, scopeValue);
+        Assert.Equal(HttpStatusCode.NoContent, (await _client.PostAsync(path, null, TestContext.Current.CancellationToken)).StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var connection = await scope.ServiceProvider.GetRequiredService<AppDbContext>().GoogleConnections.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(connection.RevokedAtUtc);
+        Assert.Empty(connection.EncryptedAccessToken);
+        Assert.Empty(connection.EncryptedRefreshToken);
+    }
+
+    [Fact]
     public async Task Callback_WithoutState_ReturnsValidationProblem()
     {
-        var response = await _client.GetAsync("/integrations/google-sheets/callback", TestContext.Current.CancellationToken);
+        var response = await _client.GetAsync("/integrations/google/callback", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
-            "Google Sheets OAuth state is required.",
+            "Google OAuth state is required.",
             problem.GetProperty("errors").GetProperty("state")[0].GetString());
     }
 
-    private static string CreateGoogleSheetsStateToken(IServiceProvider services, Guid? userId = null)
+    [Theory]
+    [InlineData("forged")]
+    [InlineData("other-user")]
+    [InlineData("unknown-integration")]
+    [InlineData("expired")]
+    public async Task Callback_RejectsInvalidState(string kind)
+    {
+        var state = kind switch
+        {
+            "forged" => "not-protected",
+            "other-user" => CreateGoogleSheetsStateToken(_factory.Services, Guid.NewGuid()),
+            "unknown-integration" => CreateGoogleSheetsStateToken(_factory.Services, integrationId: "drive"),
+            _ => CreateGoogleSheetsStateToken(_factory.Services, lifetime: TimeSpan.FromSeconds(-1)),
+        };
+        var response = await _client.GetAsync($"/integrations/google/callback?code=test&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Contains("invalid or expired", problem.GetProperty("errors").GetProperty("state")[0].GetString());
+    }
+
+    [Fact]
+    public async Task DocsCallback_WhenScopeMissing_ReturnsDocsSpecificError()
+    {
+        using var factory = CreateConfiguredFactory(new FakeGoogleSheetsOAuthTokenExchanger());
+        using var client = factory.CreateClient(new() { AllowAutoRedirect = false });
+        var connect = await client.GetAsync("/integrations/google-docs/connect", TestContext.Current.CancellationToken);
+        var state = QueryHelpers.ParseQuery(connect.Headers.Location!.Query)["state"].ToString();
+        var callback = await client.GetAsync($"/integrations/google/callback?code=test&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, callback.StatusCode);
+        var problem = await callback.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Google authorization did not grant the required Docs scope.", problem.GetProperty("errors").GetProperty("scope")[0].GetString());
+    }
+
+    [Fact]
+    public async Task DocsCallback_WhenDenied_UsesDocsSpecificError()
+    {
+        using var factory = CreateConfiguredFactory(new FakeGoogleSheetsOAuthTokenExchanger());
+        using var client = factory.CreateClient(new() { AllowAutoRedirect = false });
+        var connect = await client.GetAsync("/integrations/google-docs/connect", TestContext.Current.CancellationToken);
+        var state = QueryHelpers.ParseQuery(connect.Headers.Location!.Query)["state"].ToString();
+        var callback = await client.GetAsync($"/integrations/google/callback?error=access_denied&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, callback.StatusCode);
+        var problem = await callback.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+        Assert.Equal("Google Docs connection was not approved.", problem.GetProperty("title").GetString());
+    }
+
+    private static string CreateGoogleSheetsStateToken(IServiceProvider services, Guid? userId = null, string integrationId = "google-sheets", TimeSpan? lifetime = null)
     {
         using var scope = services.CreateScope();
         var dataProtectionProvider = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
         var protector = dataProtectionProvider
-            .CreateProtector("Glovelly.GoogleSheetsOAuthState")
+            .CreateProtector("Glovelly.GoogleIntegrationOAuthState")
             .ToTimeLimitedDataProtector();
 
         return protector.Protect(
             JsonSerializer.Serialize(new
             {
                 userId = userId ?? TestAuthContext.UserId,
-                createdUtc = DateTime.UtcNow,
+                integrationId,
             }, JsonOptions),
-            lifetime: TimeSpan.FromMinutes(15));
+            lifetime: lifetime ?? TimeSpan.FromMinutes(15));
     }
 
     private WebApplicationFactory<Program> CreateConfiguredFactory(

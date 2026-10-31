@@ -60,7 +60,7 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         Assert.Equal("offline", query["access_type"]);
         Assert.Equal("consent", query["prompt"]);
         Assert.Equal(
-            "http://localhost/integrations/google-drive/callback",
+            "http://localhost/integrations/google/callback",
             query["redirect_uri"]);
         Assert.False(string.IsNullOrWhiteSpace(query["state"]));
     }
@@ -83,7 +83,7 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
 
         var location = Assert.IsType<Uri>(response.Headers.Location);
         var query = QueryHelpers.ParseQuery(location.Query);
-        Assert.Equal("https://menu.glovelly.net/integrations/google-drive/callback", query["redirect_uri"]);
+        Assert.Equal("https://menu.glovelly.net/integrations/google/callback", query["redirect_uri"]);
     }
 
     [Fact]
@@ -146,14 +146,14 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         });
 
         var response = await client.GetAsync(
-            $"/integrations/google-drive/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+            $"/integrations/google/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(
             "/?integration=google-drive&status=callback-received",
             response.Headers.Location?.OriginalString);
         Assert.Equal("auth-code", tokenExchanger.Code);
-        Assert.Equal("http://localhost/integrations/google-drive/callback", tokenExchanger.RedirectUri);
+        Assert.Equal("http://localhost/integrations/google/callback", tokenExchanger.RedirectUri);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -219,7 +219,7 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         });
 
         var response = await client.GetAsync(
-            $"/integrations/google-drive/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+            $"/integrations/google/callback?code=auth-code&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
@@ -237,13 +237,13 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
     [Fact]
     public async Task Callback_WithoutState_ReturnsValidationProblem()
     {
-        var response = await _client.GetAsync("/integrations/google-drive/callback", TestContext.Current.CancellationToken);
+        var response = await _client.GetAsync("/integrations/google/callback", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
-            "Google Drive OAuth state is required.",
+            "Google OAuth state is required.",
             problem.GetProperty("errors").GetProperty("state")[0].GetString());
     }
 
@@ -251,13 +251,13 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
     public async Task Callback_WithInvalidState_ReturnsValidationProblem()
     {
         var response = await _client.GetAsync(
-            "/integrations/google-drive/callback?code=auth-code&state=not-a-state-token", TestContext.Current.CancellationToken);
+            "/integrations/google/callback?code=auth-code&state=not-a-state-token", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
         Assert.Equal(
-            "Google Drive OAuth state is invalid or expired.",
+            "Google OAuth state is invalid or expired.",
             problem.GetProperty("errors").GetProperty("state")[0].GetString());
     }
 
@@ -267,7 +267,7 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         var state = CreateGoogleDriveStateToken();
 
         var response = await _client.GetAsync(
-            $"/integrations/google-drive/callback?state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+            $"/integrations/google/callback?state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -283,7 +283,7 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         var state = CreateGoogleDriveStateToken();
 
         var response = await _client.GetAsync(
-            $"/integrations/google-drive/callback?error=access_denied&error_description=User%20cancelled&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
+            $"/integrations/google/callback?error=access_denied&error_description=User%20cancelled&state={Uri.EscapeDataString(state)}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -393,14 +393,14 @@ public sealed class GoogleDriveIntegrationEndpointsTests : IClassFixture<Glovell
         using var scope = services.CreateScope();
         var dataProtectionProvider = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
         var protector = dataProtectionProvider
-            .CreateProtector("Glovelly.GoogleDriveOAuthState")
+            .CreateProtector("Glovelly.GoogleIntegrationOAuthState")
             .ToTimeLimitedDataProtector();
 
         return protector.Protect(
             JsonSerializer.Serialize(new
             {
                 userId = userId ?? TestAuthContext.UserId,
-                createdUtc = DateTime.UtcNow,
+                integrationId = "google-drive",
             }, JsonOptions),
             lifetime: TimeSpan.FromMinutes(15));
     }

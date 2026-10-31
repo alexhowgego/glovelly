@@ -17,12 +17,13 @@ internal static class UserFixtureReset
         var expenseIds = await db.GigExpenses.Where(value => gigIds.Contains(value.GigId)).Select(value => value.Id).ToListAsync(cancellationToken);
         var resourceIds = await db.GigExternalResources.Where(value => gigIds.Contains(value.GigId)).Select(value => value.Id).ToListAsync(cancellationToken);
         var importBatchIds = await db.GigImportBatches.Where(value => value.CreatedByUserId == userId).Select(value => value.Id).ToListAsync(cancellationToken);
+        var importSourceKeys = await db.GigImportBatches.Where(value => value.CreatedByUserId == userId && value.SourceStorageKey != null).Select(value => value.SourceStorageKey!).ToListAsync(cancellationToken);
         var librarySnapshotIds = await db.ForScoreLibrarySnapshots.Where(value => value.CreatedByUserId == userId).Select(value => value.Id).ToListAsync(cancellationToken);
         var setListImportIds = await db.GigSetListImports.Where(value => gigIds.Contains(value.GigId)).Select(value => value.Id).ToListAsync(cancellationToken);
         var expenseAttachments = await db.ExpenseAttachments.Where(value => expenseIds.Contains(value.GigExpenseId)).ToListAsync(cancellationToken);
         var resourceAttachments = await db.GigExternalResourceAttachments.Where(value => resourceIds.Contains(value.GigExternalResourceId)).ToListAsync(cancellationToken);
 
-        foreach (var storageKey in expenseAttachments.Select(value => value.StorageKey).Concat(resourceAttachments.Select(value => value.StorageKey)))
+        foreach (var storageKey in expenseAttachments.Select(value => value.StorageKey).Concat(resourceAttachments.Select(value => value.StorageKey)).Concat(importSourceKeys))
         {
             await attachmentStore.DeleteAsync(storageKey, cancellationToken);
         }

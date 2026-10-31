@@ -58,6 +58,30 @@ internal static class GigImportEndpoints
             return Results.Ok(ToDetail(batch, duplicateWarnings));
         });
 
+        group.MapGet("/{batchId:guid}/source", async (
+            Guid batchId,
+            AppDbContext db,
+            ClaimsPrincipal user,
+            ICurrentUserAccessor currentUserAccessor,
+            IExpenseAttachmentStore store,
+            CancellationToken cancellationToken) =>
+        {
+            var userId = currentUserAccessor.TryGetUserId(user);
+            if (!userId.HasValue) return Results.Unauthorized();
+            var batch = await db.GigImportBatches.AsNoTracking()
+                .FirstOrDefaultAsync(value => value.Id == batchId && value.CreatedByUserId == userId, cancellationToken);
+            if (batch?.SourceStorageKey is null) return Results.NotFound();
+            try
+            {
+                var source = await store.OpenReadAsync(batch.SourceStorageKey, cancellationToken);
+                return Results.File(source.Content, batch.SourceContentType ?? "application/octet-stream", batch.SourceName);
+            }
+            catch (FileNotFoundException)
+            {
+                return Results.NotFound();
+            }
+        });
+
         group.MapPut("/{batchId:guid}/drafts/{draftId:guid}", async (
             Guid batchId,
             Guid draftId,
@@ -465,7 +489,9 @@ internal static class GigImportEndpoints
             batch.Drafts.Count(draft => draft.Status == GigImportDraftStatus.Committed),
             batch.Drafts.Count(draft => draft.Confidence == GigImportDraftConfidence.Low),
             batch.Drafts.Count(draft => draft.Confidence == GigImportDraftConfidence.Medium),
-            batch.Drafts.Count(draft => draft.Confidence == GigImportDraftConfidence.High));
+            batch.Drafts.Count(draft => draft.Confidence == GigImportDraftConfidence.High),
+            batch.SourceStorageKey is not null,
+            batch.SourceUrl);
     }
 
     private static GigImportBatchDetailDto ToDetail(
@@ -646,7 +672,9 @@ public sealed record GigImportBatchSummaryDto(
     int CommittedCount,
     int LowConfidenceCount,
     int MediumConfidenceCount,
-    int HighConfidenceCount);
+    int HighConfidenceCount,
+    bool HasSource,
+    string? SourceUrl);
 public sealed record GigImportBatchDetailDto(GigImportBatchSummaryDto Batch, IReadOnlyList<GigImportDraftDetailDto> Drafts);
 public sealed record GigImportDraftDetailDto(
     Guid DraftId,

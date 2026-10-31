@@ -1,4 +1,5 @@
 import { formatCurrency, formatDate, formatGigType } from '../formatters'
+import { buildApiUrl } from '../api'
 import type { Client, GigImportBatchDetail, GigImportBatchSummary, GigImportDraft } from '../types'
 import type { GigImportDraftField } from '../hooks/useGigImportsWorkspace'
 
@@ -135,6 +136,7 @@ export function GigImportsModal({
             <p className="detail-label">Import status</p>
             <span>{gigImportStatus || 'Review rows, accept the ones you trust, then commit them into real gigs.'}</span>
           </div>
+          {batchDetail?.batch.hasSource && <p><a href={buildApiUrl(`/gig-imports/${batchDetail.batch.batchId}/source`)}>Download source used for this import</a>{batchDetail.batch.sourceUrl && <> · <a href={batchDetail.batch.sourceUrl} target="_blank" rel="noreferrer">Open original Google Doc</a></>}</p>}
 
           {batchDetail ? (
             <div className="gig-import-draft-list">

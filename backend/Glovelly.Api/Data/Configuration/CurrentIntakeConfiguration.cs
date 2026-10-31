@@ -13,6 +13,10 @@ internal sealed class CurrentIntakeConfiguration : IEntityTypeConfiguration<Curr
         entity.Property(value => value.SourceType).HasConversion<string>().HasMaxLength(16);
         entity.Property(value => value.AnalysisState).HasConversion<string>().HasMaxLength(16);
         entity.Property(value => value.Intent).HasConversion<string>().HasMaxLength(16);
+        entity.Property(value => value.IntentOverride).HasConversion<string>().HasMaxLength(16);
+        entity.Property(value => value.IntentEvidenceJson).HasMaxLength(32_768);
+        entity.Property(value => value.PreparationState).HasConversion<string>().HasMaxLength(16);
+        entity.Property(value => value.PreparationError).HasMaxLength(500);
         entity.Property(value => value.Confidence).HasConversion<string>().HasMaxLength(16);
         entity.Property(value => value.FileName).HasMaxLength(255);
         entity.Property(value => value.ContentType).HasMaxLength(255);

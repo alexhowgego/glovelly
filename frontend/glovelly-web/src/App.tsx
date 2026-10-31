@@ -412,6 +412,11 @@ function App({ appMetadata }: AppProps) {
       mergeSavedGig(application.gig)
       if (application.invoices) setInvoices(current => current.map(invoice => application.invoices!.find(value => value.id === invoice.id) ?? invoice))
     },
+    onReviewImport: (batchId) => {
+      selectGigImportBatch(batchId)
+      void loadGigImportBatches(true)
+      setIsGigImportsOpen(true)
+    },
     onSessionExpired: expireSession,
   })
   useEffect(() => { resetIntakeRef.current = unifiedIntake.reset }, [unifiedIntake.reset])
@@ -421,14 +426,17 @@ function App({ appMetadata }: AppProps) {
     connectGoogleCalendar,
     connectGoogleDrive,
     connectGoogleSheets,
+    connectGoogleDocs,
     disconnectGoogleCalendar,
     disconnectGoogleDrive,
     disconnectGoogleSheets,
+    disconnectGoogleDocs,
     googleCalendarStatus,
     handleUserSettingsSubmit,
     isGoogleCalendarBusy,
     isGoogleDriveBusy,
     isGoogleSheetsBusy,
+    isGoogleDocsBusy,
     isConnectedServicesOpen,
     isUserSettingsOpen,
     isUserSettingsSaving,
@@ -1930,6 +1938,8 @@ function App({ appMetadata }: AppProps) {
         isGoogleDriveConnected={authUser?.isGoogleDriveConnected ?? false}
         isGoogleSheetsBusy={isGoogleSheetsBusy}
         isGoogleSheetsConnected={authUser?.isGoogleSheetsConnected ?? false}
+        isGoogleDocsBusy={isGoogleDocsBusy}
+        isGoogleDocsConnected={authUser?.isGoogleDocsConnected ?? false}
         isForScoreLibraryUploading={isForScoreLibraryUploading}
         isOpen={isConnectedServicesOpen}
         isSaving={isUserSettingsSaving}
@@ -1937,9 +1947,11 @@ function App({ appMetadata }: AppProps) {
         onConnectGoogleCalendar={connectGoogleCalendar}
         onConnectGoogleDrive={connectGoogleDrive}
         onConnectGoogleSheets={connectGoogleSheets}
+        onConnectGoogleDocs={connectGoogleDocs}
         onDisconnectGoogleCalendar={disconnectGoogleCalendar}
         onDisconnectGoogleDrive={disconnectGoogleDrive}
         onDisconnectGoogleSheets={disconnectGoogleSheets}
+        onDisconnectGoogleDocs={disconnectGoogleDocs}
         onForScoreLibraryFile={uploadForScoreLibrary}
         onOpenSettings={openSettingsFromServices}
         status={userSettingsStatus}
@@ -1956,7 +1968,12 @@ function App({ appMetadata }: AppProps) {
         status={sellerProfileStatus}
       />
 
-      <UnifiedIntakeModal workflow={unifiedIntake} clientNamesById={clientNamesById} />
+      <UnifiedIntakeModal workflow={unifiedIntake} clientNamesById={clientNamesById} onGoToGig={gigId => {
+        if (!selectGig(gigId)) return
+        setActiveSection('gigs')
+        unifiedIntake.close()
+        window.requestAnimationFrame(() => revealWorkspaceTarget(document.getElementById('gig-overview')))
+      }} />
       {unifiedIntake.state.phase === 'review' && <AttachmentReviewModal
         application={unifiedIntake.state.application}
         evidence={unifiedIntake.state.evidence}

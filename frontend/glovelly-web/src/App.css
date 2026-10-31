@@ -776,6 +776,13 @@
   gap: 16px;
 }
 
+.intake-source-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
 .intake-source-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1311,33 +1318,80 @@
 
 .connected-services-grid {
   display: grid;
-  gap: 12px;
+  gap: 6px;
 }
 
 .connected-service-card {
   display: grid;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 20px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
   background: var(--surface-panel);
   border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
 }
 
 .connected-service-summary {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.connected-service-card > .compact-actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-content: flex-end;
+}
+
+.connected-service-card > .connected-service-details,
+.connected-service-card > .connected-service-note,
+.connected-service-card > .connected-service-error {
+  grid-column: 1 / -1;
+}
+
+.connected-service-card > .connected-service-note:empty { display: none; }
+
+.connected-service-details {
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+}
+
+.connected-service-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.connected-service-details[open] summary { margin-bottom: 4px; }
+
+.connected-service-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .connected-service-summary > div,
 .compact-service-field {
   display: grid;
-  gap: 6px;
+  gap: 3px;
 }
 
 .connected-service-summary strong {
   color: var(--heading);
+}
+
+.connected-service-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 700px) {
+  .connected-service-card { grid-template-columns: minmax(0, 1fr); }
+  .connected-service-card > .compact-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; }
 }
 
 .connected-service-summary span,
@@ -1356,17 +1410,16 @@
 
 .service-connection-indicator {
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  margin-top: 4px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: #a65f27;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #a65f27 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #a65f27 18%, transparent);
 }
 
 .service-connection-indicator.connected {
   background: #2b8c67;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #2b8c67 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #2b8c67 18%, transparent);
 }
 
 .seller-profile-layout {

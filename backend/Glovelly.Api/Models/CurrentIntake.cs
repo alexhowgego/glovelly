@@ -2,7 +2,8 @@ namespace Glovelly.Api.Models;
 
 public enum IntakeSourceType { File, Url, Text }
 public enum IntakeAnalysisState { Pending, Succeeded, Failed }
-public enum IntakeIntent { Unknown, Receipt, Resource }
+public enum IntakeIntent { Unknown, Receipt, Resource, Gigs }
+public enum IntakePreparationState { None, Pending, Running, Failed }
 public enum AutomaticReceiptMatching { ManualOnly, VeryHighConfidence, HighConfidence, MediumConfidence }
 
 public sealed class CurrentIntake
@@ -18,7 +19,14 @@ public sealed class CurrentIntake
     public string? Url { get; set; }
     public string? Text { get; set; }
     public IntakeAnalysisState AnalysisState { get; set; }
+    public bool AnalysisInBackground { get; set; }
     public IntakeIntent Intent { get; set; }
+    public IntakeIntent? IntentOverride { get; set; }
+    public string? IntentEvidenceJson { get; set; }
+    public IntakePreparationState PreparationState { get; set; }
+    public Guid? PreparationId { get; set; }
+    public DateTimeOffset? PreparationStartedAt { get; set; }
+    public string? PreparationError { get; set; }
     public ReceiptAnalysisConfidence Confidence { get; set; }
     public string? FailureCode { get; set; }
     public string? FailureMessage { get; set; }

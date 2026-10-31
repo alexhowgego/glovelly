@@ -65,7 +65,7 @@ Receipt analysis augments, but never blocks or silently changes, the manual expe
 ### Steps
 
 1. Select **Add to Glovelly** and confirm source type selection appears before a file picker. Choose **Photo or file**, enter unified upload, and choose a receipt photo/PDF. Repeat with pasted receipt text; URLs follow the resource journey.
-2. Confirm analysis starts immediately in upload, retains the source and shows progress. Provider failure offers retry and explicit **Attach as Receipt** treatment without losing the source.
+2. Confirm analysis starts immediately in upload, retains the source and shows progress. Provider failure offers retry and explicit **Treat as Receipt** treatment without losing the source.
 3. With High confidence enabled and a qualifying receipt, confirm it is proactively saved to the nearest visible non-cancelled nearby gig even when other candidates exist. Upload stays open with compact **Attached to [Gig]**, **Review attachment**, and **Done**. No dialog automatically closes, no review appears automatically, and no workspace navigation occurs.
 4. Select **Done** without entering review, then confirm the receipt is saved in its gig. Reopen Add to Glovelly and confirm source selection is clean. Repeat closing after attached state; background/refresh during a save and confirm recovery never creates another receipt.
 5. Set **Automatic receipt application** to Manual only and confirm upload waits for explicit attachment. Check Settings label/select alignment, hover help, and focus explanation. Restore the original preference after testing.

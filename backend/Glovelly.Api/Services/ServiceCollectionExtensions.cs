@@ -41,10 +41,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<DeterministicSetListChartContextualRanker>();
         services.AddScoped<VertexAiSetListChartContextualRanker>();
         services.AddScoped<ReceiptExtractionEngine>();
+        services.AddScoped<IIntakeIntentClassifier, VertexIntakeIntentClassifier>();
+        services.AddScoped<GoogleDocIntakeReader>();
+        services.AddScoped<IIntakeGigExtractor>(provider => new IntakeGigExtractor(provider.GetRequiredService<IExpenseAttachmentStore>(), provider.GetRequiredService<IOptions<ReceiptAnalysisSettings>>(), provider.GetRequiredService<ReceiptAnalysisBudget>(), null, provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ILogger<IntakeGigExtractor>>()));
         services.AddSingleton<ReceiptAnalysisBudget>();
         services.AddScoped<IReceiptAnalysisService, AttachmentReceiptAnalysisService>();
         services.AddScoped<IntakeAnalysisService>();
         services.AddScoped<IntakeApplicationService>();
+        services.AddScoped<IntakeGigDraftService>();
         services.AddScoped<ReceiptSaveEffects>();
         services.AddScoped<IntakeWorkflowService>();
         services.AddSingleton<IntakeCommandLocks>();

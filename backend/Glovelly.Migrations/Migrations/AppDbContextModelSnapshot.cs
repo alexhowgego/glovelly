@@ -17,7 +17,7 @@ namespace Glovelly.Migrations.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -228,6 +228,9 @@ namespace Glovelly.Migrations.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("AnalysisInBackground")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("AnalysisState")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -263,6 +266,29 @@ namespace Glovelly.Migrations.Migrations
                         .HasColumnType("character varying(255)");
 
                     b.Property<string>("Intent")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("IntentEvidenceJson")
+                        .HasMaxLength(32768)
+                        .HasColumnType("character varying(32768)");
+
+                    b.Property<string>("IntentOverride")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("PreparationError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PreparationStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PreparationState")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
@@ -769,14 +795,37 @@ namespace Glovelly.Migrations.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("SourceContentType")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("SourceEvidenceJson")
+                        .HasMaxLength(32768)
+                        .HasColumnType("character varying(32768)");
+
                     b.Property<string>("SourceFingerprint")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("SourceIntakeId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("SourceName")
                         .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
+
+                    b.Property<string>("SourceStorageKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -790,6 +839,9 @@ namespace Glovelly.Migrations.Migrations
                     b.HasIndex("SourceFingerprint");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("CreatedByUserId", "SourceIntakeId")
+                        .IsUnique();
 
                     b.ToTable("GigImportBatches");
                 });

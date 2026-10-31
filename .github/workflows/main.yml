@@ -321,6 +321,23 @@ jobs:
           GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
         run: bash .github/scripts/deploy-calendar-sync-job.sh
 
+      - name: Deploy intake preparation job staging
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
+          DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+          GCP_BUCKET_NAME: ${{ vars.GCP_BUCKET_NAME }}
+          GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          GCP_CONNECTION_STRING_SECRET_ID: ${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}
+          GCP_CHATGPT_REDIRECT_SECRET_ID: ${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}
+          GCP_UAT_SECRET_ID: ${{ vars.GCP_UAT_SECRET_ID }}
+          GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
+          RECEIPT_ANALYSIS_ENABLED: ${{ vars.RECEIPT_ANALYSIS_ENABLED || 'false' }}
+          RECEIPT_ANALYSIS_VERTEX_AI_PROJECT_ID: ${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_PROJECT_ID || env.GCP_PROJECT_ID }}
+          RECEIPT_ANALYSIS_VERTEX_AI_LOCATION: ${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_LOCATION || 'eu' }}
+          RECEIPT_ANALYSIS_VERTEX_AI_MODEL: ${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_MODEL || 'gemini-3.1-flash-lite' }}
+        run: bash .github/scripts/deploy-intake-preparation-job.sh
+
       - name: Deploy Business lifecycle job staging
         env:
           IMAGE_URI: ${{ needs.build.outputs.image_uri }}
@@ -599,6 +616,22 @@ jobs:
           CALENDAR_SYNC_SCHEDULE: ${{ vars.CALENDAR_SYNC_SCHEDULE }}
           GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
         run: bash .github/scripts/deploy-calendar-sync-job.sh
+
+      - name: Deploy intake preparation job production
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
+          DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+          GCP_BUCKET_NAME: ${{ vars.GCP_BUCKET_NAME }}
+          GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          GCP_CONNECTION_STRING_SECRET_ID: ${{ vars.GCP_CONNECTION_STRING_SECRET_ID }}
+          GCP_CHATGPT_REDIRECT_SECRET_ID: ${{ vars.GCP_CHATGPT_REDIRECT_SECRET_ID }}
+          GCP_SCHEDULER_LOCATION: ${{ vars.GCP_SCHEDULER_LOCATION }}
+          RECEIPT_ANALYSIS_ENABLED: ${{ vars.RECEIPT_ANALYSIS_ENABLED || 'false' }}
+          RECEIPT_ANALYSIS_VERTEX_AI_PROJECT_ID: ${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_PROJECT_ID || env.GCP_PROJECT_ID }}
+          RECEIPT_ANALYSIS_VERTEX_AI_LOCATION: ${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_LOCATION || 'eu' }}
+          RECEIPT_ANALYSIS_VERTEX_AI_MODEL: ${{ vars.RECEIPT_ANALYSIS_VERTEX_AI_MODEL || 'gemini-3.1-flash-lite' }}
+        run: bash .github/scripts/deploy-intake-preparation-job.sh
 
       - name: Deploy Business lifecycle job production
         env:

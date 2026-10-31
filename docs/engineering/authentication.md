@@ -60,11 +60,18 @@ The Google sign-in flow is separate from optional Google service authorisation. 
 
 - `/integrations/google-drive/connect` requests `https://www.googleapis.com/auth/drive.file` for invoice PDF publishing.
 - `/integrations/google-sheets/connect` requests `https://www.googleapis.com/auth/spreadsheets.readonly` for setlist import.
+- `/integrations/google-docs/connect` requests `https://www.googleapis.com/auth/documents.readonly` for Google Doc intake. This broad read-only permission is optional and is disclosed before connecting; resource attachment does not need it.
 - `/integrations/google-calendar/connect` requests the Calendar scopes needed by the gig sync service.
 
-Drive and Sheets can be connected or disconnected independently from the profile `Services` menu. Disconnecting one service removes that local scope and revokes the shared token record only when no Google service scopes remain.
+Drive, Sheets and Docs can be connected or disconnected independently from the profile `Services` menu. Disconnecting one service removes that local scope and revokes the shared token record only when no Google service scopes remain; it does not revoke Google's grant.
 
 The Sheets readonly scope may require an HTTPS-only OAuth client in Google Cloud. Local HTTP development can continue using Drive without requesting Sheets; use staging or an HTTPS tunnel when testing the Sheets flow against real Google OAuth.
+
+Drive, Sheets, Docs and Calendar use the shared OAuth callback `/integrations/google/callback`. Before deploying this change, register the full callback URI for each local, staging and production OAuth client using its configured public API origin. Register the new URI before deployment; after all four integrations are verified, remove the old `/integrations/google-drive/callback`, `/integrations/google-sheets/callback` and `/integrations/google-calendar/callback` URIs. In-flight authorizations using the old callbacks must be restarted; saved connections are unaffected.
+
+The current deployed callback URIs are `https://staging.glovelly.net/integrations/google/callback` and `https://menu.glovelly.net/integrations/google/callback`. Local development derives its callback origin from `App:PublicBaseUrl` or the first configured allowed CORS origin (falling back to `http://localhost:5173`); verify the actual origin and OAuth client configuration before registering it.
+
+Before enabling Google Doc intake in production, enable the Google Docs API for the OAuth project and verify the consent-screen scope, verification status, registered shared callback URI, user-facing privacy disclosure, and the runtime account's Vertex access. Exercise connection, denial, revocation, retry and resource-only fallback on staging. Users can revoke Docs access in their Google Account; a retained batch snapshot is not removed by revocation.
 
 ## Staging UAT Authentication
 

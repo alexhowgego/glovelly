@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 19 October 2026
+Last updated: 31 October 2026
 
 This privacy policy explains how Glovelly handles personal information when you use:
 
@@ -41,8 +41,8 @@ Glovelly may collect and store the following categories of information.
 - Gig details such as dates, venues, fees, mileage, passenger counts, and status.
 - Expense details such as descriptions, categories, amounts, tax treatment, reimbursement status, and receipt attachments.
 - Receipt files or images uploaded by users. These may contain personal information visible on the receipt, such as names, partial payment card details, locations, timestamps, or purchase details.
-- When you request receipt analysis or submit a file or pasted text through Add to Glovelly, supported receipt content and minimal extraction context are sent to Google Cloud Vertex AI where analysis is enabled. Analysis of an existing receipt presents reviewable suggestions. Unified upload can automatically save a receipt to the nearest nearby gig according to your Automatic receipt application preference, including independently high-confidence merchant/category and a high-confidence total only when GBP currency is also confidently detected. Foreign or unknown-currency totals remain evidence for explicit GBP entry. You can choose Manual only and can review, correct, reassign, or delete saved receipts.
-- Add to Glovelly retains one private unapplied file, URL, or text source and its analysis outcome per user for recovery. Successful application retains the original source as the ordinary receipt/resource relationship and removes the private intake and transient file. Receipt analysis is promoted to the existing attachment-linked analysis records so field confidence, warnings and provenance remain reviewable. A source fingerprint is stored to detect conflicting upload retries without storing another copy of the content. Submitted URLs are analysed from metadata/type only; unified upload does not fetch linked Google Docs or Sheets contents.
+- When you request receipt analysis or submit supported text, files or an accessible Google Doc through Add to Glovelly, source content and minimal extraction context are sent to Google Cloud Vertex AI where analysis is enabled. Analysis presents reviewable suggestions. Unified upload can automatically save a receipt to the nearest nearby gig according to your Automatic receipt application preference, including independently high-confidence merchant/category and a high-confidence total only when GBP currency is also confidently detected. Foreign or unknown-currency totals remain evidence for explicit GBP entry. You can choose Manual only and can review, correct, reassign, or delete saved receipts. Gig information is prepared as a reviewable import batch; gigs are not created without a separate commit.
+- Add to Glovelly retains one private unapplied file, URL, or text source and its analysis outcome per user for recovery. Successful receipt or resource application retains the original source as the ordinary relationship and removes the private intake and transient file. Gig import preparation retains a source copy or Google Doc text snapshot and original link with the import batch for review, and removes the private intake. Receipt analysis is promoted to attachment-linked records so field confidence, warnings and provenance remain reviewable. A source fingerprint detects conflicting retries. With your Google Docs permission, unified upload reads submitted Google Docs; other URLs, including Sheets, are analysed from metadata/type only.
 - When you request set-list interpretation from a linked Google Sheet, the selected bounded worksheet grid, including displayed cell values and positions, is sent to Google Cloud Vertex AI. Glovelly validates the result and presents an editable draft; it does not alter the linked sheet or automatically select forScore charts.
 - Invoice details such as invoice numbers, line items, payment status, issue/reissue history, delivery details, PDF files, and Google Drive publication references.
 - Seller profile details used to generate invoices, such as trading name, address, payment details, invoice defaults, and tax or business identifiers where provided.
@@ -66,6 +66,10 @@ When Google Drive integration is enabled, Glovelly may store:
 - Metadata showing when an invoice was published to Drive and by which user.
 
 Google Drive access can be revoked through your Google Account permissions. If access is revoked, expires, or otherwise stops working, Google Drive publishing will stop until the connection is restored.
+
+### Google Docs intake data
+
+If you choose to connect Google Docs for intake, Glovelly requests read-only access to your Google Docs, not just the document you submit. It reads the content of supported document links you submit for analysis, retains a bounded text snapshot with any prepared import, and can send that content to Vertex AI. Connecting is optional and is not required to attach a link as a resource. You can disconnect Docs in Services to remove Glovelly's local access, or revoke access through your Google Account permissions; the latter may affect other Glovelly Google services. Previously prepared snapshots remain part of your import records.
 
 ### Google Calendar Integration Data
 
@@ -200,7 +204,7 @@ Glovelly keeps personal information only for as long as needed for the purposes 
 Typical retention expectations are:
 
 - account and access records: for the life of the account, then for a reasonable audit and security period after closure
-- Google OAuth tokens and connection data for Drive or Calendar: until the integration is disconnected, expires, is revoked, or the account is deleted, unless limited records are needed for audit or security purposes
+- Google OAuth tokens and connection data for Drive, Docs, Sheets or Calendar: until the integration is disconnected, expires, is revoked, or the account is deleted, unless limited records are needed for audit or security purposes
 - Google Calendar sync state and queue metadata: for as long as needed to operate, retry, diagnose, or rebuild the Calendar integration, unless earlier cleanup is appropriate
 - client, gig, expense, receipt, and invoice records: for as long as needed for business, tax, accounting, and dispute purposes
 - invoice, expense, receipt, and accounting records: normally at least 6 years after the relevant tax year or accounting period, where required for UK tax or accounting records
@@ -209,6 +213,7 @@ Typical retention expectations are:
 - logs and diagnostic records: normally for a limited operational period, such as up to 90 days, unless needed for security investigation, debugging, legal, accounting, or dispute purposes
 - receipt-analysis attempt metadata and validated suggestions: for as long as the associated receipt is retained for business, tax, accounting, or dispute purposes; provider responses and receipt content are not included in application logs
 - private unapplied intake source and analysis attempts: until replaced, explicitly discarded, or successfully applied; an unfinished intake has no automatic expiry. Receipt application promotes validated attempts to attachment analysis records, then removes the private intake attempts
+- gig import drafts, source copies and Google Doc snapshots: with the associated import records for business review and audit, until removed through account or operational data removal
 - documentation site technical records: according to the retention practices of GitHub or other hosting providers used to serve the site
 - Google Analytics event data: 14 months
 - map-preview signed URLs: active display memory only, not durable Glovelly storage; Google/browser handling is subject to provider headers and browser behavior

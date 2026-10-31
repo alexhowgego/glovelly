@@ -79,6 +79,7 @@ public sealed class IntakeApplicationService(AppDbContext db, IExpenseAttachment
         }
         var intake = await db.CurrentIntakes.Include(value => value.AnalysisAttempts).SingleOrDefaultAsync(value => value.Id == intakeId && value.UserId == userId, token);
         if (intake is null) return new(null, "source", "This intake is no longer available. Reopen Add to Glovelly to recover the saved item.");
+        if (intake.IntentOverride is not null && intake.IntentOverride != intent) return new(null, "intent", "The selected treatment changed. Choose it again before attaching this item.");
         if (intent is not (IntakeIntent.Receipt or IntakeIntent.Resource)) return new(null, "intent", "Choose receipt or resource.");
         if (intent == IntakeIntent.Receipt && intake.SourceType == IntakeSourceType.Url) return new(null, "source", "Choose a file or pasted receipt text rather than a URL for a receipt.");
         if (intent == IntakeIntent.Receipt && intake.SourceType == IntakeSourceType.File)

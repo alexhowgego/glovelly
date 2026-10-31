@@ -17,6 +17,14 @@ namespace Glovelly.Api.Tests;
 
 public sealed class IntakeEndpointsTests : IDisposable
 {
+    private sealed class FakeGigExtractor : IIntakeGigExtractor
+    {
+        public Task<IReadOnlyList<GigImportDraft>> ExtractAsync(CurrentIntake intake, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GigImportDraft>>([
+                new GigImportDraft { Id = Guid.NewGuid(), ProposedTitle = "First show", ProposedDate = new DateOnly(2027, 1, 1), SourceReference = "First show", Confidence = GigImportDraftConfidence.High },
+                new GigImportDraft { Id = Guid.NewGuid(), ProposedTitle = "Second show", SourceReference = "Second show", Confidence = GigImportDraftConfidence.Low },
+            ]);
+    }
     private readonly GlovellyApiFactory _factory;
     private readonly HttpClient _client;
 
@@ -41,6 +49,264 @@ public sealed class IntakeEndpointsTests : IDisposable
         var file = new ByteArrayContent("receipt"u8.ToArray()); file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
         form.Add(file, "file", "receipt.jpg"); form.Add(new StringContent(id.ToString()), "intakeId");
         return await client.PostAsync("/intake/current/file", form, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task NonReceiptOverride_PreventsAutomaticReceiptApplication()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.SingleAsync(value => value.Id == TestAuthContext.UserId, TestContext.Current.CancellationToken);
+        user.AutomaticReceiptMatching = AutomaticReceiptMatching.HighConfidence;
+        var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
+        db.Gigs.Add(new Gig { Id = Guid.NewGuid(), ClientId = TestData.RiversideId, Title = "Nearby gig", Date = DateOnly.FromDateTime(clock.GetLocalNow().DateTime), Venue = "Venue", Status = GigStatus.Confirmed, CreatedByUserId = TestAuthContext.UserId });
+        var intake = new CurrentIntake
+        {
+            Id = Guid.NewGuid(), UserId = TestAuthContext.UserId, SourceFingerprint = ReceiptFingerprint,
+            SourceType = IntakeSourceType.Text, Text = "Booking details", AnalysisState = IntakeAnalysisState.Succeeded,
+            Intent = IntakeIntent.Receipt, IntentOverride = IntakeIntent.Gigs, Confidence = ReceiptAnalysisConfidence.High,
+            EvidenceJson = ReceiptEvidence(),
+        };
+        db.CurrentIntakes.Add(intake);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await scope.ServiceProvider.GetRequiredService<IntakeWorkflowService>().CompleteAsync(intake, TestContext.Current.CancellationToken);
+
+        Assert.Empty(await db.GigExpenses.ToListAsync(TestContext.Current.CancellationToken));
+        Assert.NotNull(await db.CurrentIntakes.FindAsync([intake.Id], TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ManualGigDraft_RetainsSourceAndRecoversWithoutCreatingBusinessData()
+    {
+        var id = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.CurrentIntakes.Add(new CurrentIntake { Id = id, UserId = TestAuthContext.UserId, SourceFingerprint = "fingerprint", SourceType = IntakeSourceType.Text, Text = "Booking details", Intent = IntakeIntent.Unknown, AnalysisState = IntakeAnalysisState.Failed });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var first = await _client.PostAsJsonAsync("/intake/current/gig-drafts/manual", new { intakeId = id }, TestContext.Current.CancellationToken);
+        first.EnsureSuccessStatusCode();
+        var payload = await first.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(TestContext.Current.CancellationToken);
+        var batchId = payload.GetProperty("batchId").GetGuid();
+        var second = await _client.PostAsJsonAsync("/intake/current/gig-drafts/manual", new { intakeId = id }, TestContext.Current.CancellationToken);
+        second.EnsureSuccessStatusCode();
+        Assert.Equal(batchId, (await second.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(TestContext.Current.CancellationToken)).GetProperty("batchId").GetGuid());
+        Assert.Equal("Booking details", await (await _client.GetAsync($"/gig-imports/{batchId}/source", TestContext.Current.CancellationToken)).Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        using var check = _factory.Services.CreateScope();
+        var context = check.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Single(context.GigImportBatches.Where(value => value.SourceIntakeId == id));
+        Assert.Single(context.GigImportDrafts.Where(value => value.BatchId == batchId));
+        Assert.Empty(context.Gigs.Where(value => value.SourceImportBatchId == batchId));
+        Assert.Empty(context.GigExpenses);
+        Assert.Empty(context.CurrentIntakes);
+    }
+
+    [Fact]
+    public async Task IntentOverride_PersistsAcrossRetryAndDoesNotCreateBusinessData()
+    {
+        var id = Guid.NewGuid();
+        (await _client.PostAsJsonAsync("/intake/current", new { intakeId = id, sourceType = "text", value = "Booking details" }, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+        var changed = await _client.PutAsJsonAsync("/intake/current/intent", new { intakeId = id, intent = "Gigs" }, TestContext.Current.CancellationToken);
+        changed.EnsureSuccessStatusCode();
+        Assert.Equal("Gigs", (await changed.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(TestContext.Current.CancellationToken)).GetProperty("intentOverride").GetString());
+        (await _client.PostAsJsonAsync("/intake/current/retry", new { intakeId = id }, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+        var current = await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/intake/current", TestContext.Current.CancellationToken);
+        Assert.Equal("Gigs", current.GetProperty("intentOverride").GetString());
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(db.GigExpenses);
+        Assert.Empty(db.GigImportBatches.Where(value => value.SourceIntakeId == id));
+    }
+
+    [Fact]
+    public async Task GigPreparation_UnavailableProviderLeavesSourceAndManualFallback()
+    {
+        var id = Guid.NewGuid();
+        (await _client.PostAsJsonAsync("/intake/current", new { intakeId = id, sourceType = "text", value = "A gig to review" }, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+        var queued = await _client.PostAsJsonAsync("/intake/current/gig-drafts", new { intakeId = id }, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+        System.Text.Json.JsonElement status = default;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            status = await _client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/intake/current/gig-drafts/status?intakeId={id}", TestContext.Current.CancellationToken);
+            if (status.GetProperty("state").GetString() == "Failed") break;
+        }
+        Assert.Equal("Failed", status.GetProperty("state").GetString());
+        var current = await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/intake/current", TestContext.Current.CancellationToken);
+        Assert.Equal("A gig to review", current.GetProperty("sourceText").GetString());
+        var manual = await _client.PostAsJsonAsync("/intake/current/gig-drafts/manual", new { intakeId = id }, TestContext.Current.CancellationToken);
+        manual.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task CurrentSource_RequiresCurrentIdentity()
+    {
+        var id = Guid.NewGuid();
+        (await _client.PostAsJsonAsync("/intake/current", new { intakeId = id, sourceType = "text", value = "  Private booking information\n" }, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+        var source = await _client.GetAsync($"/intake/current/source?intakeId={id}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, source.StatusCode);
+        Assert.Equal("  Private booking information\n", await source.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync($"/intake/current/source?intakeId={Guid.NewGuid()}", TestContext.Current.CancellationToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task PdfAnalysis_RunsInBackgroundAndRetainsSourceOnFailure()
+    {
+        var id = Guid.NewGuid();
+        using var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent("synthetic pdf"u8.ToArray());
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        form.Add(file, "file", "booking.pdf");
+        form.Add(new StringContent(id.ToString()), "intakeId");
+        var response = await _client.PostAsync("/intake/current/file", form, TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        Assert.True((await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(TestContext.Current.CancellationToken)).GetProperty("analysisInBackground").GetBoolean());
+        System.Text.Json.JsonElement current = default;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            current = await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/intake/current", TestContext.Current.CancellationToken);
+            if (!current.GetProperty("analysisInBackground").GetBoolean()) break;
+        }
+        Assert.False(current.GetProperty("analysisInBackground").GetBoolean());
+        Assert.Equal("Failed", current.GetProperty("analysisState").GetString());
+        var source = await _client.GetAsync($"/intake/current/source?intakeId={id}", TestContext.Current.CancellationToken);
+        Assert.Equal("synthetic pdf", await source.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task GigPreparation_CreatesOneRecoverableBatchWithNoLiveGigs()
+    {
+        await using var isolated = new GlovellyApiFactory();
+        await using var configured = isolated.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IIntakeGigExtractor>();
+            services.AddScoped<IIntakeGigExtractor, FakeGigExtractor>();
+        }));
+        using var client = configured.CreateClient();
+        var id = Guid.NewGuid();
+        int originalClientCount;
+        await using (var setup = configured.Services.CreateAsyncScope())
+        {
+            var db = setup.ServiceProvider.GetRequiredService<AppDbContext>();
+            originalClientCount = await db.Clients.CountAsync(TestContext.Current.CancellationToken);
+            db.CurrentIntakes.Add(new CurrentIntake { Id = id, UserId = TestAuthContext.UserId, SourceType = IntakeSourceType.Text, Text = "First show\nSecond show", SourceFingerprint = "source", Intent = IntakeIntent.Gigs, AnalysisState = IntakeAnalysisState.Succeeded });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        var requests = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => client.PostAsJsonAsync("/intake/current/gig-drafts", new { intakeId = id }, TestContext.Current.CancellationToken)));
+        Assert.All(requests, value => Assert.True(value.IsSuccessStatusCode));
+        await using (var signalScope = configured.Services.CreateAsyncScope())
+        {
+            var wake = await signalScope.ServiceProvider.GetRequiredService<IScheduledTaskStateStore>().ReadAsync<IntakePreparationTaskState>(ScheduledTaskNames.IntakePreparation, TestContext.Current.CancellationToken);
+            Assert.True(wake?.State.HasPendingWork);
+        }
+        System.Text.Json.JsonElement status = default;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            status = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/intake/current/gig-drafts/status?intakeId={id}", TestContext.Current.CancellationToken);
+            if (status.GetProperty("state").GetString() == "Completed") break;
+        }
+        Assert.True(status.GetProperty("state").GetString() == "Completed", status.ToString());
+        var batchId = status.GetProperty("batchId").GetGuid();
+        var recovered = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/intake/gig-drafts/{id}", TestContext.Current.CancellationToken);
+        Assert.Equal(batchId, recovered.GetProperty("batchId").GetGuid());
+        using var otherRequest = new HttpRequestMessage(HttpMethod.Get, $"/intake/gig-drafts/{id}");
+        otherRequest.Headers.Add("X-Test-UserId", TestAuthContext.AlternateUserId.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.SendAsync(otherRequest, TestContext.Current.CancellationToken)).StatusCode);
+        await using var verify = configured.Services.CreateAsyncScope();
+        var context = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Single(context.GigImportBatches.Where(value => value.SourceIntakeId == id));
+        Assert.Equal(2, context.GigImportDrafts.Count(value => value.BatchId == batchId));
+        Assert.Empty(context.Gigs.Where(value => value.SourceImportBatchId == batchId));
+        Assert.Empty(context.GigExpenses);
+        Assert.Empty(context.GigExternalResources);
+        Assert.Empty(context.GigSetListImports);
+        Assert.Empty(context.ExpenseAttachments);
+        Assert.Empty(context.GigExternalResourceAttachments);
+        Assert.Equal(originalClientCount, context.Clients.Count());
+    }
+
+    [Fact]
+    public async Task PendingPreparation_SupersededOverrideCannotCreateBatch()
+    {
+        var id = Guid.NewGuid();
+        var gate = _factory.Services.GetRequiredService<IntakeCommandLocks>().ForUser(TestAuthContext.UserId);
+        await gate.WaitAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var intake = new CurrentIntake { Id = id, UserId = TestAuthContext.UserId, SourceType = IntakeSourceType.Text, Text = "Source", SourceFingerprint = "source", IntentOverride = IntakeIntent.Gigs, PreparationId = Guid.NewGuid(), PreparationState = IntakePreparationState.Pending };
+            db.CurrentIntakes.Add(intake);
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+            await Task.Delay(3500, TestContext.Current.CancellationToken);
+            intake.IntentOverride = IntakeIntent.Resource;
+            intake.PreparationId = null;
+            intake.PreparationState = IntakePreparationState.None;
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        finally { gate.Release(); }
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await using var verification = _factory.Services.CreateAsyncScope();
+        var context = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(context.GigImportBatches.Where(value => value.SourceIntakeId == id));
+        Assert.Equal(IntakeIntent.Resource, (await context.CurrentIntakes.SingleAsync(value => value.Id == id, TestContext.Current.CancellationToken)).IntentOverride);
+    }
+
+    [Fact]
+    public async Task GoogleDocManualDraft_RetainsSnapshotAndOriginalUrl()
+    {
+        var id = Guid.NewGuid();
+        const string url = "https://docs.google.com/document/d/synthetic/edit";
+        await using (var setup = _factory.Services.CreateAsyncScope())
+        {
+            var db = setup.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.CurrentIntakes.Add(new CurrentIntake { Id = id, UserId = TestAuthContext.UserId, SourceType = IntakeSourceType.Url, Url = url, Text = "First show\nSecond show", SourceFingerprint = "doc-source", IntentOverride = IntakeIntent.Gigs, AnalysisState = IntakeAnalysisState.Failed });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        var response = await _client.PostAsJsonAsync("/intake/current/gig-drafts/manual", new { intakeId = id }, TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        var batchId = (await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(TestContext.Current.CancellationToken)).GetProperty("batchId").GetGuid();
+        var download = await _client.GetAsync($"/gig-imports/{batchId}/source", TestContext.Current.CancellationToken);
+        Assert.Equal("First show\nSecond show", await download.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        await using var verify = _factory.Services.CreateAsyncScope();
+        var batch = await verify.ServiceProvider.GetRequiredService<AppDbContext>().GigImportBatches.SingleAsync(value => value.Id == batchId, TestContext.Current.CancellationToken);
+        Assert.Equal(url, batch.SourceUrl);
+    }
+
+    [Fact]
+    public async Task GoogleDocWithoutPermission_RetainsUrlAndCanBeAttachedAsResource()
+    {
+        var id = Guid.NewGuid();
+        var gigId = Guid.NewGuid();
+        const string url = "https://docs.google.com/document/d/example/edit";
+        await using (var setup = _factory.Services.CreateAsyncScope())
+        {
+            var db = setup.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Gigs.Add(new Gig { Id = gigId, ClientId = TestData.RiversideId, Title = "Existing gig", Date = new DateOnly(2027, 1, 1), Venue = "Venue", Status = GigStatus.Confirmed, CreatedByUserId = TestAuthContext.UserId });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        (await _client.PostAsJsonAsync("/intake/current", new { intakeId = id, sourceType = "url", value = url }, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+        System.Text.Json.JsonElement current = default;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            current = await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/intake/current", TestContext.Current.CancellationToken);
+            if (!current.GetProperty("analysisInBackground").GetBoolean()) break;
+        }
+        Assert.Equal("document_connection_required", current.GetProperty("failureCode").GetString());
+        Assert.Equal(url, current.GetProperty("sourceUrl").GetString());
+        var response = await _client.PostAsJsonAsync("/intake/current/apply", new { intakeId = id, intent = "Resource", gigId, resource = new { resourceType = "GoogleDoc", purpose = "Other", title = "Booking document", notes = (string?)null, isPrimary = false } }, TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        await using var verify = _factory.Services.CreateAsyncScope();
+        var verificationDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Single(verificationDb.GigExternalResources.Where(value => value.Id == id && value.GigId == gigId));
+        Assert.Empty(verificationDb.GigSetListImports);
     }
 
     [Theory]

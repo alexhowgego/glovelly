@@ -3,6 +3,7 @@ using Glovelly.Api.Endpoints;
 using Glovelly.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace Glovelly.Api.Services;
 
@@ -65,7 +66,7 @@ public sealed class IntakeWorkflowService(
             .Select(value => value.AutomaticReceiptMatching).SingleAsync(cancellationToken);
         IntakeApplicationResponse? saved = null;
         string? applicationError = null;
-        if (intake.AnalysisState == IntakeAnalysisState.Succeeded && intake.Intent == IntakeIntent.Receipt && candidates.Candidates.Count > 0 && AllowsAutomaticApplication(preference, intake.Confidence))
+        if (intake.AnalysisState == IntakeAnalysisState.Succeeded && intake.Intent == IntakeIntent.Receipt && (intake.IntentOverride is null or IntakeIntent.Receipt) && candidates.Candidates.Count > 0 && AllowsAutomaticApplication(preference, intake.Confidence))
         {
             try
             {
@@ -103,8 +104,9 @@ public sealed class IntakeWorkflowService(
         return new
         {
             intake.Id, intake.SourceType, sourceName = intake.FileName ?? intake.Url ?? "Pasted text",
-            sourceUrl = intake.Url, sourceText = intake.Text, intake.AnalysisState, intake.FailureMessage,
-            proposedIntent = intake.Intent, intake.Confidence, suggestedResourceType = suggestedType,
+            sourceUrl = intake.Url, sourceText = intake.Text, intake.AnalysisState, intake.AnalysisInBackground, intake.FailureCode, intake.FailureMessage,
+            intake.PreparationState, intake.PreparationError,
+            proposedIntent = intake.Intent, intake.IntentOverride, intake.Confidence, suggestedResourceType = suggestedType,
             evidence = Evidence(intake, suggestedType),
             analysis = intake.SourceType == IntakeSourceType.Url ? null : Analysis(intake),
             candidates = GigQuickCaptureSupport.ToCandidateResponses(candidates.Candidates, saved?.Gig.Id ?? candidates.Candidates.FirstOrDefault()?.Id),
@@ -115,6 +117,11 @@ public sealed class IntakeWorkflowService(
 
     private static IEnumerable<object> Evidence(CurrentIntake intake, GigExternalResourceType? suggestedType)
     {
+        if (intake.IntentEvidenceJson is not null)
+        {
+            try { return JsonSerializer.Deserialize<List<Dictionary<string, string>>>(intake.IntentEvidenceJson) ?? []; }
+            catch (JsonException) { return []; }
+        }
         if (intake.Url is not null && Uri.TryCreate(intake.Url, UriKind.Absolute, out var uri))
             return [new { label = "Link", value = uri.Host }, new { label = "Suggested type", value = suggestedType?.ToString() ?? "Url" }];
         // Receipt fields use the shared structured analysis contract/presenter.
