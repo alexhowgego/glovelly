@@ -128,6 +128,10 @@ public abstract class InvoiceUatTestBase : UatTestBase
         {
             State = WaitForSelectorState.Visible,
         });
+        await Page.GetByTestId("invoice-preview-frame").Locator("canvas").WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+        });
         await ExpectContainsAsync(Page.GetByTestId("invoice-preview-status"), "ready");
     }
 

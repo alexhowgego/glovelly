@@ -1111,13 +1111,31 @@
   border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
 }
 
-.invoice-generation-preview-frame iframe {
+.invoice-pdf-preview {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-height: min(70svh, 760px);
+  min-height: 200px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.invoice-pdf-preview canvas {
   display: block;
-  width: 100%;
-  height: min(70svh, 760px);
-  min-height: 460px;
-  border: 0;
+  width: min(100%, 700px);
+  height: auto;
   background: white;
+}
+
+.invoice-pdf-preview canvas[hidden] { display: none; }
+
+.invoice-pdf-page-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .expense-statement-summary span {
@@ -3418,6 +3436,39 @@ button:focus-visible {
   accent-color: color-mix(in srgb, var(--heading) 72%, white);
 }
 
+input[type='checkbox'] {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 2px solid var(--heading);
+  border-radius: 4px;
+  background: var(--surface-elevated);
+  display: inline-grid;
+  place-content: center;
+}
+
+input[type='checkbox']::before {
+  content: '';
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid var(--surface-elevated);
+  border-bottom: 2px solid var(--surface-elevated);
+  transform: rotate(-45deg) scale(0);
+}
+
+input[type='checkbox']:checked { background: var(--heading); }
+input[type='checkbox']:checked::before { transform: rotate(-45deg) scale(1); }
+input[type='checkbox']:disabled { opacity: 0.55; }
+
+@media (forced-colors: active) {
+  input[type='checkbox'] { appearance: auto; }
+  input[type='checkbox']::before { content: none; }
+}
+
 .checkbox-field span {
   color: var(--heading);
   font-size: 0.92rem;
@@ -3924,9 +3975,8 @@ button:disabled {
     overflow: auto;
   }
 
-  .invoice-generation-preview-frame iframe {
-    height: 62svh;
-    min-height: 430px;
+  .invoice-pdf-preview {
+    max-height: 62svh;
   }
 
   .expense-statement-modal {
