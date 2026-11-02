@@ -10,6 +10,86 @@ namespace Glovelly.Api.Tests;
 
 public sealed class IntakeAnalysisServiceTests
 {
+    private sealed class FakeClassifier(IntakeIntentClassification? result) : IIntakeIntentClassifier
+    {
+        public Task<IntakeIntentClassification?> ClassifyAsync(CurrentIntake intake, CancellationToken cancellationToken) => Task.FromResult(result);
+    }
+    private sealed class FailedClassifier : IIntakeIntentClassifier
+    {
+        public Task<IntakeIntentClassification?> ClassifyAsync(CurrentIntake intake, CancellationToken cancellationToken) => throw new IntakeClassificationException("rate_limited", "AI analysis limit reached.");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not json")]
+    [InlineData("{\"intent\":\"Gigs\",\"confidence\":\"bogus\",\"evidence\":\"x\"}")]
+    [InlineData("{\"intent\":\"Gigs\",\"confidence\":\"High\"}")]
+    public void Classifier_RejectsMalformedResponses(string? value) => Assert.Null(VertexIntakeIntentClassifier.Parse(value));
+
+    [Fact]
+    public async Task GigClassification_DoesNotRunReceiptExtraction()
+    {
+        var called = false;
+        var service = CreateService(await CreateStoreAsync(), "{}", () => called = true,
+            new FakeClassifier(new(IntakeIntent.Gigs, ReceiptAnalysisConfidence.High, "Several performance dates")));
+        var intake = CreateIntake();
+        await service.AnalyzeAsync(intake, TestContext.Current.CancellationToken);
+        Assert.Equal(IntakeIntent.Gigs, intake.Intent);
+        Assert.Equal(IntakeAnalysisState.Succeeded, intake.AnalysisState);
+        Assert.Contains("Several performance dates", intake.IntentEvidenceJson);
+        Assert.False(called);
+    }
+
+    [Fact]
+    public async Task ClassifierFailure_FailsClosedWithoutReceiptExtraction()
+    {
+        var called = false;
+        var service = CreateService(await CreateStoreAsync(), "{}", () => called = true, new FakeClassifier(null));
+        var intake = CreateIntake();
+        await service.AnalyzeAsync(intake, TestContext.Current.CancellationToken);
+        Assert.Equal(IntakeIntent.Unknown, intake.Intent);
+        Assert.Equal(IntakeAnalysisState.Failed, intake.AnalysisState);
+        Assert.False(called);
+        Assert.Equal("intake", intake.StorageKey);
+    }
+
+    [Fact]
+    public async Task ClassifierFailure_ExposesSafeSpecificReason()
+    {
+        var intake = CreateIntake();
+        var service = CreateService(await CreateStoreAsync(), "{}", classifier: new FailedClassifier());
+        await service.AnalyzeAsync(intake, TestContext.Current.CancellationToken);
+        Assert.Equal("rate_limited", intake.FailureCode);
+        Assert.Equal("AI analysis limit reached.", intake.FailureMessage);
+        Assert.Equal(IntakeIntent.Unknown, intake.Intent);
+    }
+
+    [Fact]
+    public async Task ReceiptClassificationConfidence_CapsAutomaticApplicationEligibility()
+    {
+        var service = CreateService(await CreateStoreAsync(), """{"merchant":"Rail Co","merchantConfidence":"high","warnings":[]}""", classifier: new FakeClassifier(new(IntakeIntent.Receipt, ReceiptAnalysisConfidence.Medium, "A receipt")));
+        var intake = CreateIntake();
+        await service.AnalyzeAsync(intake, TestContext.Current.CancellationToken);
+        Assert.Equal(ReceiptAnalysisConfidence.Medium, intake.Confidence);
+        Assert.False(IntakeWorkflowService.AllowsAutomaticApplication(AutomaticReceiptMatching.HighConfidence, intake.Confidence));
+        Assert.True(IntakeWorkflowService.AllowsAutomaticApplication(AutomaticReceiptMatching.MediumConfidence, intake.Confidence));
+        Assert.False(IntakeWorkflowService.AllowsAutomaticApplication(AutomaticReceiptMatching.ManualOnly, intake.Confidence));
+    }
+
+    [Fact]
+    public async Task PdfReceipt_RetainsReceiptRoutingAndHighConfidence()
+    {
+        var store = new InMemoryExpenseAttachmentStore();
+        await store.SaveAsync("intake", new MemoryStream(Encoding.ASCII.GetBytes("%PDF-1.7\nsynthetic receipt")), "application/pdf", TestContext.Current.CancellationToken);
+        var service = CreateService(store, """{"merchant":"Cafe","merchantConfidence":"high","warnings":[]}""", classifier: new FakeClassifier(new(IntakeIntent.Receipt, ReceiptAnalysisConfidence.High, "A receipt")));
+        var intake = CreateIntake();
+        intake.ContentType = "application/pdf";
+        intake.FileName = "receipt.pdf";
+        await service.AnalyzeAsync(intake, TestContext.Current.CancellationToken);
+        Assert.Equal(IntakeIntent.Receipt, intake.Intent);
+        Assert.Equal(ReceiptAnalysisConfidence.High, intake.Confidence);
+        Assert.True(IntakeWorkflowService.AllowsAutomaticApplication(AutomaticReceiptMatching.HighConfidence, intake.Confidence));
+    }
     [Fact]
     public async Task AnalyzeAsync_StoresValidatedReceiptEvidenceWithoutCreatingBusinessData()
     {
@@ -143,7 +223,7 @@ public sealed class IntakeAnalysisServiceTests
         return store;
     }
 
-    private static IntakeAnalysisService CreateService(InMemoryExpenseAttachmentStore store, string response, Action? called = null) => new(new ReceiptExtractionEngine(
+    private static IntakeAnalysisService CreateService(InMemoryExpenseAttachmentStore store, string response, Action? called = null, IIntakeIntentClassifier? classifier = null) => new(new ReceiptExtractionEngine(
         (_, _, _, _) =>
         {
             called?.Invoke();
@@ -152,5 +232,5 @@ public sealed class IntakeAnalysisServiceTests
         store,
         Options.Create(new ReceiptAnalysisSettings { Enabled = true, VertexAiProjectId = "test-project", VertexAiLocation = "eu", VertexAiModel = "test-model" }),
         TimeProvider.System,
-        NullLogger<ReceiptExtractionEngine>.Instance), TimeProvider.System);
+        NullLogger<ReceiptExtractionEngine>.Instance), TimeProvider.System, classifier);
 }

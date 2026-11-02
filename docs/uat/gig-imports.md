@@ -9,6 +9,21 @@ Use these journeys when a change may affect MCP gig extraction, staged import ba
 - The MCP client or local test harness can call the gig import tools.
 - If testing locally, the frontend dev proxy includes `/gig-imports`; otherwise the import modal can fail to load behind the Vite shell.
 
+## Prepare Gigs With Add to Glovelly
+
+> **Automation:** Backend integration and frontend component tests cover manual recovery, owner-scoped source inspection and navigation. Provider-backed PDF and Google Docs checks require staging credentials and manual review in Ubuntu CI.
+
+1. Submit a synthetic booking email, a multi-date PDF, and an accessible Google Doc in turn. Confirm source, proposal, evidence and confidence remain visible, and a PDF is not automatically treated as a gig merely because it is a PDF.
+2. Override the treatment to **Gig information**, retry analysis, and confirm the override and source remain intact. Choose **Prepare gig drafts** and refresh while it runs; resume and verify the same batch is recovered.
+3. Confirm **Draft batch prepared** remains open with **Review import** and **Done**, and that no gig, expense, resource or set list exists before explicit commit. Open review and download the original source or Doc snapshot; inspect references, missing fields, confidence and duplicate warnings.
+4. Make the provider unavailable or use malformed/low-confidence content. Confirm a recoverable error, retained source and **Prepare manual gig draft**. Complete a row and commit only after accepting it.
+5. Revoke Google Docs access. Confirm the URL remains available, connection explains the broad read-only permission, and explicit resource attachment still works without it. Attach a Sheet as a resource, choose **Go to gig**, and confirm no set-list interpretation starts automatically.
+6. Repeat on mobile. Confirm the modal controls and source inspection remain usable, inline errors persist, and notifications do not cover modal controls.
+7. With a controlled London reference date, submit an offer for “16th December” without a year. Confirm the next occurrence is proposed with an inferred-date warning, not an invented distant year. Repeat around New Year, with “this coming Sunday”, an ambiguous “next Saturday”, and an explicitly dated past gig. Check warnings and preserve the explicit year.
+8. Force an unknown or failed analysis for text and a Google Doc URL. Confirm no receipt is preselected, **Gig import** remains available, and an unreadable document explains how to connect, paste text or upload a PDF without losing the link.
+9. Exercise slow, malformed-output and provider-failure extraction with the configured test provider. Confirm preparation allows at least 90 seconds, reports an actionable safe failure, and retains retry/manual recovery. Confirm operational logs include the intake ID and safe category but never document text, URLs, credentials or raw provider responses.
+10. Use a synthetic multi-date document with both valid and invalid section citations. Confirm valid rows show source excerpts, invalid citations are cleared and marked low confidence with a visible warning, and all structurally valid rows remain available for review. PDF page references must say they are not independently verified.
+
 ## Create A Staged Import Batch
 
 > **Automation:** Backend automated; manual UAT: MCP/staging endpoint rules have backend coverage; creating a batch through a real MCP client or LLM harness remains manual.

@@ -7,6 +7,7 @@ public static class GoogleScopes
     public const string Profile = "profile";
     public const string DriveFile = "https://www.googleapis.com/auth/drive.file";
     public const string SpreadsheetsReadonly = "https://www.googleapis.com/auth/spreadsheets.readonly";
+    public const string DocumentsReadonly = "https://www.googleapis.com/auth/documents.readonly";
     public const string CalendarEvents = "https://www.googleapis.com/auth/calendar.events";
     public const string CalendarAppCreated = "https://www.googleapis.com/auth/calendar.app.created";
 
@@ -14,6 +15,7 @@ public static class GoogleScopes
     [
         DriveFile,
         SpreadsheetsReadonly,
+        DocumentsReadonly,
         CalendarAppCreated,
     ];
 

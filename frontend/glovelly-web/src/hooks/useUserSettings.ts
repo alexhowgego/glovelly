@@ -86,6 +86,7 @@ export function useUserSettings({
   const [isGoogleCalendarBusy, setIsGoogleCalendarBusy] = useState(false)
   const [isGoogleDriveBusy, setIsGoogleDriveBusy] = useState(false)
   const [isGoogleSheetsBusy, setIsGoogleSheetsBusy] = useState(false)
+  const [isGoogleDocsBusy, setIsGoogleDocsBusy] = useState(false)
 
   const resetUserSettings = useCallback(() => {
     setIsUserSettingsOpen(false)
@@ -97,6 +98,7 @@ export function useUserSettings({
     setIsGoogleCalendarBusy(false)
     setIsGoogleDriveBusy(false)
     setIsGoogleSheetsBusy(false)
+    setIsGoogleDocsBusy(false)
   }, [])
 
   const loadGoogleCalendarStatus = useCallback(async () => {
@@ -175,6 +177,19 @@ export function useUserSettings({
 
   const connectGoogleSheets = () => {
     window.location.assign(buildApiUrl('/integrations/google-sheets/connect'))
+  }
+
+  const connectGoogleDocs = () => window.location.assign(buildApiUrl('/integrations/google-docs/connect'))
+  const disconnectGoogleDocs = async () => {
+    setIsGoogleDocsBusy(true)
+    try {
+      const response = await fetchWithSession(buildApiUrl('/integrations/google-docs/disconnect'), { method: 'POST' })
+      if (handleSessionExpired(response, onSessionExpired, 'Your session expired. Sign in again to disconnect Google Docs.')) { setIsConnectedServicesOpen(false); return }
+      if (!response.ok) throw new Error(await getResponseErrorMessage(response, 'Unable to disconnect Google Docs.'))
+      setAuthUser(current => current ? { ...current, isGoogleDocsConnected: false } : current)
+      setUserSettingsStatus('Google Docs disconnected.')
+    } catch (error) { setUserSettingsStatus(error instanceof Error ? error.message : 'Unable to disconnect Google Docs.') }
+    finally { setIsGoogleDocsBusy(false) }
   }
 
   const disconnectGoogleDrive = async () => {
@@ -430,14 +445,17 @@ export function useUserSettings({
     connectGoogleCalendar,
     connectGoogleDrive,
     connectGoogleSheets,
+    connectGoogleDocs,
     disconnectGoogleCalendar,
     disconnectGoogleDrive,
     disconnectGoogleSheets,
+    disconnectGoogleDocs,
     googleCalendarStatus,
     handleUserSettingsSubmit,
     isGoogleCalendarBusy,
     isGoogleDriveBusy,
     isGoogleSheetsBusy,
+    isGoogleDocsBusy,
     isConnectedServicesOpen,
     isUserSettingsOpen,
     isUserSettingsSaving,

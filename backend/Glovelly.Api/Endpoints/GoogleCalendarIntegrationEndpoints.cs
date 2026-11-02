@@ -1,155 +1,19 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Glovelly.Api.Auth;
-using Glovelly.Api.Configuration;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Glovelly.Api.Endpoints;
 
 internal static class GoogleCalendarIntegrationEndpoints
 {
-    private const string GoogleAuthorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
-    private const string StateProtectionPurpose = "Glovelly.GoogleCalendarOAuthState";
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    public static IEndpointRouteBuilder MapGoogleCalendarIntegrationEndpoints(
-        this IEndpointRouteBuilder app,
-        StartupSettings settings)
+    public static IEndpointRouteBuilder MapGoogleCalendarIntegrationEndpoints(this IEndpointRouteBuilder app)
     {
         var googleCalendar = app.MapGroup("/integrations/google-calendar")
             .WithTags("Integrations")
             .RequireAuthorization(GlovellyPolicies.GlovellyUser);
-
-        googleCalendar.MapGet("/connect", async (
-            HttpContext httpContext,
-            ClaimsPrincipal principal,
-            ICurrentUserAccessor currentUserAccessor,
-            AppDbContext dbContext,
-            IDataProtectionProvider dataProtectionProvider) =>
-        {
-            if (string.IsNullOrWhiteSpace(settings.GoogleClientId) ||
-                string.IsNullOrWhiteSpace(settings.GoogleClientSecret))
-            {
-                return Results.Problem(
-                    detail: "Google OAuth is not configured. Set Authentication:Google:ClientId and ClientSecret.",
-                    statusCode: StatusCodes.Status500InternalServerError);
-            }
-
-            var currentUserId = await GetActiveCurrentUserIdAsync(principal, currentUserAccessor, dbContext);
-            if (!currentUserId.HasValue)
-            {
-                return Results.Unauthorized();
-            }
-
-            var authorizationScope = await GoogleIntegrationEndpointSupport.BuildAuthorizationScopeAsync(
-                dbContext,
-                currentUserId.Value,
-                GoogleScopes.CalendarAppCreated);
-            var state = CreateStateToken(currentUserId.Value, dataProtectionProvider);
-            var authorizationUrl = QueryHelpers.AddQueryString(
-                GoogleAuthorizationEndpoint,
-                new Dictionary<string, string?>
-                {
-                    ["client_id"] = settings.GoogleClientId,
-                    ["redirect_uri"] = BuildCallbackUri(settings),
-                    ["response_type"] = "code",
-                    ["scope"] = authorizationScope,
-                    ["access_type"] = "offline",
-                    ["prompt"] = "consent",
-                    ["state"] = state,
-                });
-
-            return Results.Redirect(authorizationUrl);
-        });
-
-        googleCalendar.MapGet("/callback", async (
-            HttpContext httpContext,
-            string? code,
-            string? state,
-            string? error,
-            string? error_description,
-            ClaimsPrincipal principal,
-            ICurrentUserAccessor currentUserAccessor,
-            AppDbContext dbContext,
-            IDataProtectionProvider dataProtectionProvider,
-            IGoogleOAuthTokenClient tokenClient,
-            IGoogleConnectionService googleConnectionService,
-            IGoogleCalendarIntegrationService calendarIntegrationService,
-            ICalendarSyncWorkQueue workQueue,
-            CancellationToken cancellationToken) =>
-        {
-            var currentUserId = await GetActiveCurrentUserIdAsync(principal, currentUserAccessor, dbContext);
-            if (!currentUserId.HasValue)
-            {
-                return Results.Unauthorized();
-            }
-
-            var stateValidationErrors = ValidateState(state, currentUserId.Value, dataProtectionProvider);
-            if (stateValidationErrors.Count > 0)
-            {
-                return Results.ValidationProblem(stateValidationErrors);
-            }
-
-            if (!string.IsNullOrWhiteSpace(error))
-            {
-                return Results.Problem(
-                    title: "Google Calendar connection was not approved.",
-                    detail: string.IsNullOrWhiteSpace(error_description) ? error : error_description,
-                    statusCode: StatusCodes.Status400BadRequest);
-            }
-
-            if (string.IsNullOrWhiteSpace(code))
-            {
-                return EndpointSupport.ValidationProblem("code", "Google Calendar authorization code is required.");
-            }
-
-            if (string.IsNullOrWhiteSpace(settings.GoogleClientId) ||
-                string.IsNullOrWhiteSpace(settings.GoogleClientSecret))
-            {
-                return Results.Problem(
-                    detail: "Google OAuth is not configured. Set Authentication:Google:ClientId and ClientSecret.",
-                    statusCode: StatusCodes.Status500InternalServerError);
-            }
-
-            var tokenResponse = await tokenClient.ExchangeCodeAsync(
-                code,
-                BuildCallbackUri(settings),
-                settings.GoogleClientId,
-                settings.GoogleClientSecret,
-                cancellationToken);
-            if (!tokenResponse.IsSuccess ||
-                tokenResponse.TokenResponse is null ||
-                string.IsNullOrWhiteSpace(tokenResponse.TokenResponse.AccessToken))
-            {
-                return Results.Problem(
-                    title: "Google Calendar token exchange failed.",
-                    detail: settings.IsDevelopment ? tokenResponse.ResponseBody : "Google rejected the Calendar authorization code.",
-                    statusCode: StatusCodes.Status502BadGateway);
-            }
-
-            if (!GoogleScopes.Contains(tokenResponse.TokenResponse.Scope, GoogleScopes.CalendarAppCreated))
-            {
-                return EndpointSupport.ValidationProblem("scope", "Google Calendar authorization did not grant the required Calendar scope.");
-            }
-
-            _ = await googleConnectionService.SaveConnectionAsync(
-                currentUserId.Value,
-                tokenResponse.TokenResponse,
-                cancellationToken);
-            _ = await calendarIntegrationService.EnsureCalendarAsync(currentUserId.Value, cancellationToken);
-            await calendarIntegrationService.InvalidateSyncHashesAsync(currentUserId.Value, cancellationToken);
-            await workQueue.EnqueueFullSyncAsync(
-                currentUserId.Value,
-                CalendarSyncWorkItemReason.ConnectionChanged,
-                cancellationToken);
-
-            return Results.Redirect(BuildIntegrationStatusRedirectUri(settings));
-        });
 
         googleCalendar.MapGet("/status", async (
             ClaimsPrincipal principal,
@@ -264,91 +128,4 @@ internal static class GoogleCalendarIntegrationEndpoints
         return app;
     }
 
-    private static async Task<Guid?> GetActiveCurrentUserIdAsync(
-        ClaimsPrincipal principal,
-        ICurrentUserAccessor currentUserAccessor,
-        AppDbContext dbContext)
-    {
-        var currentUserId = currentUserAccessor.TryGetUserId(principal);
-        if (!currentUserId.HasValue)
-        {
-            return null;
-        }
-
-        var userExists = await dbContext.Users
-            .AsNoTracking()
-            .AnyAsync(user => user.Id == currentUserId.Value && user.IsActive);
-
-        return userExists ? currentUserId.Value : null;
-    }
-
-    private static string BuildCallbackUri(StartupSettings settings)
-    {
-        return settings.BuildPublicUrl("/integrations/google-calendar/callback");
-    }
-
-    private static string BuildIntegrationStatusRedirectUri(StartupSettings settings)
-    {
-        const string integrationStatusPath = "/?integration=google-calendar&status=callback-received";
-
-        if (!settings.IsDevelopment || settings.AllowedCorsOrigins.Length == 0)
-        {
-            return integrationStatusPath;
-        }
-
-        var frontendOrigin = settings.AllowedCorsOrigins
-            .FirstOrDefault(origin => origin.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            ?? settings.AllowedCorsOrigins[0];
-
-        return $"{frontendOrigin.TrimEnd('/')}{integrationStatusPath}";
-    }
-
-    private static string CreateStateToken(Guid userId, IDataProtectionProvider dataProtectionProvider)
-    {
-        var protector = dataProtectionProvider
-            .CreateProtector(StateProtectionPurpose)
-            .ToTimeLimitedDataProtector();
-
-        return protector.Protect(
-            JsonSerializer.Serialize(new GoogleCalendarOAuthState(userId, DateTime.UtcNow), JsonOptions),
-            lifetime: TimeSpan.FromMinutes(15));
-    }
-
-    private static Dictionary<string, string[]> ValidateState(
-        string? state,
-        Guid expectedUserId,
-        IDataProtectionProvider dataProtectionProvider)
-    {
-        if (string.IsNullOrWhiteSpace(state))
-        {
-            return new Dictionary<string, string[]>
-            {
-                ["state"] = ["Google Calendar OAuth state is required."]
-            };
-        }
-
-        try
-        {
-            var protector = dataProtectionProvider
-                .CreateProtector(StateProtectionPurpose)
-                .ToTimeLimitedDataProtector();
-            var payloadJson = protector.Unprotect(state, out _);
-            var payload = JsonSerializer.Deserialize<GoogleCalendarOAuthState>(payloadJson, JsonOptions);
-            if (payload?.UserId == expectedUserId)
-            {
-                return [];
-            }
-        }
-        catch
-        {
-            // Invalid state is expected when a callback is forged, expired, or belongs to another app instance.
-        }
-
-        return new Dictionary<string, string[]>
-        {
-            ["state"] = ["Google Calendar OAuth state is invalid or expired."]
-        };
-    }
-
-    private sealed record GoogleCalendarOAuthState(Guid UserId, DateTime CreatedUtc);
 }

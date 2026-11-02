@@ -25,6 +25,27 @@ public sealed class GigImportEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task SourceInspection_RequiresBatchOwnership()
+    {
+        var ownedId = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.GigImportBatches.AddRange(
+                new GigImportBatch { Id = ownedId, SourceName = "source.txt", SourceStorageKey = "batch/source", SourceContentType = "text/plain", CreatedByUserId = TestAuthContext.UserId },
+                new GigImportBatch { Id = otherId, SourceName = "other.txt", SourceStorageKey = "batch/source", SourceContentType = "text/plain", CreatedByUserId = Guid.NewGuid() });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<IExpenseAttachmentStore>().SaveAsync("batch/source", new MemoryStream("private source"u8.ToArray()), "text/plain", TestContext.Current.CancellationToken);
+        }
+
+        var owned = await _client.GetAsync($"/gig-imports/{ownedId}/source", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, owned.StatusCode);
+        Assert.Equal("private source", await owned.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync($"/gig-imports/{otherId}/source", TestContext.Current.CancellationToken)).StatusCode);
+    }
+
+    [Fact]
     public async Task CommitAcceptedRows_CreatesLinkedGigAndMarksDraftCommitted()
     {
         var batchId = Guid.NewGuid();

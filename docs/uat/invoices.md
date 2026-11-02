@@ -204,6 +204,8 @@ Run browser rendering checks only in Ubuntu CI. Documentation captures use actua
 
 The same invoice PDF can be previewed reactively from the invoice pane, downloaded from the modal, and opened in the invoice workspace.
 
+On iPad Safari and a narrow mobile viewport, verify the preview renders without an embedded PDF viewer. With a multi-page invoice, use Previous and Next to inspect every page; download remains available if rendering fails. In the email review, check checked, unchecked, disabled and keyboard-focus checkbox states in light, dark and other available themes, including high-contrast/forced-colour mode where supported.
+
 ### Regeneration Checks
 
 1. Redraft a draft invoice.

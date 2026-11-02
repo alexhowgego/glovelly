@@ -15,6 +15,16 @@ description: Record the work before the details start multiplying.
 
 Use **Planned** for confirmed future work, **Completed** once it is finished, **Cancelled** when it will not go ahead, and **Draft** while the details are still taking shape.
 
+## Prepare gigs from booking information
+
+1. Choose **Add to Glovelly** and paste an email or booking notes, upload a PDF, or enter a Google Doc link.
+2. Check the suggested treatment and choose **Gig import** under **Treat as** if needed. A PDF can also be a receipt or a resource.
+3. Choose **Prepare gig drafts**. If analysis is unavailable, choose **Prepare manual gig draft** instead.
+4. Select **Review import**, check the source and each proposed row, and correct any missing or uncertain details. Accept only the rows you want.
+5. Choose **Commit decisions** to create the accepted gigs. Preparing the batch alone does not create gigs.
+
+To analyse a Google Doc, connect Google Docs in **Services** or when prompted. This grants read-only access to your Google Docs, not just the link you submit. You can attach a link as a resource without connecting. Check inferred dates and years in review, especially relative days and dates without a year. For a set list, attach the Sheet to a gig, choose **Go to gig**, and use the existing set-list import there.
+
 <figure class="product-shot">
   <img class="product-shot-light" src="/screenshots/gig-workspace-light.png" alt="The Gigs workspace showing a planned Spring concert with its fee and summary." />
   <img class="product-shot-dark" src="/screenshots/gig-workspace-dark.png" alt="The Gigs workspace showing a planned Spring concert with its fee and summary." />

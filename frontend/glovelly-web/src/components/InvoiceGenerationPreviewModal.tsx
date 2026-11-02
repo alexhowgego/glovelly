@@ -1,4 +1,5 @@
 import type { Invoice } from '../types'
+import { InvoicePdfPreview } from './InvoicePdfPreview'
 
 type InvoiceGenerationPreviewModalProps = {
   invoice: Invoice | null
@@ -46,7 +47,7 @@ export function InvoiceGenerationPreviewModal({
 
         <div className="invoice-generation-preview-frame">
           {pdfUrl ? (
-            <iframe data-testid="invoice-preview-frame" src={pdfUrl} title={`Invoice ${invoice.invoiceNumber} PDF preview`} />
+            <InvoicePdfPreview key={pdfUrl} url={pdfUrl} invoiceNumber={invoice.invoiceNumber} />
           ) : (
             <div className="empty-state roomy">
               <strong>{isLoading ? 'Preparing invoice preview...' : 'Preview unavailable.'}</strong>

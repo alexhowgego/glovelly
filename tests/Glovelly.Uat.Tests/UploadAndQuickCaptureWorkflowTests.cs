@@ -161,6 +161,9 @@ public sealed class UploadAndQuickCaptureWorkflowTests : InvoiceUatTestBase
             var upload = Page.GetByTestId("unified-intake-modal");
             await upload.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^Photo or file") }).ClickAsync();
             await upload.Locator("input[type=file]").SetInputFilesAsync(fixture);
+            // Classification may be unavailable or uncertain for the synthetic PDF.
+            // Choose the intended treatment explicitly rather than relying on a suggestion.
+            await upload.GetByLabel("Treat as").SelectOptionAsync("Receipt");
             var gigSelect = Page.GetByTestId("quick-capture-gig-select");
             var optionValue = await gigSelect.Locator("option").Filter(new LocatorFilterOptions
             {

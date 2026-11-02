@@ -70,12 +70,13 @@ export type AuthUser = {
   automaticReceiptMatching: AutomaticReceiptMatching
   isGoogleDriveConnected: boolean
   isGoogleSheetsConnected: boolean
+  isGoogleDocsConnected?: boolean
 }
 
 export type AutomaticReceiptMatching = 'ManualOnly' | 'VeryHighConfidence' | 'HighConfidence' | 'MediumConfidence'
 
 export type IntakeSourceType = 'File' | 'Url' | 'Text'
-export type IntakeIntent = 'Receipt' | 'Resource' | 'Unknown'
+export type IntakeIntent = 'Receipt' | 'Resource' | 'Gigs' | 'Unknown'
 export type IntakeAnalysisState = 'Pending' | 'Succeeded' | 'Failed'
 
 export type IntakeEvidence = {
@@ -104,8 +105,13 @@ export type Intake = {
   sourceUrl: string | null
   sourceText: string | null
   analysisState: IntakeAnalysisState
+  analysisInBackground?: boolean
+  preparationState?: 'None' | 'Pending' | 'Running' | 'Failed'
+  preparationError?: string | null
   failureMessage: string | null
+  failureCode?: string | null
   proposedIntent: IntakeIntent
+  intentOverride: IntakeIntent | null
   suggestedResourceType: GigExternalResourceType | null
   confidence: 'None' | 'Low' | 'Medium' | 'High'
   evidence: IntakeEvidence[]
@@ -648,6 +654,8 @@ export type GigImportBatchSummary = {
   lowConfidenceCount: number
   mediumConfidenceCount: number
   highConfidenceCount: number
+  hasSource?: boolean
+  sourceUrl?: string | null
 }
 
 export type GigImportDraft = {

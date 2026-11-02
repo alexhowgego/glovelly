@@ -17,6 +17,15 @@ public sealed class ScheduledTaskSignal(
         string reason,
         CancellationToken cancellationToken = default)
     {
+        if (taskName == ScheduledTaskNames.IntakePreparation)
+        {
+            var intake = await stateStore.ReadAsync<IntakePreparationTaskState>(taskName, cancellationToken)
+                ?? new ScheduledTaskStateEnvelope<IntakePreparationTaskState> { TaskName = taskName };
+            intake.State.HasPendingWork = true;
+            intake.State.LastMarkedStaleUtc = timeProvider.GetUtcNow();
+            await stateStore.WriteAsync(intake, cancellationToken);
+            return;
+        }
         if (taskName != ScheduledTaskNames.GoogleCalendarPropagation)
         {
             throw new InvalidOperationException($"Scheduled task '{taskName}' does not support stale signalling.");
@@ -41,4 +50,10 @@ public sealed class ScheduledTaskSignal(
 
         await stateStore.WriteAsync(envelope, cancellationToken);
     }
+}
+
+public sealed class IntakePreparationTaskState
+{
+    public bool HasPendingWork { get; set; }
+    public DateTimeOffset? LastMarkedStaleUtc { get; set; }
 }

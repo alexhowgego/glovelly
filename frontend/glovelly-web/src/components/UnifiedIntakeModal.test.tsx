@@ -24,8 +24,8 @@ const intake = {
 } as Intake
 
 function Harness({ onApplied = vi.fn() }: { onApplied?: (value: IntakeApplication) => void }) {
-  const workflow = useUnifiedIntake({ onApplied, onSessionExpired: vi.fn() })
-  return <><button onClick={() => void workflow.open()}>Add</button><button onClick={workflow.reset}>End session</button><UnifiedIntakeModal workflow={workflow} clientNamesById={new Map()} />{workflow.state.phase === 'review' && <div>Saved attachment review</div>}</>
+  const workflow = useUnifiedIntake({ onApplied, onReviewImport: vi.fn(), onSessionExpired: vi.fn() })
+  return <><button onClick={() => void workflow.open()}>Add</button><button onClick={workflow.reset}>End session</button><UnifiedIntakeModal workflow={workflow} clientNamesById={new Map()} onGoToGig={vi.fn()} />{workflow.state.phase === 'review' && <div>Saved attachment review</div>}</>
 }
 
 async function openFile() {
@@ -76,6 +76,97 @@ describe('Unified intake journey', () => {
     expect(screen.queryByRole('dialog', { name: 'Add to Glovelly' })).toBeNull()
   })
 
+  it('prepares a manual gig draft without choosing or creating a gig', async () => {
+    const reviewImport = vi.fn()
+    function GigHarness() {
+      const workflow = useUnifiedIntake({ onApplied: vi.fn(), onReviewImport: reviewImport, onSessionExpired: vi.fn() })
+      return <><button onClick={() => void workflow.open()}>Add</button><UnifiedIntakeModal workflow={workflow} clientNamesById={new Map()} onGoToGig={vi.fn()} /></>
+    }
+    fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(intake), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...intake, intentOverride: 'Gigs' })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ intakeId: 'intake', batchId: 'batch' })))
+    render(<GigHarness />)
+    await openFile()
+    submitFile()
+    fireEvent.change(await screen.findByLabelText('Treat as'), { target: { value: 'Gigs' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Prepare manual gig draft' }))
+    await screen.findByText('Draft batch prepared')
+    expect(reviewImport).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Review import' }))
+    expect(reviewImport).toHaveBeenCalledWith('batch')
+  })
+
+  it('offers explicit navigation after attaching a resource without interpreting a set list', async () => {
+    const goToGig = vi.fn()
+    function ResourceHarness() {
+      const workflow = useUnifiedIntake({ onApplied: vi.fn(), onReviewImport: vi.fn(), onSessionExpired: vi.fn() })
+      return <><button onClick={() => void workflow.open()}>Add</button><UnifiedIntakeModal workflow={workflow} clientNamesById={new Map()} onGoToGig={goToGig} /></>
+    }
+    fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...intake, application: { ...saved, kind: 'Resource' } }), { status: 201 }))
+    render(<ResourceHarness />)
+    await openFile()
+    submitFile()
+    fireEvent.click(await screen.findByRole('button', { name: 'Go to gig' }))
+    expect(goToGig).toHaveBeenCalledWith('gig')
+    expect(fetchSession.mock.calls.every(([url]) => !String(url).includes('setlist'))).toBe(true)
+  })
+
+  it('recovers the same draft batch after a lost preparation response', async () => {
+    fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(intake), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...intake, intentOverride: 'Gigs' })))
+      .mockRejectedValueOnce(new Error('Network interrupted'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ intakeId: 'intake', batchId: 'original-batch' })))
+    render(<Harness />)
+    await openFile()
+    submitFile()
+    fireEvent.change(await screen.findByLabelText('Treat as'), { target: { value: 'Gigs' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Prepare manual gig draft' }))
+    await screen.findByText('Draft batch prepared')
+    expect(fetchSession.mock.calls.filter(([path]) => String(path).includes('gig-drafts/manual'))).toHaveLength(1)
+  })
+
+  it('keeps a PDF source visible while background analysis finishes', async () => {
+    fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...intake, analysisState: 'Pending', analysisInBackground: true }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...intake, analysisInBackground: false })))
+    render(<Harness />)
+    await openFile()
+    submitFile()
+    expect(await screen.findByLabelText('Upload in progress')).toBeTruthy()
+    expect(screen.getByText('receipt.pdf')).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Attach receipt' }, { timeout: 3000 })).toBeTruthy()
+  })
+
+  it('offers gig import without defaulting an unknown result to receipt', async () => {
+    fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...intake, analysisState: 'Failed', proposedIntent: 'Unknown', confidence: 'None' }), { status: 201 }))
+    render(<Harness />)
+    await openFile()
+    submitFile()
+    const select = await screen.findByLabelText('Treat as') as HTMLSelectElement
+    expect(select.value).toBe('')
+    expect(screen.getByRole('option', { name: 'Gig import' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Attach receipt' })).toBeNull()
+  })
+
+  it('offers gig import when a Google Doc could not be read', async () => {
+    const doc = { ...intake, sourceType: 'Url', sourceName: 'Google Doc', sourceUrl: 'https://docs.google.com/document/d/example/edit', sourceText: null, analysisState: 'Failed', failureCode: 'document_connection_required', proposedIntent: 'Unknown', confidence: 'None' }
+    fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(doc), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...doc, intentOverride: 'Gigs' })))
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^URL/ }))
+    fireEvent.change(screen.getByLabelText('URL'), { target: { value: doc.sourceUrl } })
+    fireEvent.click(screen.getByRole('button', { name: 'Upload and analyse' }))
+    fireEvent.change(await screen.findByLabelText('Treat as'), { target: { value: 'Gigs' } })
+    expect(await screen.findByText(/Read the Google Doc first/)).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Prepare gig drafts' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('recovers a save after a lost response without resubmitting the source', async () => {
     fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockRejectedValueOnce(new Error('Network interrupted'))
@@ -90,6 +181,7 @@ describe('Unified intake journey', () => {
   it('retains an unapplied source for resume after close', async () => {
     fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(intake), { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
       .mockResolvedValueOnce(new Response(null, { status: 404 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(intake)))
     render(<Harness />)
@@ -122,6 +214,7 @@ describe('Unified intake journey', () => {
     fetchSession.mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockRejectedValueOnce(new Error('Lost response'))
       .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ...intake, sourceName: 'replacement.pdf' })))
     render(<Harness />)
     await openFile()
@@ -130,7 +223,7 @@ describe('Unified intake journey', () => {
     fireEvent.change(screen.getByLabelText('Choose photo or file'), { target: { files: [new File(['different source'], 'replacement.pdf', { type: 'application/pdf' })] } })
     await screen.findByText('replacement.pdf')
     const first = fetchSession.mock.calls[1][1].body as FormData
-    const second = fetchSession.mock.calls[3][1].body as FormData
+    const second = fetchSession.mock.calls[4][1].body as FormData
     expect(first.get('intakeId')).not.toBe(second.get('intakeId'))
     expect((second.get('file') as File).name).toBe('replacement.pdf')
   })

@@ -776,6 +776,13 @@
   gap: 16px;
 }
 
+.intake-source-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
 .intake-source-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1104,13 +1111,31 @@
   border: 1px solid color-mix(in srgb, var(--surface-border) 84%, transparent);
 }
 
-.invoice-generation-preview-frame iframe {
+.invoice-pdf-preview {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-height: min(70svh, 760px);
+  min-height: 200px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.invoice-pdf-preview canvas {
   display: block;
-  width: 100%;
-  height: min(70svh, 760px);
-  min-height: 460px;
-  border: 0;
+  width: min(100%, 700px);
+  height: auto;
   background: white;
+}
+
+.invoice-pdf-preview canvas[hidden] { display: none; }
+
+.invoice-pdf-page-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .expense-statement-summary span {
@@ -1311,33 +1336,80 @@
 
 .connected-services-grid {
   display: grid;
-  gap: 12px;
+  gap: 6px;
 }
 
 .connected-service-card {
   display: grid;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 20px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
   background: var(--surface-panel);
   border: 1px solid color-mix(in srgb, var(--surface-border) 86%, transparent);
 }
 
 .connected-service-summary {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.connected-service-card > .compact-actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-content: flex-end;
+}
+
+.connected-service-card > .connected-service-details,
+.connected-service-card > .connected-service-note,
+.connected-service-card > .connected-service-error {
+  grid-column: 1 / -1;
+}
+
+.connected-service-card > .connected-service-note:empty { display: none; }
+
+.connected-service-details {
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+}
+
+.connected-service-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.connected-service-details[open] summary { margin-bottom: 4px; }
+
+.connected-service-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .connected-service-summary > div,
 .compact-service-field {
   display: grid;
-  gap: 6px;
+  gap: 3px;
 }
 
 .connected-service-summary strong {
   color: var(--heading);
+}
+
+.connected-service-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 700px) {
+  .connected-service-card { grid-template-columns: minmax(0, 1fr); }
+  .connected-service-card > .compact-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; }
 }
 
 .connected-service-summary span,
@@ -1356,17 +1428,16 @@
 
 .service-connection-indicator {
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  margin-top: 4px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: #a65f27;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #a65f27 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #a65f27 18%, transparent);
 }
 
 .service-connection-indicator.connected {
   background: #2b8c67;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #2b8c67 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #2b8c67 18%, transparent);
 }
 
 .seller-profile-layout {
@@ -3365,6 +3436,39 @@ button:focus-visible {
   accent-color: color-mix(in srgb, var(--heading) 72%, white);
 }
 
+input[type='checkbox'] {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 2px solid var(--heading);
+  border-radius: 4px;
+  background: var(--surface-elevated);
+  display: inline-grid;
+  place-content: center;
+}
+
+input[type='checkbox']::before {
+  content: '';
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid var(--surface-elevated);
+  border-bottom: 2px solid var(--surface-elevated);
+  transform: rotate(-45deg) scale(0);
+}
+
+input[type='checkbox']:checked { background: var(--heading); }
+input[type='checkbox']:checked::before { transform: rotate(-45deg) scale(1); }
+input[type='checkbox']:disabled { opacity: 0.55; }
+
+@media (forced-colors: active) {
+  input[type='checkbox'] { appearance: auto; }
+  input[type='checkbox']::before { content: none; }
+}
+
 .checkbox-field span {
   color: var(--heading);
   font-size: 0.92rem;
@@ -3871,9 +3975,8 @@ button:disabled {
     overflow: auto;
   }
 
-  .invoice-generation-preview-frame iframe {
-    height: 62svh;
-    min-height: 430px;
+  .invoice-pdf-preview {
+    max-height: 62svh;
   }
 
   .expense-statement-modal {

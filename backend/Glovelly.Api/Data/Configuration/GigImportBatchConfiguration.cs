@@ -14,6 +14,11 @@ internal sealed class GigImportBatchConfiguration : IEntityTypeConfiguration<Gig
             .HasMaxLength(300);
         entity.Property(batch => batch.SourceFingerprint)
             .HasMaxLength(200);
+        entity.Property(batch => batch.SourceType).HasConversion<string>().HasMaxLength(16);
+        entity.Property(batch => batch.SourceUrl).HasMaxLength(2048);
+        entity.Property(batch => batch.SourceContentType).HasMaxLength(255);
+        entity.Property(batch => batch.SourceStorageKey).HasMaxLength(512);
+        entity.Property(batch => batch.SourceEvidenceJson).HasMaxLength(32768);
         entity.Property(batch => batch.Status)
             .HasConversion<string>()
             .HasMaxLength(50);
@@ -24,6 +29,7 @@ internal sealed class GigImportBatchConfiguration : IEntityTypeConfiguration<Gig
 
         entity.HasIndex(batch => batch.CreatedByUserId);
         entity.HasIndex(batch => batch.SourceFingerprint);
+        entity.HasIndex(batch => new { batch.CreatedByUserId, batch.SourceIntakeId }).IsUnique();
         entity.HasIndex(batch => batch.Status);
 
         entity.HasOne(batch => batch.CreatedByUser)

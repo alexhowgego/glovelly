@@ -18,6 +18,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddOptions<EmailSettings>()
             .Bind(configuration.GetSection("Email"));
         services.AddGlovellyApplicationServices();
+        services.AddSingleton<IWorkspaceEventPublisher, WorkerWorkspaceEventPublisher>();
         services.AddScoped<IGoogleTokenProtector, GoogleTokenProtector>();
         services.AddHttpClient<IGoogleOAuthTokenClient, GoogleOAuthTokenClient>();
         var dataProtectionBuilder = services.AddDataProtection()
@@ -39,4 +40,11 @@ public static class WorkerServiceCollectionExtensions
         });
         return services;
     }
+}
+
+// Background jobs run in a separate process without the web service's SignalR hub.
+// Intake clients recover completed work through the durable API state instead.
+internal sealed class WorkerWorkspaceEventPublisher : IWorkspaceEventPublisher
+{
+    public Task PublishAsync(Guid? userId, WorkspaceEvent workspaceEvent, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
