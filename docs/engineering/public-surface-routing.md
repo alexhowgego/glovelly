@@ -11,6 +11,12 @@ Glovelly has four public surfaces. Their roles are deliberately separate so the 
 
 The Firebase sites are in the `glovelly-dev` Google Cloud project. They are delivery targets only: Glovelly does not use Firebase Authentication, Firestore, or Firebase client SDKs.
 
+## Landing Site Appearance
+
+The landing site follows the browser or device light/dark preference using CSS, defaulting to light when that preference is unavailable. It has no theme selector, saved theme preference, or theme-specific script. Its dark palette takes the user guide's palette as a reference, while its paper-like illustrations intentionally retain light surfaces. The guide's manual theme choice is independent and can therefore differ from the landing site's appearance.
+
+When changing the landing palette, review both colour schemes on mobile and desktop, including keyboard focus, the production analytics-consent controls, reduced motion, and a preference change while the page is open. Check text and interactive contrast as well as the illustrations.
+
 ## Current Baseline
 
 - DNS is owned and managed in Squarespace.
