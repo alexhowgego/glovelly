@@ -22,7 +22,7 @@ For local development, engineers usually run:
 
 ## Core Smoke Journey
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.SmokeTests` covers public smoke endpoints and sign-in entry point visibility; signed-in workspace navigation remains manual.
+> **Automation:** `Glovelly.Uat.Tests.SmokeTests` covers public smoke endpoints and sign-in entry point visibility. `WorkspaceDeepLinkTests` covers direct workspace entry and refresh in Ubuntu CI; retain the sign-in and access-request checks below.
 
 ### Steps
 
@@ -33,6 +33,9 @@ For local development, engineers usually run:
 5. Open user settings or seller profile and confirm the modal opens and closes.
 6. Open the profile menu and confirm `Imported gigs` is present.
 7. Refresh the page and confirm the same data returns without session issues.
+8. Open `/workspaces/clients`, `/workspaces/gigs`, and `/workspaces/invoices` directly and refresh each; confirm the matching workspace is selected. Switch workspace and confirm the address updates without adding a history entry for each switch.
+9. While signed out, open a workspace URL, sign in, and confirm it returns to that workspace. Open an unknown SPA path and confirm normal Gigs entry. Check an access-request review link still survives sign-in, observes administrator permissions, and does not reopen after dismissal and refresh.
+10. Follow the guide's task-specific Menu links and confirm each opens the intended workspace; general sign-in links still open Menu normally.
 
 ### Expected Results
 

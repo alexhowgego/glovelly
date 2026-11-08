@@ -5,7 +5,7 @@ description: Keep booking contacts and billing details ready for the next gig.
 
 ## Add a client
 
-<a class="menu-link" href="https://menu.glovelly.net">Open Glovelly Menu to add a client</a>
+<a class="menu-link" href="https://menu.glovelly.net/workspaces/clients">Open Glovelly Menu to add a client</a>
 
 1. Open **Clients** in Glovelly Menu.
 2. Choose **Add client**.

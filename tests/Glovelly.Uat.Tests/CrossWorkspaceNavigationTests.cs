@@ -27,6 +27,7 @@ public sealed class CrossWorkspaceNavigationTests : InvoiceUatTestBase
             await Page.GetByTestId("client-search-input").FillAsync("stale-filter-that-hides-target");
             await OpenGigAsync(gigTitle);
             await Page.GetByTestId("gig-client-link").ClickAsync();
+            Assert.EndsWith("/workspaces/clients", Page.Url);
             await Assertions.Expect(ClientCard(clientName)).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
             {
                 Timeout = 30_000,
@@ -50,6 +51,7 @@ public sealed class CrossWorkspaceNavigationTests : InvoiceUatTestBase
             {
                 HasText = gigTitle,
             }).GetByTestId("invoice-line-link").ClickAsync();
+            Assert.EndsWith("/workspaces/gigs", Page.Url);
             await Assertions.Expect(GigCard(gigTitle)).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
             {
                 Timeout = 30_000,

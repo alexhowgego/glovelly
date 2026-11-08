@@ -5,7 +5,7 @@ description: Keep claimable costs with the gig they belong to.
 
 ## Add an expense
 
-<a class="menu-link" href="https://menu.glovelly.net">Open Glovelly Menu to record an expense</a>
+<a class="menu-link" href="https://menu.glovelly.net/workspaces/gigs">Open Glovelly Menu to record an expense</a>
 
 1. Open the saved gig.
 2. Choose **Expenses**, then **Add expense**.

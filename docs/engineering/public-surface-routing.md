@@ -33,6 +33,12 @@ When changing the landing palette, review both colour schemes on mobile and desk
 
 The application derives its Google sign-in redirect, Drive, Sheets, and Calendar callbacks, invitation links, access-review links, and fallback MCP metadata from this origin. It does not derive deployed public URLs from request headers. The authentication cookie remains host-only, so users moving from the apex application to Menu sign in again rather than sharing a cookie with the public landing site.
 
+### Workspace entrypoints
+
+Menu provides `/workspaces/clients`, `/workspaces/gigs`, and `/workspaces/invoices` on its configured origin. These are SPA document paths, not the `/clients`, `/gigs`, and `/invoices` API endpoints. Signed-out users sign in before workspace data is available and return to the requested workspace. Workspace switches replace the current history entry; they do not create a Back entry for every switch. Access-request review links retain their separate sign-in and review behavior.
+
+Deploy Menu support before or together with the guide's workspace links. If rolling Menu back to a version without these paths, first restore generic Menu links in the guide or roll both back together. Confirm deployment and guide handoffs in the target environment; a repository change alone does not establish deployment ordering.
+
 ## Steady-State Ownership
 
 - Firebase Hosting owns the apex landing site and its TLS certificate.
@@ -45,6 +51,7 @@ The application derives its Google sign-in redirect, Drive, Sheets, and Calendar
 
 - Load all four public hostnames and confirm each serves its documented purpose.
 - Confirm `menu.glovelly.net` can sign in and sign out, and that a protected request has an authenticated session.
+- Open each `/workspaces/clients`, `/workspaces/gigs`, and `/workspaces/invoices` URL directly and after sign-in; check refresh and guide handoffs select the intended workspace.
 - Send an invitation and access request; verify their generated links start with the intended application origin.
 - Start and complete Drive, Sheets, and Calendar authorization; confirm each provider callback uses the configured application origin.
 - Request `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`; confirm Menu issuer and resource URLs.
