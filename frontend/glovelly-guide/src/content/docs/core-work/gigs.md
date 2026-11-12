@@ -5,7 +5,7 @@ description: Record the work before the details start multiplying.
 
 ## Create a gig
 
-<a class="menu-link" href="https://menu.glovelly.net">Open Glovelly Menu to create a gig</a>
+<a class="menu-link" href="https://menu.glovelly.net/workspaces/gigs">Open Glovelly Menu to create a gig</a>
 
 1. Open **Gigs** and choose **Create gig**.
 2. Select the client.

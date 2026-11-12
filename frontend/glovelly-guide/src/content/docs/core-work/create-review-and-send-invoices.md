@@ -5,7 +5,7 @@ description: Turn saved work into a checked invoice without sending it by accide
 
 ## Create an invoice from a gig
 
-<a class="menu-link" href="https://menu.glovelly.net">Open Glovelly Menu to review an invoice</a>
+<a class="menu-link" href="https://menu.glovelly.net/workspaces/invoices">Open Glovelly Menu to review an invoice</a>
 
 1. Open a saved gig that has not already been invoiced.
 2. Choose the invoice action.

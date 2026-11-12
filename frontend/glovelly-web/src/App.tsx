@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { revealWorkspaceTarget } from './workspaceScrolling'
+import { replaceWorkspacePath, sectionFromPath } from './workspaceRoutes'
 import {
   AdminSection,
   AccessRequestsModal,
@@ -90,7 +91,7 @@ type AppProps = {
 }
 
 function App({ appMetadata }: AppProps) {
-  const [activeSection, setActiveSection] = useState<AppSection>('gigs')
+  const [activeSection, setActiveSectionState] = useState<AppSection>(() => sectionFromPath(window.location.pathname))
   const [status, setStatus] = useState('Checking your session...')
   const [isLoading, setIsLoading] = useState(false)
   const [isApiConnected, setIsApiConnected] = useState(false)
@@ -111,6 +112,11 @@ function App({ appMetadata }: AppProps) {
   const [monthlyInvoiceStatus, setMonthlyInvoiceStatus] = useState('')
   const [isGigImportsOpen, setIsGigImportsOpen] = useState(false)
   const [isAccessRequestsOpen, setIsAccessRequestsOpen] = useState(false)
+  const setActiveSection = useCallback((section: AppSection) => {
+    replaceWorkspacePath(section)
+    setIsAccessRequestsOpen(false)
+    setActiveSectionState(section)
+  }, [])
   const [forScoreSnapshot, setForScoreSnapshot] = useState<ForScoreLibrarySnapshot | null>(null)
   const [forScoreLibraryStatus, setForScoreLibraryStatus] = useState('No forScore library snapshot imported yet.')
   const [isForScoreLibraryUploading, setIsForScoreLibraryUploading] = useState(false)
@@ -571,7 +577,7 @@ function App({ appMetadata }: AppProps) {
     if (!isAdmin && activeSection === 'admin') {
       setActiveSection('gigs')
     }
-  }, [activeSection, isAdmin])
+  }, [activeSection, isAdmin, setActiveSection])
 
   useEffect(() => {
     let ignore = false
@@ -1122,6 +1128,9 @@ function App({ appMetadata }: AppProps) {
 
   const closeAccessRequests = () => {
     setIsAccessRequestsOpen(false)
+    if (getAccessRequestDeepLinkId(window.location.pathname)) {
+      replaceWorkspacePath(activeSection)
+    }
   }
 
   const openPreviewedInvoice = () => {

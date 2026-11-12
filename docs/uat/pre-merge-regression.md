@@ -22,7 +22,7 @@ For local development, engineers usually run:
 
 ## Core Smoke Journey
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.SmokeTests` covers public smoke endpoints and sign-in entry point visibility; signed-in workspace navigation remains manual.
+> **Automation:** `Glovelly.Uat.Tests.SmokeTests` covers public smoke endpoints and sign-in entry point visibility. `WorkspaceDeepLinkTests` covers direct workspace entry and refresh in Ubuntu CI; retain the sign-in and access-request checks below.
 
 ### Steps
 
@@ -33,6 +33,9 @@ For local development, engineers usually run:
 5. Open user settings or seller profile and confirm the modal opens and closes.
 6. Open the profile menu and confirm `Imported gigs` is present.
 7. Refresh the page and confirm the same data returns without session issues.
+8. Open `/workspaces/clients`, `/workspaces/gigs`, and `/workspaces/invoices` directly and refresh each; confirm the matching workspace is selected. Switch workspace and confirm the address updates without adding a history entry for each switch.
+9. While signed out, open a workspace URL, sign in, and confirm it returns to that workspace. Open an unknown SPA path and confirm normal Gigs entry. Check an access-request review link still survives sign-in, observes administrator permissions, and does not reopen after dismissal and refresh.
+10. Follow the guide's task-specific Menu links and confirm each opens the intended workspace; general sign-in links still open Menu normally.
 
 ### Expected Results
 
@@ -98,6 +101,14 @@ The desktop layout allocates usable space for normal records without forcing a n
 ### Documentation Capture Review
 
 The shared chrome and workspace geometry changed. Request the Ubuntu CI documentation-capture job for this change and review its `TestResults/documentation-captures/` candidates for client workspace, gig workspace, expenses/mileage, and invoice status. Check both light and dark product themes, including whether the bounded detail pane exposes the intended subject. Replace checked-in screenshots only after reviewing those real staging captures; never create substitutes locally. Record CI run and capture-review results before completing the OpenSpec validation tasks.
+
+The freshness comparison excludes the captured live map image rectangle (recorded as geometry only, without provider URLs) and ignores colour differences within ImageMagick's 3% fuzz before applying its 0.05% changed-pixel threshold. The real candidate remains unmodified. Review map presence, position, attribution, and surrounding layout manually: content within the excluded rectangle cannot trigger freshness review, including a newly appearing map over a previously blank region. Changes smaller than these tolerances can be missed, so do not treat a clean report as a substitute for visual review after UI changes. Check the threshold against real CI candidate diffs before adjusting it.
+
+Client and gig documentation captures require a visible, loaded, stable map in both themes. A missing map fails capture rather than producing an approved replacement or a freshness result; any partial candidates must not be approved. The capture artifact includes `map-diagnostics.txt` with elapsed time, descriptor-request counts, response statuses, and provider-image failures, but no map URLs, query strings, keys, or signatures. A descriptor `204` can indicate unavailability or issuance limits; it does not by itself prove which. Use the safe diagnostics and staging configuration to investigate before changing quotas or retry behavior.
+
+The documentation capture suite runs only in its dedicated CI job, not during general staging UAT. Map replacements keep the previously loaded image visible while the new size loads; capture waits for the current image and its geometry to settle before taking a screenshot.
+
+Between light and dark captures, the suite closes settings, stays in Invoices, and waits 65 seconds so the existing per-user one-minute map issuance window can replenish. It records the cooldown and fails rather than assuming success if another map descriptor is requested during that interval; it does not change production limits or retry failed previews.
 
 ## Notification Feedback
 

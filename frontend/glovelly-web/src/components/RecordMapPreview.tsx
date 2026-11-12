@@ -59,11 +59,14 @@ function MapImage({ kind, id, source, query, size, onUnavailable, onSessionExpir
   const tooltipId = useId()
   const mapsUrl = googleMapsSearchUrl(query)
   const [image, setImage] = useState<{ url: string, key: string } | null>(null)
-  const url = image?.url
-  const [loaded, setLoaded] = useState(false)
+  const [displayedImage, setDisplayedImage] = useState<{ url: string, key: string } | null>(null)
   const alive = useRef(false)
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null)
   const key = `${kind}:${id}:${source}:${size}`
+  const loaded = displayedImage?.key === key
+  const images = [displayedImage, image?.key === displayedImage?.key ? null : image].filter(
+    (value): value is { url: string, key: string } => value !== null
+  )
   useEffect(() => {
     const controller = new AbortController()
     alive.current = true
@@ -109,20 +112,20 @@ function MapImage({ kind, id, source, query, size, onUnavailable, onSessionExpir
   }, [kind, id, source, size, key, onUnavailable, onSessionExpired])
   return <figure className="map-search-preview">
     {!loaded && <p role="status">Loading map preview…</p>}
-    {url && mapsUrl && <a className="map-preview-link" href={mapsUrl} target="_blank" rel="noopener noreferrer"
-      aria-label={`Open location in Google Maps: ${query}`} aria-describedby={tooltipId} hidden={!loaded}>
-      <img src={url} alt="Unverified map search preview" referrerPolicy="origin" hidden={!loaded}
+    {images.length > 0 && mapsUrl && <a className="map-preview-link" href={mapsUrl} target="_blank" rel="noopener noreferrer"
+      aria-label={`Open location in Google Maps: ${query}`} aria-describedby={tooltipId} hidden={!displayedImage}>
+      {images.map(map => <img key={map.key} src={map.url} alt="Unverified map search preview" referrerPolicy="origin" hidden={map.key !== displayedImage?.key}
       onLoad={() => {
-        if (!alive.current || image?.key !== key) return
+        if (!alive.current || map.key !== key || image?.key !== map.key || image.url !== map.url) return
         if (watchdog.current) clearTimeout(watchdog.current)
-        setLoaded(true)
+        setDisplayedImage(map)
       }}
       onError={() => {
-        if (!alive.current || image?.key !== key) return
+        if (!alive.current || map.key !== key || image?.key !== map.key || image.url !== map.url) return
         alive.current = false
         if (watchdog.current) clearTimeout(watchdog.current)
         onUnavailable()
-      }} /></a>}
-    {loaded && <span className="visual-preview-tooltip" id={tooltipId} role="tooltip">Unverified map search preview · Open in Google Maps (new tab)</span>}
+      }} />)}</a>}
+    {displayedImage && <span className="visual-preview-tooltip" id={tooltipId} role="tooltip">Unverified map search preview · Open in Google Maps (new tab)</span>}
   </figure>
 }

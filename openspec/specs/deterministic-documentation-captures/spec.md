@@ -12,6 +12,10 @@ The system SHALL provide a staging-only `Glovelly Docs` fixture account separate
 - **WHEN** the documentation screenshot suite starts against staging
 - **THEN** it removes prior documentation-account data, seeds the fixed scenario, and does not alter UAT or non-documentation user data
 
+#### Scenario: Ordinary staging UAT runs
+- **WHEN** the general staging UAT suite runs with or without a trait filter
+- **THEN** it excludes the documentation capture suite, which runs separately in its dedicated capture job
+
 #### Scenario: Capture run is repeated
 - **WHEN** the documentation screenshot suite runs after a prior successful, failed, or cancelled capture
 - **THEN** its initial reset produces the same owned fixture state before capture
@@ -34,6 +38,14 @@ The documentation capture suite SHALL produce named light and actual-dark Glovel
 - **WHEN** the suite captures the invoice email-review interface
 - **THEN** it captures the review state before sending and does not send an email
 
+#### Scenario: A required workspace map is unavailable
+- **WHEN** a client or gig workspace capture cannot observe a visible, loaded, stable map
+- **THEN** the capture fails without reporting a valid freshness result or approving a missing-map candidate, and provides safe status and request-count diagnostics without provider URLs or credentials
+
+#### Scenario: Captures switch between themes
+- **WHEN** the suite finishes light captures and prepares to capture dark workspaces
+- **THEN** it remains outside map workspaces long enough for the existing map issuance window to replenish, and fails if map descriptor requests occur during that cooldown
+
 ### Requirement: Selected workflow states have paired documentation candidates
 The documentation capture suite SHALL capture light and actual-dark candidates for the client workspace, gig workspace, gig expenses and mileage, invoice status, invoice email review, seller profile, and user settings states. Candidate filenames SHALL identify both the workflow state and its light or dark variant so they correspond directly to the reviewed guide assets.
 
@@ -52,6 +64,21 @@ The documentation capture suite SHALL capture light and actual-dark candidates f
 #### Scenario: Candidate is re-encoded without pixel changes
 - **WHEN** a paired screenshot candidate has different PNG bytes but no decoded-pixel differences from its checked-in asset
 - **THEN** the comparison workflow reports it as current and does not request a review or replacement
+
+### Requirement: Live provider imagery and minor colour drift do not trigger stale reports
+The comparison SHALL exclude the recorded rectangle of a visible live map image from workspace pixel comparison without modifying the captured candidate. It SHALL record excluded geometry in the review report without provider URLs, compare the surrounding workspace, and apply a documented small per-pixel colour tolerance before its changed-area threshold. Missing map images SHALL not receive a mask. The review guidance SHALL explain that masked content and changes within tolerance still require visual review when relevant.
+
+#### Scenario: Live map tiles change
+- **WHEN** a workspace candidate differs from its approved screenshot only inside the recorded map image rectangle
+- **THEN** the comparison identifies the excluded rectangle and does not request review solely because the provider imagery changed
+
+#### Scenario: Workspace outside the map changes
+- **WHEN** a meaningful change outside the recorded map rectangle exceeds the colour and area tolerances
+- **THEN** the comparison requests review and supplies visual differences for the compared region
+
+#### Scenario: The map disappears
+- **WHEN** no visible map image is captured
+- **THEN** the workspace capture is rejected instead of using a mask to hide the missing map or reporting a completed freshness result
 
 ### Requirement: Screenshot drift is reviewable but non-blocking
 For same-repository pull requests, the staging CI pipeline SHALL run the documentation capture path after normal staging UAT, compare candidates with the checked-in guide images, upload candidates and comparison output as an artifact, and update one marker-based PR comment with the result and artifact location. Initial screenshot drift SHALL not fail the pipeline, and capture/comment jobs SHALL not receive staging credentials for forked pull requests.

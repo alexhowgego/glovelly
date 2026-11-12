@@ -148,6 +148,7 @@ jobs:
           mkdir -p "$GLOVELLY_UAT_ARTIFACT_DIR/test-results"
           test_args=(
             -reporter verbose
+            -trait- "Suite=DocumentationCapture"
             -result-trx "$GLOVELLY_UAT_ARTIFACT_DIR/test-results/uat-test-results.trx"
             -result-html "$GLOVELLY_UAT_ARTIFACT_DIR/test-results/uat-test-report.html"
           )

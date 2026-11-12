@@ -5,7 +5,7 @@ description: See what needs attention and record when payment arrives.
 
 ## Keep an eye on invoice status
 
-<a class="menu-link" href="https://menu.glovelly.net">Open Glovelly Menu to check invoices</a>
+<a class="menu-link" href="https://menu.glovelly.net/workspaces/invoices">Open Glovelly Menu to check invoices</a>
 
 Use the **Invoices** workspace to filter invoices by drafts, outstanding invoices, overdue invoices, and paid invoices. Open an invoice to preview its PDF, review its line items, or take the next available status action.
 

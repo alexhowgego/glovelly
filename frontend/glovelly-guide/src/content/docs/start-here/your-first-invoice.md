@@ -13,7 +13,7 @@ Create a client and a gig, add any costs you need to claim, then generate and re
 - the gig title, location, date, and agreed fee; and
 - any travel or receipts you want to keep with the work.
 
-<a class="menu-link" href="https://menu.glovelly.net">Open Glovelly Menu to start your invoice</a>
+<a class="menu-link" href="https://menu.glovelly.net/workspaces/clients">Open Glovelly Menu to start your invoice</a>
 
 ## Do this next
 

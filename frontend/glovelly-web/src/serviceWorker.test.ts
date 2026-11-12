@@ -26,6 +26,17 @@ describe('app-shell service worker privacy boundaries', () => {
     }
   })
 
+  it('handles workspace document navigation as an app-shell request', () => {
+    const { listeners } = worker()
+    const respondWith = vi.fn()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('shell'))
+    const request = { url: 'https://menu.glovelly.net/workspaces/clients', method: 'GET', mode: 'navigate' }
+    listeners.get('fetch')!({ request, respondWith })
+    expect(respondWith).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledWith(request)
+    fetchMock.mockRestore()
+  })
+
   it('cleans only old Static Maps cache entries, preserving the app shell', async () => {
     const map = { url: 'https://maps.googleapis.com/maps/api/staticmap?signature=fixture' }
     const { listeners, remove } = worker([map, { url: 'https://menu.glovelly.net/' }, { url: 'https://menu.glovelly.net/assets/app.js' }])

@@ -26,7 +26,13 @@ internal static class AuthFlowSupport
             }
         }
 
-        return returnUrl.StartsWith('/') ? settings.BuildPublicUrl(returnUrl) : settings.BuildPublicUrl("/");
+        if (returnUrl.StartsWith('/') && !returnUrl.StartsWith("//") && !returnUrl.Contains('\\') &&
+            !returnUrl.Any(char.IsControl))
+        {
+            return settings.BuildPublicUrl(returnUrl);
+        }
+
+        return settings.BuildPublicUrl("/");
     }
 
     public static string BuildDeniedPath(string failureCode, string? accessRequestToken = null)

@@ -16,6 +16,25 @@ public sealed class TestAuthEndpointsTests
     private const string UatSecret = "shared-uat-secret";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    [Theory]
+    [InlineData("/workspaces/clients", "/workspaces/clients")]
+    [InlineData("https://evil.example/path", "/")]
+    [InlineData("//evil.example/path", "/")]
+    [InlineData("/\\evil.example/path", "/")]
+    public async Task Login_ValidatesReturnDestinations(string returnUrl, string expectedPath)
+    {
+        await using var factory = CreateFactory("Staging");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/test-auth/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+        request.Headers.Add("X-Glovelly-Uat-Secret", UatSecret);
+
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(expectedPath, response.Headers.Location!.AbsolutePath);
+        Assert.NotEqual("evil.example", response.Headers.Location.Host);
+    }
+
     [Fact]
     public async Task Login_IsUnavailableOutsideStaging()
     {
