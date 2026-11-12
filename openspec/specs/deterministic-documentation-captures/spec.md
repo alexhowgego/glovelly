@@ -12,6 +12,10 @@ The system SHALL provide a staging-only `Glovelly Docs` fixture account separate
 - **WHEN** the documentation screenshot suite starts against staging
 - **THEN** it removes prior documentation-account data, seeds the fixed scenario, and does not alter UAT or non-documentation user data
 
+#### Scenario: Ordinary staging UAT runs
+- **WHEN** the general staging UAT suite runs with or without a trait filter
+- **THEN** it excludes the documentation capture suite, which runs separately in its dedicated capture job
+
 #### Scenario: Capture run is repeated
 - **WHEN** the documentation screenshot suite runs after a prior successful, failed, or cancelled capture
 - **THEN** its initial reset produces the same owned fixture state before capture

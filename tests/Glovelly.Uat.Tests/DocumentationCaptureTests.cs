@@ -142,10 +142,12 @@ public sealed class DocumentationCaptureTests : UatTestBase
         try
         {
             await WaitForLoadedMapAsync(image, 20_000);
+            await WaitForStableMapAsync();
 
             var bounds = await workspace.BoundingBoxAsync();
-            var map = await image.BoundingBoxAsync();
-            if (bounds is null || map is null || map.Width <= 0 || map.Height <= 0)
+            var mapElement = await image.ElementHandleAsync();
+            var map = mapElement is null ? null : await mapElement.BoundingBoxAsync();
+            if (bounds is null || mapElement is null || map is null || map.Width <= 0 || map.Height <= 0)
                 throw new InvalidOperationException("Map or workspace has no visible bounds.");
 
             var left = (int)Math.Floor(map.X - bounds.X);
@@ -156,10 +158,10 @@ public sealed class DocumentationCaptureTests : UatTestBase
                 throw new InvalidOperationException("Map extends beyond the captured workspace.");
 
             var screenshot = await workspace.ScreenshotAsync();
-            var after = await image.BoundingBoxAsync();
+            var after = await mapElement.BoundingBoxAsync();
             if (after is null || Math.Abs(after.X - map.X) > 0.1 || Math.Abs(after.Y - map.Y) > 0.1 ||
                 Math.Abs(after.Width - map.Width) > 0.1 || Math.Abs(after.Height - map.Height) > 0.1 ||
-                !await image.EvaluateAsync<bool>("img => img.isConnected && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0"))
+                !await mapElement.EvaluateAsync<bool>("img => img.isConnected && !img.hidden && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0 && !img.closest('.record-visual-rail')?.querySelector('[role=status]')"))
                 throw new InvalidOperationException("Map changed while the workspace was captured.");
 
             // Record only geometry, never the provider URL. The candidate remains real product UI.
@@ -181,6 +183,35 @@ public sealed class DocumentationCaptureTests : UatTestBase
         await Assertions.Expect(image).ToHaveCountAsync(1, new LocatorAssertionsToHaveCountOptions { Timeout = timeout });
         if (!await image.EvaluateAsync<bool>("img => img.complete && img.naturalWidth > 0 && img.naturalHeight > 0"))
             throw new InvalidOperationException("Map image did not finish loading.");
+    }
+
+    private async Task WaitForStableMapAsync()
+    {
+        // The map frame debounces resize-driven replacements for 300ms. Require
+        // a continuously loaded image and unchanged bounds beyond that interval.
+        await Page.EvaluateAsync("""
+            () => new Promise((resolve, reject) => {
+              const started = performance.now();
+              let previous = null;
+              let stableSince = 0;
+              function check(now) {
+                if (now - started > 20000) { reject(new Error('Map did not settle')); return; }
+                const rail = document.querySelector('.section-layout .record-visual-rail');
+                const image = rail?.querySelector('.map-search-preview img:not([hidden])');
+                const rect = image?.getBoundingClientRect();
+                const ready = image && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0 &&
+                  !rail.querySelector('[role=status]') && rect.width > 0 && rect.height > 0;
+                const dimensions = ready ? [rect.x, rect.y, rect.width, rect.height] : null;
+                if (!ready || !previous || previous.image !== image ||
+                    dimensions.some((value, index) => Math.abs(value - previous.dimensions[index]) > 0.1)) {
+                  previous = ready ? { image, dimensions } : null;
+                  stableSince = now;
+                } else if (now - stableSince >= 500) { resolve(); return; }
+                requestAnimationFrame(check);
+              }
+              requestAnimationFrame(check);
+            })
+            """);
     }
 
     private void OnMapRequest(object? sender, IRequest request)

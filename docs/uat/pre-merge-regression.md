@@ -106,6 +106,8 @@ The freshness comparison excludes the captured live map image rectangle (recorde
 
 Client and gig documentation captures require a visible, loaded, stable map in both themes. A missing map fails capture rather than producing an approved replacement or a freshness result; any partial candidates must not be approved. The capture artifact includes `map-diagnostics.txt` with elapsed time, descriptor-request counts, response statuses, and provider-image failures, but no map URLs, query strings, keys, or signatures. A descriptor `204` can indicate unavailability or issuance limits; it does not by itself prove which. Use the safe diagnostics and staging configuration to investigate before changing quotas or retry behavior.
 
+The documentation capture suite runs only in its dedicated CI job, not during general staging UAT. Map replacements keep the previously loaded image visible while the new size loads; capture waits for the current image and its geometry to settle before taking a screenshot.
+
 ## Notification Feedback
 
 > **Automation:** Partially automated UAT: invoice, gig, receipt, and attachment browser journeys assert terminal Sonner notifications. Manual checks cover dismissal, modal stacking, and visual placement.
