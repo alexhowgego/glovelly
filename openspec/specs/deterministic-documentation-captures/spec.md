@@ -42,6 +42,10 @@ The documentation capture suite SHALL produce named light and actual-dark Glovel
 - **WHEN** a client or gig workspace capture cannot observe a visible, loaded, stable map
 - **THEN** the capture fails without reporting a valid freshness result or approving a missing-map candidate, and provides safe status and request-count diagnostics without provider URLs or credentials
 
+#### Scenario: Captures switch between themes
+- **WHEN** the suite finishes light captures and prepares to capture dark workspaces
+- **THEN** it remains outside map workspaces long enough for the existing map issuance window to replenish, and fails if map descriptor requests occur during that cooldown
+
 ### Requirement: Selected workflow states have paired documentation candidates
 The documentation capture suite SHALL capture light and actual-dark candidates for the client workspace, gig workspace, gig expenses and mileage, invoice status, invoice email review, seller profile, and user settings states. Candidate filenames SHALL identify both the workflow state and its light or dark variant so they correspond directly to the reviewed guide assets.
 

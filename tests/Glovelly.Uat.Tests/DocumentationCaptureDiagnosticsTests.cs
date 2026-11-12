@@ -15,4 +15,12 @@ public sealed class DocumentationCaptureDiagnosticsTests
     {
         Assert.Equal(expected, DocumentationCaptureTests.MapRequestKind(url));
     }
+
+    [Fact]
+    public void CooldownRejectsUnexpectedMapRequests()
+    {
+        Assert.True(DocumentationCaptureTests.MapIssuanceCooldown > TimeSpan.FromMinutes(1));
+        DocumentationCaptureTests.EnsureNoMapRequestsDuringCooldown(7, 7);
+        Assert.Throws<InvalidOperationException>(() => DocumentationCaptureTests.EnsureNoMapRequestsDuringCooldown(7, 8));
+    }
 }

@@ -8,6 +8,7 @@ namespace Glovelly.Uat.Tests;
 [Trait("Suite", "DocumentationCapture")]
 public sealed class DocumentationCaptureTests : UatTestBase
 {
+    internal static readonly TimeSpan MapIssuanceCooldown = TimeSpan.FromSeconds(65);
     private readonly ConcurrentQueue<string> mapEvents = new();
     private readonly Stopwatch captureClock = Stopwatch.StartNew();
     private int descriptorRequests;
@@ -47,6 +48,7 @@ public sealed class DocumentationCaptureTests : UatTestBase
             await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ReducedMotion = ReducedMotion.Reduce, ColorScheme = ColorScheme.Light });
             await AuthenticateDocumentationFixtureAsync();
             await CaptureWorkflowViewsAsync("light");
+            await WaitForMapIssuanceWindowAsync();
             await CaptureWorkflowViewsAsync("dark");
         }
         finally
@@ -119,6 +121,26 @@ public sealed class DocumentationCaptureTests : UatTestBase
         var userSettings = Page.GetByRole(AriaRole.Dialog, new PageGetByRoleOptions { Name = "Your settings" });
         await userSettings.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await userSettings.ScreenshotAsync(new LocatorScreenshotOptions { Path = CandidatePath("user-settings", theme) });
+        await userSettings.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+    }
+
+    private async Task WaitForMapIssuanceWindowAsync()
+    {
+        // No map workspace may remain active while waiting. Waiting longer than
+        // the server's one-minute window allows all earlier permits to replenish.
+        await Assertions.Expect(Page.Locator("main.workspace-shell")).ToHaveAttributeAsync("data-section", "invoices");
+        var before = Volatile.Read(ref descriptorRequests);
+        RecordMapEvent($"map issuance cooldown started; descriptor requests this run={before}");
+        await Task.Delay(MapIssuanceCooldown, TestContext.Current.CancellationToken);
+        var after = Volatile.Read(ref descriptorRequests);
+        RecordMapEvent($"map issuance cooldown completed; descriptor requests this run={after}");
+        EnsureNoMapRequestsDuringCooldown(before, after);
+    }
+
+    internal static void EnsureNoMapRequestsDuringCooldown(int before, int after)
+    {
+        if (before != after)
+            throw new InvalidOperationException("Map descriptor requests occurred during the capture cooldown; the issuance window may not have replenished.");
     }
 
     private async Task WaitForSupplementaryPreviewAsync()

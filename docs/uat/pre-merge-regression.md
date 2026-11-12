@@ -108,6 +108,8 @@ Client and gig documentation captures require a visible, loaded, stable map in b
 
 The documentation capture suite runs only in its dedicated CI job, not during general staging UAT. Map replacements keep the previously loaded image visible while the new size loads; capture waits for the current image and its geometry to settle before taking a screenshot.
 
+Between light and dark captures, the suite closes settings, stays in Invoices, and waits 65 seconds so the existing per-user one-minute map issuance window can replenish. It records the cooldown and fails rather than assuming success if another map descriptor is requested during that interval; it does not change production limits or retry failed previews.
+
 ## Notification Feedback
 
 > **Automation:** Partially automated UAT: invoice, gig, receipt, and attachment browser journeys assert terminal Sonner notifications. Manual checks cover dismissal, modal stacking, and visual placement.
