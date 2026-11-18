@@ -55,11 +55,15 @@ export async function loadAppMetadata(): Promise<AppMetadata> {
 }
 
 export async function fetchWithSession(input: string, init?: RequestInit) {
-  return fetch(input, {
+  const response = await fetch(input, {
     ...init,
     credentials: 'include',
     cache: 'no-store',
   })
+  if (response.status === 403 && !input.endsWith('/auth/me') && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('glovelly:permissions-changed'))
+  }
+  return response
 }
 
 export function jsonRequestInit(method: string, body?: unknown): RequestInit {

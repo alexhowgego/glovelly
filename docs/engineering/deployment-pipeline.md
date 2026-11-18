@@ -102,6 +102,7 @@ GitHub Environments are used for environment-specific deployment metadata and vi
 Important distinction:
 
 - GitHub environment variables/secrets are for CI/CD deployment-time configuration.
+- Repository secret `CI_POSTGRES_PASSWORD` supplies the disposable PostgreSQL service-container password. Migration validation and backend PostgreSQL tests receive the same secret through step-scoped `PGPASSWORD` (Npgsql's password fallback), keeping credentials out of connection strings and command arguments. Do not reuse staging or production credentials. Fork and Dependabot PR runs without access to this secret cannot initialize the authenticated service; no hardcoded password or trust-authentication fallback is provided.
 - Google Secret Manager and Cloud Run configuration are the source for runtime secrets and production application configuration where possible.
 
 Avoid duplicating secret ownership unnecessarily. Runtime secrets should generally live with the runtime platform.

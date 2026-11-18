@@ -33,7 +33,7 @@ const invoice: Invoice = {
 }
 const user: AdminUser = {
   id: 'user', email: 'user@example.com', displayName: 'Musician', googleSubject: 'Full identity '.repeat(30),
-  isEnrolled: true, role: 'User', isActive: true, createdUtc: '2026-01-01T00:00:00Z', lastLoginUtc: null,
+  isEnrolled: true, isActive: true, createdUtc: '2026-01-01T00:00:00Z', lastLoginUtc: null,
 }
 
 beforeEach(() => {
@@ -188,22 +188,30 @@ describe('compact record overviews', () => {
   })
 
   it('shows Admin access facts and complete identity metadata without weakening deletion rules', () => {
+    const adminUser = { ...user, permissionSets: ['LicenseAdministrator'] }
     const props: ComponentProps<typeof AdminSection> = {
-      currentUserId: user.id, onChangeAccess: vi.fn(async () => {}),
+      currentUserId: user.id, onChangeAccess: vi.fn(async () => {}), onSessionExpired: vi.fn(), onPermissionsChanged: vi.fn(async () => {}),
       adminForm: emptyAdminForm(), isEditorOpen: false, adminMode: 'edit', adminSearchQuery: '', adminSort: { key: 'displayName', direction: 'asc' },
-      adminStatus: '', filteredAdminUsers: [user], isAdminLoading: false, onCloseEditor: vi.fn(), onDeleteUser: vi.fn(), onResetForm: vi.fn(),
-      onSearchQueryChange: vi.fn(), onSelectUser: vi.fn(), onSortChange: vi.fn(), onStartEditing: vi.fn(), onSubmit: vi.fn(), onUpdateField: vi.fn(), selectedAdminUser: user,
+      adminStatus: '', filteredAdminUsers: [adminUser], isAdminLoading: false, onCloseEditor: vi.fn(), onDeleteUser: vi.fn(), onResetForm: vi.fn(),
+      onSearchQueryChange: vi.fn(), onSelectUser: vi.fn(), onSortChange: vi.fn(), onStartEditing: vi.fn(), onSubmit: vi.fn(), onUpdateField: vi.fn(), selectedAdminUser: adminUser,
+      canManagePermissions: true,
     }
-    render(<AdminSection {...props} />)
+    const { rerender } = render(<AdminSection {...props} />)
     expectFullPaneComposition()
+    expect(within(document.querySelector('.admin-record-list') as HTMLElement).getByText('Licence Administrator')).toBeDefined()
+    expect(within(document.querySelector('.overview-facts') as HTMLElement).getByText('Licence Administrator')).toBeDefined()
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Delete user' }).disabled).toBe(true)
     expect(screen.queryByText('Account details')).toBeNull()
     expect(within(document.querySelector('.record-overview') as HTMLElement).getByText(user.googleSubject!.trim())).toBeDefined()
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole<HTMLSelectElement>('combobox', { name: 'User access role' }).disabled).toBe(true)
-    expect(within(screen.getByRole('region', { name: 'Access and role' })).queryByText('Role')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'User access role' })).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'Access' })).queryByText('Role')).toBeNull()
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Deactivate access' }).disabled).toBe(true)
     fireEvent.click(screen.getByText('Why are these controls unavailable?'))
-    expect(screen.getAllByText('You cannot deactivate your own administrator account or remove your own administrator role.')).toHaveLength(2)
+    expect(screen.getAllByText('You cannot deactivate your own administrator account.')).toHaveLength(2)
+    rerender(<AdminSection {...props} currentUserId="another-user" canManagePermissions={false} />)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Deactivate access' }).disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Edit access' }).disabled).toBe(true)
+    expect(screen.getAllByText('Only a Super Administrator can change an administrator account.')).toHaveLength(2)
   })
 })

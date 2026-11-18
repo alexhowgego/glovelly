@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { canManageUsers } from './adminAccess'
 import { revealWorkspaceTarget } from './workspaceScrolling'
 import { replaceWorkspacePath, sectionFromPath } from './workspaceRoutes'
 import {
@@ -121,7 +122,7 @@ function App({ appMetadata }: AppProps) {
   const [forScoreLibraryStatus, setForScoreLibraryStatus] = useState('No forScore library snapshot imported yet.')
   const [isForScoreLibraryUploading, setIsForScoreLibraryUploading] = useState(false)
 
-  const isAdmin = authUser?.role === 'Admin'
+  const isAdmin = canManageUsers(authUser?.permissions)
   const accessRequestDeepLinkId = getAccessRequestDeepLinkId(window.location.pathname)
   const resetIntakeRef = useRef<() => void>(() => {})
   const clearSession = useCallback(() => {
@@ -138,6 +139,17 @@ function App({ appMetadata }: AppProps) {
     },
     [clearSession]
   )
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const refreshPermissions = () => {
+      void fetchWithSession(buildApiUrl('/auth/me')).then(async response => {
+        if (response.ok) setAuthUser(await response.json() as AuthUser)
+        else if (response.status === 401) expireSession('Sign in again to continue.')
+      }).catch(() => {})
+    }
+    window.addEventListener('glovelly:permissions-changed', refreshPermissions)
+    return () => window.removeEventListener('glovelly:permissions-changed', refreshPermissions)
+  }, [expireSession, isAuthenticated])
   const syncCurrentUserFromAdmin = useCallback((savedUser: AdminUser) => {
     setAuthUser((current) =>
       current?.userId === savedUser.id
@@ -145,7 +157,6 @@ function App({ appMetadata }: AppProps) {
             ...current,
             email: savedUser.email,
             name: savedUser.displayName ?? savedUser.email,
-            role: savedUser.role,
           }
         : current
     )
@@ -711,7 +722,7 @@ function App({ appMetadata }: AppProps) {
             : `Signed in as ${user.email}. No clients yet.`
         )
 
-        if (user.role === 'Admin') {
+        if (canManageUsers(user.permissions)) {
           try {
             await Promise.all([
               loadAdminUsers(),
@@ -1651,6 +1662,17 @@ function App({ appMetadata }: AppProps) {
     ) : activeSection === 'admin' && isAdmin ? (
       <AdminSection
         currentUserId={authUser?.userId}
+        canManagePermissions={authUser?.permissions?.includes('ManagePermissions')}
+        onSessionExpired={expireSession}
+        onPermissionsChanged={async () => {
+          const response = await fetchWithSession(buildApiUrl('/auth/me'))
+          if (response.ok) {
+            const refreshed = await response.json() as AuthUser
+            setAuthUser(refreshed)
+            if (refreshed.permissions?.includes('ManageUsers')) await loadAdminUsers()
+          }
+          else if (response.status === 401) expireSession('Sign in again to continue.')
+        }}
         onChangeAccess={changeAdminAccess}
         adminForm={adminForm}
         isEditorOpen={isAdminEditorOpen}

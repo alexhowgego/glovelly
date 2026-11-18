@@ -80,7 +80,7 @@ jobs:
         image: postgres:17
         env:
           POSTGRES_DB: glovelly_migration_validation
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
           POSTGRES_USER: postgres
         ports:
           - 5432:5432
@@ -107,10 +107,14 @@ jobs:
 
       - name: Validate EF migrations
         env:
-          GLOVELLY_MIGRATIONS_VALIDATION_CONNECTION: Host=localhost;Port=5432;Database=glovelly_migration_validation;Username=postgres;Password=postgres
+          GLOVELLY_MIGRATIONS_VALIDATION_CONNECTION: Host=localhost;Port=5432;Database=glovelly_migration_validation;Username=postgres
+          PGPASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
         run: bash .github/scripts/validate-ef-migrations.sh
 
       - name: Run backend tests
+        env:
+          GLOVELLY_AUTH_TEST_CONNECTION: Host=localhost;Port=5432;Database=glovelly_migration_validation;Username=postgres
+          PGPASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
         run: dotnet test --solution glovelly.sln --no-restore --max-parallel-test-modules 1
 
       - name: Set up Node

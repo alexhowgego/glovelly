@@ -98,6 +98,14 @@ export Email__Invoices__FromDisplayName="Glovelly Invoices"
 
 `run-dev.sh` sources this file automatically before starting the backend. The admin user is only seeded when no `ConnectionStrings:Glovelly` value is configured and Glovelly is using the in-memory development database.
 
+The seeded user normally receives User Administrator permissions only. To explicitly bootstrap that user as a Super Administrator for one local run:
+
+```bash
+./run-dev.sh --super-admin
+```
+
+This uses the audited operator bootstrap in the same process as the ephemeral in-memory database. It requires the configured seeded Google subject, and refuses non-Development, staging, testing, or PostgreSQL environments. Restart without the option to return to the default User Administrator fixture. For a local PostgreSQL database, use the separate operator command described in the [authentication handbook](docs/engineering/authentication.md).
+
 Keep secrets such as `Email__Resend__ApiKey` and `Mileage__GoogleRoutes__ApiKey` out of `.glovelly.dev.local`. Store those with `dotnet user-secrets` instead.
 
 #### Finding your Google subject claim locally

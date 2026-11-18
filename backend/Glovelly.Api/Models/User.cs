@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using System.ComponentModel.DataAnnotations.Schema;
+using Glovelly.Api.Auth;
 
 namespace Glovelly.Api.Models;
 
@@ -19,8 +20,11 @@ public sealed class User
     public string? InvoiceReplyToEmail { get; set; }
     public AutomaticReceiptMatching AutomaticReceiptMatching { get; set; } = AutomaticReceiptMatching.HighConfidence;
     [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonIgnore]
     public UserRole Role { get; set; } = UserRole.User;
     public bool IsActive { get; set; } = true;
+    [NotMapped]
+    public IReadOnlyList<AdministrativePermissionSet> PermissionSets { get; set; } = [];
     public DateTime CreatedUtc { get; set; }
     public DateTime? LastLoginUtc { get; set; }
     [NotMapped]

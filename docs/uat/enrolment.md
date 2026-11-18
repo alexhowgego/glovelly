@@ -65,7 +65,7 @@ The display name updates immediately in the profile menu and Administrator user 
 
 ## Admin Access
 
-> **Automation:** Backend automated; manual UAT: admin access APIs have backend coverage; browser role-management flow remains manual.
+> **Automation:** Backend automated; permission-management browser checks remain manual.
 
 ### Steps
 
@@ -80,7 +80,7 @@ The display name updates immediately in the profile menu and Administrator user 
 9. Save.
 10. Confirm the user list updates without an invitation-sent status.
 11. Edit a user record.
-12. Toggle active state or role.
+12. Toggle the active state.
 13. Save.
 14. Edit your own display name and save.
 15. Confirm the avatar dropdown updates to the saved name without a browser refresh.
@@ -99,9 +99,9 @@ Admin changes persist and non-admin users cannot access admin workflows. An admi
 2. Open the access-request notification received by an active administrator.
 3. Follow `Review access request` and, if needed, complete Google sign-in as an administrator.
 4. Confirm Glovelly opens the Access requests dialog with the requester selected and the requester email is displayed but cannot be edited.
-5. Choose the requester role and active state, leave `Send invitation email` selected, and approve access.
+5. Choose the active state, leave `Send invitation email` selected, and approve access; confirm there is no administrative role selection.
 6. Confirm the requester is removed from the pending list and the result confirms provisioning and invitation delivery.
-7. Sign in as the requester with the same verified Google email and confirm normal first sign-in grants the provisioned role.
+7. Sign in as the requester with the same verified Google email and confirm normal first sign-in grants ordinary access without administrative permissions.
 8. Open Access requests from the administrator profile menu, select another pending request, choose Decline, and cancel the confirmation.
 9. Confirm the request remains pending, then decline it again and confirm the decline.
 10. Confirm declined requests can no longer be approved and a standard user cannot see Access requests in the profile menu.
@@ -112,7 +112,7 @@ Notification links only navigate to an authenticated administrator review; they 
 
 ## Inactive User Deletion
 
-> **Automation:** Backend automated; manual UAT: `Glovelly.Api.Tests.AdminEndpointsTests.DeleteUser_WhenInactive_DeletesUser`, `DeleteUser_WhenActive_ReturnsValidationProblem`, and `DeleteUser_WhenCurrentUser_ReturnsValidationProblem`
+> **Automation:** Backend automated; manual UAT: inactive and active user deletion and privileged-account boundaries have endpoint coverage.
 
 ### Steps
 
@@ -130,13 +130,15 @@ Only inactive users can be deleted. Active users, including the current administ
 
 ## Notes
 
-Access changes can lock testers out of an environment. Confirm the target user before changing active state or administrator role.
-# Access and role action area
+Access changes can lock testers out of an environment. Confirm the target user before changing active state or administrative permissions.
+# Access and permissions action area
 
-Confirm the bottom role selector has no extra visible **Role** label, stays aligned with its adjacent access action, and retains the accessible name **User access role**. The editor's Role label and all access restrictions/confirmations remain unchanged.
+Confirm ordinary provisioning and the bottom access controls do not offer a role selector. Permission assignment is a separate action visible only to Super Administrators.
 
-- Select an existing user. Confirm the labelled **Access and role** bottom area uses the same enclosing style as Clients' **Monthly invoice run**, without hiding identity facts or header actions.
-- Select yourself: role and deactivation controls are disabled, including in the editor. Hover or focus the bottom control group for an explanation; on keyboard or touch, expand **Why are these controls unavailable?**. No update request should be made.
-- Select another user: cancel role/access confirmation and confirm nothing changes; accept it and confirm the server-authoritative role/access appears, with a completion notification. Server validation and session-expiry handling still apply. Failed requests must not show a successful change.
-- Open the editor and change a field. Bottom access controls must be unavailable until changes are saved/discarded, preventing those changes from being overwritten. Editing role/access also requires confirmation on save. Delete remains restricted to inactive users and retains its confirmation.
+- Select an existing user. Confirm the labelled **Access** bottom area uses the same enclosing style as Clients' **Monthly invoice run**, without hiding identity facts or header actions.
+- Select yourself: deactivation is disabled. Hover or focus the bottom control group for an explanation; on keyboard or touch, expand **Why are these controls unavailable?**.
+- As a Super Administrator, assign an ordinary user User Administrator and Licence Administrator. Confirm Save is disabled until a permission changes, Reset restores the draft, and the directory and details show human-readable labels. Save and expand Permission history to verify a readable audit entry, then revoke one and check the other remains.
+- As a User Administrator without `ManagePermissions`, confirm the permission editor is absent, the disabled controls explain that only a Super Administrator can change an administrator account, and attempts to edit or invite an administratively privileged account fail.
+- With only one active enrolled Super Administrator, try removing that set and verify the conflict remains visible inline. Add another active enrolled Super Administrator, then verify handover succeeds and is audited.
+- Open the editor and change a field. Bottom access controls must be unavailable until changes are saved/discarded. Failed requests must not show successful completion. Delete remains restricted to inactive users and retains its confirmation.
 - Repeat at mobile width: controls wrap within the bottom area, explanations remain accessible, notifications do not block modal controls, and persistent validation remains available in the editor.

@@ -11,6 +11,7 @@ import {
 import { defaultAdminStatus, emptyAdminForm } from '../forms'
 import { notifications } from '../notifications'
 import { adminAccessRestriction } from '../adminAccess'
+import { formatAdministrativePermissions } from '../administrativePermissions'
 import type { AdminSort, AdminUser, AdminUserForm } from '../types'
 
 type UseAdminWorkspaceOptions = {
@@ -32,7 +33,6 @@ function toEditableAdminForm(user: AdminUser): AdminUserForm {
     email: user.email,
     displayName: user.displayName ?? '',
     googleSubject: user.googleSubject ?? '',
-    role: user.role === 'Admin' ? 'Admin' : 'User',
     isActive: user.isActive,
     sendInvitationEmail: false,
   }
@@ -117,7 +117,7 @@ export function useAdminWorkspace({
         case 'lastLogin':
           return compareText(left.lastLoginUtc ?? '', right.lastLoginUtc ?? '')
         case 'role':
-          return compareText(left.role, right.role)
+          return compareText(formatAdministrativePermissions(left.permissionSets), formatAdministrativePermissions(right.permissionSets))
         case 'displayName':
         default:
           return compareText(getDisplayName(left), getDisplayName(right))
@@ -142,7 +142,7 @@ export function useAdminWorkspace({
     }
 
     return sortedAdminUsers.filter((user) =>
-      [user.email, user.displayName ?? '', user.role, user.googleSubject ?? '']
+      [user.email, user.displayName ?? '', formatAdministrativePermissions(user.permissionSets), user.googleSubject ?? '']
         .join(' ')
         .toLowerCase()
         .includes(query)
@@ -190,7 +190,7 @@ export function useAdminWorkspace({
   }, [selectedAdminUser])
 
   const activeUsersCount = adminUsers.filter((user) => user.isActive).length
-  const totalAdmins = adminUsers.filter((user) => user.role === 'Admin').length
+  const totalAdmins = adminUsers.filter((user) => (user.permissionSets?.length ?? 0) > 0).length
 
   const startAdminCreate = () => {
     if (
@@ -278,7 +278,6 @@ export function useAdminWorkspace({
       email: adminForm.email.trim(),
       displayName: adminForm.displayName.trim(),
       googleSubject: adminForm.googleSubject.trim(),
-      role: adminForm.role,
       isActive: adminForm.isActive,
       sendInvitationEmail: adminForm.sendInvitationEmail,
     }
@@ -290,12 +289,12 @@ export function useAdminWorkspace({
 
     if (adminMode === 'edit' && selectedAdminUser) {
       const restriction = adminAccessRestriction(selectedAdminUser, currentUserId)
-      if (restriction && (!payload.isActive || payload.role !== 'Admin')) {
+      if (restriction && !payload.isActive) {
         setAdminStatus(restriction)
         return
       }
-      if ((payload.isActive !== selectedAdminUser.isActive || payload.role !== selectedAdminUser.role) &&
-        !window.confirm(`Change access and role for ${selectedAdminUser.displayName || selectedAdminUser.email}?`)) return
+      if (payload.isActive !== selectedAdminUser.isActive &&
+        !window.confirm(`Change access for ${selectedAdminUser.displayName || selectedAdminUser.email}?`)) return
     }
 
     setIsAdminLoading(true)
@@ -308,7 +307,14 @@ export function useAdminWorkspace({
 
       const response = await fetchWithSession(
         endpoint,
-        jsonRequestInit(isEdit ? 'PUT' : 'POST', payload)
+        jsonRequestInit(isEdit ? 'PUT' : 'POST', {
+          email: payload.email,
+          displayName: payload.displayName,
+          googleSubject: payload.googleSubject,
+          mileageRate: isEdit ? selectedAdminUser.mileageRate : null,
+          passengerMileageRate: isEdit ? selectedAdminUser.passengerMileageRate : null,
+          isActive: payload.isActive,
+        })
       )
 
       if (
@@ -349,7 +355,6 @@ export function useAdminWorkspace({
         email: savedUser.email,
         displayName: savedUser.displayName ?? '',
         googleSubject: savedUser.googleSubject ?? '',
-        role: savedUser.role === 'Admin' ? 'Admin' : 'User',
         isActive: savedUser.isActive,
         sendInvitationEmail: false,
       })
@@ -397,16 +402,23 @@ export function useAdminWorkspace({
     }
   }
 
-  const changeAdminAccess = async (role: AdminUserForm['role'], isActive: boolean) => {
+  const changeAdminAccess = async (isActive: boolean) => {
     if (!selectedAdminUser || isAdminLoading || isAdminEditorOpen) return
     const restriction = adminAccessRestriction(selectedAdminUser, currentUserId)
-    if (restriction && (!isActive || role !== 'Admin')) return
-    if (role === selectedAdminUser.role && isActive === selectedAdminUser.isActive) return
-    if (!window.confirm(`Change ${selectedAdminUser.displayName || selectedAdminUser.email} to ${isActive ? 'active' : 'inactive'} access with the ${role} role?`)) return
+    if (restriction && !isActive) return
+    if (isActive === selectedAdminUser.isActive) return
+    if (!window.confirm(`Change ${selectedAdminUser.displayName || selectedAdminUser.email} to ${isActive ? 'active' : 'inactive'} access?`)) return
     setIsAdminLoading(true)
     try {
       const response = await fetchWithSession(buildApiUrl(`/admin/users/${selectedAdminUser.id}`),
-        jsonRequestInit('PUT', { ...selectedAdminUser, ...toEditableAdminForm(selectedAdminUser), role, isActive }))
+        jsonRequestInit('PUT', {
+          email: selectedAdminUser.email,
+          displayName: selectedAdminUser.displayName,
+          googleSubject: selectedAdminUser.googleSubject,
+          mileageRate: selectedAdminUser.mileageRate,
+          passengerMileageRate: selectedAdminUser.passengerMileageRate,
+          isActive,
+        }))
       if (handleSessionExpired(response, onSessionExpired, 'Your session expired. Sign in again to keep managing access.')) return
       if (!response.ok) throw new Error(await getResponseErrorMessage(response, 'Unable to update access.'))
       const savedUser = await response.json() as AdminUser

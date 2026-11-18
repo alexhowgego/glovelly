@@ -6,6 +6,8 @@ using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Glovelly.Api.Endpoints;
 
@@ -15,7 +17,7 @@ internal static class AccessRequestAdminEndpoints
     {
         var requests = app.MapGroup("/admin/access-requests")
             .WithTags("Admin")
-            .RequireAuthorization(GlovellyPolicies.AdminUser);
+            .RequireAuthorization(AdministrativePermissions.ManageUsers);
 
         requests.MapGet("/", async (AccessRequestReviewService reviewService, CancellationToken cancellationToken) =>
             Results.Ok(await reviewService.ListPendingAsync(cancellationToken)));
@@ -38,11 +40,15 @@ internal static class AccessRequestAdminEndpoints
             IOptions<EmailSettings> emailSettingsAccessor,
             HttpContext httpContext,
             ILoggerFactory loggerFactory,
+            AdministrativeMutationCoordinator coordinator,
+            AdministrativeAccountGuard guard,
             CancellationToken cancellationToken) =>
         {
-            if (!Enum.TryParse<UserRole>(request.Role?.Trim(), true, out var role))
+            if (request.Role is not null || (request.Extra is not null && request.Extra.Keys.Any(key =>
+                key.Equals("permissionSets", StringComparison.OrdinalIgnoreCase) ||
+                key.Equals("permissions", StringComparison.OrdinalIgnoreCase))))
             {
-                return EndpointSupport.ValidationProblem("role", "A valid user role is required.");
+                return EndpointSupport.ValidationProblem("role", "Administrative permissions must be assigned separately.");
             }
 
             var reviewerId = currentUserAccessor.TryGetUserId(principal);
@@ -52,7 +58,7 @@ internal static class AccessRequestAdminEndpoints
             }
 
             var decision = await reviewService.ApproveAsync(
-                id, reviewerId.Value, role, request.IsActive, request.DecisionNote, cancellationToken);
+                id, reviewerId.Value, UserRole.User, request.IsActive, request.DecisionNote, cancellationToken);
             if (decision.AccessRequest is null)
             {
                 return Results.NotFound();
@@ -72,8 +78,15 @@ internal static class AccessRequestAdminEndpoints
             var invitationEmailSent = (bool?)null;
             if (decision.DecisionApplied && decision.UserCreated && request.SendInvitationEmail && decision.AccessRequest.ProvisionedUserId.HasValue)
             {
-                invitationEmailSent = await TrySendInvitationAsync(
-                    decision.AccessRequest, emailSender, emailSettingsAccessor.Value, settings, loggerFactory, cancellationToken);
+                invitationEmailSent = await coordinator.ExecuteAsync(async () =>
+                {
+                    if (!await guard.CanModifyAsync(reviewerId.Value, decision.AccessRequest.ProvisionedUserId.Value, cancellationToken))
+                    {
+                        return false;
+                    }
+                    return await TrySendInvitationAsync(
+                        decision.AccessRequest, emailSender, emailSettingsAccessor.Value, settings, loggerFactory, cancellationToken);
+                }, cancellationToken);
             }
 
             return Results.Ok(new
@@ -134,7 +147,10 @@ internal static class AccessRequestAdminEndpoints
         {
             var administratorIds = await dbContext.Users
                 .AsNoTracking()
-                .Where(user => user.IsActive && user.Role == UserRole.Admin)
+                .Where(user => user.IsActive && dbContext.UserAdministrativePermissionSets.Any(assignment =>
+                    assignment.UserId == user.Id &&
+                    (assignment.PermissionSet == AdministrativePermissionSet.UserAdministrator ||
+                     assignment.PermissionSet == AdministrativePermissionSet.SuperAdministrator)))
                 .Select(user => user.Id)
                 .ToListAsync(cancellationToken);
             var workspaceEvent = new WorkspaceEvent(
@@ -185,6 +201,10 @@ internal static class AccessRequestAdminEndpoints
         }
     }
 
-    private sealed record ApproveAccessRequest(string? Role, bool IsActive, bool SendInvitationEmail, string? DecisionNote);
+    private sealed record ApproveAccessRequest(string? Role, bool IsActive, bool SendInvitationEmail, string? DecisionNote)
+    {
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? Extra { get; init; }
+    }
     private sealed record DeclineAccessRequest(string? DecisionNote);
 }

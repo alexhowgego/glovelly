@@ -54,7 +54,8 @@ export type ClientSort = {
 
 export type AuthUser = {
   userId: string
-  role: string
+  permissions?: string[]
+  permissionSets?: string[]
   name: string
   email: string
   profileImageUrl: string
@@ -193,8 +194,10 @@ export type AdminUser = {
   email: string
   displayName: string | null
   googleSubject: string | null
+  mileageRate?: number | null
+  passengerMileageRate?: number | null
   isEnrolled: boolean
-  role: string
+  permissionSets?: string[]
   isActive: boolean
   createdUtc: string
   lastLoginUtc: string | null
@@ -204,7 +207,6 @@ export type AdminUserForm = {
   email: string
   displayName: string
   googleSubject: string
-  role: 'Admin' | 'User'
   isActive: boolean
   sendInvitationEmail: boolean
 }
@@ -240,7 +242,6 @@ export type AccessRequest = {
 }
 
 export type AccessRequestApproval = {
-  role: 'Admin' | 'User'
   isActive: boolean
   sendInvitationEmail: boolean
   decisionNote?: string

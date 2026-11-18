@@ -8,7 +8,6 @@ type AccessRequestsModalProps = {
   isLoading: boolean
   isOpen: boolean
   onApprove: (approval: {
-    role: 'Admin' | 'User'
     isActive: boolean
     sendInvitationEmail: boolean
     decisionNote?: string
@@ -32,7 +31,6 @@ export function AccessRequestsModal({
   onSelect,
   selectedAccessRequest,
 }: AccessRequestsModalProps) {
-  const [role, setRole] = useState<'Admin' | 'User'>('User')
   const [isActive, setIsActive] = useState(true)
   const [sendInvitationEmail, setSendInvitationEmail] = useState(true)
   const [decisionNote, setDecisionNote] = useState('')
@@ -40,7 +38,6 @@ export function AccessRequestsModal({
   const canDecide = selectedAccessRequest?.status === 'Pending'
 
   useEffect(() => {
-    setRole('User')
     setIsActive(true)
     setSendInvitationEmail(true)
     setDecisionNote('')
@@ -130,13 +127,6 @@ export function AccessRequestsModal({
 
                 {canDecide && (
                   <div className="access-request-form">
-                    <label>
-                      <span>Role</span>
-                      <select value={role} onChange={(event) => setRole(event.target.value as 'Admin' | 'User')}>
-                        <option value="User">User</option>
-                        <option value="Admin">Administrator</option>
-                      </select>
-                    </label>
                     <label className="checkbox-field">
                       <input checked={isActive} onChange={(event) => setIsActive(event.target.checked)} type="checkbox" />
                       <span>Activate account immediately</span>
@@ -164,7 +154,7 @@ export function AccessRequestsModal({
                       </div>
                     ) : (
                       <div className="actions">
-                        <button className="primary-button" disabled={isLoading} onClick={() => onApprove({ role, isActive, sendInvitationEmail, decisionNote: decisionNote.trim() || undefined })} type="button">
+                        <button className="primary-button" disabled={isLoading} onClick={() => onApprove({ isActive, sendInvitationEmail, decisionNote: decisionNote.trim() || undefined })} type="button">
                           Approve access
                         </button>
                         <button className="danger-button" disabled={isLoading} onClick={() => setIsDeclineConfirmationOpen(true)} type="button">

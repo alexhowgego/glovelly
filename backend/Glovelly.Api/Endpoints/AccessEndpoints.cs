@@ -1,4 +1,5 @@
 using Glovelly.Api.Configuration;
+using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
@@ -70,7 +71,10 @@ internal static class AccessEndpoints
 
             var administrators = await dbContext.Users
                 .AsNoTracking()
-                .Where(value => value.IsActive && value.Role == UserRole.Admin)
+                .Where(value => value.IsActive && dbContext.UserAdministrativePermissionSets.Any(assignment =>
+                    assignment.UserId == value.Id &&
+                    (assignment.PermissionSet == AdministrativePermissionSet.UserAdministrator ||
+                     assignment.PermissionSet == AdministrativePermissionSet.SuperAdministrator)))
                 .OrderBy(value => value.Email)
                 .ToListAsync(cancellationToken);
 

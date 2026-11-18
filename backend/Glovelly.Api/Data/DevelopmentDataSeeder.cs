@@ -1,3 +1,4 @@
+using Glovelly.Api.Auth;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.EntityFrameworkCore;
@@ -819,6 +820,16 @@ public static class DevelopmentDataSeeder
                 await dbContext.SaveChangesAsync();
             }
 
+            if (!await dbContext.UserAdministrativePermissionSets.AnyAsync(value =>
+                    value.UserId == existingUser.Id && value.PermissionSet == AdministrativePermissionSet.UserAdministrator))
+            {
+                dbContext.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+                {
+                    UserId = existingUser.Id,
+                    PermissionSet = AdministrativePermissionSet.UserAdministrator,
+                });
+                await dbContext.SaveChangesAsync();
+            }
             return existingUser.Id;
         }
 
@@ -839,6 +850,11 @@ public static class DevelopmentDataSeeder
         };
 
         dbContext.Users.Add(seededUser);
+        dbContext.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+        {
+            UserId = seededUser.Id,
+            PermissionSet = AdministrativePermissionSet.UserAdministrator,
+        });
 
         await dbContext.SaveChangesAsync();
 

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Glovelly.Api.Data;
+using Glovelly.Api.Auth;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Glovelly.Api.Tests.Infrastructure;
@@ -29,14 +30,30 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var secondAdminId = Guid.NewGuid();
         dbContext.Users.Add(new User
         {
-            Id = Guid.NewGuid(),
+            Id = secondAdminId,
             Email = "second-admin@glovelly.local",
             DisplayName = "Second Admin",
             Role = UserRole.Admin,
             IsActive = true,
             CreatedUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+        });
+        dbContext.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+        {
+            UserId = secondAdminId,
+            PermissionSet = AdministrativePermissionSet.UserAdministrator
+        });
+        var licenseOnlyId = Guid.NewGuid();
+        dbContext.Users.Add(new User
+        {
+            Id = licenseOnlyId, Email = "license-only@glovelly.local", IsActive = true,
+            CreatedUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+        });
+        dbContext.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+        {
+            UserId = licenseOnlyId, PermissionSet = AdministrativePermissionSet.LicenseAdministrator
         });
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -91,14 +108,20 @@ public sealed class AccessEndpointsTests : IClassFixture<GlovellyApiFactory>
     {
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var missingEmailAdminId = Guid.NewGuid();
         dbContext.Users.Add(new User
         {
-            Id = Guid.NewGuid(),
+            Id = missingEmailAdminId,
             Email = "   ",
             DisplayName = "Missing Email Admin",
             Role = UserRole.Admin,
             IsActive = true,
             CreatedUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+        });
+        dbContext.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+        {
+            UserId = missingEmailAdminId,
+            PermissionSet = AdministrativePermissionSet.UserAdministrator
         });
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 

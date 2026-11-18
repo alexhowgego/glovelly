@@ -210,7 +210,8 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
         {
             var response = await route.FetchAsync();
             var user = JsonNode.Parse(await response.TextAsync())!;
-            user["role"] = "Admin";
+            user["permissionSets"] = new JsonArray("UserAdministrator");
+            user["permissions"] = new JsonArray("ManageUsers");
             await route.FulfillAsync(new() { Response = response, Body = user.ToJsonString() });
         });
         await Page.RouteAsync("**/admin/users", route => route.FulfillAsync(new()
@@ -219,7 +220,7 @@ public sealed class WorkspaceLayoutTests : InvoiceUatTestBase
             Body = System.Text.Json.JsonSerializer.Serialize(Enumerable.Range(0, 32).Select(index => new
             {
                 id = $"layout-user-{index}", email = $"layout-{index}@example.com", displayName = $"{prefix} Layout User {index:00}",
-                googleSubject = (string?)null, isEnrolled = false, role = "User", isActive = true,
+                googleSubject = (string?)null, isEnrolled = false, permissionSets = Array.Empty<string>(), isActive = true,
                 createdUtc = "2026-01-01T00:00:00Z", lastLoginUtc = (string?)null,
             })),
         }));

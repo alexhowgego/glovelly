@@ -3,6 +3,7 @@ using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +51,10 @@ internal static class InfrastructureServiceCollectionExtensions
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
         });
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+        services.AddScoped<IAuthorizationHandler, AdministrativePermissionHandler>();
+        services.AddScoped<AdministrativeMutationCoordinator>();
+        services.AddScoped<AdministrativePermissionAssignmentService>();
+        services.AddScoped<AdministrativeAccountGuard>();
         services.AddScoped<IWorkspaceEventPublisher, WorkspaceEventPublisher>();
         services.AddHostedService<SetListChartMatchJobWorker>();
         services.AddHostedService<SetListInterpretationJobWorker>();
@@ -82,6 +87,21 @@ internal static class InfrastructureServiceCollectionExtensions
         });
         services.AddAuthorization(options =>
         {
+            foreach (var permission in new[]
+                     {
+                         AdministrativePermissions.ManageUsers,
+                         AdministrativePermissions.ManageLicences,
+                         AdministrativePermissions.ManageSystem,
+                         AdministrativePermissions.ManagePermissions
+                     })
+            {
+                options.AddPolicy(permission, policy =>
+                {
+                    policy.AuthenticationSchemes.Add(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
+                    policy.RequireAuthenticatedUser();
+                    policy.AddRequirements(new AdministrativePermissionRequirement(permission));
+                });
+            }
             options.AddPolicy(GlovellyPolicies.GlovellyUser, policy =>
             {
                 policy.AuthenticationSchemes.Add(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
@@ -95,13 +115,6 @@ internal static class InfrastructureServiceCollectionExtensions
                 policy.AuthenticationSchemes.Add(McpOAuthAuthenticationOptions.SchemeName);
                 policy.RequireAuthenticatedUser();
                 policy.RequireClaim(GlovellyClaimTypes.UserId);
-            });
-            options.AddPolicy(GlovellyPolicies.AdminUser, policy =>
-            {
-                policy.AuthenticationSchemes.Add(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
-                policy.RequireAuthenticatedUser();
-                policy.RequireClaim(GlovellyClaimTypes.UserId);
-                policy.RequireRole(UserRole.Admin.ToString());
             });
         });
         services.AddRateLimiter(options =>

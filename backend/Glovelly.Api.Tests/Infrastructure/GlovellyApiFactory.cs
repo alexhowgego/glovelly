@@ -1,3 +1,4 @@
+using Glovelly.Api.Auth;
 using Glovelly.Api.Data;
 using Glovelly.Api.Models;
 using Glovelly.Api.Services;
@@ -135,6 +136,11 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             Role = UserRole.Admin,
             IsActive = true,
             CreatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        });
+        dbContext.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+        {
+            UserId = TestAuthContext.UserId,
+            PermissionSet = AdministrativePermissionSet.UserAdministrator,
         });
 
         var clients = new[]

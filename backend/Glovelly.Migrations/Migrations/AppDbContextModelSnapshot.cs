@@ -94,6 +94,57 @@ namespace Glovelly.Migrations.Migrations
                     b.ToTable("AccessRequests");
                 });
 
+            modelBuilder.Entity("Glovelly.Api.Models.AdministrativePermissionChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorIdentity")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NewSets")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("PreviousSets")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("TargetIdentity")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<Guid>("TargetUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetUserId", "ChangedAtUtc");
+
+                    b.ToTable("AdministrativePermissionChanges");
+                });
+
             modelBuilder.Entity("Glovelly.Api.Models.CalendarSyncWorkItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2043,6 +2094,20 @@ namespace Glovelly.Migrations.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Glovelly.Api.Models.UserAdministrativePermissionSet", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PermissionSet")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("UserId", "PermissionSet");
+
+                    b.ToTable("UserAdministrativePermissionSets");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
                 {
                     b.Property<int>("Id")
@@ -2599,6 +2664,17 @@ namespace Glovelly.Migrations.Migrations
                         .IsRequired();
 
                     b.Navigation("Gig");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.UserAdministrativePermissionSet", b =>
+                {
+                    b.HasOne("Glovelly.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });

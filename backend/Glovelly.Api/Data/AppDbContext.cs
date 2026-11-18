@@ -9,6 +9,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AccessRequest> AccessRequests => Set<AccessRequest>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserAdministrativePermissionSet> UserAdministrativePermissionSets => Set<UserAdministrativePermissionSet>();
+    public DbSet<AdministrativePermissionChange> AdministrativePermissionChanges => Set<AdministrativePermissionChange>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Gig> Gigs => Set<Gig>();
     public DbSet<GigImportBatch> GigImportBatches => Set<GigImportBatch>();
