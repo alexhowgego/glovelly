@@ -30,7 +30,7 @@ public sealed class InvoicePdfRenderer : IInvoicePdfRenderer
                 FormatCurrency(line.LineTotal)))
             .ToList();
 
-        var document = new PdfDocumentBuilder();
+        var document = new PdfDocumentBuilder(invoice.RequiresDraftWatermark);
         var renderer = new InvoicePdfDocumentRenderer(document);
         renderer.Render(new InvoicePdfViewModel(
             SellerName: sellerName,
@@ -464,7 +464,7 @@ public sealed class InvoicePdfRenderer : IInvoicePdfRenderer
         }
     }
 
-    private sealed class PdfDocumentBuilder
+    private sealed class PdfDocumentBuilder(bool isDraft)
     {
         private readonly List<string> _pageContents = [];
 
@@ -490,10 +490,13 @@ public sealed class InvoicePdfRenderer : IInvoicePdfRenderer
             {
                 var pageObjectId = 5 + (index * 2);
                 var contentObjectId = pageObjectId + 1;
-                var content = _pageContents[index];
+                // Append after all page content so layout fills cannot hide the watermark.
+                var content = _pageContents[index] + (isDraft
+                    ? "q\n/GSdraft gs\n0.45 g\nBT /F2 96 Tf 0.7071 0.7071 -0.7071 0.7071 175 290 Tm (DRAFT) Tj ET\nQ\n"
+                    : string.Empty);
 
                 objects.Add(
-                    $"{pageObjectId} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {contentObjectId} 0 R >> endobj");
+                    $"{pageObjectId} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /ExtGState << /GSdraft << /Type /ExtGState /ca 0.22 >> >> >> /Contents {contentObjectId} 0 R >> endobj");
                 objects.Add(
                     $"{contentObjectId} 0 obj << /Length {Encoding.ASCII.GetByteCount(content)} >> stream\n{content}endstream\nendobj");
             }

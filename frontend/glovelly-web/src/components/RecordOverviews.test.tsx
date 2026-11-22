@@ -23,6 +23,8 @@ const overviewGig: Gig = {
   invoicedAt: null, isInvoiced: false, expenses: [], externalResources: [],
 }
 const invoice: Invoice = {
+  pdfHasDraftWatermark: null,
+  isPdfCurrent: false,
   id: 'invoice', invoiceNumber: 'GLV-001', clientId: overviewClient.id,
   invoiceDate: '2026-10-01', dueDate: '2026-10-15', status: 'Draft', paidOn: null, lines: [], total: 100,
   description: 'Complete invoice description '.repeat(100), deliveryCount: 0,
@@ -168,7 +170,17 @@ describe('compact record overviews', () => {
       onSendEmail: vi.fn(async () => null), onQuickFilterChange: vi.fn(), onSearchQueryChange: vi.fn(), onSelectInvoice: vi.fn(), onSortChange: vi.fn(),
       onStartEditing: vi.fn(), sellerProfileNotice: 'Configure your seller profile', selectedInvoice: invoice, sendButtonRef: createRef(),
     }
-    render(<InvoicesSection {...props} />)
+    const { rerender } = render(<InvoicesSection {...props} />)
+    expect(screen.getByTestId('invoice-draft-watermark-hint').textContent).toContain('Issue to remove DRAFT')
+    rerender(<InvoicesSection {...props} selectedInvoice={{ ...invoice, documentState: 'Current', pdfDocumentRevision: 1, pdfHasDraftWatermark: true, isPdfCurrent: true }} />)
+    const compactHint = screen.getByTestId('invoice-draft-watermark-hint')
+    expect(compactHint.tagName).toBe('SPAN')
+    expect(compactHint.parentElement?.textContent?.trim()).toBe('Issue to remove DRAFT')
+    expect(compactHint.parentElement?.querySelector('p')).toBeNull()
+    rerender(<InvoicesSection {...props} selectedInvoice={{ ...invoice, status: 'Issued' }} />)
+    expect(screen.queryByTestId('invoice-draft-watermark-hint')).toBeNull()
+    rerender(<InvoicesSection {...props} selectedInvoice={{ ...invoice, status: 'Draft', reissueCount: 1 }} />)
+    expect(screen.getByTestId('invoice-draft-watermark-hint')).toBeDefined()
     expectFullPaneComposition()
     expect(document.querySelector('.record-overview .record-visual-layout.invoice-visual-layout')).not.toBeNull()
     expect(screen.getByTestId<HTMLButtonElement>('invoice-download-pdf-button').disabled).toBe(true)
@@ -185,6 +197,14 @@ describe('compact record overviews', () => {
     expect(within(facts).getByText('Invoice PDF').parentElement?.classList.contains('full-width')).toBe(false)
     expect(within(delivery).getByTestId('invoice-send-button')).toBeDefined()
     expect(within(delivery).getByRole('button', { name: 'Publish to Drive' })).toBeDefined()
+    rerender(<InvoicesSection {...props} isGoogleDriveConnected selectedInvoice={{
+      ...invoice, status: 'Cancelled', firstIssuedUtc: '2026-11-21T10:00:00Z',
+      documentState: 'Current', pdfDocumentRevision: 1, pdfHasDraftWatermark: false, isPdfCurrent: true,
+    }} />)
+    expect(screen.getByTestId<HTMLButtonElement>('invoice-send-button').disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Publish to Drive' }).disabled).toBe(true)
+    expect(screen.getByTestId<HTMLButtonElement>('invoice-download-pdf-button').disabled).toBe(false)
+    expect(screen.getByText('Restore this cancelled invoice to Draft and issue it before delivery.')).toBeDefined()
   })
 
   it('shows Admin access facts and complete identity metadata without weakening deletion rules', () => {

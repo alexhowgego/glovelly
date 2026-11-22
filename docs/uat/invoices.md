@@ -71,6 +71,38 @@ Expected result: the app blocks generation and explains that selected gigs must 
 
 The invoice is created as a draft, linked gigs remain linked, lines are generated after redraft, and the PDF can be previewed and downloaded.
 
+## Draft PDF Watermark And Issue Boundary
+
+> **Automation:** `Glovelly.Uat.Tests.InvoicePreviewWorkflowTests.InvoicePreviewDownloadRedraftAndReissueShowLatestPdf` verifies stored draft/issued bytes and the desktop hint. `LegacyDraftRecoveryRequiresExplicitRetryAndPreservesLifecycle` covers desktop and mobile hint visibility, unavailable-document controls, and explicit failed/successful recovery using intercepted legacy metadata. PostgreSQL migration and cancellation rules also have backend coverage.
+
+### Steps
+
+1. Generate a draft invoice and open its full preview, then download the PDF.
+2. Check every page contains a diagonal `DRAFT` watermark across the content, including continuation pages. Open the download in another PDF viewer and check print preview; invoice details must remain readable.
+3. Open the invoice workspace. Confirm the PDF fact shows the compact **Issue to remove DRAFT** hint in place of **PDF current**, without a separate paragraph or needing hover on desktop or mobile. On a laptop-height viewport, this must not add a facts row or introduce scrolling for an otherwise fitting invoice.
+4. Change status to `Issued`. Confirm the hint disappears and both full preview and a fresh download are clean. Issuing alone must not send email.
+5. Re-issue the invoice. Confirm it returns to Draft with the hint and watermarked PDF restored.
+6. Issue again. Confirm the PDF is clean and the original first-issued timestamp and delivery history remain intact.
+7. Cancel a never-issued draft and regenerate if necessary: its PDF must remain watermarked. Cancel a previously issued invoice: its regenerated PDF remains clean.
+8. Email/Drive delivery must issue Drafts before delivering clean stored bytes; direct Draft delivery requests must be rejected. Cancelled invoices must not offer delivery, even with a clean saved PDF. Local watermarked preview/download remains available.
+
+### Legacy Recovery And Failure
+
+1. On a migrated environment, select an old draft or a cancelled invoice that was never issued.
+2. Confirm its old clean PDF is unavailable, an explanation asks for regeneration, and Preview, Download, Send, and Drive publishing cannot expose the old document.
+3. Merely select/reload/view the invoice: no regeneration request should occur.
+4. Use the inline **Try again** action. On failure, confirm the error notification appears and the inline error/retry remains after the notification dismisses.
+5. Retry successfully. Confirm a watermarked PDF becomes available without an issue, reissue, or delivery event.
+6. Check legacy issued PDFs remain usable without mandatory regeneration.
+
+### Visual And Placement Checks
+
+- Review real single-page and multi-page output in staging; automated byte assertions do not replace visual review.
+- Check watermark visibility over tables/filled boxes and readable totals, addresses, payment details, and continuation pages.
+- Check the hint and inline retry at desktop and narrow/mobile widths. Notifications must stay below modal overlays and not obstruct retry or preview controls.
+- During a state change, the thumbnail frame and facts columns must not collapse or jump. The old same-invoice pixels may stay blurred under **Updating preview…**, but the thumbnail is disabled until replacement succeeds. Failure clears old pixels and uses the same frame for error feedback. Switching invoice or session must never retain the previous selection's image; reduced-motion preferences disable the fade.
+- Previously downloaded, emailed, or Drive-published copies are not recalled or modified when the current document changes.
+
 ## Invoice Line Refresh Regression
 
 > **Automation:** Automated UAT: `Glovelly.Uat.Tests.InvoiceLineRefreshWorkflowTests.LinkedDraftRefreshesGeneratedLinesWithoutDuplicatingOrDroppingManualAdjustments` and `Glovelly.Uat.Tests.InvoiceLineRefreshWorkflowTests.MileageDefaultsAndEstimationFlowsAreCoveredEndToEnd`
@@ -238,24 +270,26 @@ Expected result: only draft invoices expose an editable Description and save act
 
 ## Invoice Status And Delivery
 
-> **Automation:** Partially automated UAT: `Glovelly.Uat.Tests.InvoicePromptChoiceTests.IssuingLinkedDraftHonoursLinkedGigCompletionChoice` covers accepting and declining linked-gig completion after issuing; backend tests cover status and delivery rules, while configured email/Drive checks remain manual.
+> **Automation:** `InvoicePromptChoiceTests.IssuingLinkedDraftHonoursLinkedGigCompletionChoice` covers both linked-gig checkbox choices in the single issuance dialog; `CancellingIssuanceLeavesDraftAndLinkedGigUnchanged` covers cancellation. `CoreInvoiceWorkflowTests` verifies issue-before-email request ordering. Frontend tests cover issue/delivery failures, retries, and duplicate submission. Configured Drive checks remain manual.
 
 ### Steps
 
 1. Open a draft invoice linked to one or more non-cancelled gigs.
-2. Issue it.
-3. Accept the prompt to mark the linked gig or gigs as completed.
-4. Repeat with another linked draft invoice and decline the gig completion prompt.
+2. Select Issued; confirm one dialog explains that issuance removes DRAFT without sending.
+3. Select the optional linked-gig completion checkbox and confirm **Issue invoice**. No second confirmation should appear.
+4. Repeat leaving that checkbox unchecked; gigs stay unchanged. Cancel or Escape once and confirm neither the invoice nor gigs change.
 5. Open another draft invoice and select Send to client; confirm the review dialog shows the recipient, subject, plain-text email preview, and current PDF attachment before sending.
 6. Type a multi-line optional message and confirm Enter adds a line rather than sending. Cancel once and confirm no delivery is recorded, then reopen the dialog.
-7. Optionally include receipt attachments and select Mark invoice as issued after sending before explicitly selecting Send invoice.
-8. Confirm the delivery success notification appears. If the issue or linked-gig follow-up fails, confirm the email success remains visible alongside an actionable error.
-9. Publish a draft invoice to Google Drive if connected, then repeat the delivered-draft issue prompt check.
+7. Optionally include receipts and linked-gig completion, then choose **Issue and send**. Issuance and clean PDF generation must precede email; no extra issuance/gig prompt or opt-out should appear. Issued/Paid/Overdue uses the same review with **Send invoice** and no issuance.
+8. If issuance fails, confirm no email is attempted and the review stays open with an inline error. If sending fails after issuance, confirm the invoice remains Issued with a partial-success explanation; retry sends without another issuance request. On success, the closed review produces the delivery success notification.
+9. Publish to Google Drive if connected: the same styled dialog offers **Issue and publish** for Drafts or **Publish invoice** for Issued/Paid/Overdue. No browser prompt or watermarked-draft choice exists. Publication must issue first when needed; failures retain Issued status and explain that only publishing needs retry.
 10. Re-issue an issued invoice.
+11. Cancel a previously issued invoice, then return it to Draft. Preview/download should become available with a regenerated watermark without a manual redraft. On rendering failure the Draft status remains saved and the inline retry restores preview.
+12. While Cancelled, verify Send/Drive controls are disabled with a visible restoration explanation; direct API delivery is also rejected without changing delivery history. Preview/download may remain available.
 
 ### Expected Results
 
-Status transitions are explicit, email delivery is reviewed before its explicit final action, delivery state is recorded, delivered drafts can be promoted to issued by choice, issuing from the dialog completes linked gigs without another browser confirmation, PDF remains downloadable, and receipt attachments are included only when requested.
+Issuance has one explicit confirmation, optional linked-gig completion never introduces a second prompt, and delivery always uses clean issued bytes. Draft-only and Cancelled delivery are rejected. Returning Cancelled to Draft restores preview without rewriting first-issue/reissue history. Email failures remain inline while review is open; final success is notified after closing. Check keyboard focus restoration, Escape/cancel behavior, and mobile controls with notifications below modal overlays.
 
 ## Paid Income Dashboard
 

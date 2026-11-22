@@ -8,6 +8,7 @@ public interface IInvoicePdfService
         Invoice invoice,
         Guid? userId,
         byte[] content,
+        bool hasDraftWatermark,
         CancellationToken cancellationToken = default);
 
     Task<InvoicePdfContent?> OpenReadAsync(

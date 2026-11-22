@@ -155,6 +155,7 @@ public static class InvoiceEndpoints
             invoice.DocumentState = InvoiceDocumentState.Missing;
             invoice.DocumentRevision = 1;
             invoice.PdfDocumentRevision = null;
+            invoice.PdfHasDraftWatermark = null;
             invoice.DocumentFailureMessage = null;
             invoice.PaidOn = null;
             invoice.Client = null;
@@ -215,6 +216,7 @@ public static class InvoiceEndpoints
             invoice.InvoiceNumber = request.InvoiceNumber.Trim();
             invoice.ClientId = request.ClientId;
             var requestedStatus = request.Status;
+            var restoresDraft = invoice.Status == InvoiceStatus.Cancelled && requestedStatus == InvoiceStatus.Draft;
             if (requestedStatus is not InvoiceStatus.Issued)
             {
                 invoice.InvoiceDate = request.InvoiceDate;
@@ -241,6 +243,10 @@ public static class InvoiceEndpoints
             }
             EndpointSupport.StampUpdate(invoice, userId);
 
+            if (restoresDraft)
+            {
+                await RestoreDraftPdfAsync(invoice, requestClient, userId, db, invoiceWorkflowService);
+            }
             await db.SaveChangesAsync();
             await businessLifecycleSignal.TrackInvoiceAsync(invoice);
 
@@ -293,12 +299,21 @@ public static class InvoiceEndpoints
                 return Results.Ok(invoice);
             }
 
+            var restoresDraft = invoice.Status == InvoiceStatus.Cancelled && request.Status == InvoiceStatus.Draft;
+            if (restoresDraft && invoice.Client is null)
+            {
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
+            }
             invoice.Status = request.Status;
             invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
             invoice.PaidOn = request.Status is InvoiceStatus.Paid
                 ? UkFinancialYear.CurrentDate(timeProvider)
                 : null;
             EndpointSupport.StampUpdate(invoice, userId);
+            if (restoresDraft)
+            {
+                await RestoreDraftPdfAsync(invoice, invoice.Client!, userId, db, invoiceWorkflowService);
+            }
             await db.SaveChangesAsync();
             await businessLifecycleSignal.TrackInvoiceAsync(invoice);
 
@@ -656,6 +671,27 @@ public static class InvoiceEndpoints
         });
 
         return group;
+    }
+
+    private static async Task RestoreDraftPdfAsync(
+        Invoice invoice, Client client, Guid? userId, AppDbContext db, IInvoiceWorkflowService workflow)
+    {
+        if (invoice.IsPdfCurrent && !invoice.GigLinesNeedRefresh) return;
+
+        invoice.DocumentRevision++;
+        invoice.DocumentState = InvoiceDocumentState.Regenerating;
+        invoice.DocumentFailureMessage = null;
+        // Persist the explicit restoration and block the old clean PDF before replacement.
+        await db.SaveChangesAsync();
+        try
+        {
+            await workflow.RegenerateInvoicePdfAsync(invoice, client, userId);
+        }
+        catch (Exception)
+        {
+            workflow.MarkInvoicePdfRegenerationFailed(
+                invoice, "Invoice restored to Draft, but its PDF could not be regenerated. Try again.", userId);
+        }
     }
 
     private sealed record InvoicePaidIncomeSummary(

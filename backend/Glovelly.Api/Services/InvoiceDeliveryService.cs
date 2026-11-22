@@ -20,6 +20,10 @@ public sealed class InvoiceDeliveryService(
         CancellationToken cancellationToken = default,
         IReadOnlyList<InvoiceExpenseReceiptAttachment>? expenseReceiptAttachments = null)
     {
+        if (InvoiceDeliveryPolicy.GetError(invoice) is { } error)
+        {
+            throw new InvalidOperationException(error);
+        }
         var deliveryChannel = deliveryChannels.FirstOrDefault(value => value.Channel == channel)
             ?? throw new InvalidOperationException($"Invoice delivery channel {channel} is not registered.");
 

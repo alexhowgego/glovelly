@@ -23,7 +23,6 @@ public static class DevelopmentDataSeeder
 {
     private static readonly DateTimeOffset SeededCreatedUtc = new(2026, 3, 15, 9, 0, 0, TimeSpan.Zero);
     private static readonly DateOnly SeededToday = DateOnly.FromDateTime(DateTime.UtcNow);
-    private static readonly byte[] SeededPdfContent = "Seeded development invoice PDF placeholder"u8.ToArray();
 
     public static async Task SeedAsync(
         AppDbContext dbContext,
@@ -763,8 +762,12 @@ public static class DevelopmentDataSeeder
         dbContext.Invoices.AddRange(fixture.Invoices);
         if (seededAdminUserId.HasValue)
         {
-            await SeedInvoicePdfAsync(fixture.Invoices[0], seededAdminUserId.Value, context.BlobStore);
-            await SeedInvoicePdfAsync(fixture.Invoices[1], seededAdminUserId.Value, context.BlobStore);
+            foreach (var invoice in fixture.Invoices)
+            {
+                var client = fixture.Clients.Single(value => value.Id == invoice.ClientId);
+                var lines = fixture.InvoiceLines.Where(value => value.InvoiceId == invoice.Id).ToList();
+                await SeedInvoicePdfAsync(invoice, client, lines, seededAdminUserId.Value, context.BlobStore);
+            }
         }
         dbContext.InvoiceLines.AddRange(fixture.InvoiceLines);
         dbContext.Gigs.AddRange(fixture.Gigs);
@@ -777,25 +780,17 @@ public static class DevelopmentDataSeeder
         }
     }
 
-    private static async Task SeedInvoicePdfAsync(Invoice invoice, Guid userId, IBlobStore? blobStore)
+    private static async Task SeedInvoicePdfAsync(
+        Invoice invoice, Client client, IReadOnlyCollection<InvoiceLine> lines, Guid userId, IBlobStore? blobStore)
     {
         if (blobStore is null)
         {
             return;
         }
 
-        var key = InvoicePdfStorage.BuildStorageKey(invoice, userId);
-        await blobStore.SaveAsync(new BlobWriteRequest(
-            key,
-            new MemoryStream(SeededPdfContent, writable: false),
-            InvoicePdfStorage.ContentType,
-            SeededPdfContent.Length));
-
-        invoice.PdfStorageKey = key;
-        invoice.PdfFileName = $"{invoice.InvoiceNumber}.pdf";
-        invoice.PdfContentType = InvoicePdfStorage.ContentType;
-        invoice.PdfSizeBytes = SeededPdfContent.Length;
-        invoice.PdfGeneratedAt = invoice.FirstIssuedUtc ?? SeededCreatedUtc;
+        var content = new InvoicePdfRenderer().RenderInvoicePdf(invoice, client, null, lines, null);
+        await new InvoicePdfService(blobStore, TimeProvider.System).SaveGeneratedPdfAsync(
+            invoice, userId, content, invoice.RequiresDraftWatermark);
     }
 
     private static async Task<Guid?> SeedDevelopmentAdminUserAsync(DevelopmentDataSeedContext context)

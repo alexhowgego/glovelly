@@ -8,13 +8,14 @@ type InvoiceEmailReviewModalProps = {
   includeReceipts: boolean
   invoice: Invoice | null
   isLoading: boolean
-  issueAfterSend: boolean
+  completeLinkedGigs: boolean
+  linkedGigCount: number
   message: string
   onClose: () => void
   onDownloadPdf: (invoice: Invoice) => void
   onDownloadReceipts: (invoice: Invoice) => void
   onIncludeReceiptsChange: (value: boolean) => void
-  onIssueAfterSendChange: (value: boolean) => void
+  onCompleteLinkedGigsChange: (value: boolean) => void
   onMessageChange: (value: string) => void
   onSend: () => void
   review: InvoiceEmailReview | null
@@ -26,13 +27,14 @@ export function InvoiceEmailReviewModal({
   includeReceipts,
   invoice,
   isLoading,
-  issueAfterSend,
+  completeLinkedGigs,
+  linkedGigCount,
   message,
   onClose,
   onDownloadPdf,
   onDownloadReceipts,
   onIncludeReceiptsChange,
-  onIssueAfterSendChange,
+  onCompleteLinkedGigsChange,
   onMessageChange,
   onSend,
   review,
@@ -132,10 +134,14 @@ export function InvoiceEmailReviewModal({
               <span>Include receipt attachments{review.receiptCount ? ` (${review.receiptCount})` : ''}</span>
             </label>
             {invoice.status === 'Draft' ? (
-              <label className="checkbox-field">
-                <input checked={issueAfterSend} disabled={isLoading} onChange={(event) => onIssueAfterSendChange(event.target.checked)} type="checkbox" />
-                <span>Mark invoice as issued after sending</span>
-              </label>
+              <>
+                <p className="helper-text">This draft will be issued before sending to remove DRAFT. The attachment preview above is the current draft.</p>
+                {linkedGigCount > 0 && <label className="checkbox-field">
+                  <input checked={completeLinkedGigs} disabled={isLoading}
+                    onChange={event => onCompleteLinkedGigsChange(event.target.checked)} type="checkbox" />
+                  <span>Also mark {linkedGigCount === 1 ? 'the linked gig' : `${linkedGigCount} linked gigs`} as completed</span>
+                </label>}
+              </>
             ) : null}
           </div>
         ) : (
@@ -146,8 +152,8 @@ export function InvoiceEmailReviewModal({
           <span className="status-pill">{isLoading ? 'Preparing delivery...' : 'Review before sending.'}</span>
           <div className="actions">
             <button className="ghost-button" disabled={isLoading} onClick={handleClose} type="button">Cancel</button>
-            <button className="primary-button" data-testid="invoice-email-review-send-button" disabled={isLoading || !review} onClick={onSend} type="button">
-              Send invoice
+            <button className="primary-button" data-testid="invoice-email-review-send-button" disabled={isLoading || !review || invoice.status === 'Cancelled'} onClick={onSend} type="button">
+              {invoice.status === 'Draft' ? 'Issue and send' : 'Send invoice'}
             </button>
           </div>
         </div>

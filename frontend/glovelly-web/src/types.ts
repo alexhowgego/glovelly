@@ -760,6 +760,8 @@ export type Invoice = {
   documentState: InvoiceDocumentState
   documentRevision: number
   pdfDocumentRevision: number | null
+  pdfHasDraftWatermark: boolean | null
+  isPdfCurrent: boolean
   documentFailureMessage: string | null
   gigLinesNeedRefresh?: boolean
   total: number

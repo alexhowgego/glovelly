@@ -1472,6 +1472,9 @@ namespace Glovelly.Migrations.Migrations
                     b.Property<DateTimeOffset?>("PdfGeneratedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool?>("PdfHasDraftWatermark")
+                        .HasColumnType("boolean");
+
                     b.Property<long?>("PdfSizeBytes")
                         .HasColumnType("bigint");
 

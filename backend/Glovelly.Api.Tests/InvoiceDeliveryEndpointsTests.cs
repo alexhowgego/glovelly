@@ -857,7 +857,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var invoiceEntity = await dbContext.Invoices.SingleAsync(value => value.Id == invoiceId, TestContext.Current.CancellationToken);
         var invoicePdfService = scope.ServiceProvider.GetRequiredService<IInvoicePdfService>();
-        await invoicePdfService.SaveGeneratedPdfAsync(invoiceEntity, TestAuthContext.UserId, pdfBytes);
+        await invoicePdfService.SaveGeneratedPdfAsync(invoiceEntity, TestAuthContext.UserId, pdfBytes, hasDraftWatermark: false);
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return invoice;
@@ -917,7 +917,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         await invoicePdfService.SaveGeneratedPdfAsync(
             invoice,
             TestAuthContext.UserId,
-            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"), hasDraftWatermark: false);
         dbContext.Invoices.Add(invoice);
         dbContext.Gigs.Add(new Gig
         {

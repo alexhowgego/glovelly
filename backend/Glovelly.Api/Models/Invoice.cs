@@ -34,6 +34,19 @@ public sealed class Invoice
     public InvoiceDocumentState DocumentState { get; set; } = InvoiceDocumentState.Missing;
     public int DocumentRevision { get; set; } = 1;
     public int? PdfDocumentRevision { get; set; }
+    public bool? PdfHasDraftWatermark { get; set; }
+    [NotMapped]
+    [JsonIgnore]
+    public bool RequiresDraftWatermark => Status == InvoiceStatus.Draft ||
+        (Status == InvoiceStatus.Cancelled && !FirstIssuedUtc.HasValue);
+    [NotMapped]
+    [JsonIgnore]
+    public bool HasCompatiblePdfWatermark => RequiresDraftWatermark
+        ? PdfHasDraftWatermark is true
+        : PdfHasDraftWatermark is not true;
+    [NotMapped]
+    public bool IsPdfCurrent => DocumentState == InvoiceDocumentState.Current &&
+        PdfDocumentRevision == DocumentRevision && HasCompatiblePdfWatermark;
     public string? DocumentFailureMessage { get; set; }
     public bool GigLinesNeedRefresh { get; set; }
 

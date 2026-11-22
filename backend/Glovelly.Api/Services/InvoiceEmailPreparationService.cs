@@ -17,6 +17,10 @@ public sealed class InvoiceEmailPreparationService(
         bool includeReceipts,
         CancellationToken cancellationToken = default)
     {
+        if (invoice.Status == InvoiceStatus.Cancelled)
+        {
+            throw new InvoiceEmailPreparationException("status", InvoiceDeliveryPolicy.GetError(invoice)!);
+        }
         var client = invoice.Client
             ?? throw new InvoiceEmailPreparationException("clientId", "Client does not exist.");
         if (string.IsNullOrWhiteSpace(client.Email))

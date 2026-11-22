@@ -47,6 +47,8 @@ import { useGigsWorkspace } from './hooks/useGigsWorkspace'
 import { useGigImportsWorkspace } from './hooks/useGigImportsWorkspace'
 import { useInvoicePreview } from './hooks/useInvoicePreview'
 import { useInvoicesWorkspace } from './hooks/useInvoicesWorkspace'
+import { useInvoiceActionConfirmation } from './hooks/useInvoiceActionConfirmation'
+import { InvoiceActionConfirmation } from './components/InvoiceActionConfirmation'
 import { useProfileMenu } from './hooks/useProfileMenu'
 import { useSellerProfile } from './hooks/useSellerProfile'
 import { useThemePreference } from './hooks/useThemePreference'
@@ -101,6 +103,7 @@ function App({ appMetadata }: AppProps) {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const lastWorkspaceRefreshAtRef = useRef(0)
   const invoiceSendButtonRef = useRef<HTMLButtonElement>(null)
+  const invoiceActionConfirmation = useInvoiceActionConfirmation(isAuthenticated)
   const [shouldCloseBrowserNotice, setShouldCloseBrowserNotice] = useState(false)
   const {
     closeProfileMenu,
@@ -385,11 +388,13 @@ function App({ appMetadata }: AppProps) {
     invoiceEmailReviewInvoice,
     invoiceEmailReviewMessage,
     includeInvoiceEmailReceipts,
-    issueInvoiceAfterEmail,
+    completeInvoiceEmailGigs,
+    setCompleteInvoiceEmailGigs,
     isInvoiceEditorOpen,
     isInvoiceEmailReviewLoading,
     issuedInvoiceCount,
     isInvoiceLoading,
+    updatingInvoiceId,
     loadPaidIncomeSummary,
     paidIncomeSummary,
     resetInvoicesWorkspace,
@@ -400,7 +405,6 @@ function App({ appMetadata }: AppProps) {
     setInvoices,
     setInvoiceStatus,
     setInvoiceEmailReviewMessage,
-    setIssueInvoiceAfterEmail,
     setIsInvoiceLoading,
     setInvoiceQuickFilter,
     setSelectedInvoiceId,
@@ -1161,32 +1165,16 @@ function App({ appMetadata }: AppProps) {
     await openInvoicePreview(invoice)
   }
 
-  const promptToCompleteLinkedGigs = async (invoice: Invoice, completeWithoutPrompt = false) => {
-    const linkedGigs = gigs.filter(
-      (gig) =>
-        gig.invoiceId === invoice.id &&
-        gig.status !== 'Completed' &&
-        gig.status !== 'Cancelled'
-    )
+  const linkedGigsForInvoice = (invoice: Invoice) => gigs.filter(
+    (gig) =>
+      gig.invoiceId === invoice.id &&
+      gig.status !== 'Completed' &&
+      gig.status !== 'Cancelled'
+  )
+  const completeLinkedInvoiceGigs = async (invoice: Invoice, notify = true) => {
+    const linkedGigs = linkedGigsForInvoice(invoice)
     if (linkedGigs.length === 0) {
       return
-    }
-
-    if (!completeWithoutPrompt) {
-      const linkedGigLabel =
-        linkedGigs.length === 1
-          ? `"${linkedGigs[0].title}"`
-          : `${linkedGigs.length} linked gigs`
-      const shouldComplete = window.confirm(
-        `Mark ${linkedGigLabel} as completed now that invoice ${invoice.invoiceNumber} is issued?`
-      )
-      if (!shouldComplete) {
-        notifications.info(
-          `Invoice ${invoice.invoiceNumber} issued; linked gig status left unchanged.`,
-          { dedupeKey: `invoice:${invoice.id}:linked-gig-status` }
-        )
-        return
-      }
     }
 
     setIsInvoiceLoading(true)
@@ -1223,13 +1211,16 @@ function App({ appMetadata }: AppProps) {
       setGigs((current) =>
         current.map((gig) => completedGigs.find((value) => value.id === gig.id) ?? gig)
       )
-      notifications.success(
-        completedGigs.length === 1
-          ? `Invoice ${invoice.invoiceNumber} issued; linked gig marked as completed.`
-          : `Invoice ${invoice.invoiceNumber} issued; ${completedGigs.length} linked gigs marked as completed.`,
-        { dedupeKey: `invoice:${invoice.id}:linked-gig-status` }
-      )
+      if (notify) {
+        notifications.success(
+          completedGigs.length === 1
+            ? `Invoice ${invoice.invoiceNumber} issued; linked gig marked as completed.`
+            : `Invoice ${invoice.invoiceNumber} issued; ${completedGigs.length} linked gigs marked as completed.`,
+          { dedupeKey: `invoice:${invoice.id}:linked-gig-status` }
+        )
+      }
     } catch (error) {
+      if (!notify) throw error
       notifications.error(
         error instanceof Error ? error.message : 'Unable to complete linked gig.',
         { dedupeKey: `invoice:${invoice.id}:linked-gig-status` }
@@ -1239,41 +1230,28 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
-  const handleInvoiceStatusChangeWithGigPrompt = async (
+  const handleInvoiceStatusChangeWithConfirmation = async (
     invoice: Invoice,
-    status: InvoiceStatus,
-    completeLinkedGigsWithoutPrompt = false
+    status: InvoiceStatus
   ) => {
+    let completeLinkedGigs = false
+    if (status === 'Issued' && invoice.status !== 'Issued') {
+      const decision = await invoiceActionConfirmation.confirm({
+        invoice, action: 'issue', linkedGigCount: linkedGigsForInvoice(invoice).length,
+      })
+      if (!decision) return null
+      completeLinkedGigs = decision.completeLinkedGigs
+    }
     const updatedInvoice = await handleInvoiceStatusChange(invoice, status)
-    if (updatedInvoice?.status === 'Issued' && invoice.status !== 'Issued') {
-      await promptToCompleteLinkedGigs(updatedInvoice, completeLinkedGigsWithoutPrompt)
+    if (updatedInvoice?.status === 'Issued' && completeLinkedGigs) {
+      await completeLinkedInvoiceGigs(updatedInvoice)
     }
 
     return updatedInvoice
   }
 
-  const promptToIssueDeliveredDraft = async (invoice: Invoice) => {
-    if (invoice.status !== 'Draft') {
-      return invoice
-    }
-
-    const shouldIssue = window.confirm(
-      `Mark delivered draft invoice ${invoice.invoiceNumber} as issued?`
-    )
-    if (!shouldIssue) {
-      notifications.info(`Invoice ${invoice.invoiceNumber} delivered and left as Draft.`, {
-        dedupeKey: `invoice:${invoice.id}:delivery-status`,
-      })
-      return invoice
-    }
-
-    return (
-      (await handleInvoiceStatusChangeWithGigPrompt(invoice, 'Issued')) ?? invoice
-    )
-  }
-
   const handleSendInvoiceEmailReview = async () => {
-    const deliveredInvoice = await submitInvoiceEmailReview()
+    const deliveredInvoice = await submitInvoiceEmailReview(invoice => completeLinkedInvoiceGigs(invoice, false))
     if (!deliveredInvoice) {
       return null
     }
@@ -1283,29 +1261,16 @@ function App({ appMetadata }: AppProps) {
       `Invoice ${deliveredInvoice.invoiceNumber} sent to ${deliveredInvoice.lastDeliveryRecipient}.`,
       { dedupeKey: `invoice:${deliveredInvoice.id}:email-delivery` }
     )
-    if (issueInvoiceAfterEmail && deliveredInvoice.status === 'Draft') {
-      const issuedInvoice = await handleInvoiceStatusChangeWithGigPrompt(
-        deliveredInvoice,
-        'Issued',
-        true
-      )
-      if (!issuedInvoice) {
-        notifications.error(
-          `Invoice email was sent, but ${deliveredInvoice.invoiceNumber} could not be marked as issued.`,
-          { dedupeKey: `invoice:${deliveredInvoice.id}:email-delivery-follow-up` }
-        )
-      }
-    }
     return deliveredInvoice
   }
 
-  const handlePublishInvoiceGoogleDriveWithIssuePrompt = async (invoice: Invoice) => {
-    const deliveredInvoice = await handlePublishInvoiceGoogleDrive(invoice)
-    if (!deliveredInvoice) {
-      return null
-    }
-
-    return promptToIssueDeliveredDraft(deliveredInvoice)
+  const handlePublishInvoiceGoogleDriveWithConfirmation = async (invoice: Invoice) => {
+    const decision = await invoiceActionConfirmation.confirm({
+      invoice, action: 'publish', linkedGigCount: linkedGigsForInvoice(invoice).length,
+    })
+    if (!decision) return null
+    return handlePublishInvoiceGoogleDrive(invoice, decision.completeLinkedGigs
+      ? invoice => completeLinkedInvoiceGigs(invoice, false) : undefined)
   }
 
   const handleInvoiceReissueWithPreview = async (invoice: Invoice) => {
@@ -1786,12 +1751,13 @@ function App({ appMetadata }: AppProps) {
         onDownloadPdf={handleDownloadInvoicePdf}
         onInvoiceDescriptionChange={setInvoiceDescription}
         onInvoiceDescriptionSave={handleInvoiceDescriptionSave}
-        onInvoiceStatusChange={handleInvoiceStatusChangeWithGigPrompt}
+        onInvoiceStatusChange={handleInvoiceStatusChangeWithConfirmation}
+        updatingInvoiceId={updatingInvoiceId}
         onOpenClient={openClientShortcut}
         onOpenGig={openInvoiceLineGig}
         onOpenSellerProfile={openSellerProfile}
         onPreviewPdf={previewInvoicePdf}
-        onPublishGoogleDrive={handlePublishInvoiceGoogleDriveWithIssuePrompt}
+        onPublishGoogleDrive={handlePublishInvoiceGoogleDriveWithConfirmation}
         onRegeneratePdf={handleRegenerateInvoicePdf}
         onReissue={handleInvoiceReissueWithPreview}
         onSendEmail={openInvoiceEmailReview}
@@ -1872,12 +1838,17 @@ function App({ appMetadata }: AppProps) {
         status={invoicePreviewStatus}
       />
 
+      {invoiceActionConfirmation.request && <InvoiceActionConfirmation
+        request={invoiceActionConfirmation.request} onFinish={invoiceActionConfirmation.finish} />}
+
       <InvoiceEmailReviewModal
         error={invoiceEmailReviewError}
         includeReceipts={includeInvoiceEmailReceipts}
         invoice={invoiceEmailReviewInvoice}
         isLoading={isInvoiceEmailReviewLoading}
-        issueAfterSend={issueInvoiceAfterEmail}
+        completeLinkedGigs={completeInvoiceEmailGigs}
+        linkedGigCount={invoiceEmailReviewInvoice ? linkedGigsForInvoice(invoiceEmailReviewInvoice).length : 0}
+        onCompleteLinkedGigsChange={setCompleteInvoiceEmailGigs}
         message={invoiceEmailReviewMessage}
         onClose={closeInvoiceEmailReview}
         onDownloadPdf={(invoice) => {
@@ -1889,7 +1860,6 @@ function App({ appMetadata }: AppProps) {
         onIncludeReceiptsChange={(value) => {
           void changeInvoiceEmailReceiptInclusion(value)
         }}
-        onIssueAfterSendChange={setIssueInvoiceAfterEmail}
         onMessageChange={setInvoiceEmailReviewMessage}
         onSend={() => {
           void handleSendInvoiceEmailReview()

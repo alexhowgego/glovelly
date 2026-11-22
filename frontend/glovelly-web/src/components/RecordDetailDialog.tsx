@@ -73,6 +73,9 @@ export function RecordDetailDialog({ title, children, onClose, canClose, returnF
 
     const trapTab = (event: KeyboardEvent) => {
       if (event.key !== 'Tab' || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+      // A sibling native confirmation dialog owns focus while it is above this one.
+      const focusedDialog = document.activeElement?.closest('dialog[open]')
+      if (focusedDialog && focusedDialog !== dialog) return
       updateLayer()
       // The native outer dialog does not wrap focus inside a nested role=dialog.
       // Recompute each time: controls can become hidden, disabled or inert.

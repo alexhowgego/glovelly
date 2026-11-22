@@ -8,10 +8,15 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         Invoice invoice,
         Guid? userId,
         byte[] content,
+        bool hasDraftWatermark,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(invoice);
         ArgumentNullException.ThrowIfNull(content);
+        if (hasDraftWatermark != invoice.RequiresDraftWatermark)
+        {
+            throw new ArgumentException("Generated PDF watermark must match the invoice state.", nameof(hasDraftWatermark));
+        }
 
         var key = InvoicePdfStorage.BuildStorageKey(invoice, userId);
         await blobStore.SaveAsync(
@@ -24,6 +29,7 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         invoice.PdfSizeBytes = content.Length;
         invoice.PdfGeneratedAt = timeProvider.GetUtcNow();
         invoice.PdfDocumentRevision = invoice.DocumentRevision;
+        invoice.PdfHasDraftWatermark = hasDraftWatermark;
         invoice.DocumentState = InvoiceDocumentState.Current;
         invoice.DocumentFailureMessage = null;
     }
@@ -52,10 +58,9 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
     {
         ArgumentNullException.ThrowIfNull(invoice);
 
-        if (invoice.DocumentState is not InvoiceDocumentState.Current ||
-            invoice.PdfDocumentRevision != invoice.DocumentRevision)
+        if (!InvoiceDocumentReadiness.IsCurrent(invoice))
         {
-            return new InvoicePdfReadResult(null, BuildUnavailableMessage(invoice));
+            return new InvoicePdfReadResult(null, InvoiceDocumentReadiness.UnavailableMessage(invoice));
         }
 
         try
@@ -78,16 +83,5 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         return string.IsNullOrWhiteSpace(invoice.PdfStorageKey)
             ? Task.CompletedTask
             : blobStore.DeleteAsync(invoice.PdfStorageKey, cancellationToken);
-    }
-
-    private static string BuildUnavailableMessage(Invoice invoice)
-    {
-        return invoice.DocumentState switch
-        {
-            InvoiceDocumentState.Regenerating => "Invoice PDF is regenerating. Try again when it is complete.",
-            InvoiceDocumentState.Failed => invoice.DocumentFailureMessage ?? "Invoice PDF regeneration failed. Try regenerating it again.",
-            InvoiceDocumentState.Missing => "Invoice PDF is missing.",
-            _ => "Invoice PDF is unavailable.",
-        };
     }
 }

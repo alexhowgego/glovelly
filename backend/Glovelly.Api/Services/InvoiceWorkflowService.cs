@@ -126,6 +126,7 @@ public sealed class InvoiceWorkflowService(
             invoice,
             userId,
             invoicePdfRenderer.RenderInvoicePdf(invoice, client, gig, generatedLines, sellerProfile),
+            invoice.RequiresDraftWatermark,
             cancellationToken);
 
         dbContext.Invoices.Add(invoice);
@@ -301,6 +302,7 @@ public sealed class InvoiceWorkflowService(
             invoice,
             userId,
             invoicePdfRenderer.RenderInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
+            invoice.RequiresDraftWatermark,
             cancellationToken);
         StampUpdate(invoice, userId);
     }
@@ -316,13 +318,14 @@ public sealed class InvoiceWorkflowService(
         var paymentWindowDays = await invoiceProfileDefaultsService.ResolvePaymentWindowDaysAsync(userId, cancellationToken);
         invoice.InvoiceDate = invoiceDate;
         invoice.DueDate = invoiceDate.AddDays(paymentWindowDays);
+        invoice.Status = InvoiceStatus.Draft;
         var sellerProfile = await invoiceProfileDefaultsService.ResolveSellerProfileAsync(userId, cancellationToken);
         await invoicePdfService.SaveGeneratedPdfAsync(
             invoice,
             userId,
             invoicePdfRenderer.RenderInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
+            invoice.RequiresDraftWatermark,
             cancellationToken);
-        invoice.Status = InvoiceStatus.Draft;
         invoice.StatusUpdatedUtc = reissuedUtc;
         invoice.PaidOn = null;
         invoice.ReissueCount += 1;
@@ -342,13 +345,14 @@ public sealed class InvoiceWorkflowService(
         var paymentWindowDays = await invoiceProfileDefaultsService.ResolvePaymentWindowDaysAsync(userId, cancellationToken);
         invoice.InvoiceDate = invoiceDate;
         invoice.DueDate = invoiceDate.AddDays(paymentWindowDays);
+        invoice.Status = InvoiceStatus.Draft;
         var sellerProfile = await invoiceProfileDefaultsService.ResolveSellerProfileAsync(userId, cancellationToken);
         await invoicePdfService.SaveGeneratedPdfAsync(
             invoice,
             userId,
             invoicePdfRenderer.RenderInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
+            invoice.RequiresDraftWatermark,
             cancellationToken);
-        invoice.Status = InvoiceStatus.Draft;
         StampUpdate(invoice, userId);
     }
 
@@ -397,6 +401,7 @@ public sealed class InvoiceWorkflowService(
             invoice,
             userId,
             invoicePdfRenderer.RenderInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
+            invoice.RequiresDraftWatermark,
             cancellationToken);
         StampUpdate(invoice, userId);
     }
