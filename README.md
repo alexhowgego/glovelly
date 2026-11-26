@@ -53,6 +53,7 @@ dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --
 - Gig expenses and receipt attachments
 - Invoice generation, issue, reissue, PDF download, email delivery, and Google Drive publishing
 - Seller profile, personal invoice/default settings, and connected-service management
+- Local Free/Solo/Pro plans, audited manual licensing, UK-calendar-month first-issue allowances, and plan-aware income reporting (no payment-provider integration). See [plans and entitlements](docs/engineering/plan-entitlements.md).
 - Google Sheets set list import from linked gig attachments, with review, audit, and re-import history
 - Google Calendar sync for confirmed and completed gigs
 - Admin access management and access request workflow

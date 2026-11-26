@@ -9,6 +9,8 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddGlovellyApplicationServices(this IServiceCollection services)
     {
+        services.AddScoped<EntitlementService>();
+        services.AddScoped<EntitlementMutationCoordinator>();
         services.AddSingleton(TimeProvider.System);
         services.AddOptions<SetListChartRankingSettings>()
             .BindConfiguration(SetListChartRankingSettings.SectionName);

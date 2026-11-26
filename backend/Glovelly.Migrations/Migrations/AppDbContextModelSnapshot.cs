@@ -1427,6 +1427,9 @@ namespace Glovelly.Migrations.Migrations
                     b.Property<bool>("GigLinesNeedRefresh")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("HasLegacyIssuance")
+                        .HasColumnType("boolean");
+
                     b.Property<DateOnly>("InvoiceDate")
                         .HasColumnType("date");
 
@@ -1454,6 +1457,10 @@ namespace Glovelly.Migrations.Migrations
 
                     b.Property<DateTimeOffset?>("LastReissuedUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MutationVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly?>("PaidOn")
                         .HasColumnType("date");
@@ -1568,6 +1575,54 @@ namespace Glovelly.Migrations.Migrations
                     b.HasIndex("InvoiceId");
 
                     b.ToTable("InvoiceLines");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.LicenceChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorIdentity")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NewAssignment")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PreviousAssignment")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("TargetIdentity")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<Guid>("TargetUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetUserId", "ChangedAtUtc");
+
+                    b.ToTable("LicenceChanges");
                 });
 
             modelBuilder.Entity("Glovelly.Api.Models.McpOAuthAccessToken", b =>
@@ -1733,6 +1788,52 @@ namespace Glovelly.Migrations.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("McpOAuthRefreshTokens");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.Plan", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int?>("MonthlyFirstIssueLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("PaidIncomeSummary")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Code");
+
+                    b.ToTable("Plans", t =>
+                        {
+                            t.HasCheckConstraint("CK_Plans_NonnegativeLimit", "\"MonthlyFirstIssueLimit\" IS NULL OR \"MonthlyFirstIssueLimit\" >= 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "free",
+                            DisplayName = "Free",
+                            MonthlyFirstIssueLimit = 2,
+                            PaidIncomeSummary = false
+                        },
+                        new
+                        {
+                            Code = "solo",
+                            DisplayName = "Solo",
+                            PaidIncomeSummary = true
+                        },
+                        new
+                        {
+                            Code = "pro",
+                            DisplayName = "Pro",
+                            PaidIncomeSummary = true
+                        });
                 });
 
             modelBuilder.Entity("Glovelly.Api.Models.ReceiptAnalysis", b =>
@@ -2015,6 +2116,47 @@ namespace Glovelly.Migrations.Migrations
                     b.ToTable("SetListInterpretationJobs");
                 });
 
+            modelBuilder.Entity("Glovelly.Api.Models.UsageLedgerEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Metric")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("SourceInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Metric", "SourceInvoiceId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Metric", "OccurredAtUtc");
+
+                    b.ToTable("UsageLedgerEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_UsageLedgerEntries_PositiveQuantity", "\"Quantity\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("Glovelly.Api.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2109,6 +2251,50 @@ namespace Glovelly.Migrations.Migrations
                     b.HasKey("UserId", "PermissionSet");
 
                     b.ToTable("UserAdministrativePermissionSets");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.UserSubscription", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("EndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PlanCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("StartsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("PlanCode");
+
+                    b.ToTable("UserSubscriptions", t =>
+                        {
+                            t.HasCheckConstraint("CK_UserSubscriptions_EndAfterStart", "\"EndsAtUtc\" IS NULL OR \"EndsAtUtc\" > \"StartsAtUtc\"");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
@@ -2671,6 +2857,15 @@ namespace Glovelly.Migrations.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Glovelly.Api.Models.UsageLedgerEntry", b =>
+                {
+                    b.HasOne("Glovelly.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Glovelly.Api.Models.UserAdministrativePermissionSet", b =>
                 {
                     b.HasOne("Glovelly.Api.Models.User", "User")
@@ -2680,6 +2875,21 @@ namespace Glovelly.Migrations.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Glovelly.Api.Models.UserSubscription", b =>
+                {
+                    b.HasOne("Glovelly.Api.Models.Plan", null)
+                        .WithMany()
+                        .HasForeignKey("PlanCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Glovelly.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Glovelly.Api.Models.Client", b =>

@@ -39,6 +39,28 @@ const cards = (overrides: Partial<Parameters<typeof getDashboardCards>[0]> = {})
   })
 
 describe('getDashboardCards', () => {
+  it('shows the authoritative global licence counts without depending on business records', () => {
+    const result = cards({
+      activeSection: 'licences', isWorkspaceLoading: true,
+      licenceSummary: { status: 'ready', summary: { freeUsers: 12, paidUsers: 7, expiringGrants: 2 } },
+    })
+    expect(result.map(card => card.value)).toEqual(['12', '7', '2'])
+    expect(result.map(card => card.label)).toEqual(['Free accounts', 'Solo / Pro accounts', 'Expiring grants'])
+    expect(result[2].detail).toContain('30 days')
+    expect(result.every(card => card.state === 'ready')).toBe(true)
+  })
+
+  it('uses the same loading and unavailable card states for licence summaries as other views', () => {
+    expect(cards({ activeSection: 'licences' }).every(card => card.state === 'loading')).toBe(true)
+    const failed = cards({ activeSection: 'licences', licenceSummary: { status: 'error' } })
+    expect(failed).toHaveLength(3)
+    expect(failed.every(card => card.state === 'error' && card.value === 'Unavailable')).toBe(true)
+  })
+  it('shows a reporting restriction rather than zero income or a health error', () => {
+    const result = cards({ activeSection: 'invoices', paidIncomeSummary: { status: 'restricted' } })
+    expect(result[2]).toMatchObject({ state: 'restricted', value: 'Solo / Pro' })
+    expect(result[2].detail).toContain('history remains available')
+  })
   it('selects the three Gigs metrics', () => {
     const result = cards({
       gigs: [

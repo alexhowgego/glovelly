@@ -63,6 +63,7 @@ export function useInvoicesWorkspace({
     status: 'loading',
   })
   const [incomeInvoiceIds, setIncomeInvoiceIds] = useState<string[]>([])
+  const incomeRequestGeneration = useRef(0)
   const [adjustmentAmount, setAdjustmentAmount] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [invoiceDescription, setInvoiceDescription] = useState('')
@@ -82,19 +83,32 @@ export function useInvoicesWorkspace({
   )
 
   const loadPaidIncomeSummary = useCallback(async () => {
+    const generation = ++incomeRequestGeneration.current
     setPaidIncomeSummary({ status: 'loading' })
 
     try {
       const response = await fetchWithSession(buildApiUrl('/invoices/paid-income-summary'))
+      if (generation !== incomeRequestGeneration.current) return
+      if (response.status === 403) {
+        const problem = await parseProblemDetails(response)
+        if (generation !== incomeRequestGeneration.current) return
+        if (problem?.code === 'feature_not_entitled') {
+          setPaidIncomeSummary({ status: 'restricted' })
+          setIncomeInvoiceIds([])
+          setInvoiceQuickFilter(current => current === 'income-this-financial-year' ? 'all' : current)
+          return
+        }
+      }
       if (!response.ok) {
         throw new Error('Unable to load paid income.')
       }
 
       const summary = (await response.json()) as PaidIncomeSummary
+      if (generation !== incomeRequestGeneration.current) return
       setPaidIncomeSummary({ status: 'ready', summary })
       setIncomeInvoiceIds(summary.invoiceIds)
     } catch {
-      setPaidIncomeSummary({ status: 'error' })
+      if (generation === incomeRequestGeneration.current) setPaidIncomeSummary({ status: 'error' })
     }
   }, [])
 
@@ -294,7 +308,7 @@ export function useInvoicesWorkspace({
     }
   }
 
-  const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus) => {
+  const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus, inlineFailure = false) => {
     if (invoice.status === status) {
       return invoice
     }
@@ -322,12 +336,14 @@ export function useInvoicesWorkspace({
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
       setInvoiceStatus('')
+      window.dispatchEvent(new Event('glovelly:entitlements-changed'))
       notifications.success(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
       await loadPaidIncomeSummary()
       return updatedInvoice
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to update invoice status.'
       setInvoiceStatus(message)
+      if (inlineFailure) throw error
       notifications.error(message, { dedupeKey: `invoice:${invoice.id}:status` })
       return null
     } finally {
@@ -486,6 +502,7 @@ export function useInvoicesWorkspace({
 
   const recordIssuedInvoice = (issued: Invoice) => {
     setInvoices(current => current.map(value => value.id === issued.id ? issued : value))
+    window.dispatchEvent(new Event('glovelly:entitlements-changed'))
   }
 
   const submitInvoiceEmailReview = async (completeLinkedGigs?: (invoice: Invoice) => Promise<void>) => {
@@ -531,7 +548,7 @@ export function useInvoicesWorkspace({
     }
   }
 
-  const handlePublishInvoiceGoogleDrive = async (invoice: Invoice, completeLinkedGigs?: (invoice: Invoice) => Promise<void>) => {
+  const handlePublishInvoiceGoogleDrive = async (invoice: Invoice, completeLinkedGigs?: (invoice: Invoice) => Promise<void>, inlineFailure = false) => {
     setIsInvoiceLoading(true)
     setGoogleDrivePublishLink(null)
     setInvoiceStatus(`Publishing ${invoice.invoiceNumber} to Google Drive...`)
@@ -574,6 +591,7 @@ export function useInvoicesWorkspace({
       setGoogleDrivePublishLink(null)
       const message = error instanceof Error ? error.message : 'Unable to publish invoice to Google Drive.'
       setInvoiceStatus(message)
+      if (inlineFailure) throw error
       notifications.error(message, { dedupeKey: `invoice:${invoice.id}:google-drive` })
       return null
     } finally {

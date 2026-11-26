@@ -53,6 +53,7 @@ internal static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<IAuthorizationHandler, AdministrativePermissionHandler>();
         services.AddScoped<AdministrativeMutationCoordinator>();
+        services.AddScoped<LicenceAssignmentService>();
         services.AddScoped<AdministrativePermissionAssignmentService>();
         services.AddScoped<AdministrativeAccountGuard>();
         services.AddScoped<IWorkspaceEventPublisher, WorkspaceEventPublisher>();

@@ -11,6 +11,14 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         bool hasDraftWatermark,
         CancellationToken cancellationToken = default)
     {
+        var candidate = await PrepareAsync(invoice, userId, content, hasDraftWatermark, cancellationToken);
+        ApplyCandidate(invoice, candidate);
+    }
+
+    public async Task<InvoicePdfCandidate> PrepareAsync(
+        Invoice invoice, Guid? userId, byte[] content, bool hasDraftWatermark,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(invoice);
         ArgumentNullException.ThrowIfNull(content);
         if (hasDraftWatermark != invoice.RequiresDraftWatermark)
@@ -23,13 +31,24 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
             new BlobWriteRequest(key, new MemoryStream(content, writable: false), InvoicePdfStorage.ContentType, content.Length),
             cancellationToken);
 
-        invoice.PdfStorageKey = key;
-        invoice.PdfFileName = $"{invoice.InvoiceNumber}.pdf";
+        return new InvoicePdfCandidate(key, $"{invoice.InvoiceNumber}.pdf", content.Length,
+            timeProvider.GetUtcNow(), invoice.DocumentRevision, hasDraftWatermark);
+    }
+
+    public void ApplyCandidate(Invoice invoice, InvoicePdfCandidate candidate)
+    {
+        if (candidate.DocumentRevision != invoice.DocumentRevision ||
+            candidate.HasDraftWatermark != invoice.RequiresDraftWatermark)
+        {
+            throw new InvalidOperationException("The prepared PDF no longer matches the invoice.");
+        }
+        invoice.PdfStorageKey = candidate.StorageKey;
+        invoice.PdfFileName = candidate.FileName;
         invoice.PdfContentType = InvoicePdfStorage.ContentType;
-        invoice.PdfSizeBytes = content.Length;
-        invoice.PdfGeneratedAt = timeProvider.GetUtcNow();
-        invoice.PdfDocumentRevision = invoice.DocumentRevision;
-        invoice.PdfHasDraftWatermark = hasDraftWatermark;
+        invoice.PdfSizeBytes = candidate.SizeBytes;
+        invoice.PdfGeneratedAt = candidate.GeneratedAtUtc;
+        invoice.PdfDocumentRevision = candidate.DocumentRevision;
+        invoice.PdfHasDraftWatermark = candidate.HasDraftWatermark;
         invoice.DocumentState = InvoiceDocumentState.Current;
         invoice.DocumentFailureMessage = null;
     }

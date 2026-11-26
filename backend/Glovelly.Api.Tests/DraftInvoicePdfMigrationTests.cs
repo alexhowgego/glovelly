@@ -73,7 +73,10 @@ public sealed class DraftInvoicePdfMigrationTests
                 Assert.Equal(new DateTimeOffset(2026, 4, 2, 9, 0, 0, TimeSpan.Zero), invoice.LastDeliveredUtc);
                 Assert.Equal(invoice.Id.ToString(), invoice.PdfStorageKey);
                 Assert.Equal(4, invoice.PdfDocumentRevision);
-                if (invoice.RequiresDraftWatermark)
+                // Assert this migration's original invalidation rule, before
+                // later migrations introduce trusted legacy issuance evidence.
+                if (invoice.Status == InvoiceStatus.Draft ||
+                    (invoice.Status == InvoiceStatus.Cancelled && !invoice.FirstIssuedUtc.HasValue))
                 {
                     Assert.Equal(5, invoice.DocumentRevision);
                     Assert.Equal(InvoiceDocumentState.Failed, invoice.DocumentState);

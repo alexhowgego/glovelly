@@ -12,6 +12,8 @@ The endpoint supports `initialize`, `ping`, `tools/list`, and `tools/call`. It a
 
 ## Tools
 
+Precomputed business/paid-income reporting (`glovelly_get_business_summary`) requires the local PaidIncomeSummary entitlement (Solo/Pro). Free receives a tool result with `isError: true` and structured code `feature_not_entitled`, not a partial aggregate. Ordinary owner-scoped invoice/gig/receipt/contact listing and detail remain available on Free, without a new history window.
+
 The public tool catalog is generated from the typed MCP catalog in [`mcp-tools.md`](mcp-tools.md). A machine-readable capability manifest is checked in at [`mcp-tools.json`](mcp-tools.json).
 
 ### `glovelly_search_contacts`

@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react'
 import type { FormEvent } from 'react'
 import { formatDateTime } from '../formatters'
 import type { AdminSort, AdminSortKey, AdminUser, AdminUserForm } from '../types'
 import { TrashIcon } from './TrashIcon'
 import { RecordActionDock } from './RecordActionDock'
+import { RecordEditorFrame } from './RecordEditorFrame'
+import { RecordEditorActions } from './RecordEditorActions'
+import { RecordWorkspace } from './RecordWorkspace'
 import { adminAccessRestriction } from '../adminAccess'
 import { formatAdministrativePermissions } from '../administrativePermissions'
 import { PermissionManagement } from './PermissionManagement'
@@ -60,7 +62,6 @@ export function AdminSection({
   onUpdateField,
   selectedAdminUser,
 }: AdminSectionProps) {
-  const editorSlotRef = useRef<HTMLDivElement | null>(null)
   const selfRestriction = selectedAdminUser ? adminAccessRestriction(selectedAdminUser, currentUserId) : undefined
   const privilegedRestriction = !canManagePermissions && (selectedAdminUser?.permissionSets?.length ?? 0) > 0
     ? 'Only a Super Administrator can change an administrator account.' : undefined
@@ -74,19 +75,8 @@ export function AdminSection({
     { value: 'lastLogin', label: 'Last login' },
   ]
 
-  useEffect(() => {
-    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
-      return
-    }
-
-    window.setTimeout(() => {
-      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 80)
-  }, [isEditorOpen])
-
   return (
-    <section className="section-layout admin-zone">
-      <div className="admin-workspace">
+    <RecordWorkspace className="admin-workspace" sectionClassName="admin-zone">
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -266,12 +256,7 @@ export function AdminSection({
           )}
         </div>
 
-        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
-          <form
-            aria-hidden={!isEditorOpen}
-            className="editor-panel panel"
-            onSubmit={onSubmit}
-          >
+        <RecordEditorFrame isOpen={isEditorOpen} label={adminMode === 'create' ? 'Add user' : 'Update access'} onSubmit={onSubmit}>
             <div className="panel-heading">
               <div>
                 <p className="section-label">Management Pane</p>
@@ -337,34 +322,12 @@ export function AdminSection({
               ) : null}
             </div>
 
-            <div className="form-actions">
-              <button
-                className="primary-button"
-                data-close-after-save="true"
-                type="submit"
-                disabled={isAdminLoading}
-              >
-                Save and close
-              </button>
-              <button
-                className="ghost-button"
-                data-close-after-save="false"
-                type="submit"
-                disabled={isAdminLoading}
-              >
-                Save
-              </button>
-              <button className="ghost-button" onClick={onCloseEditor} type="button">
-                Discard changes
-              </button>
-            </div>
+            <RecordEditorActions isSaving={isAdminLoading} onDiscard={onCloseEditor} />
             <p className="auth-note">
               Adding an email address is enough to let someone get started. You can fill in
               the account reference later if needed.
             </p>
-          </form>
-        </div>
-      </div>
-    </section>
+        </RecordEditorFrame>
+    </RecordWorkspace>
   )
 }

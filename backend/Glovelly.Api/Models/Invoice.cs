@@ -17,6 +17,12 @@ public sealed class Invoice
     public DateOnly? PaidOn { get; set; }
     public DateTimeOffset? FirstIssuedUtc { get; set; }
     public Guid? FirstIssuedByUserId { get; set; }
+    [JsonIgnore]
+    public bool HasLegacyIssuance { get; set; }
+    [JsonIgnore]
+    public Guid MutationVersion { get; set; } = Guid.NewGuid();
+    [NotMapped]
+    public bool HasBeenIssued => FirstIssuedUtc.HasValue || HasLegacyIssuance;
     public int ReissueCount { get; set; }
     public DateTimeOffset? LastReissuedUtc { get; set; }
     public Guid? LastReissuedByUserId { get; set; }
@@ -38,7 +44,7 @@ public sealed class Invoice
     [NotMapped]
     [JsonIgnore]
     public bool RequiresDraftWatermark => Status == InvoiceStatus.Draft ||
-        (Status == InvoiceStatus.Cancelled && !FirstIssuedUtc.HasValue);
+        (Status == InvoiceStatus.Cancelled && !HasBeenIssued);
     [NotMapped]
     [JsonIgnore]
     public bool HasCompatiblePdfWatermark => RequiresDraftWatermark

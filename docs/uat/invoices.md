@@ -10,6 +10,7 @@ Use these journeys when a change may affect invoice creation, generated invoice 
 - At least one client exists.
 - You can create or edit gigs for that client.
 - If testing delivery, confirm whether email and Google Drive are configured in the test environment.
+- Choose an explicit Free or paid fixture. First issuance is metered, not draft creation; see [plan and licence journeys](plans-and-licences.md). Existing correction/reissue and delivery retry must not spend another unit.
 
 ## Gig To Invoice
 
@@ -101,6 +102,8 @@ The invoice is created as a draft, linked gigs remain linked, lines are generate
 - Check watermark visibility over tables/filled boxes and readable totals, addresses, payment details, and continuation pages.
 - Check the hint and inline retry at desktop and narrow/mobile widths. Notifications must stay below modal overlays and not obstruct retry or preview controls.
 - During a state change, the thumbnail frame and facts columns must not collapse or jump. The old same-invoice pixels may stay blurred under **Updating preview…**, but the thumbnail is disabled until replacement succeeds. Failure clears old pixels and uses the same frame for error feedback. Switching invoice or session must never retain the previous selection's image; reduced-motion preferences disable the fade.
+- The delayed-issuance browser test must await route fulfilment before removing interception. Forward the status mutation once; do not let test cleanup replay it and manufacture a concurrency conflict. Route-handler failures must fail the test directly, not become a missing-notification timeout.
+- Compare a new Free user without a seller profile against a configured account at the same desktop window size. The setup notice must not suppress a useful invoice thumbnail: a body at least 620px wide and 180px tall can show the scaled-down PDF, with the existing Preview action available at smaller sizes. Map previews retain their separate 300px minimum-height requirement. Check Draft and Issued documents and opening the full preview; no administrative promotion or paid grant should be needed. `InvoicePreviewWorkflowTests.UnconfiguredSellerProfileDoesNotRemoveInvoiceThumbnail` covers the setup-notice browser regression in Ubuntu CI.
 - Previously downloaded, emailed, or Drive-published copies are not recalled or modified when the current document changes.
 
 ## Invoice Line Refresh Regression

@@ -17,8 +17,8 @@ function persistedPdfTimestamp(value: string | null | undefined) {
 
 export function invoiceThumbnailIdentity(invoice: Invoice): string {
   return JSON.stringify([invoice.id, invoice.documentState, invoice.documentRevision,
-    invoice.pdfDocumentRevision, persistedPdfTimestamp(invoice.pdfGeneratedAt), invoice.pdfSizeBytes, invoice.gigLinesNeedRefresh ?? false,
-    invoice.status, Boolean(invoice.firstIssuedUtc), invoice.pdfHasDraftWatermark, invoice.isPdfCurrent])
+    invoice.pdfDocumentRevision, persistedPdfTimestamp(invoice.pdfGeneratedAt), invoice.pdfSizeBytes, invoice.pdfStorageKey, invoice.gigLinesNeedRefresh ?? false,
+    invoice.status, invoice.hasBeenIssued ?? Boolean(invoice.firstIssuedUtc), invoice.pdfHasDraftWatermark, invoice.isPdfCurrent])
 }
 
 export async function readLimitedThumbnailPdf(response: Response, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {

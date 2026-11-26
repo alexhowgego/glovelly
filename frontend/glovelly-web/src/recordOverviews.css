@@ -387,7 +387,7 @@
 }
 
 @media (min-width: 1181px) and (min-height: 45em) {
-  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) > .record-overview > .overview-body {
+  .workspace-shell .record-workspace > .record-overview > .overview-body {
     /* Normal records fill the pane; unusually long content scrolls here. */
     flex: 1 1 auto;
     min-height: 0;

@@ -8,6 +8,41 @@ namespace Glovelly.Uat.Tests;
 public sealed class InvoicePreviewWorkflowTests : InvoiceUatTestBase
 {
     [Fact]
+    public Task UnconfiguredSellerProfileDoesNotRemoveInvoiceThumbnail() => RunWithDiagnosticsAsync(
+        nameof(UnconfiguredSellerProfileDoesNotRemoveInvoiceThumbnail), async () =>
+        {
+            await Page.SetViewportSizeAsync(1920, 800);
+            await AuthenticateWithUatSecretAsync();
+            // Keep fixture data intact: only vary the account-specific setup
+            // notice that reduces the overview body's available height.
+            await Page.RouteAsync("**/seller-profile", async route =>
+            {
+                var response = await route.FetchAsync();
+                var profile = JsonNode.Parse(await response.TextAsync())!.AsObject();
+                profile["isConfigured"] = false;
+                profile["isInvoiceReady"] = false;
+                profile["missingFields"] = new JsonArray("sellerName", "addressLine1", "city", "country");
+                await route.FulfillAsync(new() { Response = response, Body = profile.ToJsonString() });
+            });
+            await Page.ReloadAsync();
+            var runId = CreateRunId();
+            var clientName = $"{runId} Setup Preview Client";
+            await CreateClientAsync(clientName);
+            await CreateGigAsync(clientName, $"{runId} Setup Preview Gig", DateTime.UtcNow.AddDays(42).ToString("yyyy-MM-dd"));
+            await GenerateInvoiceAndWaitForPreviewAsync();
+            await OpenPreviewedInvoiceAsync();
+
+            await Assertions.Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Set up seller profile", Exact = true })).ToBeVisibleAsync();
+            var thumbnail = Page.GetByRole(AriaRole.Button, new() { Name = "Open PDF preview for invoice", Exact = false });
+            await Assertions.Expect(thumbnail).ToBeEnabledAsync(new() { Timeout = 30_000 });
+            await Assertions.Expect(Page.GetByTestId("invoice-thumbnail-canvas")).ToBeVisibleAsync();
+            await Assertions.Expect(Page.GetByTestId("invoice-draft-watermark-hint")).ToBeVisibleAsync();
+            Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"));
+            await thumbnail.ClickAsync();
+            await WaitForInvoicePreviewAsync();
+        });
+
+    [Fact]
     public Task InvoicePreviewDownloadRedraftAndReissueShowLatestPdf() => RunWithDiagnosticsAsync(
         nameof(InvoicePreviewDownloadRedraftAndReissueShowLatestPdf),
         async () =>

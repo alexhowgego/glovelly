@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 function renderShell(activeSection: AppSection = 'gigs', overrides: Partial<ComponentProps<typeof AppShell>> = {}) {
-  const navigationItems = (['clients', 'gigs', 'invoices', 'admin'] as const).map(id => ({
+  const navigationItems = (['clients', 'gigs', 'invoices', 'admin', 'licences'] as const).map(id => ({
     id, label: id, eyebrow: 'Workspace', description: 'Long introductory description',
   }))
   const props: ComponentProps<typeof AppShell> = {
@@ -64,9 +64,10 @@ function renderShell(activeSection: AppSection = 'gigs', overrides: Partial<Comp
 }
 
 describe('compact workspace shell', () => {
-  it.each(['clients', 'gigs', 'invoices', 'admin'] as const)('retains summaries and shared controls in %s', section => {
+  it.each(['clients', 'gigs', 'invoices', 'admin', 'licences'] as const)('retains summaries and shared controls in %s', section => {
     const props = renderShell(section)
     expect(document.querySelector('.workspace-title')).toBeNull()
+    expect(screen.getByRole('main').getAttribute('data-layout')).toBe('record-workspace')
     expect(screen.getByLabelText('Dashboard summary').querySelectorAll('article')).toHaveLength(3)
     for (const card of props.dashboardCards) {
       expect(screen.getByText(card.label)).toBeDefined()

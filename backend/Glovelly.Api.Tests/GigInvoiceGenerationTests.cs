@@ -182,7 +182,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
             $"users/{TestAuthContext.UserId:N}/",
             invoice.GetProperty("pdfStorageKey").GetString());
         Assert.Contains(
-            $"/invoices/{invoice.GetProperty("id").GetGuid():D}/invoice.pdf",
+            $"/invoices/{invoice.GetProperty("id").GetGuid():D}/generations/",
             invoice.GetProperty("pdfStorageKey").GetString());
         Assert.Equal("application/pdf", invoice.GetProperty("pdfContentType").GetString());
         Assert.True(invoice.GetProperty("pdfSizeBytes").GetInt64() > 0);

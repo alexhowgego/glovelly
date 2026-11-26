@@ -116,6 +116,15 @@ public static class McpEndpoints
             logger.LogWarning(exception, "Invalid Glovelly MCP request payload.");
             return Rpc(id, error: new McpRpcError(-32602, "Invalid tool arguments."));
         }
+        catch (FeatureNotEntitledException exception)
+        {
+            return Rpc(id, result: new
+            {
+                isError = true,
+                content = new[] { new { type = "text", text = exception.Message } },
+                structuredContent = new { code = "feature_not_entitled", feature = "PaidIncomeSummary" },
+            });
+        }
     }
 
     private static IResult? ValidateProtocolVersion(HttpRequest request)

@@ -19,6 +19,7 @@ export type AppNavigationItem = {
 }
 
 type AppShellProps = {
+  layout?: 'record-workspace' | 'document'
   activeSection: AppSection
   appMetadata: AppMetadata
   authUser: AuthUser | null
@@ -51,6 +52,7 @@ type AppShellProps = {
 }
 
 export function AppShell({
+  layout = 'record-workspace',
   activeSection,
   appMetadata,
   authUser,
@@ -116,7 +118,7 @@ export function AppShell({
   }, [])
 
   return (
-    <main className="app-shell workspace-shell" data-section={activeSection}>
+    <main className="app-shell workspace-shell" data-section={activeSection} data-layout={layout}>
       <section className="hero-panel app-frame">
         <div className="content-shell">
           <div className="content-header panel">

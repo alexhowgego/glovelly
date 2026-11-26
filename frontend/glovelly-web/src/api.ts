@@ -6,6 +6,12 @@ const sessionExpiredErrorMessage = 'SESSION_EXPIRED'
 export type SessionExpiredHandler = (message: string) => void
 
 export type ProblemDetails = {
+  code?: string
+  feature?: string
+  usage?: number
+  limit?: number | null
+  remaining?: number | null
+  resetsAtUtc?: string
   title?: string
   detail?: string
   errors?: Record<string, string[]>
@@ -61,7 +67,9 @@ export async function fetchWithSession(input: string, init?: RequestInit) {
     cache: 'no-store',
   })
   if (response.status === 403 && !input.endsWith('/auth/me') && typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('glovelly:permissions-changed'))
+    const problem = await parseProblemDetails(response.clone())
+    window.dispatchEvent(new Event(problem?.code === 'invoice_allowance_exhausted' || problem?.code === 'feature_not_entitled'
+      ? 'glovelly:entitlements-changed' : 'glovelly:permissions-changed'))
   }
   return response
 }

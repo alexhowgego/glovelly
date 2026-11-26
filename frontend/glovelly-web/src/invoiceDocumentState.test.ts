@@ -13,6 +13,14 @@ const invoice = (overrides: Partial<Invoice> = {}) =>
   }) as Invoice
 
 describe('getInvoiceDocumentAvailability', () => {
+  it('recognizes trusted legacy issuance without a fabricated first-issue timestamp', () => {
+    expect(getInvoiceDocumentAvailability(invoice({
+      status: 'Cancelled', hasBeenIssued: true, firstIssuedUtc: null, pdfHasDraftWatermark: false,
+    })).isCurrent).toBe(true)
+    expect(getInvoiceDocumentAvailability(invoice({
+      status: 'Draft', hasBeenIssued: true, firstIssuedUtc: null, pdfHasDraftWatermark: false,
+    })).isCurrent).toBe(false)
+  })
   it('keeps never-issued cancelled invoices watermarked and allows clean previously issued cancellations', () => {
     expect(getInvoiceDocumentAvailability(invoice({ status: 'Cancelled', firstIssuedUtc: null, pdfHasDraftWatermark: false })).isCurrent).toBe(false)
     expect(getInvoiceDocumentAvailability(invoice({ status: 'Cancelled', firstIssuedUtc: null, pdfHasDraftWatermark: true })).isCurrent).toBe(true)

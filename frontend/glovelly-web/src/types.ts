@@ -742,6 +742,7 @@ export type Invoice = {
   status: InvoiceStatus
   paidOn: string | null
   firstIssuedUtc: string | null
+  hasBeenIssued?: boolean
   firstIssuedByUserId: string | null
   reissueCount: number
   lastReissuedUtc: string | null
@@ -819,7 +820,50 @@ export type GigExternalResourceForm = {
   isPrimary: boolean
 }
 
-export type AppSection = 'clients' | 'admin' | 'gigs' | 'invoices'
+export type AppSection = 'clients' | 'admin' | 'licences' | 'gigs' | 'invoices'
+
+export type EntitlementSnapshot = {
+  effectivePlan: { code: string; displayName: string }
+  assignedPlan: { code: string; displayName: string } | null
+  assignmentStatus: 'Default' | 'Active' | 'Expired' | 'Cancelled' | 'NotStarted'
+  endsAtUtc: string | null
+  features: { paidIncomeSummary: boolean }
+  invoiceIssuance: {
+    used: number
+    limit: number | null
+    remaining: number | null
+    periodStartsAtUtc: string
+    resetsAtUtc: string
+    timeZone: string
+  }
+}
+
+export type LicenceUser = {
+  id: string
+  email: string
+  displayName: string | null
+  isActive: boolean
+  isEnrolled: boolean
+  version: string | null
+  entitlements: EntitlementSnapshot
+}
+
+export type LicenceSummary = {
+  freeUsers: number
+  paidUsers: number
+  expiringGrants: number
+}
+
+export type LicenceAudit = {
+  id: string
+  targetIdentity: string
+  actorIdentity: string
+  changedAtUtc: string
+  previousAssignment: string | null
+  newAssignment: string
+  reason: string | null
+  source: string
+}
 export type ThemePreference =
   | 'system'
   | 'light'

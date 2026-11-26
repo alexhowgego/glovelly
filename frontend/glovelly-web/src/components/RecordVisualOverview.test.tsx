@@ -9,7 +9,7 @@ vi.mock('../api', async importOriginal => ({ ...await importOriginal<typeof impo
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.resetAllMocks(); vi.unstubAllGlobals() })
 
 describe('automatic preview eligibility', () => {
-  function setup() {
+  function setup(layout: 'content' | 'invoice' = 'content') {
     let resized!: ResizeObserverCallback
     let intersected!: IntersectionObserverCallback
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
@@ -30,7 +30,8 @@ describe('automatic preview eligibility', () => {
     })
     const unavailable = vi.fn()
     let reportFailure: (() => void) | undefined
-    const view = render(<RecordVisualOverview visual={(bucket, failed) => {
+    const view = render(<RecordVisualOverview layout={layout} visual={(bucket, failed) => {
+      if (layout === 'invoice') return <div>Invoice thumbnail</div>
       reportFailure ??= () => { unavailable(); failed() }
       return <RecordMapPreview kind="clients" id="one" source="v1:test" query="Hall" bucket={bucket} onUnavailable={reportFailure} />
     }}>
@@ -79,6 +80,21 @@ describe('automatic preview eligibility', () => {
     expect(screen.getByLabelText('Supplementary preview')).toBeDefined()
     expect(screen.getByRole('status').textContent).toBe('Loading map preview…')
     expect(fetchWithSession).toHaveBeenCalledOnce()
+  })
+
+  it('mounts an invoice preview in the reduced body space available to an unconfigured account', () => {
+    const pane = setup('invoice')
+    pane.resize(900, 260)
+    pane.visible(true)
+    expect(screen.getByLabelText('Supplementary preview')).toBeDefined()
+    expect(screen.getByText('Invoice thumbnail')).toBeDefined()
+    const layout = pane.view.container.querySelector('.invoice-visual-layout') as HTMLElement
+    expect(layout.style.getPropertyValue('--record-visual-max-height')).toBe('252px')
+    pane.resize(900, 500)
+    expect(screen.getByText('Invoice thumbnail')).toBeDefined()
+    pane.resize(900, 260)
+    expect(screen.getByText('Invoice thumbnail')).toBeDefined()
+    expect(fetchWithSession).not.toHaveBeenCalled()
   })
 
   it('updates the height budget within a bucket without issuing another descriptor', async () => {

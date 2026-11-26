@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { RecordWorkspace } from './RecordWorkspace'
 import type { RefObject } from 'react'
 import {
   formatCurrency,
@@ -10,9 +11,11 @@ import { TrashIcon } from './TrashIcon'
 import { getInvoiceDocumentAvailability } from '../invoiceDocumentState'
 import { invoiceDeliveryRestriction } from '../invoiceDelivery'
 import { InvoiceThumbnail } from './InvoiceThumbnail'
+import { PlanAccessSummary } from './PlanAccessSummary'
 import { RecordVisualOverview } from './RecordVisualOverview'
 import { RecordActionDock } from './RecordActionDock'
 import type {
+  EntitlementSnapshot,
   Invoice,
   InvoiceLine,
   InvoiceQuickFilter,
@@ -22,6 +25,8 @@ import type {
 } from '../types'
 
 type InvoicesSectionProps = {
+  entitlements?: EntitlementSnapshot | null
+  entitlementError?: string
   onSessionExpired?: (message: string) => void
   adjustmentAmount: string
   adjustmentReason: string
@@ -70,6 +75,8 @@ type InvoicesSectionProps = {
 }
 
 export function InvoicesSection({
+  entitlements,
+  entitlementError,
   onSessionExpired,
   adjustmentAmount,
   adjustmentReason,
@@ -139,7 +146,8 @@ export function InvoicesSection({
     { value: 'drafts', label: 'Drafts' },
     { value: 'overdue', label: 'Overdue' },
     { value: 'paid', label: 'Paid' },
-    { value: 'income-this-financial-year', label: 'Income this financial year' },
+    ...(entitlements?.features.paidIncomeSummary
+      ? [{ value: 'income-this-financial-year' as const, label: 'Income this financial year' }] : []),
   ]
 
   useEffect(() => {
@@ -159,13 +167,13 @@ export function InvoicesSection({
   }, [isEditorOpen])
 
   return (
-    <section className="section-layout">
-      <div className="gig-workspace">
+    <RecordWorkspace className="gig-workspace">
         <div className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Billing</p>
               <h2>Invoices</h2>
+              <PlanAccessSummary entitlements={entitlements} error={entitlementError} />
             </div>
             {(invoiceStatus || googleDrivePublishLink) && (
               <span className="status-pill" data-testid="invoice-status">
@@ -586,7 +594,6 @@ export function InvoicesSection({
             )}
           </div>
         </div>
-      </div>
-    </section>
+    </RecordWorkspace>
   )
 }

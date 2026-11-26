@@ -104,10 +104,7 @@
 /* Only record workspaces opt into viewport containment. Height in em also
    releases containment when the user's default text size needs more room. */
 @media (min-width: 1181px) and (min-height: 45em) {
-  .workspace-shell[data-section='clients'],
-  .workspace-shell[data-section='gigs'],
-  .workspace-shell[data-section='invoices'],
-  .workspace-shell[data-section='admin'] {
+  .workspace-shell[data-layout='record-workspace'] {
     height: 100vh;
     height: 100dvh;
     min-height: 0;
@@ -154,12 +151,12 @@
     grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 0.7fr)) 40px;
   }
 
-  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) {
+  .workspace-shell .record-workspace {
     min-height: 0;
     gap: 16px;
   }
 
-  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) > .panel,
+  .workspace-shell .record-workspace > .panel,
   .workspace-shell .editor-slot.open > .panel {
     min-height: 0;
     overflow: auto;
@@ -168,7 +165,7 @@
     scroll-padding: 16px;
   }
 
-  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) > .panel > *,
+  .workspace-shell .record-workspace > .panel > *,
   .workspace-shell .editor-slot.open > .panel > * {
     flex-shrink: 0;
   }
@@ -1650,30 +1647,20 @@
   color: var(--muted);
 }
 
-.workspace {
+.record-workspace {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, var(--directory-pane-width, 0.9fr)) minmax(0, 1fr) auto;
   align-items: stretch;
+}
+
+.workspace {
+  --directory-pane-width: 0.95fr;
 }
 
 .admin-zone {
   display: grid;
   gap: 24px;
-}
-
-.admin-workspace {
-  display: grid;
-  gap: 24px;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) auto;
-  align-items: stretch;
-}
-
-.gig-workspace {
-  display: grid;
-  gap: 24px;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) auto;
-  align-items: stretch;
 }
 
 .gig-import-workspace {
@@ -1978,9 +1965,7 @@
     contain: size layout paint;
   }
 
-  .workspace > .panel:has(> .compact-record-list),
-  .admin-workspace > .panel:has(> .compact-record-list),
-  .gig-workspace > .panel:has(> .compact-record-list) {
+  .record-workspace > .panel:has(> .compact-record-list) {
     overflow: hidden;
   }
 
@@ -3482,9 +3467,7 @@ button:disabled {
 
 @media (max-width: 1180px) {
   .hero-panel,
-  .workspace,
-  .admin-workspace,
-  .gig-workspace,
+  .record-workspace,
   .gig-import-workspace,
   .access-request-workspace,
   .app-frame {
@@ -3577,9 +3560,7 @@ button:disabled {
 
   .section-layout,
   .content-shell,
-  .workspace,
-  .admin-workspace,
-  .gig-workspace,
+  .record-workspace,
   .admin-zone {
     gap: 14px;
   }
@@ -4044,4 +4025,12 @@ button:disabled {
     height: 48svh;
     min-height: 360px;
   }
+}
+.compact-list-main-controls.licence-list-main-controls,
+.workspace-shell .compact-list-main-controls.licence-list-main-controls {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.licence-pagination {
+  justify-content: space-between;
 }

@@ -9,6 +9,7 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
     public void Configure(EntityTypeBuilder<Invoice> entity)
     {
         entity.HasKey(invoice => invoice.Id);
+        entity.Property(invoice => invoice.MutationVersion).IsConcurrencyToken();
         entity.Property(invoice => invoice.InvoiceNumber)
             .HasMaxLength(50);
         entity.Property(invoice => invoice.Status)

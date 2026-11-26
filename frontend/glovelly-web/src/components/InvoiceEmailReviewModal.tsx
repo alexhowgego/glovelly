@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
-import type { Invoice, InvoiceEmailReview } from '../types'
+import type { EntitlementSnapshot, Invoice, InvoiceEmailReview } from '../types'
+import { InvoiceAllowanceNotice } from './InvoiceAllowanceNotice'
 import { buildInvoiceEmailReviewPreview } from '../invoiceEmailReviewPreview'
 
 type InvoiceEmailReviewModalProps = {
+  entitlements?: EntitlementSnapshot | null
   error: string
   includeReceipts: boolean
   invoice: Invoice | null
@@ -23,6 +25,7 @@ type InvoiceEmailReviewModalProps = {
 }
 
 export function InvoiceEmailReviewModal({
+  entitlements,
   error,
   includeReceipts,
   invoice,
@@ -87,6 +90,7 @@ export function InvoiceEmailReviewModal({
         </div>
 
         {error ? <div className="settings-note" role="alert">{error}</div> : null}
+        <InvoiceAllowanceNotice invoice={invoice} entitlements={entitlements} />
         {review ? (
           <div className="invoice-email-review-content">
             <div className="detail-grid">
@@ -152,7 +156,8 @@ export function InvoiceEmailReviewModal({
           <span className="status-pill">{isLoading ? 'Preparing delivery...' : 'Review before sending.'}</span>
           <div className="actions">
             <button className="ghost-button" disabled={isLoading} onClick={handleClose} type="button">Cancel</button>
-            <button className="primary-button" data-testid="invoice-email-review-send-button" disabled={isLoading || !review || invoice.status === 'Cancelled'} onClick={onSend} type="button">
+            <button className="primary-button" data-testid="invoice-email-review-send-button" disabled={isLoading || !review || invoice.status === 'Cancelled' ||
+              (invoice.status === 'Draft' && !invoice.hasBeenIssued && !invoice.firstIssuedUtc && entitlements?.invoiceIssuance.remaining === 0)} onClick={onSend} type="button">
               {invoice.status === 'Draft' ? 'Issue and send' : 'Send invoice'}
             </button>
           </div>

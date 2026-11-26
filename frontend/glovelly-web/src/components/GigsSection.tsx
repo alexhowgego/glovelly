@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { RecordWorkspace } from './RecordWorkspace'
 import { RecordVisualOverview } from './RecordVisualOverview'
 import { GoogleMapsLocationLink, RecordMapPreview } from './RecordMapPreview'
 import { RecordActionDock } from './RecordActionDock'
@@ -211,8 +212,7 @@ export function GigsSection({
   }, [isEditorOpen])
 
   return (
-    <section className="section-layout">
-      <div className="gig-workspace">
+    <RecordWorkspace className="gig-workspace">
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -558,7 +558,6 @@ export function GigsSection({
             onUpdateGigField={onUpdateGigField}
           />
         </div>
-      </div>
-    </section>
+    </RecordWorkspace>
   )
 }

@@ -10,7 +10,7 @@ export function getInvoiceDocumentAvailability(
   invoice: Invoice | null
 ): InvoiceDocumentAvailability {
   const requiresWatermark = invoice?.status === 'Draft' ||
-    (invoice?.status === 'Cancelled' && !invoice.firstIssuedUtc)
+    (invoice?.status === 'Cancelled' && !(invoice.hasBeenIssued ?? Boolean(invoice.firstIssuedUtc)))
   const compatibleWatermark = requiresWatermark
     ? invoice?.pdfHasDraftWatermark === true
     : invoice?.pdfHasDraftWatermark !== true

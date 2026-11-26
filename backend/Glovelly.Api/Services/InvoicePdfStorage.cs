@@ -14,6 +14,6 @@ public static class InvoicePdfStorage
             ? userId.Value.ToString("N")
             : invoice.CreatedByUserId?.ToString("N") ?? "unassigned";
 
-        return $"users/{ownerSegment}/invoices/{invoice.Id:D}/invoice.pdf";
+        return $"users/{ownerSegment}/invoices/{invoice.Id:D}/generations/{Guid.NewGuid():N}.pdf";
     }
 }

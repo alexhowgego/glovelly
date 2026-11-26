@@ -22,4 +22,14 @@ describe('visual pane dimensions', () => {
     expect(visualPaneBucket(840, 430, true, 'medium')).toBe('medium')
     expect(visualPaneBucket(860, 450, true, 'small')).toBe('medium')
   })
+
+  it('keeps invoice thumbnails eligible when account setup notices reduce body height', () => {
+    expect(visualPaneBucket(900, 260, false)).toBeNull()
+    expect(visualPaneBucket(900, 260, false, null, 'invoice')).toBe('small')
+    expect(visualPaneBucket(620, 180, false, null, 'invoice')).toBe('small')
+    expect(visualPaneBucket(620, 179, false, null, 'invoice')).toBeNull()
+    expect(visualPaneBucket(610, 170, true, 'small', 'invoice')).toBe('small')
+    expect(visualPaneBucket(610, 159, true, 'small', 'invoice')).toBeNull()
+    expect(visualPaneBucket(599, 500, true, 'small', 'invoice')).toBeNull()
+  })
 })

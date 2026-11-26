@@ -11,7 +11,10 @@ public sealed class InvoiceWorkflowService(
     IInvoiceLineGenerationService invoiceLineGenerationService,
     IInvoiceProfileDefaultsService invoiceProfileDefaultsService,
     IInvoicePdfRenderer invoicePdfRenderer,
-    IInvoicePdfService invoicePdfService) : IInvoiceWorkflowService
+    IInvoicePdfService invoicePdfService,
+    EntitlementService entitlementService,
+    EntitlementMutationCoordinator entitlementCoordinator,
+    TimeProvider timeProvider) : IInvoiceWorkflowService
 {
     public async Task<GenerateInvoiceFromGigSelectionResult> GenerateInvoiceFromGigSelectionAsync(
         IReadOnlyCollection<Guid> gigIds,
@@ -283,7 +286,82 @@ public sealed class InvoiceWorkflowService(
         Guid? userId,
         CancellationToken cancellationToken = default)
     {
-        var issuedUtc = DateTimeOffset.UtcNow;
+        if (!userId.HasValue)
+        {
+            throw new InvalidOperationException("A signed-in user is required to issue an invoice.");
+        }
+        await entitlementCoordinator.ExecuteInvoiceAsync(userId.Value, invoice.Id, async () =>
+        {
+            var entry = dbContext.Entry(invoice);
+            var stored = await entry.GetDatabaseValuesAsync(cancellationToken);
+            if (stored is null ||
+                stored.GetValue<Guid>(nameof(Invoice.MutationVersion)) !=
+                    entry.Property(value => value.MutationVersion).OriginalValue)
+            {
+                throw new DbUpdateConcurrencyException("Invoice changed while waiting to issue. Reload and try again.");
+            }
+            var owner = stored.GetValue<Guid?>(nameof(Invoice.CreatedByUserId));
+            if (owner.HasValue && owner != userId)
+            {
+                throw new InvalidOperationException("The invoice is not visible to this user.");
+            }
+            // The version check preserves pending permitted business edits from
+            // generic PUT, but lifecycle/first-issue values come from persistence.
+            invoice.FirstIssuedUtc = stored.GetValue<DateTimeOffset?>(nameof(Invoice.FirstIssuedUtc));
+            invoice.FirstIssuedByUserId = stored.GetValue<Guid?>(nameof(Invoice.FirstIssuedByUserId));
+            invoice.HasLegacyIssuance = stored.GetValue<bool>(nameof(Invoice.HasLegacyIssuance));
+            if (stored.GetValue<InvoiceStatus>(nameof(Invoice.Status)) != InvoiceStatus.Draft)
+            {
+                throw new DbUpdateConcurrencyException("Only a current Draft can be issued.");
+            }
+            var issuedUtc = timeProvider.GetUtcNow();
+            var snapshot = await entitlementService.GetAtAsync(userId.Value, issuedUtc, cancellationToken);
+            var firstIssue = !invoice.HasBeenIssued;
+            if (firstIssue && snapshot.InvoiceIssuance.Remaining is 0)
+            {
+                throw new InvoiceAllowanceExceededException(snapshot);
+            }
+            entry.Collection(value => value.Lines).IsLoaded = false;
+            await entry.Collection(value => value.Lines).LoadAsync(cancellationToken);
+            var candidate = await IssuePreparedAsync(invoice, client, userId, issuedUtc, cancellationToken);
+            if (firstIssue)
+            {
+                dbContext.UsageLedgerEntries.Add(new UsageLedgerEntry
+                {
+                    Id = Guid.NewGuid(), UserId = userId.Value, SourceInvoiceId = invoice.Id,
+                    OccurredAtUtc = issuedUtc, Source = "Issuance",
+                });
+            }
+            // Publish state, immutable document pointer, and ledger in one save
+            // and one coordinator-owned relational transaction.
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException) when (dbContext.Database.IsRelational())
+            {
+                // Save failed before the coordinator attempted commit. This
+                // unique candidate cannot be published by another transaction.
+                // Commit failures occur outside this block: retain those bytes
+                // because the outcome may be unknown.
+                try
+                {
+                    await invoicePdfService.DeleteAsync(new Invoice { PdfStorageKey = candidate.StorageKey }, CancellationToken.None);
+                }
+                catch (Exception)
+                {
+                    // Best-effort only; an unreachable orphan is safer than
+                    // masking the original failure or deleting a published key.
+                }
+                throw;
+            }
+            return true;
+        }, cancellationToken);
+    }
+
+    private async Task<InvoicePdfCandidate> IssuePreparedAsync(
+        Invoice invoice, Client client, Guid? userId, DateTimeOffset issuedUtc, CancellationToken cancellationToken)
+    {
         var invoiceDate = DateOnly.FromDateTime(issuedUtc.UtcDateTime);
         var paymentWindowDays = await invoiceProfileDefaultsService.ResolvePaymentWindowDaysAsync(userId, cancellationToken);
         invoice.InvoiceDate = invoiceDate;
@@ -291,20 +369,22 @@ public sealed class InvoiceWorkflowService(
         invoice.Status = InvoiceStatus.Issued;
         invoice.StatusUpdatedUtc = issuedUtc;
 
-        if (!invoice.FirstIssuedUtc.HasValue)
+        if (!invoice.HasBeenIssued)
         {
             invoice.FirstIssuedUtc = issuedUtc;
             invoice.FirstIssuedByUserId = userId;
         }
 
         var sellerProfile = await invoiceProfileDefaultsService.ResolveSellerProfileAsync(userId, cancellationToken);
-        await invoicePdfService.SaveGeneratedPdfAsync(
+        var candidate = await invoicePdfService.PrepareAsync(
             invoice,
             userId,
             invoicePdfRenderer.RenderInvoicePdf(invoice, client, null, invoice.Lines.ToList(), sellerProfile),
             invoice.RequiresDraftWatermark,
             cancellationToken);
+        invoicePdfService.ApplyCandidate(invoice, candidate);
         StampUpdate(invoice, userId);
+        return candidate;
     }
 
     private async Task ReissueInvoiceInternalAsync(

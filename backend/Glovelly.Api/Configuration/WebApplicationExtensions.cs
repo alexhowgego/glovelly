@@ -47,6 +47,24 @@ internal static class WebApplicationExtensions
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseAuthorization();
+        app.Use(async (context, next) =>
+        {
+            try
+            {
+                await next();
+            }
+            catch (Glovelly.Api.Services.InvoiceAllowanceExceededException exception) when (!context.Response.HasStarted)
+            {
+                await EntitlementProblems.AllowanceExhausted(exception.Snapshot).ExecuteAsync(context);
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException) when (!context.Response.HasStarted)
+            {
+                await Results.Problem(statusCode: StatusCodes.Status409Conflict,
+                    title: "The record changed",
+                    detail: "Reload the latest record and try again.",
+                    extensions: new Dictionary<string, object?> { ["code"] = "concurrent_update" }).ExecuteAsync(context);
+            }
+        });
         app.UseDefaultFiles();
         app.UseStaticFiles();
         app.Use(async (context, next) =>

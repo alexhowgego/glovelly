@@ -156,6 +156,14 @@ public static class DocumentationFixtureSeeder
         }
 
         ApplyUserDefaults(user);
+        if (!await db.UserSubscriptions.AnyAsync(value => value.UserId == UserId, cancellationToken))
+        {
+            db.UserSubscriptions.Add(new UserSubscription
+            {
+                UserId = UserId, PlanCode = Plan.Pro, StartsAtUtc = SeededAt,
+                Reason = "Documentation fixture",
+            });
+        }
         return user;
     }
 

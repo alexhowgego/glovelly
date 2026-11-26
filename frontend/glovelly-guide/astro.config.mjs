@@ -35,6 +35,7 @@ export default defineConfig({
           items: [
             { label: 'Seller profile', slug: 'set-up/seller-profile' },
             { label: 'Settings and defaults', slug: 'set-up/settings-and-defaults' },
+            { label: 'Plans and invoice allowances', slug: 'set-up/plans-and-allowances' },
           ],
         },
         {

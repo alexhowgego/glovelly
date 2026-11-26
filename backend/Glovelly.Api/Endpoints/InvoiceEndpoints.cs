@@ -32,9 +32,15 @@ public static class InvoiceEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             TimeProvider timeProvider,
+            EntitlementService entitlementService,
             CancellationToken cancellationToken) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
+            if (!userId.HasValue) return Results.Unauthorized();
+            if (!(await entitlementService.GetAsync(userId.Value, cancellationToken)).Features.PaidIncomeSummary)
+            {
+                return EntitlementProblems.FeatureNotEntitled();
+            }
             var period = UkFinancialYear.Current(timeProvider);
             var contributions = await db.Invoices
                 .WhereVisibleTo(userId)
@@ -119,13 +125,23 @@ public static class InvoiceEndpoints
         });
 
         group.MapPost("/", async (
-            Invoice invoice,
+            InvoiceWriteRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
+            if (request.Status != InvoiceStatus.Draft)
+            {
+                return EndpointSupport.ValidationProblem("status", "New invoices must begin as Draft.");
+            }
+            var invoice = new Invoice
+            {
+                InvoiceNumber = request.InvoiceNumber,
+                ClientId = request.ClientId,
+                Description = request.Description,
+            };
             if (!await db.Clients
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == invoice.ClientId))
@@ -171,7 +187,7 @@ public static class InvoiceEndpoints
 
         group.MapPut("/{id:guid}", async (
             Guid id,
-            Invoice request,
+            InvoiceWriteRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
@@ -699,6 +715,7 @@ public static class InvoiceEndpoints
         DateOnly FinancialYearEnd,
         decimal Total,
         IReadOnlyList<Guid> InvoiceIds);
+    [System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
     private sealed record InvoiceDescriptionUpdateRequest(string? Description);
     private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);

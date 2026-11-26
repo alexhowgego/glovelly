@@ -37,4 +37,6 @@ Cancelled invoices cannot be emailed or published through Glovelly, even if thei
 
 The **Income this financial year** view includes paid invoices received between 6 April and 5 April. It is a useful record of paid income, not tax advice or a tax return.
 
+This summary and its matching invoice filter require Solo or Pro. Free still includes payment recording, ordinary paid-invoice filters, and complete invoice history. See [plans and invoice allowances](/set-up/plans-and-allowances/) for first-issue limits and what happens when paid access ends.
+
 <div class="help-panel"><p>Need help? <a href="mailto:support@glovelly.net">Contact help</a> or <a href="https://github.com/alexhowgego/glovelly/issues/new">report a problem</a>.</p></div>

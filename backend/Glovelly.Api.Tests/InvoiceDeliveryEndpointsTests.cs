@@ -846,12 +846,15 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             clientId,
             invoiceDate = "2026-04-20",
             dueDate = "2026-05-04",
-            status = "Issued",
+            status = "Draft",
             description,
         });
         createInvoiceResponse.EnsureSuccessStatusCode();
         var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         var invoiceId = invoice.GetProperty("id").GetGuid();
+        var issueResponse = await client.PutAsJsonAsync($"/invoices/{invoiceId}/status", new { status = "Issued" });
+        issueResponse.EnsureSuccessStatusCode();
+        invoice = await issueResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();

@@ -142,6 +142,13 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
             UserId = TestAuthContext.UserId,
             PermissionSet = AdministrativePermissionSet.UserAdministrator,
         });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            UserId = TestAuthContext.UserId,
+            PlanCode = Plan.Pro,
+            StartsAtUtc = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            Reason = "Test fixture",
+        });
 
         var clients = new[]
         {
@@ -213,6 +220,14 @@ public sealed class GlovellyApiFactory : WebApplicationFactory<Program>
 
         dbContext.Clients.AddRange(clients);
         dbContext.Invoices.AddRange(invoices);
+        dbContext.UsageLedgerEntries.Add(new UsageLedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            UserId = TestAuthContext.UserId,
+            SourceInvoiceId = TestData.FoxInvoiceId,
+            OccurredAtUtc = invoices[0].FirstIssuedUtc!.Value,
+            Source = "TestFixture",
+        });
         dbContext.SaveChanges();
     }
 

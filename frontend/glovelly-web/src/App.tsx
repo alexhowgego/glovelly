@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { canManageUsers } from './adminAccess'
+import { LicencesSection } from './components/LicencesSection'
+import { useEntitlements } from './hooks/useEntitlements'
+import { useLicenceSummary } from './hooks/useLicenceSummary'
 import { revealWorkspaceTarget } from './workspaceScrolling'
 import { replaceWorkspacePath, sectionFromPath } from './workspaceRoutes'
 import {
@@ -126,6 +129,10 @@ function App({ appMetadata }: AppProps) {
   const [isForScoreLibraryUploading, setIsForScoreLibraryUploading] = useState(false)
 
   const isAdmin = canManageUsers(authUser?.permissions)
+  const canManageLicences = authUser?.permissions?.includes('ManageLicences') ?? false
+  useEffect(() => {
+    if (authUser && activeSection === 'licences' && !canManageLicences) setActiveSection('gigs')
+  }, [authUser, activeSection, canManageLicences, setActiveSection])
   const accessRequestDeepLinkId = getAccessRequestDeepLinkId(window.location.pathname)
   const resetIntakeRef = useRef<() => void>(() => {})
   const clearSession = useCallback(() => {
@@ -142,6 +149,8 @@ function App({ appMetadata }: AppProps) {
     },
     [clearSession]
   )
+  const entitlements = useEntitlements(isAuthenticated, activeSection, expireSession)
+  const licenceSummary = useLicenceSummary(isAuthenticated && canManageLicences && activeSection === 'licences', expireSession)
   useEffect(() => {
     if (!isAuthenticated) return
     const refreshPermissions = () => {
@@ -562,7 +571,7 @@ function App({ appMetadata }: AppProps) {
     if (isAuthenticated) {
       void loadPaidIncomeSummary()
     }
-  }, [isAuthenticated, loadPaidIncomeSummary])
+  }, [isAuthenticated, loadPaidIncomeSummary, entitlements.snapshot?.features.paidIncomeSummary])
 
   useWorkspaceEvents({
     enabled: isAuthenticated,
@@ -1053,6 +1062,10 @@ function App({ appMetadata }: AppProps) {
           },
         ]
       : []),
+    ...(canManageLicences ? [{
+      id: 'licences' as const, label: 'Licences', eyebrow: 'Restricted',
+      description: 'Manage product plans, expiry and licence history.',
+    }] : []),
   ]
 
   const pendingGigImportCount = gigImportBatches.reduce(
@@ -1069,6 +1082,7 @@ function App({ appMetadata }: AppProps) {
         invoices,
         isWorkspaceLoading: isLoading,
         paidIncomeSummary,
+        licenceSummary,
         adminSummary: {
           status: adminSummaryState,
           totalUsers: adminUsers.length,
@@ -1077,7 +1091,7 @@ function App({ appMetadata }: AppProps) {
         },
         today: new Date().toISOString().slice(0, 10),
       }),
-    [activeSection, clients, gigs, invoices, isLoading, paidIncomeSummary, adminSummaryState, adminUsers.length, activeUsersCount, totalAdmins]
+    [activeSection, clients, gigs, invoices, isLoading, paidIncomeSummary, licenceSummary, adminSummaryState, adminUsers.length, activeUsersCount, totalAdmins]
   )
 
   const signIn = () => {
@@ -1230,24 +1244,28 @@ function App({ appMetadata }: AppProps) {
     }
   }
 
+  const recordRefreshedInvoice = (invoice: Invoice) => {
+    setInvoices(current => current.map(value => value.id === invoice.id ? invoice : value))
+  }
+
   const handleInvoiceStatusChangeWithConfirmation = async (
     invoice: Invoice,
     status: InvoiceStatus
   ) => {
-    let completeLinkedGigs = false
     if (status === 'Issued' && invoice.status !== 'Issued') {
+      const outcome = { invoice: null as Invoice | null }
       const decision = await invoiceActionConfirmation.confirm({
         invoice, action: 'issue', linkedGigCount: linkedGigsForInvoice(invoice).length,
-      })
+      }, async (_decision, currentInvoice) => {
+        outcome.invoice = await handleInvoiceStatusChange(currentInvoice, status, true)
+      }, recordRefreshedInvoice)
       if (!decision) return null
-      completeLinkedGigs = decision.completeLinkedGigs
+      if (outcome.invoice?.status === 'Issued' && decision.completeLinkedGigs) {
+        await completeLinkedInvoiceGigs(outcome.invoice)
+      }
+      return outcome.invoice
     }
-    const updatedInvoice = await handleInvoiceStatusChange(invoice, status)
-    if (updatedInvoice?.status === 'Issued' && completeLinkedGigs) {
-      await completeLinkedInvoiceGigs(updatedInvoice)
-    }
-
-    return updatedInvoice
+    return handleInvoiceStatusChange(invoice, status)
   }
 
   const handleSendInvoiceEmailReview = async () => {
@@ -1265,12 +1283,15 @@ function App({ appMetadata }: AppProps) {
   }
 
   const handlePublishInvoiceGoogleDriveWithConfirmation = async (invoice: Invoice) => {
+    const outcome = { invoice: null as Invoice | null }
     const decision = await invoiceActionConfirmation.confirm({
       invoice, action: 'publish', linkedGigCount: linkedGigsForInvoice(invoice).length,
-    })
+    }, async (choice, currentInvoice) => {
+      outcome.invoice = await handlePublishInvoiceGoogleDrive(currentInvoice, choice.completeLinkedGigs
+        ? invoice => completeLinkedInvoiceGigs(invoice, false) : undefined, true)
+    }, recordRefreshedInvoice)
     if (!decision) return null
-    return handlePublishInvoiceGoogleDrive(invoice, decision.completeLinkedGigs
-      ? invoice => completeLinkedInvoiceGigs(invoice, false) : undefined)
+    return outcome.invoice
   }
 
   const handleInvoiceReissueWithPreview = async (invoice: Invoice) => {
@@ -1624,6 +1645,8 @@ function App({ appMetadata }: AppProps) {
         selectedClient={selectedClient}
         status={status}
       />
+    ) : activeSection === 'licences' && canManageLicences ? (
+      <LicencesSection onSessionExpired={expireSession} />
     ) : activeSection === 'admin' && isAdmin ? (
       <AdminSection
         currentUserId={authUser?.userId}
@@ -1721,6 +1744,8 @@ function App({ appMetadata }: AppProps) {
       />
     ) : (
       <InvoicesSection
+        entitlements={entitlements.snapshot}
+        entitlementError={entitlements.error}
         key={authUser?.userId}
         onSessionExpired={expireSession}
         adjustmentAmount={adjustmentAmount}
@@ -1839,9 +1864,11 @@ function App({ appMetadata }: AppProps) {
       />
 
       {invoiceActionConfirmation.request && <InvoiceActionConfirmation
+        entitlements={entitlements.snapshot} busy={invoiceActionConfirmation.busy} error={invoiceActionConfirmation.error}
         request={invoiceActionConfirmation.request} onFinish={invoiceActionConfirmation.finish} />}
 
       <InvoiceEmailReviewModal
+        entitlements={entitlements.snapshot}
         error={invoiceEmailReviewError}
         includeReceipts={includeInvoiceEmailReceipts}
         invoice={invoiceEmailReviewInvoice}

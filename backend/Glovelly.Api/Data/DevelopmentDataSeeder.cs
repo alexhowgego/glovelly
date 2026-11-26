@@ -760,6 +760,21 @@ public static class DevelopmentDataSeeder
 
         dbContext.Clients.AddRange(fixture.Clients);
         dbContext.Invoices.AddRange(fixture.Invoices);
+        foreach (var invoice in fixture.Invoices.Where(value => value.FirstIssuedUtc.HasValue))
+        {
+            var billingUserId = invoice.FirstIssuedByUserId ?? invoice.CreatedByUserId;
+            if (billingUserId.HasValue)
+            {
+                dbContext.UsageLedgerEntries.Add(new UsageLedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = billingUserId.Value,
+                    SourceInvoiceId = invoice.Id,
+                    OccurredAtUtc = invoice.FirstIssuedUtc!.Value,
+                    Source = "DevelopmentFixture",
+                });
+            }
+        }
         if (seededAdminUserId.HasValue)
         {
             foreach (var invoice in fixture.Invoices)
@@ -845,6 +860,15 @@ public static class DevelopmentDataSeeder
         };
 
         dbContext.Users.Add(seededUser);
+        // Explicit local fixture, not the production one-time Founder eligibility rule.
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            UserId = seededUser.Id,
+            PlanCode = Plan.Pro,
+            StartsAtUtc = SeededCreatedUtc,
+            Source = "Manual",
+            Reason = "Development fixture",
+        });
         dbContext.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
         {
             UserId = seededUser.Id,

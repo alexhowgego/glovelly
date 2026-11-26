@@ -9,6 +9,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AccessRequest> AccessRequests => Set<AccessRequest>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<Plan> Plans => Set<Plan>();
+    public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
+    public DbSet<LicenceChange> LicenceChanges => Set<LicenceChange>();
+    public DbSet<UsageLedgerEntry> UsageLedgerEntries => Set<UsageLedgerEntry>();
     public DbSet<UserAdministrativePermissionSet> UserAdministrativePermissionSets => Set<UserAdministrativePermissionSet>();
     public DbSet<AdministrativePermissionChange> AdministrativePermissionChanges => Set<AdministrativePermissionChange>();
     public DbSet<Client> Clients => Set<Client>();
@@ -39,6 +43,66 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<McpOAuthAuthorizationCode> McpOAuthAuthorizationCodes => Set<McpOAuthAuthorizationCode>();
     public DbSet<McpOAuthAccessToken> McpOAuthAccessTokens => Set<McpOAuthAccessToken>();
     public DbSet<McpOAuthRefreshToken> McpOAuthRefreshTokens => Set<McpOAuthRefreshToken>();
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        PrepareInvoiceMutationsAsync(false, CancellationToken.None).GetAwaiter().GetResult();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override async Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        await PrepareInvoiceMutationsAsync(true, cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private async Task PrepareInvoiceMutationsAsync(bool asynchronous, CancellationToken cancellationToken)
+    {
+        ChangeTracker.DetectChanges();
+        // Every line writer participates, including generic line routes and
+        // background gig refresh. A move invalidates both source and destination.
+        var lineParents = ChangeTracker.Entries<InvoiceLine>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .SelectMany(entry => new[]
+            {
+                entry.Entity.InvoiceId,
+                entry.Property(value => value.InvoiceId).OriginalValue,
+            }).Where(id => id != Guid.Empty).Distinct().ToList();
+        foreach (var id in lineParents)
+        {
+            var invoice = Invoices.Local.FirstOrDefault(value => value.Id == id);
+            if (invoice is null)
+            {
+                invoice = asynchronous
+                    ? await Invoices.SingleOrDefaultAsync(value => value.Id == id, cancellationToken)
+                    : Invoices.SingleOrDefault(value => value.Id == id);
+            }
+            if (invoice is null || Entry(invoice).State is EntityState.Added or EntityState.Deleted)
+            {
+                continue;
+            }
+            var entry = Entry(invoice);
+            // A newly prepared candidate already includes the pending lines.
+            // Otherwise the existing PDF must no longer appear current.
+            if (!entry.Property(value => value.PdfStorageKey).IsModified)
+            {
+                if (!entry.Property(value => value.DocumentRevision).IsModified)
+                {
+                    invoice.DocumentRevision++;
+                }
+                invoice.DocumentState = InvoiceDocumentState.Regenerating;
+                invoice.DocumentFailureMessage = null;
+            }
+            entry.Property(value => value.MutationVersion).IsModified = true;
+        }
+        ChangeTracker.DetectChanges();
+        foreach (var entry in ChangeTracker.Entries<Invoice>()
+            .Where(entry => entry.State == EntityState.Modified))
+        {
+            entry.Entity.MutationVersion = Guid.NewGuid();
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

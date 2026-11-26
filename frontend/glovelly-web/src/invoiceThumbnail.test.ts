@@ -47,6 +47,7 @@ describe('uncached thumbnail PDF reads', () => {
     { gigLinesNeedRefresh: true },
     { status: 'Draft', pdfHasDraftWatermark: true },
     { pdfHasDraftWatermark: true },
+    { pdfStorageKey: 'users/owner/invoices/one/generations/replacement.pdf' },
   ] satisfies Partial<Invoice>[])('discards changed metadata %j without retries', async changed => {
     vi.mocked(fetchWithSession).mockResolvedValueOnce(pdf()).mockResolvedValueOnce(new Response(JSON.stringify(invoice(changed))))
     await expect(loadInvoiceThumbnailBytes(invoice(), new AbortController().signal, vi.fn())).rejects.toThrow('changed')

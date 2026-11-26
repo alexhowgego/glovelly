@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { RecordWorkspace } from './RecordWorkspace'
 import type { FormEvent } from 'react'
 import type { Client, ClientForm, ClientSort, ClientSortKey } from '../types'
 import { TrashIcon } from './TrashIcon'
@@ -97,8 +98,7 @@ export function ClientsSection({
   }, [isEditorOpen])
 
   return (
-    <section className="section-layout">
-      <div className="workspace">
+    <RecordWorkspace className="workspace">
         <div className="clients-panel panel">
           <div className="panel-heading">
             <div>
@@ -418,7 +418,6 @@ export function ClientsSection({
             </div>
           </form>
         </div>
-      </div>
-    </section>
+    </RecordWorkspace>
   )
 }
