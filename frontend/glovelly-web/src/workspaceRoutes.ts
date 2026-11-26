@@ -4,6 +4,7 @@ const paths = {
   clients: '/workspaces/clients',
   gigs: '/workspaces/gigs',
   invoices: '/workspaces/invoices',
+  licences: '/workspaces/licences',
 } as const
 
 export function sectionFromPath(pathname: string): AppSection {

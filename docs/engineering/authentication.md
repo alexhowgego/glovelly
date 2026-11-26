@@ -13,8 +13,8 @@ A valid Google login is not, by itself, sufficient to access Glovelly.
 3. Glovelly reads the Google subject identifier and verified email claims.
 4. Glovelly maps those claims to an internal `User` record.
 5. Glovelly checks that the user is active.
-6. Glovelly issues an application cookie containing internal Glovelly user and role claims.
-7. Application endpoints authorise work against Glovelly policies, roles, and ownership rules.
+6. Glovelly issues an application cookie identifying the internal user.
+7. Application endpoints authorise work against current database-backed capabilities and ownership rules.
 
 ## Durable Identity
 
@@ -37,14 +37,30 @@ If no matching active user exists, the login is denied and the access-request fl
 
 ## Roles And Permissions
 
-Roles are application-owned concepts. Google provides identity, not business permissions.
+Google provides identity, not business permissions. Administrative permission sets are additive and code-defined:
 
-Current roles are:
+| Permission set | Capabilities |
+| --- | --- |
+| User Administrator | `ManageUsers` |
+| License Administrator | `ManageLicences` |
+| Super Administrator | `ManageUsers`, `ManageLicences`, `ManageSystem`, `ManagePermissions` |
 
-- `Admin`
-- `User`
+ASP.NET Core policies resolve current assignments from the local database for each request. New capabilities are not implicitly included in Super Administrator. The old persisted role remains for migration/rollback, not administrative authorization. Permission assignment is a separate audited action requiring `ManagePermissions`; user administrators cannot alter privileged accounts, including identity and invitation fields. User-owned business data still uses ownership rules such as `WhereVisibleTo(...)`.
 
-Server-side policies require an authenticated Glovelly user claim and, for admin routes, the admin role. User-owned business data should also be filtered by internal ownership rules such as `WhereVisibleTo(...)`.
+## Bootstrap and recovery
+
+The migration maps legacy Admin accounts to User Administrator only. After migration, an operator must explicitly grant the first Super Administrator to an existing active user who has already enrolled with Google. No startup setting permanently grants this authority. The same command is available for emergency recovery and is idempotent.
+
+1. Verify the target environment, database and active enrolled user ID using an authorized read-only operator workflow. Back up the database and confirm the deployment's migration completed.
+2. Run the application image as a one-off Cloud Run Job, **overriding the image entrypoint** to `dotnet` and using arguments `Glovelly.Api.dll`, `grant-super-admin`, `--user-id`, the verified GUID, `--operator`, the accountable operator identity, `--reason`, and the reason. The normal image entrypoint starts the web server and does not forward job arguments.
+3. Bind `ConnectionStrings__Glovelly` to the target environment's existing database secret, use the same network access as the migration job, and restrict who can create/execute the job and access that secret. Never place the connection string in job arguments, logs, or repository files. The operator value is an accountable assertion, not independently authenticated by the command; correlate it with Cloud audit logs.
+4. Check the command exit status, the `AdministrativePermissionChanges` audit entry, and the effective permissions in the application. Assign a second active, enrolled Super Administrator before a handover.
+
+For local operator execution, set `ConnectionStrings__Glovelly` securely in the process environment, then run `dotnet run --project backend/Glovelly.Api -- grant-super-admin --user-id <guid> --operator <identity> --reason <reason>`. The command refuses missing, inactive or unenrolled targets and never applies migrations.
+
+For the ephemeral local in-memory database, a separate operator process cannot access the web process's data. Use `./run-dev.sh --super-admin` to run the same audited bootstrap in the web process immediately after development seeding. This explicit one-run option requires `DevelopmentSeeding:AdminGoogleSubject` and rejects non-Development, staging, testing, or PostgreSQL configurations. Restart without it for the normal User Administrator fixture; the in-memory assignments and audit history do not persist across restarts.
+
+Rollback is security-sensitive: preserve a database backup and permission audit, inspect the old `Users.Role` values, and explicitly review the resulting legacy Admin access before returning to old code. The migration down operation removes permission and audit tables; do not run it before preserving their contents. Do not automatically convert every new administrative assignment into legacy Admin.
 
 ## Implementation Notes
 

@@ -18,18 +18,17 @@ describe('user access actions', () => {
     await act(() => hook.result.current.loadAdminUsers())
     return { ...hook, saved }
   }
-  it('does not request a prohibited self-deactivation or self-demotion', async () => {
+  it('does not request a prohibited self-deactivation', async () => {
     const hook = await setup(user.id)
     const confirm = vi.spyOn(window, 'confirm')
-    await act(() => hook.result.current.changeAdminAccess('Admin', false))
-    await act(() => hook.result.current.changeAdminAccess('User', true))
+    await act(() => hook.result.current.changeAdminAccess(false))
     expect(confirm).not.toHaveBeenCalled()
     expect(fetchWithSession).toHaveBeenCalledOnce()
   })
   it('cancelling confirmation leaves access unchanged', async () => {
     const hook = await setup()
     vi.spyOn(window, 'confirm').mockReturnValue(false)
-    await act(() => hook.result.current.changeAdminAccess('Admin', false))
+    await act(() => hook.result.current.changeAdminAccess(false))
     expect(fetchWithSession).toHaveBeenCalledOnce()
     expect(hook.result.current.selectedAdminUser?.isActive).toBe(true)
   })
@@ -37,16 +36,17 @@ describe('user access actions', () => {
     const hook = await setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(fetchWithSession).mockResolvedValueOnce(new Response(JSON.stringify({ ...user, isActive: false })))
-    await act(() => hook.result.current.changeAdminAccess('Admin', false))
+    await act(() => hook.result.current.changeAdminAccess(false))
     const request = vi.mocked(fetchWithSession).mock.calls[1][1]!
-    expect(JSON.parse(request.body as string)).toMatchObject({ isActive: false, role: 'Admin', mileageRate: 0.5, passengerMileageRate: 0.06 })
+    expect(JSON.parse(request.body as string)).toMatchObject({ isActive: false, mileageRate: 0.5, passengerMileageRate: 0.06 })
+    expect(JSON.parse(request.body as string)).not.toHaveProperty('role')
     expect(hook.result.current.selectedAdminUser?.isActive).toBe(false)
     expect(hook.saved).toHaveBeenCalledOnce()
   })
   it('does not overwrite an open editor', async () => {
     const hook = await setup()
     act(() => hook.result.current.startAdminEdit())
-    await act(() => hook.result.current.changeAdminAccess('Admin', false))
+    await act(() => hook.result.current.changeAdminAccess(false))
     expect(fetchWithSession).toHaveBeenCalledOnce()
   })
 })

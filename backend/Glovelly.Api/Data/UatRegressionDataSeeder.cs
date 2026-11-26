@@ -166,6 +166,14 @@ public static class UatRegressionDataSeeder
         {
             ApplyUserFixture(user, fixture.User);
         }
+        if (!await dbContext.UserSubscriptions.AnyAsync(value => value.UserId == UserId))
+        {
+            dbContext.UserSubscriptions.Add(new UserSubscription
+            {
+                UserId = UserId, PlanCode = Plan.Pro, StartsAtUtc = SeededCreatedUtc,
+                Reason = "UAT fixture",
+            });
+        }
 
         var client = await dbContext.Clients.FirstOrDefaultAsync(value => value.Id == ClientId);
         if (client is null)

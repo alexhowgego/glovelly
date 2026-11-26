@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Glovelly.Api.Services;
+using Glovelly.Api.Auth;
+using Glovelly.Api.Data;
+using Glovelly.Api.Models;
 using Glovelly.Api.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -21,6 +24,83 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
+    public async Task LastEnrolledSuperCannotBeDeactivatedOrDeleted()
+    {
+        var id = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var actor = await db.Users.FindAsync([TestAuthContext.UserId], TestContext.Current.CancellationToken);
+            Assert.NotNull(actor);
+            actor.GoogleSubject = null;
+            db.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+            {
+                UserId = actor.Id, PermissionSet = AdministrativePermissionSet.SuperAdministrator
+            });
+            db.Users.Add(new User
+            {
+                Id = id, Email = "last-super@example.test", GoogleSubject = "last-super-subject",
+                IsActive = true, CreatedUtc = DateTime.UtcNow
+            });
+            db.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+            {
+                UserId = id, PermissionSet = AdministrativePermissionSet.SuperAdministrator
+            });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var deactivate = await _client.PutAsJsonAsync($"/admin/users/{id}", new
+        {
+            email = "last-super@example.test", googleSubject = "last-super-subject", isActive = false
+        }, TestContext.Current.CancellationToken);
+        var delete = await _client.DeleteAsync($"/admin/users/{id}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Conflict, deactivate.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, delete.StatusCode);
+        using var verify = _factory.Services.CreateScope();
+        var verificationDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True((await verificationDb.Users.FindAsync([id], TestContext.Current.CancellationToken))!.IsActive);
+    }
+
+    [Fact]
+    public async Task UserAdministratorCannotModifyOrInvitePrivilegedAccount()
+    {
+        var id = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Users.Add(new User { Id = id, Email = "privileged@example.test", IsActive = true, CreatedUtc = DateTime.UtcNow });
+            db.UserAdministrativePermissionSets.Add(new UserAdministrativePermissionSet
+            {
+                UserId = id, PermissionSet = AdministrativePermissionSet.LicenseAdministrator
+            });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var edit = await _client.PutAsJsonAsync($"/admin/users/{id}", new
+        {
+            email = "replacement@example.test", isActive = true
+        }, TestContext.Current.CancellationToken);
+        var invite = await _client.PostAsync($"/admin/users/{id}/invitation-email", null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, edit.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, invite.StatusCode);
+        Assert.Empty(_factory.Emails.SentEmails);
+    }
+
+    [Fact]
+    public async Task CreateUser_WithAdministrativeRole_IsRejected()
+    {
+        var response = await _client.PostAsJsonAsync("/admin/users", new
+        {
+            email = "escalation@glovelly.local",
+            role = "Admin",
+            isActive = true,
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task CreateUser_DoesNotSendInvitationEmailByDefault()
     {
         var createResponse = await _client.PostAsJsonAsync("/admin/users", new
@@ -30,7 +110,6 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
             googleSubject = (string?)null,
             mileageRate = (decimal?)null,
             passengerMileageRate = (decimal?)null,
-            role = "User",
             isActive = true,
         }, TestContext.Current.CancellationToken);
 
@@ -49,7 +128,6 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
             googleSubject = (string?)null,
             mileageRate = (decimal?)null,
             passengerMileageRate = (decimal?)null,
-            role = "User",
             isActive = true,
         }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
@@ -88,7 +166,6 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
             googleSubject = (string?)null,
             mileageRate = (decimal?)null,
             passengerMileageRate = (decimal?)null,
-            role = "User",
             isActive = true,
         }, TestContext.Current.CancellationToken);
         var createdUser = await createResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
@@ -122,7 +199,6 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
             googleSubject = (string?)null,
             mileageRate = (decimal?)null,
             passengerMileageRate = (decimal?)null,
-            role = "User",
             isActive = false,
         }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
@@ -151,7 +227,6 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
             googleSubject = (string?)null,
             mileageRate = (decimal?)null,
             passengerMileageRate = (decimal?)null,
-            role = "User",
             isActive = true,
         }, TestContext.Current.CancellationToken);
         createResponse.EnsureSuccessStatusCode();
@@ -176,15 +251,10 @@ public sealed class AdminEndpointsTests : IClassFixture<GlovellyApiFactory>
     }
 
     [Fact]
-    public async Task DeleteUser_WhenCurrentUser_ReturnsValidationProblem()
+    public async Task DeleteUser_WhenCurrentUserWithoutPermissionManagement_IsForbidden()
     {
         var deleteResponse = await _client.DeleteAsync($"/admin/users/{TestAuthContext.UserId}", TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
-
-        var problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
-        Assert.Equal(
-            "You cannot delete your own administrator account.",
-            problem.GetProperty("errors").GetProperty("id")[0].GetString());
+        Assert.Equal(HttpStatusCode.Forbidden, deleteResponse.StatusCode);
     }
 }

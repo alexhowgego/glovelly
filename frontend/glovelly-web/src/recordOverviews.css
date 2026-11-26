@@ -59,6 +59,91 @@
   overflow-wrap: anywhere;
 }
 
+.permission-management {
+  margin-top: 12px;
+  border-top: 1px solid var(--surface-border);
+  padding-top: 10px;
+}
+
+.permission-management summary {
+  cursor: pointer;
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.permission-management summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.permission-management-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.permission-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.permission-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  color: var(--heading);
+  font-size: 0.9rem;
+}
+
+.permission-reason {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.permission-reason input {
+  width: 100%;
+  min-width: 0;
+}
+
+.permission-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.permission-status,
+.permission-history p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.permission-history {
+  font-size: 0.88rem;
+}
+
+.permission-history ul {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.permission-history li {
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.permission-history li span {
+  color: var(--muted);
+}
+
 .record-overview h2 {
   outline-offset: -2px;
 }
@@ -191,6 +276,15 @@
 
 .record-visual-facts, .record-visual-rail { min-width: 0; }
 .record-action-dock { width: 100%; min-width: 0; }
+.invoice-issue-confirmation {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100svh - 32px);
+  margin: auto;
+  overflow: auto;
+  color: var(--text);
+}
+.invoice-issue-confirmation::backdrop { background: color-mix(in srgb, #1a1410 42%, transparent); }
+.invoice-issue-confirmation .actions { margin-top: 16px; flex-wrap: wrap; }
 .record-action-dock .actions { flex-wrap: wrap; align-items: end; }
 .record-action-dock .helper-text { overflow-wrap: anywhere; }
 .access-restriction-help { font-size: 0.85rem; margin-top: 8px; }
@@ -236,6 +330,18 @@
 .invoice-thumbnail { display: block; max-width: 100%; padding: 0; background: white; border: 1px solid var(--surface-border); }
 .invoice-thumbnail[hidden] { display: none; }
 .invoice-thumbnail canvas { display: block; width: 100%; height: auto; }
+.invoice-thumbnail-frame { position: relative; max-width: 100%; background: var(--surface-panel); }
+.invoice-thumbnail-frame .invoice-thumbnail { width: 100%; height: 100%; }
+.invoice-thumbnail-frame canvas { width: 100%; height: 100%; object-fit: contain; transition: opacity 160ms ease; }
+.invoice-thumbnail-frame canvas[hidden] { display: none; }
+.invoice-thumbnail-frame.is-updating canvas { filter: blur(5px); opacity: 0.45; }
+.invoice-thumbnail-status {
+  position: absolute; inset: 0; display: grid; place-content: center; margin: 0; padding: 16px;
+  font-size: 0.85rem; text-align: center; overflow-wrap: anywhere; pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .invoice-thumbnail-frame canvas { transition: none; }
+}
 .invoice-thumbnail-preview > p { font-size: 0.85rem; overflow-wrap: anywhere; }
 .visual-preview-tooltip {
   position: absolute;
@@ -281,7 +387,7 @@
 }
 
 @media (min-width: 1181px) and (min-height: 45em) {
-  .workspace-shell :is(.workspace, .gig-workspace, .admin-workspace) > .record-overview > .overview-body {
+  .workspace-shell .record-workspace > .record-overview > .overview-body {
     /* Normal records fill the pane; unusually long content scrolls here. */
     flex: 1 1 auto;
     min-height: 0;

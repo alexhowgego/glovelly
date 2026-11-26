@@ -1,11 +1,11 @@
 ## Purpose
 
-Provide supplementary, accessible invoice thumbnails from existing stored PDFs without changing invoice workflows, retaining reusable document bytes, or presenting known outdated imagery.
+Provide supplementary, accessible invoice thumbnails from existing stored PDFs without changing invoice workflows, retaining reusable document bytes, or presenting known outdated imagery as current.
 
 ## Requirements
 
 ### Requirement: Thumbnail renders the existing current PDF locally
-When an eligible invoice visual rail is visible, the application SHALL render only page one of the existing current invoice PDF locally into a canvas using authenticated stored PDF bytes. It SHALL preserve page proportions and SHALL NOT embed a miniature PDF viewer or send document bytes to an external renderer. Passive selection, loading, rendering, and preview retries SHALL NOT generate, regenerate, repair, issue/reissue, deliver, or otherwise mutate the invoice.
+When an eligible invoice visual rail is visible, the application SHALL render only page one of the existing current invoice PDF locally into a canvas using authenticated stored PDF bytes. It SHALL preserve page proportions and SHALL NOT embed a miniature PDF viewer or send document bytes to an external renderer. Passive selection, loading, rendering, and preview retries SHALL NOT generate, regenerate, repair, issue/reissue, deliver, or otherwise mutate the invoice. During a same-invoice update, the previous displayed pixels MAY remain solely as a blurred, clearly labelled, non-interactive updating placeholder.
 
 #### Scenario: Viewing a current invoice
 - **WHEN** the selected invoice has a current readable PDF and its visual rail is eligible
@@ -30,7 +30,7 @@ The thumbnail SHALL be a keyboard-operable affordance with an accessible invoice
 - **THEN** the application shows a quiet inline unavailable state and retains applicable explicit document actions
 
 ### Requirement: PDF loading is bounded and uncached
-Passive PDF loading/rendering SHALL be gated on actual visual eligibility and selection. Bytes SHALL belong only to the active thumbnail render, without a reusable browser/server byte or thumbnail cache or modal byte sharing. Selection, known revision/readiness changes, session changes and obsolete completions SHALL NOT populate the wrong invoice or retain known outdated imagery. Renderer tasks/documents and canvas memory SHALL be released on cleanup. Ordinary component renders SHALL NOT repeat the download; revisiting/remounting an invoice MAY download/render it again. Existing PDF storage and generation SHALL remain unchanged.
+Passive PDF loading/rendering SHALL be gated on actual visual eligibility and selection. Bytes SHALL belong only to the active thumbnail render, without a reusable browser/server byte or thumbnail cache or modal byte sharing. Selection, known revision/readiness changes, session changes and obsolete completions SHALL NOT populate the wrong invoice or retain known outdated imagery as current. Renderer tasks/documents and staging canvas memory SHALL be released on cleanup. Only the last displayed pixels of the same mounted selected invoice MAY persist during an update placeholder. Ordinary component renders SHALL NOT repeat the download; revisiting/remounting an invoice MAY download/render it again. Existing PDF storage and generation SHALL remain unchanged.
 
 #### Scenario: Selection changes before rendering completes
 - **WHEN** invoice A's load/render is pending and invoice B is selected
@@ -39,7 +39,8 @@ Passive PDF loading/rendering SHALL be gated on actual visual eligibility and se
 
 #### Scenario: Current revision changes
 - **WHEN** a selected invoice's document revision changes or becomes non-current
-- **THEN** the old thumbnail is cleared immediately and only the new current identity can become visible
+- **THEN** the old image immediately becomes disabled and visibly blurred/labelled as updating rather than current
+- **AND** only a completed render for the new validated document identity can become interactive
 
 #### Scenario: Revisiting an invoice
 - **WHEN** an invoice thumbnail is unmounted and later selected again in an eligible pane
@@ -61,3 +62,14 @@ After downloading the stored PDF, the frontend SHALL re-read authorized invoice 
 - **WHEN** pane dimensions make the rail ineligible or the session ends
 - **THEN** passive rendering stops and hidden-only work is cancelled
 - **AND** session end releases document bytes and visual resources
+
+### Requirement: Preview replacement preserves layout
+The eligible selected invoice preview SHALL retain a stable paper-shaped frame through loading, mutation, replacement, and failure. Updating SHALL show an accessible status overlay, without replacing the paper frame with a short text paragraph or collapsing the facts/preview grid. Previous pixels SHALL be removed on failure, invoice/session change, or unmount. Motion SHALL respect reduced-motion preferences.
+
+#### Scenario: Same invoice is regenerating
+- **WHEN** a user changes an invoice state and a replacement is pending
+- **THEN** the old rendered pixels MAY remain blurred and non-interactive under Updating preview while the frame dimensions remain stable
+
+#### Scenario: Replacement fails
+- **WHEN** the fresh thumbnail cannot be loaded or rendered
+- **THEN** the previous image SHALL be removed and the error SHALL occupy the existing frame without an automatic retry loop

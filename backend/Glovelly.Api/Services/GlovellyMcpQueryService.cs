@@ -30,7 +30,8 @@ public interface IGlovellyMcpQueryService
 public sealed class GlovellyMcpQueryService(
     AppDbContext db,
     IExpenseStatementBuilder expenseStatementBuilder,
-    IWorkspaceEventPublisher workspaceEventPublisher) : IGlovellyMcpQueryService
+    IWorkspaceEventPublisher workspaceEventPublisher,
+    EntitlementService entitlementService) : IGlovellyMcpQueryService
 {
     private const string DefaultCurrency = "GBP";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -333,6 +334,10 @@ public sealed class GlovellyMcpQueryService(
 
     public async Task<BusinessSummaryResult> GetBusinessSummaryAsync(Guid userId, BusinessSummaryRequest request, CancellationToken cancellationToken)
     {
+        if (!(await entitlementService.GetAsync(userId, cancellationToken)).Features.PaidIncomeSummary)
+        {
+            throw new FeatureNotEntitledException();
+        }
         var invoiceQuery = ApplyInvoiceDateFilter(
             db.Invoices
                 .WhereVisibleTo(userId)

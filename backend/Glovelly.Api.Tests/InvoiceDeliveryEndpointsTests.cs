@@ -846,18 +846,21 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
             clientId,
             invoiceDate = "2026-04-20",
             dueDate = "2026-05-04",
-            status = "Issued",
+            status = "Draft",
             description,
         });
         createInvoiceResponse.EnsureSuccessStatusCode();
         var invoice = await createInvoiceResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         var invoiceId = invoice.GetProperty("id").GetGuid();
+        var issueResponse = await client.PutAsJsonAsync($"/invoices/{invoiceId}/status", new { status = "Issued" });
+        issueResponse.EnsureSuccessStatusCode();
+        invoice = await issueResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var invoiceEntity = await dbContext.Invoices.SingleAsync(value => value.Id == invoiceId, TestContext.Current.CancellationToken);
         var invoicePdfService = scope.ServiceProvider.GetRequiredService<IInvoicePdfService>();
-        await invoicePdfService.SaveGeneratedPdfAsync(invoiceEntity, TestAuthContext.UserId, pdfBytes);
+        await invoicePdfService.SaveGeneratedPdfAsync(invoiceEntity, TestAuthContext.UserId, pdfBytes, hasDraftWatermark: false);
         await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return invoice;
@@ -917,7 +920,7 @@ public sealed class InvoiceDeliveryEndpointsTests : IClassFixture<GlovellyApiFac
         await invoicePdfService.SaveGeneratedPdfAsync(
             invoice,
             TestAuthContext.UserId,
-            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"));
+            Encoding.ASCII.GetBytes("%PDF-1.4 invoice content"), hasDraftWatermark: false);
         dbContext.Invoices.Add(invoice);
         dbContext.Gigs.Add(new Gig
         {

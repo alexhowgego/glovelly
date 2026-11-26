@@ -147,7 +147,10 @@ public sealed class DevelopmentSeedDataTests
             new InvoiceLineGenerationService(dbContext, Options.Create(new InvoiceRateSettings())),
             new InvoiceProfileDefaultsService(dbContext),
             new InvoicePdfRenderer(),
-            new InvoicePdfService(new InMemoryBlobStore(), TimeProvider.System));
+            new InvoicePdfService(new InMemoryBlobStore(), TimeProvider.System),
+            new EntitlementService(dbContext, TimeProvider.System),
+            new EntitlementMutationCoordinator(dbContext),
+            TimeProvider.System);
     }
 
     private static IConfiguration CreateSeedConfiguration()

@@ -80,11 +80,16 @@ internal static class AuthEndpoints
                     .AsNoTracking()
                     .FirstOrDefaultAsync(settings => settings.UserId == userId.Value)
                 : null;
+            var permissionSets = await dbContext.UserAdministrativePermissionSets.AsNoTracking()
+                .Where(value => value.UserId == userId.Value)
+                .Select(value => value.PermissionSet)
+                .ToListAsync();
 
             return Results.Ok(new
             {
                 userId,
-                role = localUser.Role.ToString(),
+                permissionSets,
+                permissions = AdministrativePermissionSets.Resolve(permissionSets).ToArray(),
                 name = localUser.DisplayName ?? localUser.Email,
                 email = localUser.Email,
                 profileImageUrl = user.FindFirstValue("picture") ?? user.FindFirstValue("profile") ?? string.Empty,

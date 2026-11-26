@@ -54,7 +54,8 @@ export type ClientSort = {
 
 export type AuthUser = {
   userId: string
-  role: string
+  permissions?: string[]
+  permissionSets?: string[]
   name: string
   email: string
   profileImageUrl: string
@@ -193,8 +194,10 @@ export type AdminUser = {
   email: string
   displayName: string | null
   googleSubject: string | null
+  mileageRate?: number | null
+  passengerMileageRate?: number | null
   isEnrolled: boolean
-  role: string
+  permissionSets?: string[]
   isActive: boolean
   createdUtc: string
   lastLoginUtc: string | null
@@ -204,7 +207,6 @@ export type AdminUserForm = {
   email: string
   displayName: string
   googleSubject: string
-  role: 'Admin' | 'User'
   isActive: boolean
   sendInvitationEmail: boolean
 }
@@ -240,7 +242,6 @@ export type AccessRequest = {
 }
 
 export type AccessRequestApproval = {
-  role: 'Admin' | 'User'
   isActive: boolean
   sendInvitationEmail: boolean
   decisionNote?: string
@@ -741,6 +742,7 @@ export type Invoice = {
   status: InvoiceStatus
   paidOn: string | null
   firstIssuedUtc: string | null
+  hasBeenIssued?: boolean
   firstIssuedByUserId: string | null
   reissueCount: number
   lastReissuedUtc: string | null
@@ -759,6 +761,8 @@ export type Invoice = {
   documentState: InvoiceDocumentState
   documentRevision: number
   pdfDocumentRevision: number | null
+  pdfHasDraftWatermark: boolean | null
+  isPdfCurrent: boolean
   documentFailureMessage: string | null
   gigLinesNeedRefresh?: boolean
   total: number
@@ -816,7 +820,50 @@ export type GigExternalResourceForm = {
   isPrimary: boolean
 }
 
-export type AppSection = 'clients' | 'admin' | 'gigs' | 'invoices'
+export type AppSection = 'clients' | 'admin' | 'licences' | 'gigs' | 'invoices'
+
+export type EntitlementSnapshot = {
+  effectivePlan: { code: string; displayName: string }
+  assignedPlan: { code: string; displayName: string } | null
+  assignmentStatus: 'Default' | 'Active' | 'Expired' | 'Cancelled' | 'NotStarted'
+  endsAtUtc: string | null
+  features: { paidIncomeSummary: boolean }
+  invoiceIssuance: {
+    used: number
+    limit: number | null
+    remaining: number | null
+    periodStartsAtUtc: string
+    resetsAtUtc: string
+    timeZone: string
+  }
+}
+
+export type LicenceUser = {
+  id: string
+  email: string
+  displayName: string | null
+  isActive: boolean
+  isEnrolled: boolean
+  version: string | null
+  entitlements: EntitlementSnapshot
+}
+
+export type LicenceSummary = {
+  freeUsers: number
+  paidUsers: number
+  expiringGrants: number
+}
+
+export type LicenceAudit = {
+  id: string
+  targetIdentity: string
+  actorIdentity: string
+  changedAtUtc: string
+  previousAssignment: string | null
+  newAssignment: string
+  reason: string | null
+  source: string
+}
 export type ThemePreference =
   | 'system'
   | 'light'

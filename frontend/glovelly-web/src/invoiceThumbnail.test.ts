@@ -45,6 +45,9 @@ describe('uncached thumbnail PDF reads', () => {
     { pdfGeneratedAt: '2026-10-19T10:00:00Z' },
     { id: 'different' },
     { gigLinesNeedRefresh: true },
+    { status: 'Draft', pdfHasDraftWatermark: true },
+    { pdfHasDraftWatermark: true },
+    { pdfStorageKey: 'users/owner/invoices/one/generations/replacement.pdf' },
   ] satisfies Partial<Invoice>[])('discards changed metadata %j without retries', async changed => {
     vi.mocked(fetchWithSession).mockResolvedValueOnce(pdf()).mockResolvedValueOnce(new Response(JSON.stringify(invoice(changed))))
     await expect(loadInvoiceThumbnailBytes(invoice(), new AbortController().signal, vi.fn())).rejects.toThrow('changed')
@@ -53,6 +56,11 @@ describe('uncached thumbnail PDF reads', () => {
 
   it.each(['Missing', 'Regenerating', 'Failed'] as const)('does not fetch or generate a %s document', async documentState => {
     await expect(loadInvoiceThumbnailBytes(invoice({ documentState }), new AbortController().signal, vi.fn())).rejects.toThrow('not current')
+    expect(fetchWithSession).not.toHaveBeenCalled()
+  })
+
+  it.each([null, false])('does not fetch or repair a draft with watermark provenance %s', async pdfHasDraftWatermark => {
+    await expect(loadInvoiceThumbnailBytes(invoice({ status: 'Draft', pdfHasDraftWatermark }), new AbortController().signal, vi.fn())).rejects.toThrow('not current')
     expect(fetchWithSession).not.toHaveBeenCalled()
   })
 
@@ -90,5 +98,12 @@ describe('uncached thumbnail PDF reads', () => {
 
   it('ignores unrelated invoice metadata for render identity', () => {
     expect(invoiceThumbnailIdentity(invoice({ description: 'new description', total: 100 }))).toBe(invoiceThumbnailIdentity(invoice()))
+  })
+
+  it('uses only first-issue presence for watermark identity, not timestamp serialization precision', () => {
+    expect(invoiceThumbnailIdentity(invoice({ firstIssuedUtc: '2026-11-21T09:00:00.1234567Z' })))
+      .toBe(invoiceThumbnailIdentity(invoice({ firstIssuedUtc: '2026-11-21T09:00:00.123456Z' })))
+    expect(invoiceThumbnailIdentity(invoice({ firstIssuedUtc: null })))
+      .not.toBe(invoiceThumbnailIdentity(invoice({ firstIssuedUtc: '2026-11-21T09:00:00Z' })))
   })
 })

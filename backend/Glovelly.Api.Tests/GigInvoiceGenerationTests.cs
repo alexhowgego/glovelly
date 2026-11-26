@@ -110,6 +110,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         var pdfBytes = await _client.GetByteArrayAsync($"/invoices/{invoiceId}/pdf", TestContext.Current.CancellationToken);
         var pdfText = Encoding.ASCII.GetString(pdfBytes);
         Assert.Contains("GBP 53.51", pdfText);
+        Assert.Contains("(DRAFT)", pdfText);
         Assert.Contains($"GBP {(53.51m * lineCount).ToString("0.00", CultureInfo.InvariantCulture)}", pdfText);
 
         var adjustmentResponse = await _client.PostAsJsonAsync($"/invoices/{invoiceId}/adjustments", new
@@ -123,6 +124,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Equal(0m, adjusted.GetProperty("lines").EnumerateArray().Sum(line => line.GetProperty("lineTotal").GetDecimal()));
         var adjustedPdf = Encoding.ASCII.GetString(await _client.GetByteArrayAsync($"/invoices/{invoiceId}/pdf", TestContext.Current.CancellationToken));
         Assert.Contains("GBP 0.00", adjustedPdf);
+        Assert.Contains("(DRAFT)", adjustedPdf);
         Assert.DoesNotContain("GBP -0.01", adjustedPdf);
         var refreshedGig = await _client.GetFromJsonAsync<JsonElement>($"/gigs/{gigId}", TestContext.Current.CancellationToken);
         Assert.Equal(miles, refreshedGig.GetProperty("travelMiles").GetDecimal());
@@ -180,7 +182,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
             $"users/{TestAuthContext.UserId:N}/",
             invoice.GetProperty("pdfStorageKey").GetString());
         Assert.Contains(
-            $"/invoices/{invoice.GetProperty("id").GetGuid():D}/invoice.pdf",
+            $"/invoices/{invoice.GetProperty("id").GetGuid():D}/generations/",
             invoice.GetProperty("pdfStorageKey").GetString());
         Assert.Equal("application/pdf", invoice.GetProperty("pdfContentType").GetString());
         Assert.True(invoice.GetProperty("pdfSizeBytes").GetInt64() > 0);
@@ -225,6 +227,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 
         var pdfText = Encoding.ASCII.GetString(pdfBytes);
         Assert.Contains("Invoice", pdfText);
+        Assert.Contains("(DRAFT)", pdfText);
         Assert.Contains("Bill to", pdfText);
         Assert.Contains("Description", pdfText);
         Assert.Contains("Qty", pdfText);
@@ -458,6 +461,7 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
         Assert.Contains("Rate", pdfText);
         Assert.Contains("Amount", pdfText);
         Assert.Contains(@"First date gig \(2026-05-10\)", pdfText);
+        Assert.Contains("(DRAFT)", pdfText);
         Assert.Contains(@"Second date gig \(2026-05-20\)", pdfText);
     }
 
@@ -542,7 +546,8 @@ public sealed class GigInvoiceGenerationTests : IClassFixture<GlovellyApiFactory
 
         var pdfResponse = await _client.GetAsync($"/invoices/{invoiceId}/pdf", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, pdfResponse.StatusCode);
-        Assert.True((await pdfResponse.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)).Length > 0);
+        Assert.Contains("(DRAFT)", Encoding.ASCII.GetString(
+            await pdfResponse.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)));
     }
 
     [Fact]

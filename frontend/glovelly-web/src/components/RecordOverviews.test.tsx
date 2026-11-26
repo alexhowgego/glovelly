@@ -23,6 +23,8 @@ const overviewGig: Gig = {
   invoicedAt: null, isInvoiced: false, expenses: [], externalResources: [],
 }
 const invoice: Invoice = {
+  pdfHasDraftWatermark: null,
+  isPdfCurrent: false,
   id: 'invoice', invoiceNumber: 'GLV-001', clientId: overviewClient.id,
   invoiceDate: '2026-10-01', dueDate: '2026-10-15', status: 'Draft', paidOn: null, lines: [], total: 100,
   description: 'Complete invoice description '.repeat(100), deliveryCount: 0,
@@ -33,7 +35,7 @@ const invoice: Invoice = {
 }
 const user: AdminUser = {
   id: 'user', email: 'user@example.com', displayName: 'Musician', googleSubject: 'Full identity '.repeat(30),
-  isEnrolled: true, role: 'User', isActive: true, createdUtc: '2026-01-01T00:00:00Z', lastLoginUtc: null,
+  isEnrolled: true, isActive: true, createdUtc: '2026-01-01T00:00:00Z', lastLoginUtc: null,
 }
 
 beforeEach(() => {
@@ -168,7 +170,17 @@ describe('compact record overviews', () => {
       onSendEmail: vi.fn(async () => null), onQuickFilterChange: vi.fn(), onSearchQueryChange: vi.fn(), onSelectInvoice: vi.fn(), onSortChange: vi.fn(),
       onStartEditing: vi.fn(), sellerProfileNotice: 'Configure your seller profile', selectedInvoice: invoice, sendButtonRef: createRef(),
     }
-    render(<InvoicesSection {...props} />)
+    const { rerender } = render(<InvoicesSection {...props} />)
+    expect(screen.getByTestId('invoice-draft-watermark-hint').textContent).toContain('Issue to remove DRAFT')
+    rerender(<InvoicesSection {...props} selectedInvoice={{ ...invoice, documentState: 'Current', pdfDocumentRevision: 1, pdfHasDraftWatermark: true, isPdfCurrent: true }} />)
+    const compactHint = screen.getByTestId('invoice-draft-watermark-hint')
+    expect(compactHint.tagName).toBe('SPAN')
+    expect(compactHint.parentElement?.textContent?.trim()).toBe('Issue to remove DRAFT')
+    expect(compactHint.parentElement?.querySelector('p')).toBeNull()
+    rerender(<InvoicesSection {...props} selectedInvoice={{ ...invoice, status: 'Issued' }} />)
+    expect(screen.queryByTestId('invoice-draft-watermark-hint')).toBeNull()
+    rerender(<InvoicesSection {...props} selectedInvoice={{ ...invoice, status: 'Draft', reissueCount: 1 }} />)
+    expect(screen.getByTestId('invoice-draft-watermark-hint')).toBeDefined()
     expectFullPaneComposition()
     expect(document.querySelector('.record-overview .record-visual-layout.invoice-visual-layout')).not.toBeNull()
     expect(screen.getByTestId<HTMLButtonElement>('invoice-download-pdf-button').disabled).toBe(true)
@@ -185,25 +197,41 @@ describe('compact record overviews', () => {
     expect(within(facts).getByText('Invoice PDF').parentElement?.classList.contains('full-width')).toBe(false)
     expect(within(delivery).getByTestId('invoice-send-button')).toBeDefined()
     expect(within(delivery).getByRole('button', { name: 'Publish to Drive' })).toBeDefined()
+    rerender(<InvoicesSection {...props} isGoogleDriveConnected selectedInvoice={{
+      ...invoice, status: 'Cancelled', firstIssuedUtc: '2026-11-21T10:00:00Z',
+      documentState: 'Current', pdfDocumentRevision: 1, pdfHasDraftWatermark: false, isPdfCurrent: true,
+    }} />)
+    expect(screen.getByTestId<HTMLButtonElement>('invoice-send-button').disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Publish to Drive' }).disabled).toBe(true)
+    expect(screen.getByTestId<HTMLButtonElement>('invoice-download-pdf-button').disabled).toBe(false)
+    expect(screen.getByText('Restore this cancelled invoice to Draft and issue it before delivery.')).toBeDefined()
   })
 
   it('shows Admin access facts and complete identity metadata without weakening deletion rules', () => {
+    const adminUser = { ...user, permissionSets: ['LicenseAdministrator'] }
     const props: ComponentProps<typeof AdminSection> = {
-      currentUserId: user.id, onChangeAccess: vi.fn(async () => {}),
+      currentUserId: user.id, onChangeAccess: vi.fn(async () => {}), onSessionExpired: vi.fn(), onPermissionsChanged: vi.fn(async () => {}),
       adminForm: emptyAdminForm(), isEditorOpen: false, adminMode: 'edit', adminSearchQuery: '', adminSort: { key: 'displayName', direction: 'asc' },
-      adminStatus: '', filteredAdminUsers: [user], isAdminLoading: false, onCloseEditor: vi.fn(), onDeleteUser: vi.fn(), onResetForm: vi.fn(),
-      onSearchQueryChange: vi.fn(), onSelectUser: vi.fn(), onSortChange: vi.fn(), onStartEditing: vi.fn(), onSubmit: vi.fn(), onUpdateField: vi.fn(), selectedAdminUser: user,
+      adminStatus: '', filteredAdminUsers: [adminUser], isAdminLoading: false, onCloseEditor: vi.fn(), onDeleteUser: vi.fn(), onResetForm: vi.fn(),
+      onSearchQueryChange: vi.fn(), onSelectUser: vi.fn(), onSortChange: vi.fn(), onStartEditing: vi.fn(), onSubmit: vi.fn(), onUpdateField: vi.fn(), selectedAdminUser: adminUser,
+      canManagePermissions: true,
     }
-    render(<AdminSection {...props} />)
+    const { rerender } = render(<AdminSection {...props} />)
     expectFullPaneComposition()
+    expect(within(document.querySelector('.admin-record-list') as HTMLElement).getByText('Licence Administrator')).toBeDefined()
+    expect(within(document.querySelector('.overview-facts') as HTMLElement).getByText('Licence Administrator')).toBeDefined()
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Delete user' }).disabled).toBe(true)
     expect(screen.queryByText('Account details')).toBeNull()
     expect(within(document.querySelector('.record-overview') as HTMLElement).getByText(user.googleSubject!.trim())).toBeDefined()
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole<HTMLSelectElement>('combobox', { name: 'User access role' }).disabled).toBe(true)
-    expect(within(screen.getByRole('region', { name: 'Access and role' })).queryByText('Role')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'User access role' })).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'Access' })).queryByText('Role')).toBeNull()
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Deactivate access' }).disabled).toBe(true)
     fireEvent.click(screen.getByText('Why are these controls unavailable?'))
-    expect(screen.getAllByText('You cannot deactivate your own administrator account or remove your own administrator role.')).toHaveLength(2)
+    expect(screen.getAllByText('You cannot deactivate your own administrator account.')).toHaveLength(2)
+    rerender(<AdminSection {...props} currentUserId="another-user" canManagePermissions={false} />)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Deactivate access' }).disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Edit access' }).disabled).toBe(true)
+    expect(screen.getAllByText('Only a Super Administrator can change an administrator account.')).toHaveLength(2)
   })
 })

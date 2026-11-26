@@ -32,9 +32,15 @@ public static class InvoiceEndpoints
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             TimeProvider timeProvider,
+            EntitlementService entitlementService,
             CancellationToken cancellationToken) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
+            if (!userId.HasValue) return Results.Unauthorized();
+            if (!(await entitlementService.GetAsync(userId.Value, cancellationToken)).Features.PaidIncomeSummary)
+            {
+                return EntitlementProblems.FeatureNotEntitled();
+            }
             var period = UkFinancialYear.Current(timeProvider);
             var contributions = await db.Invoices
                 .WhereVisibleTo(userId)
@@ -119,13 +125,23 @@ public static class InvoiceEndpoints
         });
 
         group.MapPost("/", async (
-            Invoice invoice,
+            InvoiceWriteRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
             IBusinessLifecycleSignal businessLifecycleSignal) =>
         {
             var userId = currentUserAccessor.TryGetUserId(user);
+            if (request.Status != InvoiceStatus.Draft)
+            {
+                return EndpointSupport.ValidationProblem("status", "New invoices must begin as Draft.");
+            }
+            var invoice = new Invoice
+            {
+                InvoiceNumber = request.InvoiceNumber,
+                ClientId = request.ClientId,
+                Description = request.Description,
+            };
             if (!await db.Clients
                     .WhereVisibleTo(userId)
                     .AnyAsync(client => client.Id == invoice.ClientId))
@@ -155,6 +171,7 @@ public static class InvoiceEndpoints
             invoice.DocumentState = InvoiceDocumentState.Missing;
             invoice.DocumentRevision = 1;
             invoice.PdfDocumentRevision = null;
+            invoice.PdfHasDraftWatermark = null;
             invoice.DocumentFailureMessage = null;
             invoice.PaidOn = null;
             invoice.Client = null;
@@ -170,7 +187,7 @@ public static class InvoiceEndpoints
 
         group.MapPut("/{id:guid}", async (
             Guid id,
-            Invoice request,
+            InvoiceWriteRequest request,
             AppDbContext db,
             ClaimsPrincipal user,
             ICurrentUserAccessor currentUserAccessor,
@@ -215,6 +232,7 @@ public static class InvoiceEndpoints
             invoice.InvoiceNumber = request.InvoiceNumber.Trim();
             invoice.ClientId = request.ClientId;
             var requestedStatus = request.Status;
+            var restoresDraft = invoice.Status == InvoiceStatus.Cancelled && requestedStatus == InvoiceStatus.Draft;
             if (requestedStatus is not InvoiceStatus.Issued)
             {
                 invoice.InvoiceDate = request.InvoiceDate;
@@ -241,6 +259,10 @@ public static class InvoiceEndpoints
             }
             EndpointSupport.StampUpdate(invoice, userId);
 
+            if (restoresDraft)
+            {
+                await RestoreDraftPdfAsync(invoice, requestClient, userId, db, invoiceWorkflowService);
+            }
             await db.SaveChangesAsync();
             await businessLifecycleSignal.TrackInvoiceAsync(invoice);
 
@@ -293,12 +315,21 @@ public static class InvoiceEndpoints
                 return Results.Ok(invoice);
             }
 
+            var restoresDraft = invoice.Status == InvoiceStatus.Cancelled && request.Status == InvoiceStatus.Draft;
+            if (restoresDraft && invoice.Client is null)
+            {
+                return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
+            }
             invoice.Status = request.Status;
             invoice.StatusUpdatedUtc = DateTimeOffset.UtcNow;
             invoice.PaidOn = request.Status is InvoiceStatus.Paid
                 ? UkFinancialYear.CurrentDate(timeProvider)
                 : null;
             EndpointSupport.StampUpdate(invoice, userId);
+            if (restoresDraft)
+            {
+                await RestoreDraftPdfAsync(invoice, invoice.Client!, userId, db, invoiceWorkflowService);
+            }
             await db.SaveChangesAsync();
             await businessLifecycleSignal.TrackInvoiceAsync(invoice);
 
@@ -658,11 +689,33 @@ public static class InvoiceEndpoints
         return group;
     }
 
+    private static async Task RestoreDraftPdfAsync(
+        Invoice invoice, Client client, Guid? userId, AppDbContext db, IInvoiceWorkflowService workflow)
+    {
+        if (invoice.IsPdfCurrent && !invoice.GigLinesNeedRefresh) return;
+
+        invoice.DocumentRevision++;
+        invoice.DocumentState = InvoiceDocumentState.Regenerating;
+        invoice.DocumentFailureMessage = null;
+        // Persist the explicit restoration and block the old clean PDF before replacement.
+        await db.SaveChangesAsync();
+        try
+        {
+            await workflow.RegenerateInvoicePdfAsync(invoice, client, userId);
+        }
+        catch (Exception)
+        {
+            workflow.MarkInvoicePdfRegenerationFailed(
+                invoice, "Invoice restored to Draft, but its PDF could not be regenerated. Try again.", userId);
+        }
+    }
+
     private sealed record InvoicePaidIncomeSummary(
         DateOnly FinancialYearStart,
         DateOnly FinancialYearEnd,
         decimal Total,
         IReadOnlyList<Guid> InvoiceIds);
+    [System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
     private sealed record InvoiceStatusUpdateRequest(InvoiceStatus Status);
     private sealed record InvoiceDescriptionUpdateRequest(string? Description);
     private sealed record InvoiceAdjustmentCreateRequest(decimal Amount, string Reason);

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { RecordWorkspace } from './RecordWorkspace'
 import type { RefObject } from 'react'
 import {
   formatCurrency,
@@ -8,11 +9,13 @@ import {
 } from '../formatters'
 import { TrashIcon } from './TrashIcon'
 import { getInvoiceDocumentAvailability } from '../invoiceDocumentState'
-import { invoiceThumbnailIdentity } from '../invoiceThumbnail'
+import { invoiceDeliveryRestriction } from '../invoiceDelivery'
 import { InvoiceThumbnail } from './InvoiceThumbnail'
+import { PlanAccessSummary } from './PlanAccessSummary'
 import { RecordVisualOverview } from './RecordVisualOverview'
 import { RecordActionDock } from './RecordActionDock'
 import type {
+  EntitlementSnapshot,
   Invoice,
   InvoiceLine,
   InvoiceQuickFilter,
@@ -22,6 +25,8 @@ import type {
 } from '../types'
 
 type InvoicesSectionProps = {
+  entitlements?: EntitlementSnapshot | null
+  entitlementError?: string
   onSessionExpired?: (message: string) => void
   adjustmentAmount: string
   adjustmentReason: string
@@ -39,6 +44,7 @@ type InvoicesSectionProps = {
   issuedInvoiceCount: number
   isGoogleDriveConnected: boolean
   isInvoiceLoading: boolean
+  updatingInvoiceId?: string | null
   isSellerProfileConfigured: boolean
   onAdjustmentAmountChange: (value: string) => void
   onAdjustmentReasonChange: (value: string) => void
@@ -69,6 +75,8 @@ type InvoicesSectionProps = {
 }
 
 export function InvoicesSection({
+  entitlements,
+  entitlementError,
   onSessionExpired,
   adjustmentAmount,
   adjustmentReason,
@@ -86,6 +94,7 @@ export function InvoicesSection({
   issuedInvoiceCount,
   isGoogleDriveConnected,
   isInvoiceLoading,
+  updatingInvoiceId,
   isSellerProfileConfigured,
   onAdjustmentAmountChange,
   onAdjustmentReasonChange,
@@ -120,6 +129,7 @@ export function InvoicesSection({
     'Unknown client'
   const documentAvailability = getInvoiceDocumentAvailability(selectedInvoice)
   const isDocumentCurrent = documentAvailability.isCurrent
+  const deliveryRestriction = selectedInvoice ? invoiceDeliveryRestriction(selectedInvoice) : null
   const documentStatus = documentAvailability.message
   const invoiceSortOptions: { value: InvoiceSortKey; label: string }[] = [
     { value: 'priority', label: 'Priority' },
@@ -136,7 +146,8 @@ export function InvoicesSection({
     { value: 'drafts', label: 'Drafts' },
     { value: 'overdue', label: 'Overdue' },
     { value: 'paid', label: 'Paid' },
-    { value: 'income-this-financial-year', label: 'Income this financial year' },
+    ...(entitlements?.features.paidIncomeSummary
+      ? [{ value: 'income-this-financial-year' as const, label: 'Income this financial year' }] : []),
   ]
 
   useEffect(() => {
@@ -156,13 +167,13 @@ export function InvoicesSection({
   }, [isEditorOpen])
 
   return (
-    <section className="section-layout">
-      <div className="gig-workspace">
+    <RecordWorkspace className="gig-workspace">
         <div className="panel">
           <div className="panel-heading">
             <div>
               <p className="section-label">Billing</p>
               <h2>Invoices</h2>
+              <PlanAccessSummary entitlements={entitlements} error={entitlementError} />
             </div>
             {(invoiceStatus || googleDrivePublishLink) && (
               <span className="status-pill" data-testid="invoice-status">
@@ -374,9 +385,9 @@ export function InvoicesSection({
 
           {selectedInvoice ? (
             <>
-              <RecordVisualOverview key={invoiceThumbnailIdentity(selectedInvoice)} layout="invoice"
-                visual={isDocumentCurrent && !selectedInvoice.gigLinesNeedRefresh ? () => <InvoiceThumbnail invoice={selectedInvoice}
-                  maxHeight={1200} onPreview={onPreviewPdf} onSessionExpired={onSessionExpired} /> : undefined}>
+              <RecordVisualOverview key={selectedInvoice.id} layout="invoice"
+                visual={() => <InvoiceThumbnail invoice={selectedInvoice}
+                  maxHeight={1200} updating={updatingInvoiceId === selectedInvoice.id} onPreview={onPreviewPdf} onSessionExpired={onSessionExpired} />}>
               <dl className="overview-facts">
                 <div><dt>Client</dt><dd><button className="link-button" data-testid="invoice-client-link" onClick={() => onOpenClient(selectedInvoice.clientId)} type="button">{selectedInvoiceClientName}</button></dd></div>
                 <div><dt>Status</dt><dd><select aria-label="Invoice status" data-testid="invoice-status-select" value={selectedInvoice.status} disabled={isInvoiceLoading} onChange={event => void onInvoiceStatusChange(selectedInvoice, event.target.value as InvoiceStatus)}>
@@ -386,8 +397,12 @@ export function InvoicesSection({
                 <div><dt>Invoice date</dt><dd>{formatDate(selectedInvoice.invoiceDate)}</dd></div>
                 <div><dt>Due date</dt><dd>{formatDate(selectedInvoice.dueDate)}</dd></div>
                 <div><dt>Total</dt><dd>{formatCurrency(selectedInvoice.total)}</dd></div>
-                <div><dt>Invoice PDF</dt><dd className="overview-long-text">{documentStatus}
+                <div><dt>Invoice PDF</dt><dd className="overview-long-text">
+                  {selectedInvoice.status === 'Draft' && isDocumentCurrent
+                    ? <span data-testid="invoice-draft-watermark-hint">Issue to remove DRAFT</span>
+                    : documentStatus}
                   {documentAvailability.canRetry && <button className="link-button" data-testid="invoice-regenerate-pdf-button" disabled={isInvoiceLoading} onClick={() => void onRegeneratePdf(selectedInvoice)} type="button">Try again</button>}
+                  {selectedInvoice.status === 'Draft' && !isDocumentCurrent && <span className="helper-text" data-testid="invoice-draft-watermark-hint"> · Issue to remove DRAFT</span>}
                 </dd></div>
                 <div><dt>First issued</dt><dd>{selectedInvoice.firstIssuedUtc ? formatDateTime(selectedInvoice.firstIssuedUtc) : 'Not issued'}</dd></div>
                 <div><dt>Re-issued</dt><dd>{selectedInvoice.reissueCount} {selectedInvoice.reissueCount === 1 ? 'time' : 'times'}</dd></div>
@@ -403,11 +418,12 @@ export function InvoicesSection({
                 <div className="actions">
                   <button className="primary-button" data-testid="invoice-send-button" ref={sendButtonRef}
                     onClick={() => void onSendEmail(selectedInvoice)} type="button"
-                    disabled={isInvoiceLoading || !isDocumentCurrent} title={!isDocumentCurrent ? documentStatus : undefined}>Send to client</button>
+                    disabled={isInvoiceLoading || !isDocumentCurrent || !!deliveryRestriction} title={deliveryRestriction || (!isDocumentCurrent ? documentStatus : undefined)}>Send to client</button>
                   <button className="ghost-button" onClick={() => void onPublishGoogleDrive(selectedInvoice)} type="button"
-                    disabled={isInvoiceLoading || !isGoogleDriveConnected || !isDocumentCurrent}
-                    title={!isGoogleDriveConnected ? 'Connect Google Drive from your profile menu first.' : !isDocumentCurrent ? documentStatus : undefined}>Publish to Drive</button>
+                    disabled={isInvoiceLoading || !isGoogleDriveConnected || !isDocumentCurrent || !!deliveryRestriction}
+                    title={deliveryRestriction || (!isGoogleDriveConnected ? 'Connect Google Drive from your profile menu first.' : !isDocumentCurrent ? documentStatus : undefined)}>Publish to Drive</button>
                 </div>
+                {deliveryRestriction && <p className="helper-text">{deliveryRestriction}</p>}
               {!isSellerProfileConfigured && (
                 <div className="settings-note">
                   {sellerProfileNotice}
@@ -578,7 +594,6 @@ export function InvoicesSection({
             )}
           </div>
         </div>
-      </div>
-    </section>
+    </RecordWorkspace>
   )
 }

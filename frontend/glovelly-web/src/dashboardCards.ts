@@ -1,7 +1,7 @@
 import { formatCurrency, formatDate } from './formatters'
-import type { AppSection, Client, Gig, Invoice, PaidIncomeSummary } from './types'
+import type { AppSection, Client, Gig, Invoice, LicenceSummary, PaidIncomeSummary } from './types'
 
-export type DashboardCardState = 'loading' | 'ready' | 'error'
+export type DashboardCardState = 'loading' | 'ready' | 'error' | 'restricted'
 
 export type DashboardCard = {
   detail: string
@@ -13,7 +13,13 @@ export type DashboardCard = {
 export type PaidIncomeSummaryState =
   | { status: 'loading' }
   | { status: 'error' }
+  | { status: 'restricted' }
   | { status: 'ready'; summary: PaidIncomeSummary }
+
+export type LicenceSummaryState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'ready'; summary: LicenceSummary }
 
 type DashboardCardOptions = {
   activeSection: AppSection
@@ -23,6 +29,7 @@ type DashboardCardOptions = {
   isWorkspaceLoading: boolean
   paidIncomeSummary: PaidIncomeSummaryState
   today: string
+  licenceSummary?: LicenceSummaryState
   adminSummary?: {
     status: DashboardCardState
     totalUsers: number
@@ -38,6 +45,18 @@ const loadingCard = (label: string): DashboardCard => ({
   state: 'loading',
 })
 
+function summaryCards(
+  metrics: { label: string; value: number | undefined; detail: string }[],
+  status: DashboardCardState | undefined,
+  error: string,
+): DashboardCard[] {
+  return metrics.map(({ label, value, detail }) => {
+    if (!status || status === 'loading') return loadingCard(label)
+    if (status === 'error') return { label, value: 'Unavailable', detail: error, state: 'error' }
+    return { label, value: String(value), detail, state: 'ready' }
+  })
+}
+
 export function getDashboardCards({
   activeSection,
   clients,
@@ -47,20 +66,23 @@ export function getDashboardCards({
   paidIncomeSummary,
   today,
   adminSummary,
+  licenceSummary,
 }: DashboardCardOptions): DashboardCard[] {
+  if (activeSection === 'licences') {
+    const summary = licenceSummary?.status === 'ready' ? licenceSummary.summary : undefined
+    return summaryCards([
+      { label: 'Free accounts', value: summary?.freeUsers, detail: 'Effective Free access across all accounts' },
+      { label: 'Solo / Pro accounts', value: summary?.paidUsers, detail: 'Effective paid-plan access, including manual grants' },
+      { label: 'Expiring grants', value: summary?.expiringGrants, detail: 'Paid grants ending within 30 days' },
+    ], licenceSummary?.status, 'Unable to load the licence summary.')
+  }
   if (activeSection === 'admin') {
     const metrics = [
       { label: 'Users with access', value: adminSummary?.totalUsers, detail: 'Registered users' },
       { label: 'Active accounts', value: adminSummary?.activeUsers, detail: 'Accounts enabled to sign in' },
       { label: 'Administrators', value: adminSummary?.administrators, detail: 'Users with administrator access' },
     ]
-    return metrics.map(({ label, value, detail }) => {
-      if (!adminSummary || adminSummary.status === 'loading') return loadingCard(label)
-      if (adminSummary.status === 'error') return {
-        label, value: 'Unavailable', detail: 'Unable to load user access summary.', state: 'error',
-      }
-      return { label, value: String(value), detail, state: 'ready' }
-    })
+    return summaryCards(metrics, adminSummary?.status, 'Unable to load user access summary.')
   }
 
   if (isWorkspaceLoading) {
@@ -129,6 +151,8 @@ export function getDashboardCards({
             detail: 'Unable to load paid income.',
             state: 'error',
           }
+        : paidIncomeSummary.status === 'restricted'
+          ? { label: 'Income this financial year', value: 'Solo / Pro', detail: 'Reporting requires Solo or Pro. Your invoice history remains available.', state: 'restricted' }
         : {
             label: 'Income this financial year',
             value: formatCurrency(paidIncomeSummary.summary.total),

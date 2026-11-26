@@ -114,6 +114,10 @@ internal static class InvoiceDeliveryEndpoints
                 return Results.NotFound();
             }
 
+            if (InvoiceDeliveryPolicy.GetError(invoice) is { } deliveryError)
+            {
+                return EndpointSupport.ValidationProblem("status", deliveryError);
+            }
             InvoiceEmailPreparation preparation;
             try
             {
@@ -203,6 +207,10 @@ internal static class InvoiceDeliveryEndpoints
                 return EndpointSupport.ValidationProblem("clientId", "Client does not exist.");
             }
 
+            if (InvoiceDeliveryPolicy.GetError(invoice) is { } deliveryError)
+            {
+                return EndpointSupport.ValidationProblem("status", deliveryError);
+            }
             var invoicePdfResult = await invoicePdfService.OpenCurrentReadAsync(invoice, cancellationToken);
             if (!invoicePdfResult.IsAvailable)
             {

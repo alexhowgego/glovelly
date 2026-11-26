@@ -116,7 +116,7 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
     [Fact]
     public async Task UpdateStatus_WhenFirstIssued_StampsFirstIssueAndSlidesInvoiceDates()
     {
-        var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var expectedInvoiceDate = new DateOnly(2026, 1, 1);
 
         var response = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
         {
@@ -138,7 +138,7 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
             $"users/{TestAuthContext.UserId:N}/",
             updatedInvoice.GetProperty("pdfStorageKey").GetString());
         Assert.Contains(
-            $"/invoices/{TestData.RiversideInvoiceId:D}/invoice.pdf",
+            $"/invoices/{TestData.RiversideInvoiceId:D}/generations/",
             updatedInvoice.GetProperty("pdfStorageKey").GetString());
     }
 
@@ -156,7 +156,7 @@ public sealed class InvoiceStatusEndpointsTests : IClassFixture<GlovellyApiFacto
         }, TestContext.Current.CancellationToken);
         updateSettingsResponse.EnsureSuccessStatusCode();
 
-        var expectedInvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var expectedInvoiceDate = new DateOnly(2026, 1, 1);
 
         var response = await _client.PutAsJsonAsync($"/invoices/{TestData.RiversideInvoiceId}/status", new
         {

@@ -86,6 +86,20 @@ describe('record detail dialogs', () => {
     expect(fireEvent.keyDown(document.body, { key: 'Tab' })).toBe(true)
   })
 
+  it('leaves focus trapping to a sibling native confirmation above the detail dialog', () => {
+    render(<RecordDetailDialog title="Parent" onClose={vi.fn()}><button>Parent action</button></RecordDetailDialog>)
+    const confirmation = document.createElement('dialog')
+    confirmation.setAttribute('open', '')
+    const button = document.createElement('button')
+    button.textContent = 'Confirm issue'
+    confirmation.append(button)
+    document.body.append(confirmation)
+    button.focus()
+    expect(fireEvent.keyDown(button, { key: 'Tab' })).toBe(true)
+    expect(document.activeElement).toBe(button)
+    confirmation.remove()
+  })
+
   it('focuses a named modal, locks scrolling, and restores the trigger without scrolling', () => {
     document.body.style.overflow = 'auto'
     render(<Harness />)

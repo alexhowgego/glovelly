@@ -53,6 +53,7 @@ dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --
 - Gig expenses and receipt attachments
 - Invoice generation, issue, reissue, PDF download, email delivery, and Google Drive publishing
 - Seller profile, personal invoice/default settings, and connected-service management
+- Local Free/Solo/Pro plans, audited manual licensing, UK-calendar-month first-issue allowances, and plan-aware income reporting (no payment-provider integration). See [plans and entitlements](docs/engineering/plan-entitlements.md).
 - Google Sheets set list import from linked gig attachments, with review, audit, and re-import history
 - Google Calendar sync for confirmed and completed gigs
 - Admin access management and access request workflow
@@ -65,6 +66,8 @@ dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --
 - Background work: `Glovelly.Worker` run via Cloud Run Jobs and Cloud Scheduler
 
 ## Local Development
+
+Use Node.js 24 and a serviced .NET 10 SDK (10.0.404 or newer, including ASP.NET Core runtime 10.0.15 or newer). Check `dotnet --list-runtimes` as well as package versions: restoring NuGet packages does not patch the locally installed shared runtime.
 
 Run both the frontend and backend together from the repo root:
 
@@ -97,6 +100,14 @@ export Email__Invoices__FromDisplayName="Glovelly Invoices"
 ```
 
 `run-dev.sh` sources this file automatically before starting the backend. The admin user is only seeded when no `ConnectionStrings:Glovelly` value is configured and Glovelly is using the in-memory development database.
+
+The seeded user normally receives User Administrator permissions only. To explicitly bootstrap that user as a Super Administrator for one local run:
+
+```bash
+./run-dev.sh --super-admin
+```
+
+This uses the audited operator bootstrap in the same process as the ephemeral in-memory database. It requires the configured seeded Google subject, and refuses non-Development, staging, testing, or PostgreSQL environments. Restart without the option to return to the default User Administrator fixture. For a local PostgreSQL database, use the separate operator command described in the [authentication handbook](docs/engineering/authentication.md).
 
 Keep secrets such as `Email__Resend__ApiKey` and `Mileage__GoogleRoutes__ApiKey` out of `.glovelly.dev.local`. Store those with `dotnet user-secrets` instead.
 

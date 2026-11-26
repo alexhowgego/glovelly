@@ -46,6 +46,10 @@
       href: engineering/database.md
     - name: Email
       href: engineering/email.md
+    - name: Invoice PDF watermarking
+      href: engineering/invoice-pdf-watermarking.md
+    - name: Plans and entitlements
+      href: engineering/plan-entitlements.md
     - name: Mileage and routes
       href: engineering/mileage-routes.md
     - name: Dependency maintenance

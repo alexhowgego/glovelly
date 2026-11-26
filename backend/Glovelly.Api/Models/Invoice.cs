@@ -17,6 +17,12 @@ public sealed class Invoice
     public DateOnly? PaidOn { get; set; }
     public DateTimeOffset? FirstIssuedUtc { get; set; }
     public Guid? FirstIssuedByUserId { get; set; }
+    [JsonIgnore]
+    public bool HasLegacyIssuance { get; set; }
+    [JsonIgnore]
+    public Guid MutationVersion { get; set; } = Guid.NewGuid();
+    [NotMapped]
+    public bool HasBeenIssued => FirstIssuedUtc.HasValue || HasLegacyIssuance;
     public int ReissueCount { get; set; }
     public DateTimeOffset? LastReissuedUtc { get; set; }
     public Guid? LastReissuedByUserId { get; set; }
@@ -34,6 +40,19 @@ public sealed class Invoice
     public InvoiceDocumentState DocumentState { get; set; } = InvoiceDocumentState.Missing;
     public int DocumentRevision { get; set; } = 1;
     public int? PdfDocumentRevision { get; set; }
+    public bool? PdfHasDraftWatermark { get; set; }
+    [NotMapped]
+    [JsonIgnore]
+    public bool RequiresDraftWatermark => Status == InvoiceStatus.Draft ||
+        (Status == InvoiceStatus.Cancelled && !HasBeenIssued);
+    [NotMapped]
+    [JsonIgnore]
+    public bool HasCompatiblePdfWatermark => RequiresDraftWatermark
+        ? PdfHasDraftWatermark is true
+        : PdfHasDraftWatermark is not true;
+    [NotMapped]
+    public bool IsPdfCurrent => DocumentState == InvoiceDocumentState.Current &&
+        PdfDocumentRevision == DocumentRevision && HasCompatiblePdfWatermark;
     public string? DocumentFailureMessage { get; set; }
     public bool GigLinesNeedRefresh { get; set; }
 

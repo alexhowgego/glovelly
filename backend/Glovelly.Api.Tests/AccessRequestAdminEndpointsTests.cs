@@ -23,6 +23,24 @@ public sealed class AccessRequestAdminEndpointsTests : IClassFixture<GlovellyApi
     }
 
     [Fact]
+    public async Task Approve_WithAdministrativeRole_IsRejectedWithoutProvisioning()
+    {
+        var request = await AddRequestAsync("escalation@glovelly.local", "Escalation", DateTimeOffset.UtcNow);
+
+        var response = await _client.PostAsJsonAsync($"/admin/access-requests/{request.Id}/approve", new
+        {
+            role = "Admin",
+            isActive = true,
+            sendInvitationEmail = false
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Users.AnyAsync(user => user.Email == request.Email, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Approve_ProvisionsStoredIdentityWithoutGoogleSubject_AndReportsInvitationFailure()
     {
         var request = await AddRequestAsync("requested@glovelly.local", "Requested User", DateTimeOffset.UtcNow);
@@ -30,7 +48,6 @@ public sealed class AccessRequestAdminEndpointsTests : IClassFixture<GlovellyApi
 
         var response = await _client.PostAsJsonAsync($"/admin/access-requests/{request.Id}/approve", new
         {
-            role = "User",
             isActive = true,
             sendInvitationEmail = true
         }, TestContext.Current.CancellationToken);
@@ -57,7 +74,6 @@ public sealed class AccessRequestAdminEndpointsTests : IClassFixture<GlovellyApi
 
         var response = await _client.PostAsJsonAsync($"/admin/access-requests/{request.Id}/approve", new
         {
-            role = "User",
             isActive = true,
             sendInvitationEmail = true
         }, TestContext.Current.CancellationToken);
@@ -98,13 +114,11 @@ public sealed class AccessRequestAdminEndpointsTests : IClassFixture<GlovellyApi
         var responses = await Task.WhenAll(
             _client.PostAsJsonAsync($"/admin/access-requests/{request.Id}/approve", new
             {
-                role = "User",
                 isActive = true,
                 sendInvitationEmail = false
             }, TestContext.Current.CancellationToken),
             _client.PostAsJsonAsync($"/admin/access-requests/{request.Id}/approve", new
             {
-                role = "User",
                 isActive = true,
                 sendInvitationEmail = false
             }, TestContext.Current.CancellationToken));
@@ -138,7 +152,6 @@ public sealed class AccessRequestAdminEndpointsTests : IClassFixture<GlovellyApi
 
         var response = await _client.PostAsJsonAsync($"/admin/access-requests/{request.Id}/approve", new
         {
-            role = "Admin",
             isActive = false,
             sendInvitationEmail = false
         }, TestContext.Current.CancellationToken);

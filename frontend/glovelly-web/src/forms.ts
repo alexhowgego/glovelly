@@ -25,7 +25,6 @@ export const emptyAdminForm = (): AdminUserForm => ({
   email: '',
   displayName: '',
   googleSubject: '',
-  role: 'User',
   isActive: true,
   sendInvitationEmail: true,
 })

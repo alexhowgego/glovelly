@@ -59,6 +59,10 @@ internal static class UserFixtureReset
         db.Gigs.RemoveRange(db.Gigs.Where(value => gigIds.Contains(value.Id)));
         db.Clients.RemoveRange(db.Clients.Where(value => value.CreatedByUserId == userId));
         db.SellerProfiles.RemoveRange(db.SellerProfiles.Where(value => value.UserId == userId));
+        // This helper is only called for fixed, isolated UAT/docs users. Ordinary
+        // invoice deletion must never remove allowance history.
+        db.UsageLedgerEntries.RemoveRange(db.UsageLedgerEntries.Where(value => value.UserId == userId));
+        db.UserSubscriptions.RemoveRange(db.UserSubscriptions.Where(value => value.UserId == userId));
 
         await db.SaveChangesAsync(cancellationToken);
     }

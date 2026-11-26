@@ -124,7 +124,8 @@ public static class DocumentationFixtureSeeder
         await invoicePdfService.SaveGeneratedPdfAsync(
             invoice,
             UserId,
-            "%PDF-1.1\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n"u8.ToArray(),
+            new InvoicePdfRenderer().RenderInvoicePdf(invoice, client, gig, invoice.Lines.ToList(), sellerProfile),
+            invoice.RequiresDraftWatermark,
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -155,6 +156,14 @@ public static class DocumentationFixtureSeeder
         }
 
         ApplyUserDefaults(user);
+        if (!await db.UserSubscriptions.AnyAsync(value => value.UserId == UserId, cancellationToken))
+        {
+            db.UserSubscriptions.Add(new UserSubscription
+            {
+                UserId = UserId, PlanCode = Plan.Pro, StartsAtUtc = SeededAt,
+                Reason = "Documentation fixture",
+            });
+        }
         return user;
     }
 

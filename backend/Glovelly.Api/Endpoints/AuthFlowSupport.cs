@@ -52,6 +52,7 @@ internal static class AuthFlowSupport
                path.StartsWithSegments("/app") ||
                path.StartsWithSegments("/clients") ||
                path.StartsWithSegments("/expense-statements") ||
+               path.StartsWithSegments("/entitlements") ||
                path.StartsWithSegments("/gigs") ||
                path.StartsWithSegments("/gig-imports") ||
                path.StartsWithSegments("/health") ||

@@ -9,7 +9,7 @@ export function RecordVisualOverview({ children, visual, factsColumns = 2, layou
   layout?: 'content' | 'invoice'
   visual?: (bucket: MapSizeBucket, unavailable: () => void) => ReactNode
 }) {
-  const { ref, bucket, height } = useVisualPaneEligibility()
+  const { ref, bucket, height } = useVisualPaneEligibility(layout)
   const [failed, setFailed] = useState(false)
   const unavailable = useCallback(() => setFailed(true), [])
   const show = bucket !== null && visual !== undefined && !failed

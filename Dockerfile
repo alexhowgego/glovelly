@@ -8,7 +8,7 @@ COPY frontend/glovelly-web/ ./
 COPY tests/fixtures/record-location-sources.json /src/tests/fixtures/record-location-sources.json
 RUN npm run build
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0.402 AS backend-build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404 AS backend-build
 WORKDIR /src
 
 COPY glovelly.sln ./
@@ -37,7 +37,7 @@ RUN dotnet tool run dotnet-ef migrations bundle \
 
 COPY --from=frontend-build /src/frontend/glovelly-web/dist/ /app/api/wwwroot/
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.13 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.15 AS runtime
 WORKDIR /app
 
 ARG BUILD_COMMIT_ID=unknown

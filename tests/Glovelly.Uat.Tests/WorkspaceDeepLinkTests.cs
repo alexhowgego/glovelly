@@ -91,7 +91,8 @@ public sealed class WorkspaceDeepLinkTests : UatTestBase
             {
                 var response = await route.FetchAsync();
                 var user = JsonNode.Parse(await response.TextAsync())!;
-                user["role"] = "Admin";
+                user["permissionSets"] = new JsonArray("UserAdministrator");
+                user["permissions"] = new JsonArray("ManageUsers");
                 await route.FulfillAsync(new() { Response = response, Body = user.ToJsonString() });
             });
             await Page.RouteAsync("**/admin/users", route => route.FulfillAsync(new() { ContentType = "application/json", Body = "[]" }));

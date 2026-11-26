@@ -7,6 +7,18 @@ BACKEND_DIR="$ROOT_DIR/backend/Glovelly.Api"
 FRONTEND_DIR="$ROOT_DIR/frontend/glovelly-web"
 LOCAL_DEV_CONFIG_FILE="$ROOT_DIR/.glovelly.dev.local"
 
+bootstrap_super_admin=false
+if [[ $# -gt 1 ]]; then
+  echo "Usage: ./run-dev.sh [--super-admin]"
+  exit 2
+fi
+case "${1:-}" in
+  "") ;;
+  --super-admin) bootstrap_super_admin=true ;;
+  -h|--help) echo "Usage: ./run-dev.sh [--super-admin]"; exit 0 ;;
+  *) echo "Usage: ./run-dev.sh [--super-admin]"; exit 2 ;;
+esac
+
 if ! command -v dotnet >/dev/null 2>&1; then
   echo "dotnet is required but was not found on PATH."
   exit 1
@@ -57,6 +69,9 @@ trap cleanup EXIT INT TERM
 echo "Starting Glovelly API on http://localhost:5153 ..."
 (
   cd "$BACKEND_DIR"
+  if [[ "$bootstrap_super_admin" == true ]]; then
+    exec dotnet run -- grant-super-admin --development-in-memory --serve --urls http://localhost:5153
+  fi
   exec dotnet run --urls http://localhost:5153
 ) &
 backend_pid=$!
@@ -75,6 +90,9 @@ echo "Backend:  http://localhost:5153"
 echo "Swagger:  http://localhost:5153/swagger"
 if [[ -n "${DevelopmentSeeding__AdminGoogleSubject:-}" ]]; then
   echo "Local admin seeding: enabled for in-memory development database"
+fi
+if [[ "$bootstrap_super_admin" == true ]]; then
+  echo "Local Super Administrator bootstrap: explicitly requested for this run"
 fi
 echo
 echo "Press Ctrl+C to stop both services."

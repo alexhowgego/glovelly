@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InvoiceThumbnail } from './InvoiceThumbnail'
 import { loadInvoiceThumbnailBytes } from '../invoiceThumbnail'
 import { renderInvoiceThumbnail } from '../renderInvoiceThumbnail'
@@ -10,7 +10,10 @@ vi.mock('../invoiceThumbnail', async importOriginal => ({
   ...await importOriginal<typeof import('../invoiceThumbnail')>(), loadInvoiceThumbnailBytes: vi.fn(),
 }))
 vi.mock('../renderInvoiceThumbnail', () => ({ renderInvoiceThumbnail: vi.fn() }))
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.resetAllMocks() })
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D)
+})
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.resetAllMocks(); vi.restoreAllMocks() })
 
 const invoice = (overrides: Partial<Invoice> = {}) => ({ id: 'one', invoiceNumber: 'INV-1', documentState: 'Current',
   documentRevision: 2, pdfDocumentRevision: 2, pdfGeneratedAt: '2026-10-19T09:00:00Z', pdfSizeBytes: 3, ...overrides }) as Invoice
@@ -32,7 +35,8 @@ describe('invoice thumbnail lifecycle', () => {
     const expired = vi.fn()
     const view = render(<InvoiceThumbnail invoice={selected} maxHeight={250} onPreview={preview} onSessionExpired={expired} />)
     const button = await screen.findByRole('button', { name: 'Open PDF preview for invoice INV-1' })
-    expect(button.getAttribute('style')).toContain('var(--record-visual-max-height')
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false))
+    expect(screen.getByTestId('invoice-thumbnail-frame').getAttribute('style')).toContain('var(--record-visual-max-height')
     const tooltip = screen.getByRole('tooltip')
     expect(button.getAttribute('aria-describedby')).toBe(tooltip.id)
     expect(tooltip.tagName).toBe('SPAN')
@@ -61,23 +65,61 @@ describe('invoice thumbnail lifecycle', () => {
     const oldSignal = vi.mocked(loadInvoiceThumbnailBytes).mock.calls[0][1]
     view.rerender(<InvoiceThumbnail invoice={invoice({ id: 'two', invoiceNumber: 'INV-2' })} maxHeight={250} onPreview={preview} />)
     await screen.findByRole('button', { name: 'Open PDF preview for invoice INV-2' })
+    await waitFor(() => expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(false))
     await act(async () => finish(new Uint8Array([4])))
     expect(oldSignal.aborted).toBe(true)
     expect(renderInvoiceThumbnail).toHaveBeenCalledOnce()
     expect(screen.queryByRole('button', { name: /INV-1/ })).toBeNull()
   })
 
-  it('clears a ready canvas immediately on revision/readiness changes', async () => {
+  it('keeps only blurred non-interactive previous pixels in a stable frame during refresh', async () => {
     ready()
     const preview = vi.fn().mockResolvedValue(undefined)
     const view = render(<InvoiceThumbnail invoice={invoice()} maxHeight={250} onPreview={preview} />)
-    await screen.findByRole('button')
+    await waitFor(() => expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(false))
     const oldCanvas = screen.getByTestId('invoice-thumbnail-canvas') as HTMLCanvasElement
+    const frame = screen.getByTestId('invoice-thumbnail-frame')
+    const dimensions = frame.getAttribute('style')
     view.rerender(<InvoiceThumbnail invoice={invoice({ documentState: 'Regenerating', documentRevision: 3 })} maxHeight={250} onPreview={preview} />)
-    expect(screen.queryByRole('button')).toBeNull()
-    expect(oldCanvas.width).toBe(0)
+    expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(true)
+    expect(oldCanvas.width).toBe(300)
+    expect(frame.classList.contains('is-updating')).toBe(true)
+    expect(frame.getAttribute('style')).toBe(dimensions)
+    fireEvent.click(screen.getByRole('button'))
+    expect(preview).not.toHaveBeenCalled()
     expect(loadInvoiceThumbnailBytes).toHaveBeenCalledOnce()
-    expect(screen.getByRole('status').textContent).toContain('regenerating')
+    expect(screen.getByRole('status').textContent).toContain('Updating preview')
+    view.rerender(<InvoiceThumbnail invoice={invoice({ documentRevision: 3, pdfDocumentRevision: 3 })} maxHeight={250} onPreview={preview} />)
+    await waitFor(() => expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(false))
+    expect(screen.getByTestId('invoice-thumbnail-frame')).toBe(frame)
+    expect(frame.classList.contains('is-updating')).toBe(false)
+    expect(loadInvoiceThumbnailBytes).toHaveBeenCalledTimes(2)
+  })
+
+  it('retains the frame but removes old pixels when replacement fails', async () => {
+    ready()
+    const view = render(<InvoiceThumbnail invoice={invoice()} maxHeight={250} onPreview={vi.fn()} />)
+    await waitFor(() => expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(false))
+    const frame = screen.getByTestId('invoice-thumbnail-frame')
+    const dimensions = frame.getAttribute('style')
+    vi.mocked(renderInvoiceThumbnail).mockRejectedValueOnce(new Error('Replacement failed.'))
+    view.rerender(<InvoiceThumbnail invoice={invoice({ documentRevision: 3, pdfDocumentRevision: 3 })} maxHeight={250} onPreview={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Replacement failed'))
+    expect((screen.getByTestId('invoice-thumbnail-canvas') as HTMLCanvasElement).width).toBe(0)
+    expect(frame.getAttribute('style')).toBe(dimensions)
+    expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('blurs during an explicit document mutation without fetching old bytes', async () => {
+    ready()
+    const view = render(<InvoiceThumbnail invoice={invoice()} maxHeight={250} onPreview={vi.fn()} />)
+    await waitFor(() => expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(false))
+    view.rerender(<InvoiceThumbnail invoice={invoice()} maxHeight={250} updating onPreview={vi.fn()} />)
+    expect(screen.getByTestId('invoice-thumbnail-frame').classList.contains('is-updating')).toBe(true)
+    expect(loadInvoiceThumbnailBytes).toHaveBeenCalledOnce()
+    view.rerender(<InvoiceThumbnail invoice={invoice()} maxHeight={250} onPreview={vi.fn()} />)
+    await waitFor(() => expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(false))
+    expect(loadInvoiceThumbnailBytes).toHaveBeenCalledTimes(2)
   })
 
   it('shows a quiet render failure without retrying or invoking preview/generation', async () => {

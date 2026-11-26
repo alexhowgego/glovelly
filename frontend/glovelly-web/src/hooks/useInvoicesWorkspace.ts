@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildApiUrl,
   downloadResponseBlob,
@@ -21,6 +21,7 @@ import type {
 } from '../types'
 import type { PaidIncomeSummaryState } from '../dashboardCards'
 import { notifications } from '../notifications'
+import { executeInvoiceDelivery } from '../invoiceDelivery'
 
 type GoogleDrivePublishLink = {
   href: string
@@ -57,10 +58,12 @@ export function useInvoicesWorkspace({
   const [googleDrivePublishLink, setGoogleDrivePublishLink] =
     useState<GoogleDrivePublishLink | null>(null)
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
+  const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null)
   const [paidIncomeSummary, setPaidIncomeSummary] = useState<PaidIncomeSummaryState>({
     status: 'loading',
   })
   const [incomeInvoiceIds, setIncomeInvoiceIds] = useState<string[]>([])
+  const incomeRequestGeneration = useRef(0)
   const [adjustmentAmount, setAdjustmentAmount] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [invoiceDescription, setInvoiceDescription] = useState('')
@@ -68,7 +71,8 @@ export function useInvoicesWorkspace({
   const [invoiceEmailReview, setInvoiceEmailReview] = useState<InvoiceEmailReview | null>(null)
   const [invoiceEmailReviewMessage, setInvoiceEmailReviewMessage] = useState('')
   const [includeInvoiceEmailReceipts, setIncludeInvoiceEmailReceipts] = useState(false)
-  const [issueInvoiceAfterEmail, setIssueInvoiceAfterEmail] = useState(false)
+  const [completeInvoiceEmailGigs, setCompleteInvoiceEmailGigs] = useState(false)
+  const emailSendInFlight = useRef(false)
   const [invoiceEmailReviewError, setInvoiceEmailReviewError] = useState('')
   const [isInvoiceEmailReviewLoading, setIsInvoiceEmailReviewLoading] = useState(false)
   const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery)
@@ -79,19 +83,32 @@ export function useInvoicesWorkspace({
   )
 
   const loadPaidIncomeSummary = useCallback(async () => {
+    const generation = ++incomeRequestGeneration.current
     setPaidIncomeSummary({ status: 'loading' })
 
     try {
       const response = await fetchWithSession(buildApiUrl('/invoices/paid-income-summary'))
+      if (generation !== incomeRequestGeneration.current) return
+      if (response.status === 403) {
+        const problem = await parseProblemDetails(response)
+        if (generation !== incomeRequestGeneration.current) return
+        if (problem?.code === 'feature_not_entitled') {
+          setPaidIncomeSummary({ status: 'restricted' })
+          setIncomeInvoiceIds([])
+          setInvoiceQuickFilter(current => current === 'income-this-financial-year' ? 'all' : current)
+          return
+        }
+      }
       if (!response.ok) {
         throw new Error('Unable to load paid income.')
       }
 
       const summary = (await response.json()) as PaidIncomeSummary
+      if (generation !== incomeRequestGeneration.current) return
       setPaidIncomeSummary({ status: 'ready', summary })
       setIncomeInvoiceIds(summary.invoiceIds)
     } catch {
-      setPaidIncomeSummary({ status: 'error' })
+      if (generation === incomeRequestGeneration.current) setPaidIncomeSummary({ status: 'error' })
     }
   }, [])
 
@@ -227,6 +244,7 @@ export function useInvoicesWorkspace({
     setInvoiceStatus(defaultInvoiceStatus)
     setGoogleDrivePublishLink(null)
     setIsInvoiceLoading(false)
+    setUpdatingInvoiceId(null)
     setPaidIncomeSummary({ status: 'loading' })
     setIncomeInvoiceIds([])
     setAdjustmentAmount('')
@@ -236,7 +254,7 @@ export function useInvoicesWorkspace({
     setInvoiceEmailReview(null)
     setInvoiceEmailReviewMessage('')
     setIncludeInvoiceEmailReceipts(false)
-    setIssueInvoiceAfterEmail(false)
+    setCompleteInvoiceEmailGigs(false)
     setInvoiceEmailReviewError('')
     setIsInvoiceEmailReviewLoading(false)
   }, [])
@@ -290,12 +308,13 @@ export function useInvoicesWorkspace({
     }
   }
 
-  const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus) => {
+  const handleInvoiceStatusChange = async (invoice: Invoice, status: InvoiceStatus, inlineFailure = false) => {
     if (invoice.status === status) {
       return invoice
     }
 
     setIsInvoiceLoading(true)
+    setUpdatingInvoiceId(invoice.id)
     setInvoiceStatus(`Updating ${invoice.invoiceNumber} to ${status}...`)
 
     try {
@@ -317,16 +336,19 @@ export function useInvoicesWorkspace({
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
       )
       setInvoiceStatus('')
+      window.dispatchEvent(new Event('glovelly:entitlements-changed'))
       notifications.success(`Invoice ${updatedInvoice.invoiceNumber} is now ${updatedInvoice.status}.`)
       await loadPaidIncomeSummary()
       return updatedInvoice
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to update invoice status.'
       setInvoiceStatus(message)
+      if (inlineFailure) throw error
       notifications.error(message, { dedupeKey: `invoice:${invoice.id}:status` })
       return null
     } finally {
       setIsInvoiceLoading(false)
+      setUpdatingInvoiceId(null)
     }
   }
 
@@ -344,6 +366,7 @@ export function useInvoicesWorkspace({
     }
 
     setIsInvoiceLoading(true)
+    setUpdatingInvoiceId(invoice.id)
     setInvoiceStatus(`${actionVerb} ${invoice.invoiceNumber}...`)
 
     try {
@@ -388,6 +411,7 @@ export function useInvoicesWorkspace({
       return null
     } finally {
       setIsInvoiceLoading(false)
+      setUpdatingInvoiceId(null)
     }
   }
 
@@ -405,7 +429,6 @@ export function useInvoicesWorkspace({
       const review = (await response.json()) as InvoiceEmailReview
       setInvoiceEmailReview(review)
       setIncludeInvoiceEmailReceipts(review.receiptCount > 0)
-      setIssueInvoiceAfterEmail(true)
     } catch (error) {
       setInvoiceEmailReview(null)
       setInvoiceEmailReviewError(
@@ -421,7 +444,7 @@ export function useInvoicesWorkspace({
     setInvoiceEmailReview(null)
     setInvoiceEmailReviewMessage('')
     setIncludeInvoiceEmailReceipts(false)
-    setIssueInvoiceAfterEmail(false)
+    setCompleteInvoiceEmailGigs(false)
     await loadInvoiceEmailReview(invoice)
     return invoice
   }
@@ -463,26 +486,55 @@ export function useInvoicesWorkspace({
     }
   }
 
-  const submitInvoiceEmailReview = async () => {
+  const issueForDelivery = async (invoice: Invoice): Promise<Invoice> => {
+    setUpdatingInvoiceId(invoice.id)
+    try {
+      const response = await fetchWithSession(
+        buildApiUrl(`/invoices/${invoice.id}/status`),
+        jsonRequestInit('PUT', { status: 'Issued' })
+      )
+      if (!response.ok) throw new Error(await getResponseErrorMessage(response, 'Unable to issue invoice.'))
+      return (await response.json()) as Invoice
+    } finally {
+      setUpdatingInvoiceId(null)
+    }
+  }
+
+  const recordIssuedInvoice = (issued: Invoice) => {
+    setInvoices(current => current.map(value => value.id === issued.id ? issued : value))
+    window.dispatchEvent(new Event('glovelly:entitlements-changed'))
+  }
+
+  const submitInvoiceEmailReview = async (completeLinkedGigs?: (invoice: Invoice) => Promise<void>) => {
     const invoice = invoiceEmailReviewInvoice
-    if (!invoice || !invoiceEmailReview || isInvoiceEmailReviewLoading) {
+    if (!invoice || !invoiceEmailReview || isInvoiceEmailReviewLoading || emailSendInFlight.current) {
       return null
     }
 
+    emailSendInFlight.current = true
     setIsInvoiceEmailReviewLoading(true)
     setInvoiceEmailReviewError('')
     try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/invoices/${invoice.id}/send-email`),
-        jsonRequestInit('POST', {
-          message: invoiceEmailReviewMessage.trim() || null,
-          includeReceipts: includeInvoiceEmailReceipts,
-        })
-      )
-      if (!response.ok) {
-        throw new Error(await getResponseErrorMessage(response, 'Unable to send invoice email.'))
-      }
-      const updatedInvoice = (await response.json()) as Invoice
+      const updatedInvoice = await executeInvoiceDelivery(invoice, {
+        destination: 'email',
+        issue: issueForDelivery,
+        onIssued: issued => {
+          recordIssuedInvoice(issued)
+          setInvoiceEmailReviewInvoice(issued)
+        },
+        completeLinkedGigs: completeInvoiceEmailGigs ? completeLinkedGigs : undefined,
+        deliver: async document => {
+          const response = await fetchWithSession(
+            buildApiUrl(`/invoices/${document.id}/send-email`),
+            jsonRequestInit('POST', {
+              message: invoiceEmailReviewMessage.trim() || null,
+              includeReceipts: includeInvoiceEmailReceipts,
+            })
+          )
+          if (!response.ok) throw new Error(await getResponseErrorMessage(response, 'Unable to send invoice email.'))
+          return (await response.json()) as Invoice
+        },
+      })
       setInvoices((current) => current.map((value) => value.id === updatedInvoice.id ? updatedInvoice : value))
       return updatedInvoice
     } catch (error) {
@@ -491,42 +543,30 @@ export function useInvoicesWorkspace({
       )
       return null
     } finally {
+      emailSendInFlight.current = false
       setIsInvoiceEmailReviewLoading(false)
     }
   }
 
-  const handlePublishInvoiceGoogleDrive = async (invoice: Invoice) => {
-    const shouldProceed = window.confirm(
-      `Publish ${invoice.invoiceNumber} to your connected Google Drive?`
-    )
-    if (!shouldProceed) {
-      return
-    }
-
+  const handlePublishInvoiceGoogleDrive = async (invoice: Invoice, completeLinkedGigs?: (invoice: Invoice) => Promise<void>, inlineFailure = false) => {
     setIsInvoiceLoading(true)
     setGoogleDrivePublishLink(null)
     setInvoiceStatus(`Publishing ${invoice.invoiceNumber} to Google Drive...`)
 
     try {
-      const response = await fetchWithSession(
-        buildApiUrl(`/invoices/${invoice.id}/publish/google-drive`),
-        {
-          method: 'POST',
-        }
-      )
-
-      if (!response.ok) {
-        const problem = await parseProblemDetails(response)
-        const folderError = problem?.errors?.folderId?.[0]
-        const pdfError = problem?.errors?.pdf?.[0]
-        throw new Error(
-          folderError ??
-            pdfError ??
-            getProblemDetailsMessage(problem, 'Unable to publish invoice to Google Drive.')
-        )
-      }
-
-      const publishResult = (await response.json()) as GoogleDrivePublishResponse
+      const publishResult = await executeInvoiceDelivery(invoice, {
+        destination: 'Google Drive',
+        issue: issueForDelivery,
+        onIssued: recordIssuedInvoice,
+        completeLinkedGigs,
+        deliver: async document => {
+          const response = await fetchWithSession(
+            buildApiUrl(`/invoices/${document.id}/publish/google-drive`), { method: 'POST' }
+          )
+          if (!response.ok) throw new Error(await getResponseErrorMessage(response, 'Unable to publish invoice to Google Drive.'))
+          return (await response.json()) as GoogleDrivePublishResponse
+        },
+      })
       const updatedInvoice = publishResult.invoice
       setInvoices((current) =>
         current.map((value) => (value.id === updatedInvoice.id ? updatedInvoice : value))
@@ -551,6 +591,7 @@ export function useInvoicesWorkspace({
       setGoogleDrivePublishLink(null)
       const message = error instanceof Error ? error.message : 'Unable to publish invoice to Google Drive.'
       setInvoiceStatus(message)
+      if (inlineFailure) throw error
       notifications.error(message, { dedupeKey: `invoice:${invoice.id}:google-drive` })
       return null
     } finally {
@@ -572,6 +613,7 @@ export function useInvoicesWorkspace({
     }
 
     setIsInvoiceLoading(true)
+    setUpdatingInvoiceId(invoice.id)
     setInvoiceStatus(`Saving adjustment on ${invoice.invoiceNumber}...`)
 
     try {
@@ -617,11 +659,13 @@ export function useInvoicesWorkspace({
       notifications.error(message, { dedupeKey: `invoice:${invoice.id}:adjustment` })
     } finally {
       setIsInvoiceLoading(false)
+      setUpdatingInvoiceId(null)
     }
   }
 
   const handleRegenerateInvoicePdf = async (invoice: Invoice) => {
     setIsInvoiceLoading(true)
+    setUpdatingInvoiceId(invoice.id)
     setInvoiceStatus(`Regenerating ${invoice.invoiceNumber} PDF...`)
 
     try {
@@ -653,6 +697,7 @@ export function useInvoicesWorkspace({
       notifications.error(message, { dedupeKey: `invoice:${invoice.id}:regenerate-pdf` })
     } finally {
       setIsInvoiceLoading(false)
+      setUpdatingInvoiceId(null)
     }
   }
 
@@ -706,6 +751,7 @@ export function useInvoicesWorkspace({
     }
 
     setIsInvoiceLoading(true)
+    setUpdatingInvoiceId(invoice.id)
     setInvoiceStatus(`Removing adjustment from ${invoice.invoiceNumber}...`)
 
     try {
@@ -739,6 +785,7 @@ export function useInvoicesWorkspace({
       notifications.error(message, { dedupeKey: `invoice:${invoice.id}:adjustment` })
     } finally {
       setIsInvoiceLoading(false)
+      setUpdatingInvoiceId(null)
     }
   }
 
@@ -823,10 +870,12 @@ export function useInvoicesWorkspace({
     invoiceEmailReviewInvoice,
     invoiceEmailReviewMessage,
     includeInvoiceEmailReceipts,
-    issueInvoiceAfterEmail,
+    completeInvoiceEmailGigs,
+    setCompleteInvoiceEmailGigs,
     isInvoiceEditorOpen,
     issuedInvoiceCount: invoices.filter((invoice) => invoice.status === 'Issued').length,
     isInvoiceLoading,
+    updatingInvoiceId,
     isInvoiceEmailReviewLoading,
     loadPaidIncomeSummary,
     overdueInvoiceCount: invoices.filter((invoice) => invoice.status === 'Overdue').length,
@@ -839,7 +888,6 @@ export function useInvoicesWorkspace({
     setInvoices,
     setInvoiceStatus,
     setInvoiceEmailReviewMessage,
-    setIssueInvoiceAfterEmail,
     setIsInvoiceLoading,
     setInvoiceQuickFilter,
     setSelectedInvoiceId,

@@ -7,6 +7,8 @@ import { InvoiceEmailReviewModal } from './InvoiceEmailReviewModal'
 import type { Invoice, InvoiceEmailReview } from '../types'
 
 const invoice: Invoice = {
+  pdfHasDraftWatermark: true,
+  isPdfCurrent: true,
   id: 'invoice-1',
   invoiceNumber: 'GLV-001',
   clientId: 'client-1',
@@ -57,13 +59,14 @@ function renderModal(overrides: Partial<ComponentProps<typeof InvoiceEmailReview
     includeReceipts: false,
     invoice,
     isLoading: false,
-    issueAfterSend: false,
+    completeLinkedGigs: false,
+    linkedGigCount: 1,
     message: '',
     onClose: vi.fn(),
     onDownloadPdf: vi.fn(),
     onDownloadReceipts: vi.fn(),
     onIncludeReceiptsChange: vi.fn(),
-    onIssueAfterSendChange: vi.fn(),
+    onCompleteLinkedGigsChange: vi.fn(),
     onMessageChange: vi.fn(),
     onSend: vi.fn(),
     review,
@@ -104,5 +107,20 @@ describe('InvoiceEmailReviewModal', () => {
 
     expect(screen.getByTestId('invoice-email-review-send-button').getAttribute('disabled')).not.toBeNull()
     expect(screen.getByTestId('invoice-email-review-message').getAttribute('disabled')).not.toBeNull()
+  })
+
+  it('makes clean issue-and-send explicit in the existing review rather than adding a prompt', () => {
+    const props = renderModal()
+    expect(screen.getByRole('button', { name: 'Issue and send' })).toBeDefined()
+    expect(screen.getByText('This draft will be issued before sending to remove DRAFT.', { exact: false })).toBeDefined()
+    fireEvent.click(screen.getByLabelText('Also mark the linked gig as completed'))
+    expect(props.onCompleteLinkedGigsChange).toHaveBeenCalledWith(true)
+    expect(props.onSend).not.toHaveBeenCalled()
+  })
+
+  it('does not offer draft-only delivery or an issuance opt-out', () => {
+    renderModal()
+    expect(screen.queryByRole('button', { name: 'Send draft' })).toBeNull()
+    expect(screen.queryByLabelText(/Issue before sending/)).toBeNull()
   })
 })

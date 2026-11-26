@@ -36,6 +36,7 @@ When adding or changing Playwright UAT coverage, update the matching UAT page in
 
 - [Pre-merge regression](pre-merge-regression.md): the main end-to-end checklist before shipping changes.
 - [Invoices](invoices.md): invoice creation, regeneration, preview, status, and delivery journeys.
+- [Plans and licences](plans-and-licences.md): Free allowances, expiry, reporting restrictions, and licence-only administration.
 - [Expenses](expenses.md): receipts, quick receipts, reimbursement, and expense statement journeys.
 - [Gig attachments](gig-external-resources.md): attached set lists, setlist import, gig plans, URLs, and files.
 - [Imported gigs](gig-imports.md): MCP-staged gig imports, review, autosave, accept/reject, notification dots, and commit.

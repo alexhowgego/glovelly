@@ -1,14 +1,22 @@
-import { useEffect, useRef } from 'react'
 import type { FormEvent } from 'react'
 import { formatDateTime } from '../formatters'
 import type { AdminSort, AdminSortKey, AdminUser, AdminUserForm } from '../types'
 import { TrashIcon } from './TrashIcon'
 import { RecordActionDock } from './RecordActionDock'
+import { RecordEditorFrame } from './RecordEditorFrame'
+import { RecordEditorActions } from './RecordEditorActions'
+import { RecordWorkspace } from './RecordWorkspace'
 import { adminAccessRestriction } from '../adminAccess'
+import { formatAdministrativePermissions } from '../administrativePermissions'
+import { PermissionManagement } from './PermissionManagement'
+import type { SessionExpiredHandler } from '../api'
 
 type AdminSectionProps = {
   currentUserId?: string
-  onChangeAccess: (role: AdminUserForm['role'], isActive: boolean) => Promise<void>
+  canManagePermissions?: boolean
+  onSessionExpired: SessionExpiredHandler
+  onPermissionsChanged: () => Promise<void>
+  onChangeAccess: (isActive: boolean) => Promise<void>
   adminForm: AdminUserForm
   isEditorOpen: boolean
   adminMode: 'create' | 'edit'
@@ -31,6 +39,9 @@ type AdminSectionProps = {
 
 export function AdminSection({
   currentUserId,
+  canManagePermissions,
+  onSessionExpired,
+  onPermissionsChanged,
   onChangeAccess,
   adminForm,
   isEditorOpen,
@@ -51,31 +62,21 @@ export function AdminSection({
   onUpdateField,
   selectedAdminUser,
 }: AdminSectionProps) {
-  const editorSlotRef = useRef<HTMLDivElement | null>(null)
   const selfRestriction = selectedAdminUser ? adminAccessRestriction(selectedAdminUser, currentUserId) : undefined
-  const accessRestriction = selfRestriction ?? (isEditorOpen ? 'Save or discard editor changes before changing access here.' : undefined)
+  const privilegedRestriction = !canManagePermissions && (selectedAdminUser?.permissionSets?.length ?? 0) > 0
+    ? 'Only a Super Administrator can change an administrator account.' : undefined
+  const accessRestriction = privilegedRestriction ?? selfRestriction ?? (isEditorOpen ? 'Save or discard editor changes before changing access here.' : undefined)
   const adminSortOptions: { value: AdminSortKey; label: string }[] = [
     { value: 'displayName', label: 'User' },
     { value: 'email', label: 'Email' },
-    { value: 'role', label: 'Role' },
+    { value: 'role', label: 'Permissions' },
     { value: 'access', label: 'Access' },
     { value: 'enrolment', label: 'Sign-in' },
     { value: 'lastLogin', label: 'Last login' },
   ]
 
-  useEffect(() => {
-    if (!isEditorOpen || !window.matchMedia('(max-width: 1180px)').matches) {
-      return
-    }
-
-    window.setTimeout(() => {
-      editorSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 80)
-  }, [isEditorOpen])
-
   return (
-    <section className="section-layout admin-zone">
-      <div className="admin-workspace">
+    <RecordWorkspace className="admin-workspace" sectionClassName="admin-zone">
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -93,7 +94,7 @@ export function AdminSection({
                 <span>Search</span>
                 <input
                   type="search"
-                  placeholder="Name, email, role..."
+                  placeholder="Name, email, permissions..."
                   value={adminSearchQuery}
                   onChange={(event) => onSearchQueryChange(event.target.value)}
                 />
@@ -138,7 +139,7 @@ export function AdminSection({
             <div className="compact-record-header admin-record-row">
               <span>User</span>
               <span>Email</span>
-              <span>Role</span>
+              <span>Permissions</span>
               <span>Access</span>
               <span>Sign-in</span>
               <span>Last login</span>
@@ -155,7 +156,7 @@ export function AdminSection({
                   <span>{user.email}</span>
                 </div>
                 <span>{user.email}</span>
-                <span className="compact-status-cell">{user.role}</span>
+                <span className="compact-status-cell">{formatAdministrativePermissions(user.permissionSets)}</span>
                 <span>{user.isActive ? 'Active' : 'Inactive'}</span>
                 <span>{user.isEnrolled ? 'Bound' : 'Invited'}</span>
                 <span>{formatDateTime(user.lastLoginUtc)}</span>
@@ -186,7 +187,8 @@ export function AdminSection({
                 className={`ghost-button editor-toggle ${isEditorOpen ? 'active' : ''}`}
                 onClick={isEditorOpen ? onCloseEditor : onStartEditing}
                 type="button"
-                disabled={!selectedAdminUser}
+                disabled={!selectedAdminUser || (!!privilegedRestriction && !isEditorOpen)}
+                title={privilegedRestriction}
                 aria-expanded={isEditorOpen}
               >
                 Edit access
@@ -198,6 +200,7 @@ export function AdminSection({
                 disabled={
                   isAdminLoading ||
                   !selectedAdminUser ||
+                  !!privilegedRestriction ||
                   selectedAdminUser.isActive
                 }
                 title={
@@ -214,58 +217,46 @@ export function AdminSection({
 
           {selectedAdminUser ? (
             <>
-            <div className="overview-body" key={selectedAdminUser.id}>
-            <dl className="overview-facts">
-              <div className="full-width"><dt>Email</dt><dd>{selectedAdminUser.email}</dd></div>
-              <div><dt>Role</dt><dd>{selectedAdminUser.role}</dd></div>
-              <div><dt>Access</dt><dd>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</dd></div>
-              <div><dt>Sign-in</dt><dd>{selectedAdminUser.isEnrolled ? 'Ready to sign in' : 'Waiting for first sign-in'}</dd></div>
-              <div><dt>Last login</dt><dd>{formatDateTime(selectedAdminUser.lastLoginUtc)}</dd></div>
-              <div><dt>Created</dt><dd>{formatDateTime(selectedAdminUser.createdUtc)}</dd></div>
-              <div className="full-width"><dt>Account reference</dt><dd>{selectedAdminUser.googleSubject ?? 'Added by email only so far'}</dd></div>
-            </dl>
-            </div>
-            <RecordActionDock title="Access and role">
-              <div className="actions access-control-group" tabIndex={accessRestriction ? 0 : undefined}
-                aria-label={accessRestriction ? 'Access controls unavailable' : undefined}
-                aria-describedby={accessRestriction ? 'admin-access-restriction' : undefined} title={accessRestriction}>
-                {accessRestriction && <span className="access-control-tooltip" role="tooltip">{accessRestriction}</span>}
-                <label>
-                  <select aria-label="User access role" value={selectedAdminUser.role}
+              <div className="overview-body" key={selectedAdminUser.id}>
+                <dl className="overview-facts">
+                  <div className="full-width"><dt>Email</dt><dd>{selectedAdminUser.email}</dd></div>
+                  <div><dt>Permissions</dt><dd>{formatAdministrativePermissions(selectedAdminUser.permissionSets)}</dd></div>
+                  <div><dt>Access</dt><dd>{selectedAdminUser.isActive ? 'Active' : 'Inactive'}</dd></div>
+                  <div><dt>Sign-in</dt><dd>{selectedAdminUser.isEnrolled ? 'Ready to sign in' : 'Waiting for first sign-in'}</dd></div>
+                  <div><dt>Last login</dt><dd>{formatDateTime(selectedAdminUser.lastLoginUtc)}</dd></div>
+                  <div><dt>Created</dt><dd>{formatDateTime(selectedAdminUser.createdUtc)}</dd></div>
+                  <div className="full-width"><dt>Account reference</dt><dd>{selectedAdminUser.googleSubject ?? 'Added by email only so far'}</dd></div>
+                </dl>
+                {canManagePermissions && <PermissionManagement key={selectedAdminUser.id} userId={selectedAdminUser.id}
+                  onSessionExpired={onSessionExpired} onPermissionsChanged={onPermissionsChanged} />}
+              </div>
+              <RecordActionDock title="Access">
+                <div className="actions access-control-group" tabIndex={accessRestriction ? 0 : undefined}
+                  aria-label={accessRestriction ? 'Access controls unavailable' : undefined}
+                  aria-describedby={accessRestriction ? 'admin-access-restriction' : undefined} title={accessRestriction}>
+                  {accessRestriction && <span className="access-control-tooltip" role="tooltip">{accessRestriction}</span>}
+                  <button type="button" className={selectedAdminUser.isActive ? 'danger-button' : 'primary-button'}
                     disabled={isAdminLoading || !!accessRestriction} title={accessRestriction}
                     aria-describedby={accessRestriction ? 'admin-access-restriction' : undefined}
-                    onChange={event => void onChangeAccess(event.target.value as AdminUserForm['role'], selectedAdminUser.isActive)}>
-                    <option value="User">User</option>
-                    <option value="Admin">Admin</option>
-                  </select>
-                </label>
-                <button type="button" className={selectedAdminUser.isActive ? 'danger-button' : 'primary-button'}
-                  disabled={isAdminLoading || !!accessRestriction} title={accessRestriction}
-                  aria-describedby={accessRestriction ? 'admin-access-restriction' : undefined}
-                  onClick={() => void onChangeAccess(selectedAdminUser.role === 'Admin' ? 'Admin' : 'User', !selectedAdminUser.isActive)}>
-                  {selectedAdminUser.isActive ? 'Deactivate access' : 'Enable access'}
-                </button>
-              </div>
-              {accessRestriction && <details className="access-restriction-help">
-                <summary title={accessRestriction}>Why are these controls unavailable?</summary>
-                <p id="admin-access-restriction">{accessRestriction}</p>
-              </details>}
-            </RecordActionDock>
+                    onClick={() => void onChangeAccess(!selectedAdminUser.isActive)}>
+                    {selectedAdminUser.isActive ? 'Deactivate access' : 'Enable access'}
+                  </button>
+                </div>
+                {accessRestriction && <details className="access-restriction-help">
+                  <summary title={accessRestriction}>Why are these controls unavailable?</summary>
+                  <p id="admin-access-restriction">{accessRestriction}</p>
+                </details>}
+              </RecordActionDock>
             </>
           ) : (
             <div className="empty-state roomy">
               <strong>Select a user to review their access.</strong>
-              <p>You can update their role, status and sign-in details here.</p>
+              <p>You can update their access and sign-in details here.</p>
             </div>
           )}
         </div>
 
-        <div ref={editorSlotRef} className={`editor-slot ${isEditorOpen ? 'open' : ''}`}>
-          <form
-            aria-hidden={!isEditorOpen}
-            className="editor-panel panel"
-            onSubmit={onSubmit}
-          >
+        <RecordEditorFrame isOpen={isEditorOpen} label={adminMode === 'create' ? 'Add user' : 'Update access'} onSubmit={onSubmit}>
             <div className="panel-heading">
               <div>
                 <p className="section-label">Management Pane</p>
@@ -305,20 +296,6 @@ export function AdminSection({
                 />
               </label>
 
-              <label>
-                <span>Role</span>
-                <select
-                  value={adminForm.role}
-                  disabled={adminMode === 'edit' && !!selfRestriction}
-                  title={adminMode === 'edit' ? selfRestriction : undefined}
-                  onChange={(event) =>
-                    onUpdateField('role', event.target.value as AdminUserForm['role'])
-                  }
-                >
-                  <option value="User">User</option>
-                  <option value="Admin">Admin</option>
-                </select>
-              </label>
 
               <label className="checkbox-field">
                 <input
@@ -345,34 +322,12 @@ export function AdminSection({
               ) : null}
             </div>
 
-            <div className="form-actions">
-              <button
-                className="primary-button"
-                data-close-after-save="true"
-                type="submit"
-                disabled={isAdminLoading}
-              >
-                Save and close
-              </button>
-              <button
-                className="ghost-button"
-                data-close-after-save="false"
-                type="submit"
-                disabled={isAdminLoading}
-              >
-                Save
-              </button>
-              <button className="ghost-button" onClick={onCloseEditor} type="button">
-                Discard changes
-              </button>
-            </div>
+            <RecordEditorActions isSaving={isAdminLoading} onDiscard={onCloseEditor} />
             <p className="auth-note">
               Adding an email address is enough to let someone get started. You can fill in
               the account reference later if needed.
             </p>
-          </form>
-        </div>
-      </div>
-    </section>
+        </RecordEditorFrame>
+    </RecordWorkspace>
   )
 }

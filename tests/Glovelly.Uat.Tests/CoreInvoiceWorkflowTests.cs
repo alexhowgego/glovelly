@@ -46,8 +46,26 @@ public sealed class CoreInvoiceWorkflowTests : InvoiceUatTestBase
         await Page.GetByTestId("invoice-email-review-modal").WaitForAsync();
         await Page.GetByTestId("invoice-email-review-message")
             .FillAsync($"Automated UAT invoice delivery for {runId}.");
-        await Page.GetByTestId("invoice-email-review-send-button").ClickAsync();
-        await ExpectNotificationAsync("sent to", "success");
+        var sequence = new List<string>();
+        void WatchDelivery(object? _, Microsoft.Playwright.IRequest request)
+        {
+            if (request.Url.Contains("/invoices/", StringComparison.Ordinal) &&
+                request.Method == "PUT" && request.Url.EndsWith("/status", StringComparison.Ordinal))
+                sequence.Add("issue");
+            if (request.Method == "POST" && request.Url.EndsWith("/send-email", StringComparison.Ordinal))
+                sequence.Add("send");
+        }
+        Page.Request += WatchDelivery;
+        try
+        {
+            await Page.GetByTestId("invoice-email-review-send-button").ClickAsync();
+            await ExpectNotificationAsync("sent to", "success");
+            Assert.Equal(new[] { "issue", "send" }, sequence);
+        }
+        finally
+        {
+            Page.Request -= WatchDelivery;
+        }
     }
 
     private static string ConfiguredInvoiceRecipientEmail()

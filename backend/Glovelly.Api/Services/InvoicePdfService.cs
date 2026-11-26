@@ -8,22 +8,47 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         Invoice invoice,
         Guid? userId,
         byte[] content,
+        bool hasDraftWatermark,
+        CancellationToken cancellationToken = default)
+    {
+        var candidate = await PrepareAsync(invoice, userId, content, hasDraftWatermark, cancellationToken);
+        ApplyCandidate(invoice, candidate);
+    }
+
+    public async Task<InvoicePdfCandidate> PrepareAsync(
+        Invoice invoice, Guid? userId, byte[] content, bool hasDraftWatermark,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(invoice);
         ArgumentNullException.ThrowIfNull(content);
+        if (hasDraftWatermark != invoice.RequiresDraftWatermark)
+        {
+            throw new ArgumentException("Generated PDF watermark must match the invoice state.", nameof(hasDraftWatermark));
+        }
 
         var key = InvoicePdfStorage.BuildStorageKey(invoice, userId);
         await blobStore.SaveAsync(
             new BlobWriteRequest(key, new MemoryStream(content, writable: false), InvoicePdfStorage.ContentType, content.Length),
             cancellationToken);
 
-        invoice.PdfStorageKey = key;
-        invoice.PdfFileName = $"{invoice.InvoiceNumber}.pdf";
+        return new InvoicePdfCandidate(key, $"{invoice.InvoiceNumber}.pdf", content.Length,
+            timeProvider.GetUtcNow(), invoice.DocumentRevision, hasDraftWatermark);
+    }
+
+    public void ApplyCandidate(Invoice invoice, InvoicePdfCandidate candidate)
+    {
+        if (candidate.DocumentRevision != invoice.DocumentRevision ||
+            candidate.HasDraftWatermark != invoice.RequiresDraftWatermark)
+        {
+            throw new InvalidOperationException("The prepared PDF no longer matches the invoice.");
+        }
+        invoice.PdfStorageKey = candidate.StorageKey;
+        invoice.PdfFileName = candidate.FileName;
         invoice.PdfContentType = InvoicePdfStorage.ContentType;
-        invoice.PdfSizeBytes = content.Length;
-        invoice.PdfGeneratedAt = timeProvider.GetUtcNow();
-        invoice.PdfDocumentRevision = invoice.DocumentRevision;
+        invoice.PdfSizeBytes = candidate.SizeBytes;
+        invoice.PdfGeneratedAt = candidate.GeneratedAtUtc;
+        invoice.PdfDocumentRevision = candidate.DocumentRevision;
+        invoice.PdfHasDraftWatermark = candidate.HasDraftWatermark;
         invoice.DocumentState = InvoiceDocumentState.Current;
         invoice.DocumentFailureMessage = null;
     }
@@ -52,10 +77,9 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
     {
         ArgumentNullException.ThrowIfNull(invoice);
 
-        if (invoice.DocumentState is not InvoiceDocumentState.Current ||
-            invoice.PdfDocumentRevision != invoice.DocumentRevision)
+        if (!InvoiceDocumentReadiness.IsCurrent(invoice))
         {
-            return new InvoicePdfReadResult(null, BuildUnavailableMessage(invoice));
+            return new InvoicePdfReadResult(null, InvoiceDocumentReadiness.UnavailableMessage(invoice));
         }
 
         try
@@ -78,16 +102,5 @@ public sealed class InvoicePdfService(IBlobStore blobStore, TimeProvider timePro
         return string.IsNullOrWhiteSpace(invoice.PdfStorageKey)
             ? Task.CompletedTask
             : blobStore.DeleteAsync(invoice.PdfStorageKey, cancellationToken);
-    }
-
-    private static string BuildUnavailableMessage(Invoice invoice)
-    {
-        return invoice.DocumentState switch
-        {
-            InvoiceDocumentState.Regenerating => "Invoice PDF is regenerating. Try again when it is complete.",
-            InvoiceDocumentState.Failed => invoice.DocumentFailureMessage ?? "Invoice PDF regeneration failed. Try regenerating it again.",
-            InvoiceDocumentState.Missing => "Invoice PDF is missing.",
-            _ => "Invoice PDF is unavailable.",
-        };
     }
 }

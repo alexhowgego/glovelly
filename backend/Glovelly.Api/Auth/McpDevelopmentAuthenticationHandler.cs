@@ -45,7 +45,10 @@ public sealed class McpDevelopmentAuthenticationHandler(
             .FirstOrDefaultAsync(value =>
                 value.GoogleSubject == googleSubject &&
                 value.IsActive &&
-                value.Role == UserRole.Admin);
+                db.UserAdministrativePermissionSets.Any(assignment =>
+                    assignment.UserId == value.Id &&
+                    (assignment.PermissionSet == AdministrativePermissionSet.UserAdministrator ||
+                     assignment.PermissionSet == AdministrativePermissionSet.SuperAdministrator)));
 
         if (user is null)
         {
