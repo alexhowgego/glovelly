@@ -14,6 +14,12 @@ The root `Dockerfile` uses a multi-stage build:
 
 The final image exposes port `8080` and starts `Glovelly.Api.dll`, respecting Cloud Run's `PORT` environment variable. It also includes `Glovelly.Worker.dll` under `/app/worker` so Cloud Run Jobs can run non-interactive commands from the same image, and `/app/efbundle` so database migrations can run from the same immutable artifact.
 
+### Dependency servicing
+
+Keep `Directory.Packages.props`, the `dotnet-ef` version in `.config/dotnet-tools.json`, and both .NET image tags in `Dockerfile` serviced together. The current .NET 10 baseline is SDK 10.0.404 / runtime 10.0.15. Updating a standalone NuGet dependency does not patch the shared ASP.NET Core runtime; the self-contained migration bundle also needs rebuilding with the serviced SDK. Rebuild and deploy the image through the normal pipeline to apply these changes to services and jobs.
+
+For a compatible dependency-maintenance pass, use `dotnet package list --outdated --highest-minor` and `dotnet package list --vulnerable --include-transitive`, then run `npm outdated` / `npm audit` separately in all three frontend directories. Preserve each frontend's existing major-version (and pre-1.0 minor-version) constraints and commit the matching lockfiles. Run `./verify.sh`, both Astro sites' check/build commands, and UAT Release compilation; browser validation remains in Ubuntu CI.
+
 ## Database Migrations
 
 Database migrations run as an explicit Cloud Run Job, not during web application startup. The deployment job uses the same image URI that will be deployed to the Cloud Run service and binds `ConnectionStrings__Glovelly` from Secret Manager. The job runs `/app/efbundle` with the target connection string and fails the deployment if the bundle exits unsuccessfully.

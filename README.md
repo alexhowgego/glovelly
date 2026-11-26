@@ -67,6 +67,8 @@ dotnet test --project backend/Glovelly.Api.Tests/Glovelly.Api.Tests.csproj -- --
 
 ## Local Development
 
+Use Node.js 24 and a serviced .NET 10 SDK (10.0.404 or newer, including ASP.NET Core runtime 10.0.15 or newer). Check `dotnet --list-runtimes` as well as package versions: restoring NuGet packages does not patch the locally installed shared runtime.
+
 Run both the frontend and backend together from the repo root:
 
 ```bash
